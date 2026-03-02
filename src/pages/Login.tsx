@@ -2,20 +2,27 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { motion } from "framer-motion";
-import { HardHat, Shield, User } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { HardHat } from "lucide-react";
+import { toast } from "sonner";
 
 export default function Login() {
-  const [selectedRole, setSelectedRole] = useState<"admin" | "employee">("admin");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const { login } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
-    setLoading(true);
-    await new Promise((r) => setTimeout(r, 600));
-    login(selectedRole);
-    navigate(selectedRole === "admin" ? "/admin/dashboard" : "/app/dashboard");
+    try {
+      setLoading(true);
+      const user = await login(email, password);
+      navigate(user.role === "ADMIN" ? "/admin/dashboard" : "/app/dashboard");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Login failed";
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -43,32 +50,29 @@ export default function Login() {
 
         {/* Card */}
         <div className="glass-panel-strong p-8">
-          <h2 className="text-lg font-semibold mb-6 text-center">Select your role to continue</h2>
+          <h2 className="text-lg font-semibold mb-6 text-center">Sign in to continue</h2>
 
-          <div className="grid grid-cols-2 gap-4 mb-8">
-            {[
-              { role: "admin" as const, icon: Shield, label: "Admin", desc: "Highway Engineer" },
-              { role: "employee" as const, icon: User, label: "Employee", desc: "Team Member" },
-            ].map(({ role, icon: Icon, label, desc }) => (
-              <motion.button
-                key={role}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setSelectedRole(role)}
-                className={cn(
-                  "flex flex-col items-center gap-3 p-6 rounded-xl border-2 transition-all duration-200",
-                  selectedRole === role
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-border/50 bg-secondary/30 text-muted-foreground hover:border-border hover:bg-secondary/50"
-                )}
-              >
-                <Icon className="h-8 w-8" />
-                <div className="text-center">
-                  <p className="font-semibold text-foreground">{label}</p>
-                  <p className="text-xs text-muted-foreground">{desc}</p>
-                </div>
-              </motion.button>
-            ))}
+          <div className="space-y-4 mb-8">
+            <div>
+              <label className="text-xs text-muted-foreground mb-1.5 block">Email</label>
+              <input
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
+                placeholder="you@highwayops.com"
+                type="email"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1.5 block">Password</label>
+              <input
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
+                placeholder="••••••••"
+                type="password"
+              />
+            </div>
           </div>
 
           <motion.button
@@ -88,9 +92,7 @@ export default function Login() {
             )}
           </motion.button>
 
-          <p className="text-xs text-muted-foreground text-center mt-4">
-            Demo mode — no credentials required
-          </p>
+          <p className="text-xs text-muted-foreground text-center mt-4">Use your database user credentials</p>
         </div>
       </motion.div>
     </div>

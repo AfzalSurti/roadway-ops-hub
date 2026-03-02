@@ -1,0 +1,184 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  EMPLOYEE
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  BLOCKED
+  DONE
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum ReportStatus {
+  SUBMITTED
+  APPROVED
+  CHANGES_REQUESTED
+  REJECTED
+}
+
+enum AuditAction {
+  TASK_CREATED
+  TASK_UPDATED
+  STATUS_CHANGED
+  REPORT_SUBMITTED
+  REPORT_REVIEWED
+  TEMPLATE_UPDATED
+  UPLOAD_ADDED
+}
+
+model User {
+  id            String         @id @default(cuid())
+  name          String
+  email         String         @unique
+  passwordHash  String
+  role          Role
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  assignedTasks Task[]         @relation("TaskAssignee")
+  createdTasks  Task[]         @relation("TaskCreator")
+  reports       Report[]
+  comments      Comment[]
+  attachments   Attachment[]
+  refreshTokens RefreshToken[]
+  audits        AuditLog[]
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model ReportTemplate {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  fields      Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tasks       Task[]
+  reports     Report[]
+}
+
+model Task {
+  id               String        @id @default(cuid())
+  title            String
+  description      String
+  project          String
+  dueDate          DateTime
+  status           TaskStatus    @default(TODO)
+  priority         Priority
+  blockedReason    String?
+  assignedToId     String
+  createdById      String
+  reportTemplateId String
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  assignedTo       User          @relation("TaskAssignee", fields: [assignedToId], references: [id], onDelete: Restrict)
+  createdBy        User          @relation("TaskCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  reportTemplate   ReportTemplate @relation(fields: [reportTemplateId], references: [id], onDelete: Restrict)
+  reports          Report[]
+  comments         Comment[]
+  attachments      Attachment[]
+
+  @@index([assignedToId])
+  @@index([status])
+  @@index([priority])
+  @@index([dueDate])
+  @@index([reportTemplateId])
+}
+
+model Report {
+  id               String       @id @default(cuid())
+  taskId           String
+  reportTemplateId String
+  submittedById    String
+  submission       Json
+  templateSnapshot Json
+  status           ReportStatus @default(SUBMITTED)
+  adminFeedback    String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  task             Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  reportTemplate   ReportTemplate @relation(fields: [reportTemplateId], references: [id], onDelete: Restrict)
+  submittedBy      User         @relation(fields: [submittedById], references: [id], onDelete: Restrict)
+  attachments      Attachment[]
+
+  @@index([taskId])
+  @@index([submittedById])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Attachment {
+  id           String   @id @default(cuid())
+  fileName     String
+  originalName String
+  mimeType     String
+  size         Int
+  path         String
+  url          String
+  taskId       String?
+  reportId     String?
+  uploadedById String
+  createdAt    DateTime @default(now())
+  task         Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  report       Report?  @relation(fields: [reportId], references: [id], onDelete: SetNull)
+  uploadedBy   User     @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
+
+  @@index([taskId])
+  @@index([reportId])
+  @@index([uploadedById])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  taskId    String
+  authorId  String
+  body      String
+  createdAt DateTime @default(now())
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@index([taskId])
+  @@index([authorId])
+}
+
+model AuditLog {
+  id         String      @id @default(cuid())
+  action     AuditAction
+  actorId    String?
+  entityType String
+  entityId   String
+  meta       Json?
+  createdAt  DateTime    @default(now())
+  actor      User?       @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([action])
+  @@index([actorId])
+  @@index([entityType, entityId])
+}

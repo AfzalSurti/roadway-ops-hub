@@ -1,34 +1,50 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PageWrapper } from "@/components/PageWrapper";
 import { motion } from "framer-motion";
-import { Plus, LayoutGrid, List, Search, Filter, Calendar, User } from "lucide-react";
+import { Plus, LayoutGrid, List, Search, Calendar } from "lucide-react";
 import { Link } from "react-router-dom";
-import {
-  tasks,
-  users,
-  statusConfig,
-  priorityConfig,
-  reportTypeLabels,
-  type TaskStatus,
-  type Task,
-} from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
+import { api } from "@/lib/api";
+import type { TaskItem, TaskStatus } from "@/lib/domain";
+import { priorityConfig, statusConfig, toAvatarUrl } from "@/lib/domain";
+import { toast } from "sonner";
 
 const columns: { status: TaskStatus; label: string }[] = [
-  { status: "todo", label: "To Do" },
-  { status: "in_progress", label: "In Progress" },
-  { status: "blocked", label: "Blocked" },
-  { status: "done", label: "Done" },
+  { status: "TODO", label: "To Do" },
+  { status: "IN_PROGRESS", label: "In Progress" },
+  { status: "BLOCKED", label: "Blocked" },
+  { status: "DONE", label: "Done" }
 ];
 
 export default function AdminTasks() {
   const [view, setView] = useState<"kanban" | "list">("kanban");
   const [search, setSearch] = useState("");
+  const [tasks, setTasks] = useState<TaskItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filtered = tasks.filter(
-    (t) =>
-      t.title.toLowerCase().includes(search.toLowerCase()) ||
-      t.project.toLowerCase().includes(search.toLowerCase())
+  useEffect(() => {
+    const run = async () => {
+      try {
+        const result = await api.getTasks({ limit: 100, search: search || undefined });
+        setTasks(result.items);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to load tasks";
+        toast.error(message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    void run();
+  }, [search]);
+
+  const filtered = useMemo(
+    () =>
+      tasks.filter(
+        (task) =>
+          task.title.toLowerCase().includes(search.toLowerCase()) ||
+          task.project.toLowerCase().includes(search.toLowerCase())
+      ),
+    [tasks, search]
   );
 
   return (
@@ -47,7 +63,6 @@ export default function AdminTasks() {
         </Link>
       </div>
 
-      {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-3 mb-6">
         <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 text-sm flex-1 max-w-sm">
           <Search className="h-4 w-4 text-muted-foreground" />
@@ -55,7 +70,7 @@ export default function AdminTasks() {
             type="text"
             placeholder="Search tasks…"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(event) => setSearch(event.target.value)}
             className="bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground w-full"
           />
         </div>
@@ -75,22 +90,24 @@ export default function AdminTasks() {
         </div>
       </div>
 
-      {view === "kanban" ? (
+      {loading ? (
+        <div className="glass-panel p-8 text-sm text-muted-foreground">Loading tasks…</div>
+      ) : view === "kanban" ? (
         <div className="flex gap-4 overflow-x-auto pb-4">
-          {columns.map((col) => {
-            const colTasks = filtered.filter((t) => t.status === col.status);
-            const cfg = statusConfig[col.status];
+          {columns.map((column) => {
+            const columnTasks = filtered.filter((task) => task.status === column.status);
+            const cfg = statusConfig[column.status];
             return (
-              <div key={col.status} className="kanban-column min-w-[280px]">
+              <div key={column.status} className="kanban-column min-w-[280px]">
                 <div className="flex items-center gap-2 mb-4">
-                  <span className={`status-badge ${cfg.color}`}>{col.label}</span>
-                  <span className="text-xs text-muted-foreground">{colTasks.length}</span>
+                  <span className={`status-badge ${cfg.color}`}>{column.label}</span>
+                  <span className="text-xs text-muted-foreground">{columnTasks.length}</span>
                 </div>
                 <div className="space-y-3">
-                  {colTasks.map((task, i) => (
-                    <TaskCard key={task.id} task={task} index={i} />
+                  {columnTasks.map((task, index) => (
+                    <TaskCard key={task.id} task={task} index={index} />
                   ))}
-                  {colTasks.length === 0 && (
+                  {columnTasks.length === 0 && (
                     <p className="text-sm text-muted-foreground text-center py-8">No tasks</p>
                   )}
                 </div>
@@ -112,37 +129,28 @@ export default function AdminTasks() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((task) => {
-                const assignee = users.find((u) => u.id === task.assignedTo);
-                return (
-                  <tr key={task.id} className="border-b border-border/30 hover:bg-secondary/30 transition-colors">
-                    <td className="p-4">
-                      <p className="font-medium">{task.title}</p>
-                      <p className="text-xs text-muted-foreground">{reportTypeLabels[task.reportType]}</p>
-                    </td>
-                    <td className="p-4 hidden md:table-cell text-muted-foreground">{task.project}</td>
-                    <td className="p-4 hidden sm:table-cell">
-                      <div className="flex items-center gap-2">
-                        <img src={assignee?.avatar} alt="" className="w-6 h-6 rounded-full" />
-                        <span className="text-muted-foreground">{assignee?.name}</span>
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <span className={`status-badge ${statusConfig[task.status].color}`}>
-                        {statusConfig[task.status].label}
-                      </span>
-                    </td>
-                    <td className="p-4 hidden lg:table-cell">
-                      <span className={`status-badge ${priorityConfig[task.priority].color}`}>
-                        {priorityConfig[task.priority].label}
-                      </span>
-                    </td>
-                    <td className="p-4 hidden lg:table-cell text-muted-foreground">
-                      {new Date(task.dueDate).toLocaleDateString()}
-                    </td>
-                  </tr>
-                );
-              })}
+              {filtered.map((task) => (
+                <tr key={task.id} className="border-b border-border/30 hover:bg-secondary/30 transition-colors">
+                  <td className="p-4">
+                    <p className="font-medium">{task.title}</p>
+                    <p className="text-xs text-muted-foreground">{task.reportTemplate?.name ?? "Template"}</p>
+                  </td>
+                  <td className="p-4 hidden md:table-cell text-muted-foreground">{task.project}</td>
+                  <td className="p-4 hidden sm:table-cell">
+                    <div className="flex items-center gap-2">
+                      <img src={toAvatarUrl(task.assignedTo?.name ?? "User")} alt="" className="w-6 h-6 rounded-full" />
+                      <span className="text-muted-foreground">{task.assignedTo?.name ?? "—"}</span>
+                    </div>
+                  </td>
+                  <td className="p-4">
+                    <span className={`status-badge ${statusConfig[task.status].color}`}>{statusConfig[task.status].label}</span>
+                  </td>
+                  <td className="p-4 hidden lg:table-cell">
+                    <span className={`status-badge ${priorityConfig[task.priority].color}`}>{priorityConfig[task.priority].label}</span>
+                  </td>
+                  <td className="p-4 hidden lg:table-cell text-muted-foreground">{new Date(task.dueDate).toLocaleDateString()}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -151,9 +159,8 @@ export default function AdminTasks() {
   );
 }
 
-function TaskCard({ task, index }: { task: Task; index: number }) {
-  const assignee = users.find((u) => u.id === task.assignedTo);
-  const isOverdue = new Date(task.dueDate) < new Date() && task.status !== "done";
+function TaskCard({ task, index }: { task: TaskItem; index: number }) {
+  const isOverdue = new Date(task.dueDate) < new Date() && task.status !== "DONE";
 
   return (
     <motion.div
@@ -171,8 +178,8 @@ function TaskCard({ task, index }: { task: Task; index: number }) {
       <p className="text-xs text-muted-foreground mb-3">{task.project}</p>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <img src={assignee?.avatar} alt="" className="w-5 h-5 rounded-full" />
-          <span className="text-xs text-muted-foreground">{assignee?.name?.split(" ")[0]}</span>
+          <img src={toAvatarUrl(task.assignedTo?.name ?? "User")} alt="" className="w-5 h-5 rounded-full" />
+          <span className="text-xs text-muted-foreground">{task.assignedTo?.name?.split(" ")[0] ?? "—"}</span>
         </div>
         <span className={cn("text-xs flex items-center gap-1", isOverdue ? "text-destructive" : "text-muted-foreground")}>
           <Calendar className="h-3 w-3" />
@@ -180,9 +187,7 @@ function TaskCard({ task, index }: { task: Task; index: number }) {
         </span>
       </div>
       <div className="mt-2">
-        <span className="text-[10px] text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full">
-          {reportTypeLabels[task.reportType]}
-        </span>
+        <span className="text-[10px] text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full">{task.reportTemplate?.name ?? "Template"}</span>
       </div>
     </motion.div>
   );

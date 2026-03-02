@@ -1,73 +1,118 @@
-# Welcome to your Lovable project
+# HighwayOps Backend (Task + Report Management)
 
-## Project info
+Node.js + TypeScript backend for HighwayOps using Express, Prisma ORM, SQLite, JWT auth, role-based access control, uploads, and audit logging.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Stack
 
-## How can I edit this code?
+- Node.js + TypeScript
+- Express.js
+- Prisma ORM + SQLite
+- JWT (access + refresh)
+- bcrypt
+- zod
+- multer (local uploads)
+- helmet + cors + express-rate-limit
+- pino logger with requestId
 
-There are several ways of editing your application.
+## Setup
 
-**Use Lovable**
+1. Install dependencies
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
+```bash
 npm i
+```
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+2. Create env file
+
+```bash
+cp .env.example .env
+```
+
+3. Run database migration
+
+```bash
+npx prisma migrate dev
+```
+
+4. (Optional) Run seed command
+
+```bash
+npx prisma db seed
+```
+
+5. Bootstrap first admin user (required on empty DB)
+
+```bash
+npm run bootstrap:admin -- --email=admin@yourcompany.com --password=StrongPass123 --name="Admin User"
+```
+
+6. Start API server
+
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+Server default URL: `http://localhost:4000`
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Scripts
 
-**Use GitHub Codespaces**
+- `npm run dev` - start backend in watch mode
+- `npm run build` - build frontend + backend
+- `npm run build:backend` - compile backend
+- `npm run start` - run compiled backend
+- `npm run prisma:migrate` - prisma migrate dev
+- `npm run prisma:seed` - prisma db seed
+- `npm run bootstrap:admin -- --email=<email> --password=<password> --name="Admin User"` - create first admin user
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## SQLite concurrency settings
 
-## What technologies are used for this project?
+On startup the backend executes:
 
-This project is built with:
+- `PRAGMA journal_mode = WAL;`
+- `PRAGMA busy_timeout = 5000;`
+- `PRAGMA foreign_keys = ON;`
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+The default seed script is a no-op and does not insert sample records.
 
-## How can I deploy this project?
+## API Base
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+- `POST /auth/login`
+- `POST /auth/refresh`
+- `POST /auth/logout`
+- `POST /tasks` (ADMIN)
+- `GET /tasks`
+- `GET /tasks/:id`
+- `PATCH /tasks/:id`
+- `DELETE /tasks/:id` (ADMIN)
+- `POST /tasks/:id/comments`
+- `GET /tasks/:id/comments`
+- `CRUD /templates` (ADMIN)
+- `POST /reports` (EMPLOYEE)
+- `GET /reports`
+- `GET /reports/:id`
+- `PATCH /reports/:id/status` (ADMIN)
+- `PATCH /reports/:id/feedback` (ADMIN)
+- `POST /uploads` (multipart)
+- `GET /uploads/:filename` (static)
 
-## Can I connect a custom domain to my Lovable project?
+All responses use:
 
-Yes, you can!
+```json
+{
+	"success": true,
+	"data": {}
+}
+```
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+or
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+```json
+{
+	"success": false,
+	"error": {
+		"code": "ERROR_CODE",
+		"message": "Readable message",
+		"details": {}
+	}
+}
+```
