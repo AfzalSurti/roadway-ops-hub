@@ -1,6 +1,6 @@
 import type { ApiUser, ReportItem, ReportStatus, ReportTemplate, TaskItem, TaskStatus } from "./domain";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
+const API_BASE_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:4000").replace(/\/+$/, "");
 
 type ApiResponse<T> = {
   success: boolean;

@@ -1,7 +1,7 @@
 export default {
   plugins: {
     tailwindcss: {
-      config: "./frontend/tailwind.config.ts",
+      config: "./tailwind.config.ts",
     },
     autoprefixer: {},
   },
