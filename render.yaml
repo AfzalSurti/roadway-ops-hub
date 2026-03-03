@@ -32,3 +32,5 @@ services:
         sync: false
       - key: BOOTSTRAP_ADMIN_NAME
         value: Admin
+      - key: FORCE_BOOTSTRAP_ADMIN
+        value: "false"
