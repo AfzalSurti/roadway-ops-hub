@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from "@/lib/auth";
 import { AppLayout } from "@/components/AppLayout";
 
 import Login from "./pages/Login";
+import Index from "./pages/Index";
 import AdminDashboard from "./pages/admin/Dashboard";
 import AdminTasks from "./pages/admin/Tasks";
 import CreateTask from "./pages/admin/CreateTask";
@@ -34,7 +35,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={user ? <Navigate to={user.role === "ADMIN" ? "/admin/dashboard" : "/app/dashboard"} replace /> : <Login />} />
-      <Route path="/" element={<Navigate to="/login" replace />} />
+      <Route path="/" element={user ? <Navigate to={user.role === "ADMIN" ? "/admin/dashboard" : "/app/dashboard"} replace /> : <Index />} />
 
       {/* Admin Routes */}
       <Route path="/admin" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
