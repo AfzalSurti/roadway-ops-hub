@@ -21,7 +21,10 @@ export default function AdminDashboard() {
   return (
     <PageWrapper>
       <div className="page-header">
-        <h1 className="page-title">Dashboard</h1>
+        <div className="flex items-center gap-3">
+          <img src="/roadway-logo.svg" alt="RoadwayOps" className="h-10 w-10 rounded-xl" />
+          <h1 className="page-title">RoadwayOps Dashboard</h1>
+        </div>
         <p className="page-subtitle">Overview of your highway operations</p>
       </div>
 

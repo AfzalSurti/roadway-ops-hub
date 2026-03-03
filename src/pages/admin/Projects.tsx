@@ -10,6 +10,7 @@ import { toast } from "sonner";
 export default function AdminProjects() {
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ name: "", description: "" });
+  const [selectedProject, setSelectedProject] = useState<string | null>(null);
 
   const { data: tasksData } = useQuery({ queryKey: ["tasks", "projects"], queryFn: () => api.getTasks({ limit: 200 }) });
   const { data: projects = [], refetch: refetchProjects } = useQuery({ queryKey: ["projects"], queryFn: () => api.getProjects() });
@@ -21,6 +22,27 @@ export default function AdminProjects() {
     const fromTasks = tasks.map((task) => task.project);
     return Array.from(new Set([...fromDb, ...fromTasks]));
   }, [projects, tasks]);
+
+  const selectedProjectName = selectedProject ?? projectNames[0] ?? null;
+  const selectedProjectInfo = selectedProjectName
+    ? projects.find((project) => project.name === selectedProjectName)
+    : undefined;
+  const selectedProjectTasks = selectedProjectName
+    ? tasks.filter((task) => task.project === selectedProjectName)
+    : [];
+
+  const selectedPeople = useMemo(() => {
+    const map = new Map<string, string>();
+    selectedProjectTasks.forEach((task) => {
+      const key = task.assignedToId;
+      const value = task.assignedTo?.name ?? "Unknown Employee";
+      map.set(key, value);
+    });
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [selectedProjectTasks]);
+
+  const selectedDoneCount = selectedProjectTasks.filter((task) => task.status === "DONE").length;
+  const selectedProgress = selectedProjectTasks.length ? Math.round((selectedDoneCount / selectedProjectTasks.length) * 100) : 0;
 
   const handleCreateProject = async () => {
     try {
@@ -63,7 +85,8 @@ export default function AdminProjects() {
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.08 }}
-              className="glass-panel p-6 hover:border-primary/20 transition-all cursor-pointer group"
+              onClick={() => setSelectedProject(project)}
+              className={`glass-panel p-6 hover:border-primary/20 transition-all cursor-pointer group ${selectedProjectName === project ? "border-primary/40" : ""}`}
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="p-2.5 rounded-xl bg-primary/10">
@@ -101,6 +124,86 @@ export default function AdminProjects() {
           );
         })}
       </div>
+
+      {selectedProjectName && (
+        <div className="glass-panel p-6 mt-6">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-semibold">{selectedProjectName}</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                {selectedProjectInfo?.description?.trim() ? selectedProjectInfo.description : "No description provided."}
+              </p>
+            </div>
+            <span className="text-xs px-2.5 py-1 rounded-full bg-primary/10 text-primary font-medium">
+              {selectedProgress}% complete
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-5">
+            <div className="rounded-xl border border-border/40 bg-secondary/20 p-3">
+              <p className="text-xs text-muted-foreground">People Involved</p>
+              <p className="text-xl font-semibold mt-1">{selectedPeople.length}</p>
+            </div>
+            <div className="rounded-xl border border-border/40 bg-secondary/20 p-3">
+              <p className="text-xs text-muted-foreground">Total Tasks</p>
+              <p className="text-xl font-semibold mt-1">{selectedProjectTasks.length}</p>
+            </div>
+            <div className="rounded-xl border border-border/40 bg-secondary/20 p-3">
+              <p className="text-xs text-muted-foreground">Completed Tasks</p>
+              <p className="text-xl font-semibold mt-1">{selectedDoneCount}</p>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <div className="h-2 rounded-full bg-secondary overflow-hidden">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${selectedProgress}%` }}
+                transition={{ duration: 0.6 }}
+                className="h-full rounded-full bg-gradient-to-r from-primary to-accent"
+              />
+            </div>
+          </div>
+
+          <div className="mt-5">
+            <p className="text-sm font-medium mb-2">Assigned Employees</p>
+            {selectedPeople.length ? (
+              <div className="flex flex-wrap gap-2">
+                {selectedPeople.map((person) => (
+                  <span key={person.id} className="text-xs px-2.5 py-1 rounded-full bg-secondary text-foreground border border-border/40">
+                    {person.name}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No employees assigned yet.</p>
+            )}
+          </div>
+
+          <div className="mt-5">
+            <p className="text-sm font-medium mb-2">Task Details</p>
+            {selectedProjectTasks.length ? (
+              <div className="space-y-2">
+                {selectedProjectTasks.map((task) => (
+                  <div key={task.id} className="rounded-xl border border-border/40 bg-secondary/20 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium">{task.title}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Assigned to: {task.assignedTo?.name ?? "Unknown Employee"}
+                        </p>
+                      </div>
+                      <span className={`status-badge text-[10px] ${statusConfig[task.status].color}`}>{statusConfig[task.status].label}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No tasks added for this project yet.</p>
+            )}
+          </div>
+        </div>
+      )}
 
       {showCreate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
