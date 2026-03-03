@@ -11,7 +11,7 @@ services:
       - key: PORT
         value: 4000
       - key: DATABASE_URL
-        value: file:/var/data/dev.db
+        value: file:./dev.db
       - key: JWT_ACCESS_SECRET
         sync: false
       - key: JWT_REFRESH_SECRET
@@ -32,7 +32,3 @@ services:
         sync: false
       - key: BOOTSTRAP_ADMIN_NAME
         value: Admin
-    disk:
-      name: highwayops-sqlite
-      mountPath: /var/data
-      sizeGB: 1
