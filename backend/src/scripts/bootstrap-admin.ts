@@ -27,7 +27,7 @@ async function main() {
   try {
     const args = parseArgs();
     if (!args.email || !args.password) {
-      console.error("Missing required args. Use: npm run bootstrap:admin -- --email=you@example.com --password=StrongPass123 --name='Admin User'");
+      console.error("Missing required args. Use: npm run bootstrap:admin -- --email=<email> --password=<password> --name=<name>");
       process.exit(1);
     }
 

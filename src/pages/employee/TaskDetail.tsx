@@ -145,7 +145,16 @@ export default function TaskDetail() {
                   ) : (
                     <input
                       type={field.type === "number" ? "number" : field.type === "date" ? "date" : "text"}
-                      onChange={(event) => setSubmission((prev) => ({ ...prev, [field.id]: event.target.value }))}
+                      onChange={(event) => {
+                        const rawValue = event.target.value;
+                        const parsedValue =
+                          field.type === "number"
+                            ? rawValue === ""
+                              ? undefined
+                              : Number(rawValue)
+                            : rawValue;
+                        setSubmission((prev) => ({ ...prev, [field.id]: parsedValue }));
+                      }}
                       className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
                     />
                   )}

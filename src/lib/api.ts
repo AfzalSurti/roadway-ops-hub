@@ -28,6 +28,9 @@ export const authStorage = {
     localStorage.setItem(REFRESH_TOKEN_KEY, args.refreshToken);
     localStorage.setItem(USER_KEY, JSON.stringify(args.user));
   },
+  setAccessToken(accessToken: string) {
+    localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+  },
   clear() {
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);
@@ -35,7 +38,32 @@ export const authStorage = {
   }
 };
 
-async function request<T>(path: string, init: RequestInit = {}, useAuth = true): Promise<T> {
+let refreshPromise: Promise<string> | null = null;
+
+async function refreshAccessToken(): Promise<string> {
+  const refreshToken = authStorage.getRefreshToken();
+  if (!refreshToken) {
+    throw new Error("Session expired. Please login again.");
+  }
+
+  const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ refreshToken })
+  });
+
+  const json = (await response.json()) as ApiResponse<{ accessToken: string }>;
+  if (!response.ok || !json.success || !json.data?.accessToken) {
+    throw new Error(json.error?.message ?? "Session expired. Please login again.");
+  }
+
+  authStorage.setAccessToken(json.data.accessToken);
+  return json.data.accessToken;
+}
+
+async function request<T>(path: string, init: RequestInit = {}, useAuth = true, retryOnUnauthorized = true): Promise<T> {
   const headers = new Headers(init.headers);
   headers.set("Content-Type", "application/json");
 
@@ -50,6 +78,21 @@ async function request<T>(path: string, init: RequestInit = {}, useAuth = true):
     ...init,
     headers
   });
+
+  if (response.status === 401 && useAuth && retryOnUnauthorized) {
+    try {
+      if (!refreshPromise) {
+        refreshPromise = refreshAccessToken().finally(() => {
+          refreshPromise = null;
+        });
+      }
+      await refreshPromise;
+      return request<T>(path, init, useAuth, false);
+    } catch {
+      authStorage.clear();
+      throw new Error("Invalid or expired access token. Please login again.");
+    }
+  }
 
   const json = (await response.json()) as ApiResponse<T>;
 
@@ -172,6 +215,17 @@ export const api = {
 
   getUsers() {
     return request<ApiUser[]>("/users");
+  },
+
+  getProjects() {
+    return request<Array<{ id: string; name: string; description?: string | null; createdAt: string; updatedAt: string }>>("/projects");
+  },
+
+  createProject(payload: { name: string; description?: string }) {
+    return request<{ id: string; name: string; description?: string | null; createdAt: string; updatedAt: string }>("/projects", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
   },
 
   createEmployee(payload: { name: string; email: string; password: string }) {

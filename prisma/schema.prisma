@@ -84,6 +84,16 @@ model ReportTemplate {
   reports     Report[]
 }
 
+model Project {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([name])
+}
+
 model Task {
   id               String        @id @default(cuid())
   title            String

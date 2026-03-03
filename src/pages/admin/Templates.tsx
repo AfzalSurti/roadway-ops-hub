@@ -1,15 +1,38 @@
 import { useMemo, useState } from "react";
 import { PageWrapper } from "@/components/PageWrapper";
 import { motion } from "framer-motion";
-import { FileText, Plus } from "lucide-react";
+import { FileText, Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import type { TemplateField } from "@/lib/domain";
+
+type TemplateFieldDraft = {
+  id: string;
+  label: string;
+  type: TemplateField["type"];
+  required: boolean;
+  optionsText: string;
+};
+
+const fieldTypeOptions: Array<TemplateField["type"]> = ["text", "textarea", "number", "date", "select", "checkbox", "photo", "file"];
+
+const createEmptyField = (): TemplateFieldDraft => ({
+  id: `field_${Date.now()}_${Math.random().toString(16).slice(2, 6)}`,
+  label: "",
+  type: "text",
+  required: false,
+  optionsText: ""
+});
 
 export default function AdminTemplates() {
   const { data: templates = [], refetch } = useQuery({ queryKey: ["templates"], queryFn: () => api.getTemplates() });
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [fields, setFields] = useState<TemplateFieldDraft[]>([createEmptyField()]);
 
   const selected = useMemo(
     () => templates.find((template) => template.id === selectedId) ?? templates[0],
@@ -17,30 +40,66 @@ export default function AdminTemplates() {
   );
 
   const createTemplate = async () => {
-    const name = window.prompt("Template name");
-    if (!name) {
+    const cleanName = name.trim();
+    if (!cleanName) {
+      toast.error("Template name is required");
       return;
     }
 
-    const fieldsJson = window.prompt("Template fields JSON array");
+    const normalizedFields = fields
+      .map((field, index) => {
+        const label = field.label.trim();
+        const options = field.type === "select"
+          ? field.optionsText.split(",").map((option) => option.trim()).filter(Boolean)
+          : undefined;
+        return {
+          id: field.id || `field_${index + 1}`,
+          label,
+          type: field.type,
+          required: field.required,
+          options
+        };
+      })
+      .filter((field) => field.label.length > 0);
 
-    if (!fieldsJson) {
+    if (!normalizedFields.length) {
+      toast.error("Add at least one field with a label");
+      return;
+    }
+
+    const invalidSelect = normalizedFields.find((field) => field.type === "select" && (!field.options || !field.options.length));
+    if (invalidSelect) {
+      toast.error(`Select field \"${invalidSelect.label}\" needs options`);
       return;
     }
 
     try {
-      const parsedFields = JSON.parse(fieldsJson);
       await api.createTemplate({
-        name,
-        description: "",
-        fields: parsedFields
+        name: cleanName,
+        description: description.trim(),
+        fields: normalizedFields
       });
       toast.success("Template created");
+      setShowCreate(false);
+      setName("");
+      setDescription("");
+      setFields([createEmptyField()]);
       await refetch();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to create template";
       toast.error(message);
     }
+  };
+
+  const updateField = (fieldId: string, patch: Partial<TemplateFieldDraft>) => {
+    setFields((prev) => prev.map((field) => (field.id === fieldId ? { ...field, ...patch } : field)));
+  };
+
+  const removeField = (fieldId: string) => {
+    setFields((prev) => {
+      const next = prev.filter((field) => field.id !== fieldId);
+      return next.length ? next : [createEmptyField()];
+    });
   };
 
   return (
@@ -79,7 +138,7 @@ export default function AdminTemplates() {
           ))}
 
           <button
-            onClick={() => void createTemplate()}
+            onClick={() => setShowCreate(true)}
             className="w-full py-2.5 rounded-xl border-2 border-dashed border-border/50 text-sm text-muted-foreground hover:border-primary/30 hover:text-primary transition-all flex items-center justify-center gap-2"
           >
             <Plus className="h-4 w-4" />
@@ -115,6 +174,108 @@ export default function AdminTemplates() {
           )}
         </div>
       </div>
+
+      {showCreate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="glass-panel-strong p-6 w-full max-w-3xl mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold">Create Report Template</h3>
+              <button
+                onClick={() => setShowCreate(false)}
+                className="p-1 rounded-lg hover:bg-secondary/50"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <input
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
+                placeholder="Template name (e.g. Daily Site Progress)"
+              />
+              <textarea
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                rows={2}
+                className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none resize-none focus:border-primary/50"
+                placeholder="Description (optional)"
+              />
+
+              <div className="space-y-3 pt-1">
+                {fields.map((field, index) => (
+                  <div key={field.id} className="rounded-xl border border-border/50 p-4 bg-secondary/20 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium">Field {index + 1}</p>
+                      <button
+                        onClick={() => removeField(field.id)}
+                        className="text-xs text-muted-foreground hover:text-destructive"
+                        type="button"
+                      >
+                        Remove
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <input
+                        value={field.label}
+                        onChange={(event) => updateField(field.id, { label: event.target.value })}
+                        className="md:col-span-2 px-3 py-2 rounded-lg bg-secondary/40 border border-border/40 text-sm outline-none focus:border-primary/50"
+                        placeholder="Field label"
+                      />
+                      <select
+                        value={field.type}
+                        onChange={(event) => updateField(field.id, { type: event.target.value as TemplateField["type"] })}
+                        className="px-3 py-2 rounded-lg bg-secondary/40 border border-border/40 text-sm outline-none focus:border-primary/50"
+                      >
+                        {fieldTypeOptions.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {field.type === "select" && (
+                      <input
+                        value={field.optionsText}
+                        onChange={(event) => updateField(field.id, { optionsText: event.target.value })}
+                        className="w-full px-3 py-2 rounded-lg bg-secondary/40 border border-border/40 text-sm outline-none focus:border-primary/50"
+                        placeholder="Options (comma separated), e.g. Clear, Rain, Fog"
+                      />
+                    )}
+
+                    <label className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+                      <input
+                        type="checkbox"
+                        checked={field.required}
+                        onChange={(event) => updateField(field.id, { required: event.target.checked })}
+                      />
+                      Required field
+                    </label>
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={() => setFields((prev) => [...prev, createEmptyField()])}
+                  className="w-full py-2 rounded-xl border border-dashed border-border/60 text-sm text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors"
+                >
+                  + Add Another Field
+                </button>
+              </div>
+
+              <button
+                onClick={() => void createTemplate()}
+                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-primary to-accent text-primary-foreground font-medium hover:opacity-90 transition-opacity"
+              >
+                Save Template
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </PageWrapper>
   );
 }

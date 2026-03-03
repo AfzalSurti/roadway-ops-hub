@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { PageWrapper } from "@/components/PageWrapper";
 import { ArrowLeft } from "lucide-react";
@@ -15,7 +15,6 @@ const taskSchema = z.object({
   assignedToId: z.string().min(1, "Please assign to someone"),
   dueDate: z.string().min(1, "Due date is required"),
   priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]),
-  project: z.string().min(1, "Project is required"),
   reportTemplateId: z.string().min(1, "Template is required")
 });
 
@@ -23,15 +22,15 @@ type TaskFormValues = z.infer<typeof taskSchema>;
 
 export default function CreateTask() {
   const navigate = useNavigate();
+  const [projectMode, setProjectMode] = useState<"existing" | "other">("existing");
+  const [selectedProject, setSelectedProject] = useState("");
+  const [otherProject, setOtherProject] = useState("");
 
   const { data: users = [] } = useQuery({ queryKey: ["users"], queryFn: () => api.getUsers() });
   const { data: templates = [] } = useQuery({ queryKey: ["templates"], queryFn: () => api.getTemplates() });
-  const { data: tasksResult } = useQuery({ queryKey: ["tasks", "projects"], queryFn: () => api.getTasks({ limit: 100 }) });
+  const { data: projectsResult = [] } = useQuery({ queryKey: ["projects"], queryFn: () => api.getProjects() });
 
-  const projects = useMemo(
-    () => Array.from(new Set((tasksResult?.items ?? []).map((task) => task.project))).sort(),
-    [tasksResult]
-  );
+  const projects = useMemo(() => projectsResult.map((project) => project.name), [projectsResult]);
 
   const {
     register,
@@ -43,8 +42,17 @@ export default function CreateTask() {
   });
 
   const onSubmit = async (data: TaskFormValues) => {
+    const project = projectMode === "existing" ? selectedProject : otherProject.trim();
+    if (!project) {
+      toast.error("Project is required");
+      return;
+    }
+
     try {
-      await api.createTask(data);
+      await api.createTask({
+        ...data,
+        project
+      });
       toast.success("Task created successfully!");
       navigate("/admin/tasks");
     } catch (error) {
@@ -132,18 +140,52 @@ export default function CreateTask() {
 
           <div>
             <label className="text-sm font-medium mb-1.5 block">Project / Site</label>
-            <input
-              {...register("project")}
-              list="projects-list"
-              placeholder="Enter project/site"
-              className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
-            />
-            <datalist id="projects-list">
-              {projects.map((project) => (
-                <option key={project} value={project} />
-              ))}
-            </datalist>
-            {errors.project && <p className="text-xs text-destructive mt-1">{errors.project.message}</p>}
+            <div className="flex gap-2 mb-2">
+              <button
+                type="button"
+                onClick={() => setProjectMode("existing")}
+                className={`px-3 py-2 rounded-lg text-xs border ${
+                  projectMode === "existing"
+                    ? "bg-primary/10 text-primary border-primary/30"
+                    : "bg-secondary/50 text-muted-foreground border-border/50"
+                }`}
+              >
+                Existing Project
+              </button>
+              <button
+                type="button"
+                onClick={() => setProjectMode("other")}
+                className={`px-3 py-2 rounded-lg text-xs border ${
+                  projectMode === "other"
+                    ? "bg-primary/10 text-primary border-primary/30"
+                    : "bg-secondary/50 text-muted-foreground border-border/50"
+                }`}
+              >
+                Other Project
+              </button>
+            </div>
+
+            {projectMode === "existing" ? (
+              <select
+                value={selectedProject}
+                onChange={(event) => setSelectedProject(event.target.value)}
+                className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
+              >
+                <option value="">Select existing project</option>
+                {projects.map((project) => (
+                  <option key={project} value={project}>
+                    {project}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                value={otherProject}
+                onChange={(event) => setOtherProject(event.target.value)}
+                placeholder="Enter new project name"
+                className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
+              />
+            )}
           </div>
         </div>
 
