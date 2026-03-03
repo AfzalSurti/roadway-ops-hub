@@ -12,6 +12,29 @@ type ApiResponse<T> = {
   };
 };
 
+function buildErrorMessage<T>(response: Response, json: ApiResponse<T>): string {
+  const fallbackMessage = json.error?.message ?? `Request failed (${response.status})`;
+  const details = json.error?.details as
+    | {
+        formErrors?: string[];
+        fieldErrors?: Record<string, string[] | undefined>;
+      }
+    | undefined;
+
+  if (!details) {
+    return fallbackMessage;
+  }
+
+  const fieldMessages = Object.entries(details.fieldErrors ?? {})
+    .flatMap(([field, messages]) => (messages ?? []).map((message) => `${field}: ${message}`))
+    .filter(Boolean);
+
+  const formMessages = (details.formErrors ?? []).filter(Boolean);
+  const combined = [...fieldMessages, ...formMessages];
+
+  return combined.length ? combined.join(" | ") : fallbackMessage;
+}
+
 const ACCESS_TOKEN_KEY = "highwayops_access_token";
 const REFRESH_TOKEN_KEY = "highwayops_refresh_token";
 const USER_KEY = "highwayops_user";
@@ -97,7 +120,7 @@ async function request<T>(path: string, init: RequestInit = {}, useAuth = true, 
   const json = (await response.json()) as ApiResponse<T>;
 
   if (!response.ok || !json.success || json.data === undefined) {
-    throw new Error(json.error?.message ?? "Request failed");
+    throw new Error(buildErrorMessage(response, json));
   }
 
   return json.data;
