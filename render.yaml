@@ -4,7 +4,7 @@ services:
     runtime: node
     plan: free
     buildCommand: npm ci --include=dev && npm run build:backend
-    startCommand: npm run start
+    startCommand: npm run start:render
     envVars:
       - key: NODE_ENV
         value: production
@@ -26,6 +26,12 @@ services:
         sync: false
       - key: SQLITE_BUSY_TIMEOUT_MS
         value: 5000
+      - key: BOOTSTRAP_ADMIN_EMAIL
+        sync: false
+      - key: BOOTSTRAP_ADMIN_PASSWORD
+        sync: false
+      - key: BOOTSTRAP_ADMIN_NAME
+        value: Admin
     disk:
       name: highwayops-sqlite
       mountPath: /var/data
