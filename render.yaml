@@ -3,7 +3,7 @@ services:
     name: highwayops-backend
     runtime: node
     plan: free
-    buildCommand: npm install && npm run build:backend && npx prisma migrate deploy
+    buildCommand: npm ci --include=dev && npm run build:backend && npx prisma migrate deploy
     startCommand: npm run start
     envVars:
       - key: NODE_ENV
