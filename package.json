@@ -5,18 +5,18 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch backend/src/server.ts",
-    "dev:frontend": "vite",
+    "dev:frontend": "vite --config frontend/vite.config.ts",
     "build": "npm run build:frontend && npm run build:backend",
-    "build:frontend": "vite build",
+    "build:frontend": "vite build --config frontend/vite.config.ts",
     "build:backend": "tsc -p backend/tsconfig.json",
-    "build:dev": "vite build --mode development",
+    "build:dev": "vite build --mode development --config frontend/vite.config.ts",
     "start": "node backend/dist/server.js",
     "prisma:migrate": "prisma migrate dev",
     "bootstrap:admin": "tsx backend/src/scripts/bootstrap-admin.ts",
     "lint": "eslint .",
-    "preview": "vite preview",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "preview": "vite preview --config frontend/vite.config.ts",
+    "test": "vitest run --config frontend/vitest.config.ts",
+    "test:watch": "vitest --config frontend/vitest.config.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

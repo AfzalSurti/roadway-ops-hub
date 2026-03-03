@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: highwayops-backend
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build:backend && npx prisma migrate deploy
+    startCommand: npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: DATABASE_URL
+        value: file:/var/data/dev.db
+      - key: JWT_ACCESS_SECRET
+        sync: false
+      - key: JWT_REFRESH_SECRET
+        sync: false
+      - key: JWT_ACCESS_EXPIRES_IN
+        value: 15m
+      - key: JWT_REFRESH_EXPIRES_IN
+        value: 7d
+      - key: BCRYPT_SALT_ROUNDS
+        value: 10
+      - key: CORS_ORIGIN
+        sync: false
+      - key: SQLITE_BUSY_TIMEOUT_MS
+        value: 5000
+    disk:
+      name: highwayops-sqlite
+      mountPath: /var/data
+      sizeGB: 1

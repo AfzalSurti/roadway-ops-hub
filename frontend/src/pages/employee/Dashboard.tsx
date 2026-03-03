@@ -27,10 +27,7 @@ export default function EmployeeDashboard() {
   return (
     <PageWrapper>
       <div className="page-header">
-        <div className="flex items-center gap-3">
-          <img src="/roadway-logo.svg" alt="RoadwayOps" className="h-10 w-10 rounded-xl" />
-          <h1 className="page-title">Welcome back, {user?.name?.split(" ")[0]}</h1>
-        </div>
+        <h1 className="page-title">Welcome back, {user?.name?.split(" ")[0]}</h1>
         <p className="page-subtitle">Here's your task overview</p>
       </div>
 

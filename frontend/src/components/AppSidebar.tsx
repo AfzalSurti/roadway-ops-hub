@@ -10,7 +10,6 @@ import {
   FileCheck,
   ChevronLeft,
   ChevronRight,
-  HardHat,
   LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -46,9 +45,7 @@ export function AppSidebar() {
       {/* Logo */}
       <div className="h-16 flex items-center px-4 border-b border-sidebar-border">
         <div className="flex items-center gap-3 overflow-hidden">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center shrink-0">
-            <HardHat className="h-4.5 w-4.5 text-primary-foreground" />
-          </div>
+          <img src="/roadway-logo.svg" alt="HighwayOps" className="w-8 h-8 rounded-lg shrink-0" />
           <AnimatePresence>
             {!collapsed && (
               <motion.span

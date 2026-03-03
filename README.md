@@ -1,109 +1,199 @@
-# HighwayOps Backend (Task + Report Management)
+# HighwayOps Hub
 
-Node.js + TypeScript backend for HighwayOps using Express, Prisma ORM, SQLite, JWT auth, role-based access control, uploads, and audit logging.
+Full-stack HighwayOps application with:
 
-## Stack
+- **Frontend**: React + Vite + Tailwind (now under `frontend/`)
+- **Backend**: Node.js + Express + Prisma + SQLite (under `backend/`)
+- **Auth**: JWT access + refresh tokens
+- **Roles**: `ADMIN`, `EMPLOYEE`
 
-- Node.js + TypeScript
-- Express.js
-- Prisma ORM + SQLite
-- JWT (access + refresh)
-- bcrypt
-- zod
-- multer (local uploads)
-- helmet + cors + express-rate-limit
-- pino logger with requestId
+---
 
-## Setup
+## Project Structure
 
-1. Install dependencies
-
-```bash
-npm i
+```txt
+roadway-ops-hub/
+├─ frontend/                 # Vite React app (Vercel target)
+│  ├─ src/
+│  ├─ public/
+│  ├─ vite.config.ts
+│  └─ ...
+├─ backend/                  # Express API (Render target)
+│  ├─ src/
+│  └─ tsconfig.json
+├─ prisma/                   # Prisma schema + migrations
+├─ uploads/                  # Local uploads directory
+├─ vercel.json               # Vercel build + SPA rewrite config
+└─ render.yaml               # Render service blueprint
 ```
 
-2. Create env file
+---
+
+## Local Development
+
+### 1) Install dependencies
 
 ```bash
-cp .env.example .env
+npm install
 ```
 
-3. Run database migration
+### 2) Configure environment
+
+Create root `.env` from `.env.example` and set values.
+
+### 3) Run database migration
 
 ```bash
 npx prisma migrate dev
 ```
 
-4. Bootstrap first admin user (required on empty DB)
+### 4) Create first admin (if DB is empty)
 
 ```bash
-npm run bootstrap:admin -- --email=<email> --password=<password> --name=<name>
+npm run bootstrap:admin -- --email=admin@highwayops.com --password=Admin@123 --name="Admin User"
 ```
 
-5. Start API server
+### 5) Run backend + frontend
+
+Option A (one command on Windows):
+
+```powershell
+.\run-project.ps1
+```
+
+Option B (separate terminals):
 
 ```bash
+npm run dev            # backend on 4000
+npm run dev:frontend   # frontend on 8080 (or passed port)
+```
+
+---
+
+## Deployment Target
+
+- **Frontend** → **Vercel**
+- **Backend** → **Render**
+
+---
+
+## Step-by-Step: Deploy Backend on Render
+
+### 1) Create Render Web Service
+
+1. Push code to GitHub.
+2. In Render: **New +** → **Web Service**.
+3. Select your repository.
+4. Use these settings:
+   - **Root Directory**: leave empty (`.`)
+   - **Build Command**:
+     ```bash
+     npm install && npm run build:backend && npx prisma migrate deploy
+     ```
+   - **Start Command**:
+     ```bash
+     npm run start
+     ```
+
+### 2) Add persistent disk (required for SQLite)
+
+1. In service settings, add a **Disk**.
+2. Mount path: `/var/data`
+3. Set env var:
+   - `DATABASE_URL=file:/var/data/dev.db`
+
+### 3) Configure backend environment variables
+
+Set these in Render **Environment**:
+
+- `NODE_ENV=production`
+- `PORT=4000`
+- `DATABASE_URL=file:/var/data/dev.db`
+- `JWT_ACCESS_SECRET=<strong-random-secret>`
+- `JWT_REFRESH_SECRET=<strong-random-secret>`
+- `JWT_ACCESS_EXPIRES_IN=15m`
+- `JWT_REFRESH_EXPIRES_IN=7d`
+- `BCRYPT_SALT_ROUNDS=10`
+- `CORS_ORIGIN=https://<your-vercel-domain>`
+- `SQLITE_BUSY_TIMEOUT_MS=5000`
+
+### 4) Create first admin in production
+
+After first successful deploy, open Render shell and run:
+
+```bash
+npm run bootstrap:admin -- --email=<admin-email> --password=<strong-password> --name="Admin"
+```
+
+### 5) Confirm backend
+
+Open:
+
+```txt
+https://<your-render-service>.onrender.com/health
+```
+
+Should return `{"success":true,...}`.
+
+---
+
+## Step-by-Step: Deploy Frontend on Vercel
+
+### 1) Create Vercel project
+
+1. In Vercel: **Add New Project**.
+2. Import the same repository.
+3. Keep **Root Directory** as repository root (`.`).
+
+### 2) Build settings
+
+Use:
+
+- **Install Command**: `npm install`
+- **Build Command**: `npm run build:frontend`
+- **Output Directory**: `frontend/dist`
+
+(`vercel.json` in repo already sets build + SPA rewrites.)
+
+### 3) Add frontend environment variable
+
+In Vercel project settings → Environment Variables:
+
+- `VITE_API_URL=https://<your-render-service>.onrender.com`
+
+Redeploy after setting env vars.
+
+### 4) Confirm frontend
+
+Open your Vercel domain and verify login + API calls work.
+
+---
+
+## Deployment Checklist
+
+- Render `/health` is reachable.
+- Vercel `VITE_API_URL` points to Render backend URL.
+- Render `CORS_ORIGIN` includes exact Vercel domain.
+- Admin login works in deployed app.
+- Task/template/project APIs return success.
+
+---
+
+## Useful Commands
+
+```bash
+npm run build
+npm run build:frontend
+npm run build:backend
 npm run dev
+npm run dev:frontend
+npm test
 ```
 
-Server default URL: `http://localhost:4000`
+---
 
-## Scripts
+## Notes
 
-- `npm run dev` - start backend in watch mode
-- `npm run build` - build frontend + backend
-- `npm run build:backend` - compile backend
-- `npm run start` - run compiled backend
-- `npm run prisma:migrate` - prisma migrate dev
-- `npm run bootstrap:admin -- --email=<email> --password=<password> --name=<name>` - create first admin user
-
-## SQLite concurrency settings
-
-On startup the backend executes:
-
-- `PRAGMA journal_mode = WAL;`
-- `PRAGMA busy_timeout = 5000;`
-- `PRAGMA foreign_keys = ON;`
-
-## API Base
-
-- `POST /auth/login`
-- `POST /auth/refresh`
-- `POST /auth/logout`
-- `POST /tasks` (ADMIN)
-- `GET /tasks`
-- `GET /tasks/:id`
-- `PATCH /tasks/:id`
-- `DELETE /tasks/:id` (ADMIN)
-- `POST /tasks/:id/comments`
-- `GET /tasks/:id/comments`
-- `CRUD /templates` (ADMIN)
-- `POST /reports` (EMPLOYEE)
-- `GET /reports`
-- `GET /reports/:id`
-- `PATCH /reports/:id/status` (ADMIN)
-- `PATCH /reports/:id/feedback` (ADMIN)
-- `POST /uploads` (multipart)
-- `GET /uploads/:filename` (static)
-
-All responses use:
-
-```json
-{
-	"success": true,
-	"data": {}
-}
-```
-
-or
-
-```json
-{
-	"success": false,
-	"error": {
-		"code": "ERROR_CODE",
-		"message": "Readable message",
-		"details": {}
-	}
-}
-```
+- SQLite is suitable for small/single-instance deployments.
+- Render disk is required to persist SQLite data across restarts.
+- `uploads/` on ephemeral filesystem may not persist unless redirected to persistent storage (S3/R2 recommended for production files).
