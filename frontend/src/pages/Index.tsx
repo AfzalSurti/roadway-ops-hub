@@ -97,6 +97,20 @@ const Index = () => {
             <img src="/landing-feature-2.svg" alt="Report workflow preview" className="w-full rounded-xl border border-border/40" />
           </div>
         </section>
+
+        <section className="pt-2 pb-6">
+          <p className="text-sm text-muted-foreground text-center">
+            Made by <span className="text-foreground font-medium">Afzal N. Surti</span> ·{" "}
+            <a
+              href="https://www.linkedin.com/in/afzal-surti-9904b2287/"
+              target="_blank"
+              rel="noreferrer"
+              className="text-primary hover:underline"
+            >
+              LinkedIn
+            </a>
+          </p>
+        </section>
       </main>
     </div>
   );
