@@ -1,5 +1,20 @@
 # HighwayOps Hub
 
+## About
+
+HighwayOps Hub is a web-based **task and report management platform** for highway/construction operations teams. It helps admins assign and track field work, and helps employees submit structured daily reports from assigned tasks.
+
+## Description
+
+This project is designed to replace manual tracking (spreadsheets/messages) with one centralized workflow:
+
+- Admins create projects, tasks, templates, and employee accounts.
+- Employees receive assigned tasks and submit report data using templates.
+- Teams can monitor progress, overdue work, submissions, and project-level status from dashboards.
+- Authentication and role-based access ensure secure admin/employee separation.
+
+## Tech Stack
+
 Full-stack HighwayOps application with:
 
 - **Frontend**: React + Vite + Tailwind (now under `frontend/`)
