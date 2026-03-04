@@ -1,6 +1,8 @@
 import { userRepository } from "../repositories/user.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { hashPassword } from "../utils/password.js";
+import { emailService } from "./email.service.js";
+import { logger } from "../config/logger.js";
 
 export const userService = {
   listEmployees() {
@@ -12,12 +14,25 @@ export const userService = {
       throw conflict("User with this email already exists");
     }
 
-    return userRepository.create({
+    const user = await userRepository.create({
       name: payload.name,
       email: payload.email,
       role: "EMPLOYEE",
       passwordHash: await hashPassword(payload.password)
     });
+
+    try {
+      await emailService.sendEmployeeWelcomeEmail({
+        to: payload.email,
+        employeeName: payload.name,
+        employeeEmail: payload.email,
+        password: payload.password
+      });
+    } catch (error) {
+      logger.warn({ err: error, email: payload.email }, "Failed to send employee welcome email");
+    }
+
+    return user;
   },
   async deleteEmployee(id: string) {
     const employee = await userRepository.findById(id);

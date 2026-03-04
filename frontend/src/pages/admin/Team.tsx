@@ -11,6 +11,8 @@ export default function AdminTeam() {
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [passwordMode, setPasswordMode] = useState<"manual" | "auto">("manual");
+  const [generatedPassword, setGeneratedPassword] = useState("");
   const [form, setForm] = useState({ name: "", email: "", password: "" });
 
   const { data: users = [], refetch: refetchUsers } = useQuery({ queryKey: ["users"], queryFn: () => api.getUsers() });
@@ -39,16 +41,43 @@ export default function AdminTeam() {
   );
 
   const handleCreateEmployee = async () => {
+    const passwordToUse = passwordMode === "auto" ? generatedPassword : form.password;
+
+    if (!form.name.trim() || !form.email.trim()) {
+      toast.error("Please enter name and email");
+      return;
+    }
+
+    if (!passwordToUse.trim()) {
+      toast.error("Please provide a password");
+      return;
+    }
+
     try {
-      await api.createEmployee(form);
+      await api.createEmployee({
+        name: form.name.trim(),
+        email: form.email.trim(),
+        password: passwordToUse
+      });
       await refetchUsers();
       setShowCreate(false);
       setForm({ name: "", email: "", password: "" });
+      setGeneratedPassword("");
+      setPasswordMode("manual");
       toast.success("Employee created successfully");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to create employee";
       toast.error(message);
     }
+  };
+
+  const generatePassword = () => {
+    const letters = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+    const numbers = "23456789";
+    const symbols = "@#$%&*!";
+    const pick = (set: string) => set[Math.floor(Math.random() * set.length)];
+    const value = `${pick(letters)}${pick(letters)}${pick(numbers)}${pick(symbols)}${pick(letters)}${pick(numbers)}${pick(symbols)}${pick(letters)}${pick(numbers)}${pick(letters)}`;
+    setGeneratedPassword(value);
   };
 
   const handleDeleteEmployee = async () => {
@@ -188,13 +217,69 @@ export default function AdminTeam() {
                 placeholder="Email"
                 type="email"
               />
-              <input
-                value={form.password}
-                onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
-                className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
-                placeholder="Temporary password"
-                type="password"
-              />
+
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Password Option</p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPasswordMode("manual")}
+                    className={`px-3 py-2 rounded-lg text-xs border ${
+                      passwordMode === "manual"
+                        ? "bg-primary/10 text-primary border-primary/30"
+                        : "bg-secondary/50 text-muted-foreground border-border/50"
+                    }`}
+                  >
+                    Enter Manually
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPasswordMode("auto");
+                      if (!generatedPassword) {
+                        generatePassword();
+                      }
+                    }}
+                    className={`px-3 py-2 rounded-lg text-xs border ${
+                      passwordMode === "auto"
+                        ? "bg-primary/10 text-primary border-primary/30"
+                        : "bg-secondary/50 text-muted-foreground border-border/50"
+                    }`}
+                  >
+                    Auto Generate
+                  </button>
+                </div>
+              </div>
+
+              {passwordMode === "manual" ? (
+                <input
+                  value={form.password}
+                  onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
+                  className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
+                  placeholder="Temporary password"
+                  type="password"
+                />
+              ) : (
+                <div className="space-y-2">
+                  <input
+                    value={generatedPassword}
+                    readOnly
+                    className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none"
+                    placeholder="Generated password"
+                  />
+                  <button
+                    type="button"
+                    onClick={generatePassword}
+                    className="w-full py-2 rounded-xl border border-border/50 text-sm text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
+                  >
+                    Regenerate Password
+                  </button>
+                </div>
+              )}
+
+              <p className="text-xs text-muted-foreground">
+                A welcome email with website link and credentials will be sent to the employee email.
+              </p>
               <button
                 onClick={() => void handleCreateEmployee()}
                 className="w-full py-2.5 rounded-xl bg-gradient-to-r from-primary to-accent text-primary-foreground font-medium hover:opacity-90 transition-opacity"
