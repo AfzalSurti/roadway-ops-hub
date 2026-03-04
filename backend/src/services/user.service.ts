@@ -21,16 +21,16 @@ export const userService = {
       passwordHash: await hashPassword(payload.password)
     });
 
-    try {
-      await emailService.sendEmployeeWelcomeEmail({
+    void emailService
+      .sendEmployeeWelcomeEmail({
         to: payload.email,
         employeeName: payload.name,
         employeeEmail: payload.email,
         password: payload.password
+      })
+      .catch((error) => {
+        logger.warn({ err: error, email: payload.email }, "Failed to send employee welcome email");
       });
-    } catch (error) {
-      logger.warn({ err: error, email: payload.email }, "Failed to send employee welcome email");
-    }
 
     return user;
   },

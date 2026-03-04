@@ -11,6 +11,7 @@ export default function AdminTeam() {
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
   const [passwordMode, setPasswordMode] = useState<"manual" | "auto">("manual");
   const [generatedPassword, setGeneratedPassword] = useState("");
   const [form, setForm] = useState({ name: "", email: "", password: "" });
@@ -54,6 +55,7 @@ export default function AdminTeam() {
     }
 
     try {
+      setIsCreating(true);
       await api.createEmployee({
         name: form.name.trim(),
         email: form.email.trim(),
@@ -68,6 +70,8 @@ export default function AdminTeam() {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to create employee";
       toast.error(message);
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -282,9 +286,10 @@ export default function AdminTeam() {
               </p>
               <button
                 onClick={() => void handleCreateEmployee()}
+                disabled={isCreating}
                 className="w-full py-2.5 rounded-xl bg-gradient-to-r from-primary to-accent text-primary-foreground font-medium hover:opacity-90 transition-opacity"
               >
-                Create Employee
+                {isCreating ? "Creating..." : "Create Employee"}
               </button>
             </div>
           </motion.div>
