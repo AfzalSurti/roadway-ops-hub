@@ -10,11 +10,12 @@ import { toast } from "sonner";
 export default function AdminTeam() {
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", password: "" });
 
   const { data: users = [], refetch: refetchUsers } = useQuery({ queryKey: ["users"], queryFn: () => api.getUsers() });
-  const { data: tasksData } = useQuery({ queryKey: ["tasks", "team"], queryFn: () => api.getTasks({ limit: 200 }) });
-  const { data: reportsData } = useQuery({ queryKey: ["reports", "team"], queryFn: () => api.getReports({ limit: 200 }) });
+  const { data: tasksData, refetch: refetchTasks } = useQuery({ queryKey: ["tasks", "team"], queryFn: () => api.getTasks({ limit: 200 }) });
+  const { data: reportsData, refetch: refetchReports } = useQuery({ queryKey: ["reports", "team"], queryFn: () => api.getReports({ limit: 200 }) });
 
   const tasks = tasksData?.items ?? [];
   const reports = reportsData?.items ?? [];
@@ -47,6 +48,30 @@ export default function AdminTeam() {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to create employee";
       toast.error(message);
+    }
+  };
+
+  const handleDeleteEmployee = async () => {
+    if (!selectedUser || !selected) {
+      return;
+    }
+
+    const confirmed = window.confirm(`Delete employee ${selected.name}? This cannot be undone.`);
+    if (!confirmed) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      await api.deleteEmployee(selectedUser);
+      await Promise.all([refetchUsers(), refetchTasks(), refetchReports()]);
+      setSelectedUser(null);
+      toast.success("Employee deleted");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to delete employee";
+      toast.error(message);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -98,7 +123,7 @@ export default function AdminTeam() {
           >
             <div className="flex items-center justify-between mb-6">
               <h3 className="font-semibold">Team Member Profile</h3>
-              <button onClick={() => setSelectedUser(null)} className="p-1.5 rounded-lg hover:bg-secondary/50"><X className="h-4 w-4" /></button>
+              <button aria-label="Close profile" title="Close profile" onClick={() => setSelectedUser(null)} className="p-1.5 rounded-lg hover:bg-secondary/50"><X className="h-4 w-4" /></button>
             </div>
 
             <div className="text-center mb-6">
@@ -127,6 +152,14 @@ export default function AdminTeam() {
               ))}
               {selectedReports.length === 0 && <p className="text-sm text-muted-foreground">No submissions yet</p>}
             </div>
+
+            <button
+              onClick={() => void handleDeleteEmployee()}
+              disabled={isDeleting}
+              className="w-full mt-6 py-2.5 rounded-xl border border-destructive/40 text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-60"
+            >
+              {isDeleting ? "Deleting..." : "Delete Employee"}
+            </button>
           </motion.div>
         </div>
       )}
@@ -136,7 +169,7 @@ export default function AdminTeam() {
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="glass-panel-strong p-6 w-full max-w-md mx-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold">Add Employee</h3>
-              <button onClick={() => setShowCreate(false)} className="p-1 rounded-lg hover:bg-secondary/50">
+              <button aria-label="Close add employee" title="Close add employee" onClick={() => setShowCreate(false)} className="p-1 rounded-lg hover:bg-secondary/50">
                 <X className="h-4 w-4" />
               </button>
             </div>

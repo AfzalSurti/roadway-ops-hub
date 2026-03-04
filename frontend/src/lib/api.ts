@@ -1,6 +1,6 @@
 import type { ApiUser, ReportItem, ReportStatus, ReportTemplate, TaskItem, TaskStatus } from "./domain";
 
-const API_BASE_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:4000").replace(/\/+$/, "");
+  const API_BASE_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:4000").replace(/\/+$/, "");
 
 type ApiResponse<T> = {
   success: boolean;
@@ -255,6 +255,12 @@ export const api = {
     return request<ApiUser>("/users", {
       method: "POST",
       body: JSON.stringify(payload)
+    });
+  },
+
+  deleteEmployee(id: string) {
+    return request<{ deleted: boolean }>(`/users/${id}`, {
+      method: "DELETE"
     });
   }
 };

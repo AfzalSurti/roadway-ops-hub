@@ -11,3 +11,4 @@ export const usersRouter = Router();
 usersRouter.use(requireAuth, requireRole("ADMIN"));
 usersRouter.post("/", validate(createEmployeeSchema), asyncHandler(userController.createEmployee));
 usersRouter.get("/", asyncHandler(userController.listEmployees));
+usersRouter.delete("/:id", asyncHandler(userController.deleteEmployee));

@@ -24,5 +24,9 @@ export const userController = {
       createdAt: user.createdAt,
       updatedAt: user.updatedAt
     })));
+  },
+  async deleteEmployee(req: Request, res: Response) {
+    const result = await userService.deleteEmployee(req.params.id);
+    return sendSuccess(res, result);
   }
 };

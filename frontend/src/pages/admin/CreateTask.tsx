@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { PageWrapper } from "@/components/PageWrapper";
 import { ArrowLeft } from "lucide-react";
@@ -20,11 +20,28 @@ const taskSchema = z.object({
 
 type TaskFormValues = z.infer<typeof taskSchema>;
 
+const TASK_DRAFT_KEY = "highwayops_create_task_draft";
+
+type TaskDraft = Partial<TaskFormValues> & {
+  projectMode?: "existing" | "other";
+  selectedProject?: string;
+  otherProject?: string;
+};
+
 export default function CreateTask() {
   const navigate = useNavigate();
-  const [projectMode, setProjectMode] = useState<"existing" | "other">("existing");
-  const [selectedProject, setSelectedProject] = useState("");
-  const [otherProject, setOtherProject] = useState("");
+  const draft: TaskDraft = useMemo(() => {
+    try {
+      const raw = sessionStorage.getItem(TASK_DRAFT_KEY);
+      return raw ? (JSON.parse(raw) as TaskDraft) : {};
+    } catch {
+      return {};
+    }
+  }, []);
+
+  const [projectMode, setProjectMode] = useState<"existing" | "other">(draft.projectMode ?? "existing");
+  const [selectedProject, setSelectedProject] = useState(draft.selectedProject ?? "");
+  const [otherProject, setOtherProject] = useState(draft.otherProject ?? "");
 
   const { data: users = [] } = useQuery({ queryKey: ["users"], queryFn: () => api.getUsers() });
   const { data: templates = [] } = useQuery({ queryKey: ["templates"], queryFn: () => api.getTemplates() });
@@ -35,11 +52,31 @@ export default function CreateTask() {
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors, isSubmitting }
   } = useForm<TaskFormValues>({
     resolver: zodResolver(taskSchema),
-    defaultValues: { priority: "MEDIUM" }
+    defaultValues: {
+      title: draft.title ?? "",
+      description: draft.description ?? "",
+      assignedToId: draft.assignedToId ?? "",
+      dueDate: draft.dueDate ?? "",
+      priority: draft.priority ?? "MEDIUM",
+      reportTemplateId: draft.reportTemplateId ?? ""
+    }
   });
+
+  const values = watch();
+
+  useEffect(() => {
+    const payload: TaskDraft = {
+      ...values,
+      projectMode,
+      selectedProject,
+      otherProject
+    };
+    sessionStorage.setItem(TASK_DRAFT_KEY, JSON.stringify(payload));
+  }, [values, projectMode, selectedProject, otherProject]);
 
   const onSubmit = async (data: TaskFormValues) => {
     const project = projectMode === "existing" ? selectedProject : otherProject.trim();
@@ -53,6 +90,7 @@ export default function CreateTask() {
         ...data,
         project
       });
+      sessionStorage.removeItem(TASK_DRAFT_KEY);
       toast.success("Task created successfully!");
       navigate("/admin/tasks");
     } catch (error) {
@@ -103,6 +141,8 @@ export default function CreateTask() {
             <label className="text-sm font-medium mb-1.5 block">Assigned To</label>
             <select
               {...register("assignedToId")}
+              aria-label="Assigned To"
+              title="Assigned To"
               className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
             >
               <option value="">Select employee</option>
@@ -129,6 +169,8 @@ export default function CreateTask() {
             <label className="text-sm font-medium mb-1.5 block">Priority</label>
             <select
               {...register("priority")}
+              aria-label="Priority"
+              title="Priority"
               className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
             >
               <option value="LOW">Low</option>
@@ -169,6 +211,8 @@ export default function CreateTask() {
               <select
                 value={selectedProject}
                 onChange={(event) => setSelectedProject(event.target.value)}
+                aria-label="Existing Project"
+                title="Existing Project"
                 className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
               >
                 <option value="">Select existing project</option>
@@ -193,6 +237,8 @@ export default function CreateTask() {
           <label className="text-sm font-medium mb-1.5 block">Template</label>
           <select
             {...register("reportTemplateId")}
+            aria-label="Template"
+            title="Template"
             className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
           >
             <option value="">Select template</option>
