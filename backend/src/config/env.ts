@@ -20,6 +20,8 @@ const envSchema = z.object({
     .min(8)
     .transform((value) => value.replace(/\s+/g, ""))
     .optional(),
+  RESEND_API_KEY: z.string().min(1).optional(),
+  EMAIL_FROM: z.string().trim().min(3).optional(),
   APP_URL: z.string().url().optional()
 });
 
