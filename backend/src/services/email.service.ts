@@ -1,6 +1,9 @@
 import nodemailer from "nodemailer";
+import { Resend } from "resend";
 import { env } from "../config/env.js";
 import { logger } from "../config/logger.js";
+
+const resend = env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null;
 
 const transporter =
   env.GMAIL && env.APP_PASSWORD
@@ -38,29 +41,21 @@ function buildWelcomeHtml(payload: { employeeName: string; employeeEmail: string
 }
 
 async function sendViaResend(args: { to: string; subject: string; html: string }) {
-  if (!env.RESEND_API_KEY) {
+  if (!resend) {
     return false;
   }
 
   const from = env.EMAIL_FROM ?? "RoadwayOps Hub <onboarding@resend.dev>";
 
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${env.RESEND_API_KEY}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      from,
-      to: [args.to],
-      subject: args.subject,
-      html: args.html
-    })
+  const result = await resend.emails.send({
+    from,
+    to: [args.to],
+    subject: args.subject,
+    html: args.html
   });
 
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`Resend send failed (${response.status}): ${body}`);
+  if (result.error) {
+    throw new Error(`Resend send failed: ${result.error.message}`);
   }
 
   return true;
@@ -94,6 +89,30 @@ export const emailService = {
     await transporter.sendMail({
       from: env.EMAIL_FROM ?? `RoadwayOps Hub <${env.GMAIL}>`,
       to: payload.to,
+      subject,
+      html
+    });
+
+    return true;
+  },
+
+  async sendSimpleWelcomeEmail(to: string) {
+    const html = "<p>Your account is created successfully.</p>";
+    const subject = "Welcome Employee";
+
+    if (resend) {
+      await sendViaResend({ to, subject, html });
+      return true;
+    }
+
+    if (!transporter || !env.GMAIL) {
+      logger.warn("No email provider configured (RESEND_API_KEY or GMAIL/APP_PASSWORD). Welcome email skipped.");
+      return false;
+    }
+
+    await transporter.sendMail({
+      from: env.EMAIL_FROM ?? `RoadwayOps Hub <${env.GMAIL}>`,
+      to,
       subject,
       html
     });
