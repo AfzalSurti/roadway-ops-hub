@@ -14,8 +14,12 @@ const envSchema = z.object({
   BCRYPT_SALT_ROUNDS: z.coerce.number().int().min(8).max(14).default(10),
   CORS_ORIGIN: z.string().default("http://localhost:5173"),
   SQLITE_BUSY_TIMEOUT_MS: z.coerce.number().int().min(1000).default(5000),
-  GMAIL: z.string().email().optional(),
-  APP_PASSWORD: z.string().min(8).optional(),
+  GMAIL: z.string().trim().email().optional(),
+  APP_PASSWORD: z
+    .string()
+    .min(8)
+    .transform((value) => value.replace(/\s+/g, ""))
+    .optional(),
   APP_URL: z.string().url().optional()
 });
 
