@@ -13,6 +13,8 @@ export default function TaskDetail() {
   const navigate = useNavigate();
   const [submission, setSubmission] = useState<Record<string, unknown>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [commentBody, setCommentBody] = useState("");
+  const [postingComment, setPostingComment] = useState(false);
 
   const { data: task } = useQuery({
     queryKey: ["task", id],
@@ -21,6 +23,11 @@ export default function TaskDetail() {
   });
 
   const templateFields = useMemo(() => task?.reportTemplate?.fields ?? [], [task]);
+  const { data: comments = [], refetch: refetchComments } = useQuery({
+    queryKey: ["task-comments", id],
+    queryFn: () => api.getTaskComments(id as string),
+    enabled: Boolean(id)
+  });
 
   if (!task) {
     return (
@@ -57,6 +64,25 @@ export default function TaskDetail() {
       toast.error(message);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleAddComment = async () => {
+    if (!id || !commentBody.trim()) {
+      return;
+    }
+
+    try {
+      setPostingComment(true);
+      await api.addTaskComment(id, commentBody.trim());
+      setCommentBody("");
+      await refetchComments();
+      toast.success("Comment sent to admin");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to send comment";
+      toast.error(message);
+    } finally {
+      setPostingComment(false);
     }
   };
 
@@ -100,6 +126,18 @@ export default function TaskDetail() {
                 <p className="text-xs text-muted-foreground">Created</p>
                 <p className="text-sm font-medium">{new Date(task.createdAt).toLocaleDateString()}</p>
               </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Submission Period</p>
+                <p className="text-sm font-medium">{task.allottedDays ?? "-"} days</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Days Taken</p>
+                <p className="text-sm font-medium">{task.completionDays ?? "-"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Delay (Days)</p>
+                <p className="text-sm font-medium">{task.completionDelayDays ?? 0}</p>
+              </div>
             </div>
           </div>
 
@@ -127,11 +165,15 @@ export default function TaskDetail() {
                   {field.type === "textarea" ? (
                     <textarea
                       rows={3}
+                      title={field.label}
+                      placeholder={field.label}
                       onChange={(event) => setSubmission((prev) => ({ ...prev, [field.id]: event.target.value }))}
                       className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none resize-none focus:border-primary/50"
                     />
                   ) : field.type === "select" ? (
                     <select
+                      title={field.label}
+                      aria-label={field.label}
                       onChange={(event) => setSubmission((prev) => ({ ...prev, [field.id]: event.target.value }))}
                       className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
                     >
@@ -145,6 +187,8 @@ export default function TaskDetail() {
                   ) : (
                     <input
                       type={field.type === "number" ? "number" : field.type === "date" ? "date" : "text"}
+                      title={field.label}
+                      placeholder={field.label}
                       onChange={(event) => {
                         const rawValue = event.target.value;
                         const parsedValue =
@@ -168,6 +212,37 @@ export default function TaskDetail() {
                 {submitting ? "Submitting…" : "Submit Report"}
               </button>
             </div>
+          </div>
+
+          <div className="glass-panel p-6">
+            <h3 className="font-semibold mb-4">Manager Comments</h3>
+            <div className="space-y-3 mb-4 max-h-64 overflow-y-auto pr-1">
+              {comments.map((comment) => (
+                <div key={comment.id} className="rounded-xl border border-border/40 bg-secondary/20 p-3">
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <p className="text-sm font-medium">{comment.author?.name ?? "User"}</p>
+                    <p className="text-xs text-muted-foreground">{new Date(comment.createdAt).toLocaleString()}</p>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{comment.body}</p>
+                </div>
+              ))}
+              {comments.length === 0 && <p className="text-sm text-muted-foreground">No comments yet.</p>}
+            </div>
+
+            <textarea
+              value={commentBody}
+              onChange={(event) => setCommentBody(event.target.value)}
+              rows={3}
+              placeholder="Reply to manager comments..."
+              className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none resize-none focus:border-primary/50"
+            />
+            <button
+              onClick={() => void handleAddComment()}
+              disabled={postingComment || !commentBody.trim()}
+              className="mt-3 w-full py-2.5 rounded-xl bg-gradient-to-r from-primary to-accent text-primary-foreground font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+            >
+              {postingComment ? "Sending..." : "Send Reply"}
+            </button>
           </div>
         </div>
 

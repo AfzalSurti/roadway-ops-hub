@@ -11,6 +11,9 @@ export const userRepository = {
   findEmployees() {
     return prisma.user.findMany({ where: { role: "EMPLOYEE" } });
   },
+  findAdmins() {
+    return prisma.user.findMany({ where: { role: "ADMIN" } });
+  },
   async getEmployeeUsageSummary(id: string) {
     const [assignedTasks, submittedReports, comments, uploads] = await Promise.all([
       prisma.task.count({ where: { assignedToId: id } }),

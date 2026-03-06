@@ -3,6 +3,8 @@ import { commentRepository } from "../repositories/comment.repository.js";
 import { taskRepository } from "../repositories/task.repository.js";
 import { forbidden, notFound } from "../utils/errors.js";
 import { auditService } from "./audit.service.js";
+import { notificationService } from "./notification.service.js";
+import { userRepository } from "../repositories/user.repository.js";
 
 export const commentService = {
   async create(taskId: string, body: string, user: { id: string; role: Role }) {
@@ -27,6 +29,15 @@ export const commentService = {
       entityType: "Task",
       entityId: taskId,
       meta: { commentAdded: true }
+    });
+
+    const recipientIds = user.role === "ADMIN" ? [task.assignedToId] : (await userRepository.findAdmins()).map((admin) => admin.id);
+    await notificationService.notifyUsers({
+      userIds: recipientIds,
+      title: user.role === "ADMIN" ? "Manager Comment" : "Employee Reply",
+      message: `${task.title}: ${body.slice(0, 80)}`,
+      entityType: "Task",
+      entityId: taskId
     });
 
     return comment;

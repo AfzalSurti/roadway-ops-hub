@@ -1,4 +1,4 @@
-import type { ApiUser, ReportItem, ReportStatus, ReportTemplate, TaskItem, TaskStatus } from "./domain";
+import type { ApiUser, AppNotification, ReportItem, ReportStatus, ReportTemplate, TaskComment, TaskItem, TaskStatus } from "./domain";
 
   const API_BASE_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:4000").replace(/\/+$/, "");
 
@@ -175,8 +175,11 @@ export const api = {
   createTask(payload: {
     title: string;
     description: string;
+    projectCode?: string;
+    projectNumber?: string;
     project: string;
     dueDate: string;
+    allottedDays?: number;
     priority: TaskItem["priority"];
     assignedToId: string;
     reportTemplateId: string;
@@ -191,6 +194,17 @@ export const api = {
     return request<TaskItem>(`/tasks/${id}`, {
       method: "PATCH",
       body: JSON.stringify(payload)
+    });
+  },
+
+  getTaskComments(taskId: string) {
+    return request<TaskComment[]>(`/tasks/${taskId}/comments`);
+  },
+
+  addTaskComment(taskId: string, body: string) {
+    return request<TaskComment>(`/tasks/${taskId}/comments`, {
+      method: "POST",
+      body: JSON.stringify({ body })
     });
   },
 
@@ -261,6 +275,22 @@ export const api = {
   deleteEmployee(id: string) {
     return request<{ deleted: boolean }>(`/users/${id}`, {
       method: "DELETE"
+    });
+  },
+
+  getNotifications(limit = 30) {
+    return request<AppNotification[]>(`/notifications?limit=${limit}`);
+  },
+
+  markNotificationRead(id: string) {
+    return request<{ updated: boolean }>(`/notifications/${id}/read`, {
+      method: "PATCH"
+    });
+  },
+
+  markAllNotificationsRead() {
+    return request<{ updated: number }>("/notifications/read-all", {
+      method: "PATCH"
     });
   }
 };

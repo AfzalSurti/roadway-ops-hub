@@ -4,6 +4,11 @@ import { notFound } from "../utils/errors.js";
 import { getPagination } from "../utils/pagination.js";
 import { auditService } from "./audit.service.js";
 
+function calculateDayDifference(startAt: Date, endAt: Date): number {
+  const dayMs = 1000 * 60 * 60 * 24;
+  return Math.max(0, Math.ceil((endAt.getTime() - startAt.getTime()) / dayMs));
+}
+
 type TaskFilters = {
   assignedToId?: string;
   status?: TaskStatus;
@@ -79,7 +84,20 @@ export const taskService = {
   async update(id: string, data: Prisma.TaskUncheckedUpdateInput, actorId: string) {
     await this.getById(id);
     const previous = await taskRepository.findById(id);
-    const updated = await taskRepository.update(id, data);
+    const normalizedData: Prisma.TaskUncheckedUpdateInput = { ...data };
+
+    if (data.status === "DONE" && previous) {
+      const completedAt = data.actualCompletedAt ? new Date(String(data.actualCompletedAt)) : new Date();
+      const completionDays = calculateDayDifference(previous.createdAt, completedAt);
+      const baselineDays = previous.allottedDays ?? calculateDayDifference(previous.createdAt, previous.dueDate);
+
+      normalizedData.actualCompletedAt = completedAt;
+      normalizedData.completionDays = completionDays;
+      normalizedData.completionDelayDays = Math.max(0, completionDays - baselineDays);
+      normalizedData.submittedForReviewAt = normalizedData.submittedForReviewAt ?? completedAt;
+    }
+
+    const updated = await taskRepository.update(id, normalizedData);
     await auditService.log({
       action: "TASK_UPDATED",
       actorId,

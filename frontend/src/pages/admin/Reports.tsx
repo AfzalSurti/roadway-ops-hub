@@ -16,12 +16,18 @@ export default function AdminReports() {
   const [selectedReport, setSelectedReport] = useState<string | null>(null);
   const [feedbackModal, setFeedbackModal] = useState<string | null>(null);
   const [feedback, setFeedback] = useState("");
+  const [taskComment, setTaskComment] = useState("");
 
   const { data } = useQuery({ queryKey: ["reports", "admin"], queryFn: () => api.getReports({ limit: 100 }) });
 
   const reports = data?.items ?? [];
   const filtered = filter === "ALL" ? reports : reports.filter((report) => report.status === filter);
   const selected = reports.find((report) => report.id === selectedReport);
+  const { data: taskComments = [], refetch: refetchTaskComments } = useQuery({
+    queryKey: ["task-comments", selected?.taskId],
+    queryFn: () => api.getTaskComments(selected!.taskId),
+    enabled: Boolean(selected?.taskId)
+  });
 
   const statusFilters: { value: ReportStatusFilter; label: string }[] = [
     { value: "ALL", label: "All" },
@@ -56,6 +62,22 @@ export default function AdminReports() {
       window.location.reload();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to submit feedback";
+      toast.error(message);
+    }
+  };
+
+  const handleAddTaskComment = async () => {
+    if (!selected?.taskId || !taskComment.trim()) {
+      return;
+    }
+
+    try {
+      await api.addTaskComment(selected.taskId, taskComment.trim());
+      setTaskComment("");
+      await refetchTaskComments();
+      toast.success("Comment sent to employee");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to add comment";
       toast.error(message);
     }
   };
@@ -97,6 +119,7 @@ export default function AdminReports() {
                 <th className="text-left p-4 font-medium">Task</th>
                 <th className="text-left p-4 font-medium hidden sm:table-cell">Submitted By</th>
                 <th className="text-left p-4 font-medium hidden md:table-cell">Date</th>
+                <th className="text-left p-4 font-medium hidden xl:table-cell">Days</th>
                 <th className="text-left p-4 font-medium">Status</th>
                 <th className="text-left p-4 font-medium">Actions</th>
               </tr>
@@ -122,6 +145,7 @@ export default function AdminReports() {
                     </div>
                   </td>
                   <td className="p-4 hidden md:table-cell text-muted-foreground">{new Date(report.createdAt).toLocaleDateString()}</td>
+                  <td className="p-4 hidden xl:table-cell text-muted-foreground">{report.turnaroundDays ?? "-"}</td>
                   <td className="p-4">
                     <span className={cn("status-badge", reportStatusConfig[report.status].color)}>
                       {reportStatusConfig[report.status].label}
@@ -182,6 +206,34 @@ export default function AdminReports() {
                   <p className="text-sm">{selected.adminFeedback}</p>
                 </div>
               )}
+
+              <div className="mt-5">
+                <p className="text-xs text-muted-foreground mb-2">Task Comments</p>
+                <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
+                  {taskComments.map((comment) => (
+                    <div key={comment.id} className="rounded-lg border border-border/40 p-2">
+                      <p className="text-xs text-muted-foreground mb-1">
+                        {comment.author?.name ?? "User"} • {new Date(comment.createdAt).toLocaleString()}
+                      </p>
+                      <p className="text-sm">{comment.body}</p>
+                    </div>
+                  ))}
+                  {taskComments.length === 0 && <p className="text-xs text-muted-foreground">No comments yet.</p>}
+                </div>
+                <textarea
+                  value={taskComment}
+                  onChange={(event) => setTaskComment(event.target.value)}
+                  rows={2}
+                  className="mt-2 w-full px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none resize-none focus:border-primary/50"
+                  placeholder="Comment for employee"
+                />
+                <button
+                  onClick={() => void handleAddTaskComment()}
+                  className="mt-2 w-full py-2 rounded-xl bg-primary/10 text-primary border border-primary/20 text-sm font-medium hover:bg-primary/20 transition-colors"
+                >
+                  Send Comment
+                </button>
+              </div>
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-48 text-muted-foreground">

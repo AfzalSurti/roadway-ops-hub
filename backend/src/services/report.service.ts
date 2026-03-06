@@ -6,6 +6,13 @@ import { badRequest, notFound } from "../utils/errors.js";
 import { getPagination } from "../utils/pagination.js";
 import { auditService } from "./audit.service.js";
 import { templateFieldsSchema } from "../validators/template.validator.js";
+import { userRepository } from "../repositories/user.repository.js";
+import { notificationService } from "./notification.service.js";
+
+function calculateDayDifference(startAt: Date, endAt: Date): number {
+  const dayMs = 1000 * 60 * 60 * 24;
+  return Math.max(0, Math.ceil((endAt.getTime() - startAt.getTime()) / dayMs));
+}
 
 type ReportFilters = {
   status?: ReportStatus;
@@ -77,18 +84,38 @@ export const reportService = {
 
     validateSubmission(template.fields, payload.submission);
 
+    const submittedAt = new Date();
+    const turnaroundDays = calculateDayDifference(task.createdAt, submittedAt);
+
     const report = await reportRepository.create({
       taskId: payload.taskId,
       reportTemplateId: payload.reportTemplateId,
       submittedById: userId,
       submission: payload.submission as Prisma.InputJsonValue,
       templateSnapshot: template.fields as Prisma.InputJsonValue,
-      status: "SUBMITTED"
+      status: "SUBMITTED",
+      submittedAt,
+      turnaroundDays
+    });
+
+    await taskRepository.update(task.id, {
+      submittedForReviewAt: submittedAt,
+      completionDays: turnaroundDays,
+      completionDelayDays: task.allottedDays ? Math.max(0, turnaroundDays - task.allottedDays) : undefined
     });
 
     await auditService.log({
       action: "REPORT_SUBMITTED",
       actorId: userId,
+      entityType: "Report",
+      entityId: report.id
+    });
+
+    const admins = await userRepository.findAdmins();
+    await notificationService.notifyUsers({
+      userIds: admins.map((admin) => admin.id),
+      title: "Task Submitted",
+      message: `${task.title} was submitted for your review.`,
       entityType: "Report",
       entityId: report.id
     });
@@ -136,8 +163,21 @@ export const reportService = {
   },
 
   async updateStatus(id: string, status: ReportStatus, adminId: string) {
-    await this.getById(id);
+    const existing = await this.getById(id);
     const updated = await reportRepository.update(id, { status });
+
+    if (status === "APPROVED") {
+      const completedAt = new Date();
+      const completionDays = calculateDayDifference(existing.task.createdAt, completedAt);
+      await taskRepository.update(existing.taskId, {
+        status: "DONE",
+        reviewCompletedAt: completedAt,
+        actualCompletedAt: completedAt,
+        completionDays,
+        completionDelayDays: existing.task.allottedDays ? Math.max(0, completionDays - existing.task.allottedDays) : undefined
+      });
+    }
+
     await auditService.log({
       action: "REPORT_REVIEWED",
       actorId: adminId,
@@ -145,11 +185,20 @@ export const reportService = {
       entityId: id,
       meta: { status }
     });
+
+    await notificationService.notifyUsers({
+      userIds: [existing.submittedById],
+      title: `Report ${status.replace("_", " ")}`,
+      message: `Your task report for ${existing.task?.title ?? "task"} has been reviewed.`,
+      entityType: "Report",
+      entityId: id
+    });
+
     return updated;
   },
 
   async updateFeedback(id: string, adminFeedback: string, adminId: string) {
-    await this.getById(id);
+    const existing = await this.getById(id);
     const updated = await reportRepository.update(id, { adminFeedback });
     await auditService.log({
       action: "REPORT_REVIEWED",
@@ -158,6 +207,15 @@ export const reportService = {
       entityId: id,
       meta: { feedback: true }
     });
+
+    await notificationService.notifyUsers({
+      userIds: [existing.submittedById],
+      title: "Changes Requested",
+      message: `Admin added feedback on ${existing.task?.title ?? "your report"}.`,
+      entityType: "Report",
+      entityId: id
+    });
+
     return updated;
   }
 };

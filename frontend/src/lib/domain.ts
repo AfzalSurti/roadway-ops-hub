@@ -22,8 +22,18 @@ export type TaskItem = {
   id: string;
   title: string;
   description: string;
+  projectCode?: string | null;
+  projectNumber?: string | null;
   project: string;
   dueDate: string;
+  allottedDays?: number | null;
+  submittedForReviewAt?: string | null;
+  managerReviewComments?: string | null;
+  reviewCompletedAt?: string | null;
+  actualCompletedAt?: string | null;
+  completionDays?: number | null;
+  completionDelayDays?: number | null;
+  rating?: number | null;
   status: TaskStatus;
   priority: Priority;
   blockedReason?: string | null;
@@ -55,12 +65,34 @@ export type ReportItem = {
   templateSnapshot: TemplateField[];
   status: ReportStatus;
   adminFeedback?: string | null;
+  submittedAt?: string;
+  turnaroundDays?: number | null;
   createdAt: string;
   updatedAt: string;
   task?: TaskItem;
   submittedBy?: ApiUser;
   reportTemplate?: ReportTemplate;
   attachments?: Array<{ id: string; fileName: string; url: string }>;
+};
+
+export type TaskComment = {
+  id: string;
+  taskId: string;
+  authorId: string;
+  body: string;
+  createdAt: string;
+  author?: ApiUser;
+};
+
+export type AppNotification = {
+  id: string;
+  userId: string;
+  title: string;
+  message: string;
+  entityType: string;
+  entityId: string;
+  isRead: boolean;
+  createdAt: string;
 };
 
 export const statusConfig: Record<TaskStatus, { label: string; color: string }> = {

@@ -6,6 +6,7 @@ import { reportsRouter } from "./reports.routes.js";
 import { uploadsRouter } from "./uploads.routes.js";
 import { usersRouter } from "./users.routes.js";
 import { projectsRouter } from "./projects.routes.js";
+import { notificationsRouter } from "./notifications.routes.js";
 
 export const apiRouter = Router();
 
@@ -16,3 +17,4 @@ apiRouter.use("/reports", reportsRouter);
 apiRouter.use("/uploads", uploadsRouter);
 apiRouter.use("/users", usersRouter);
 apiRouter.use("/projects", projectsRouter);
+apiRouter.use("/notifications", notificationsRouter);

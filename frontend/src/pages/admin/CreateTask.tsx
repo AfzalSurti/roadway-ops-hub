@@ -12,8 +12,11 @@ import { useQuery } from "@tanstack/react-query";
 const taskSchema = z.object({
   title: z.string().min(3, "Title must be at least 3 characters"),
   description: z.string().min(10, "Description must be at least 10 characters"),
+  projectCode: z.string().optional(),
+  projectNumber: z.string().optional(),
   assignedToId: z.string().min(1, "Please assign to someone"),
   dueDate: z.string().min(1, "Due date is required"),
+  allottedDays: z.string().optional(),
   priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]),
   reportTemplateId: z.string().min(1, "Template is required")
 });
@@ -61,6 +64,9 @@ export default function CreateTask() {
       description: draft.description ?? "",
       assignedToId: draft.assignedToId ?? "",
       dueDate: draft.dueDate ?? "",
+      projectCode: draft.projectCode ?? "",
+      projectNumber: draft.projectNumber ?? "",
+      allottedDays: draft.allottedDays ?? "",
       priority: draft.priority ?? "MEDIUM",
       reportTemplateId: draft.reportTemplateId ?? ""
     }
@@ -88,6 +94,9 @@ export default function CreateTask() {
     try {
       await api.createTask({
         ...data,
+        projectCode: data.projectCode?.trim() || undefined,
+        projectNumber: data.projectNumber?.trim() || undefined,
+        allottedDays: data.allottedDays ? Number(data.allottedDays) : undefined,
         project
       });
       sessionStorage.removeItem(TASK_DRAFT_KEY);
@@ -166,6 +175,17 @@ export default function CreateTask() {
           </div>
 
           <div>
+            <label className="text-sm font-medium mb-1.5 block">Submission Period (Days)</label>
+            <input
+              {...register("allottedDays")}
+              type="number"
+              min={1}
+              className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
+              placeholder="e.g. 7"
+            />
+          </div>
+
+          <div>
             <label className="text-sm font-medium mb-1.5 block">Priority</label>
             <select
               {...register("priority")}
@@ -230,6 +250,19 @@ export default function CreateTask() {
                 className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
               />
             )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+              <input
+                {...register("projectCode")}
+                placeholder="Project code (optional)"
+                className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
+              />
+              <input
+                {...register("projectNumber")}
+                placeholder="Project number (optional)"
+                className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
+              />
+            </div>
           </div>
         </div>
 

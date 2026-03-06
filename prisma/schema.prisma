@@ -58,6 +58,7 @@ model User {
   attachments   Attachment[]
   refreshTokens RefreshToken[]
   audits        AuditLog[]
+  notifications Notification[]
 }
 
 model RefreshToken {
@@ -98,8 +99,18 @@ model Task {
   id               String        @id @default(cuid())
   title            String
   description      String
+  projectCode      String?
+  projectNumber    String?
   project          String
   dueDate          DateTime
+  allottedDays     Int?
+  submittedForReviewAt DateTime?
+  managerReviewComments String?
+  reviewCompletedAt DateTime?
+  actualCompletedAt DateTime?
+  completionDays   Int?
+  completionDelayDays Int?
+  rating           Float?
   status           TaskStatus    @default(TODO)
   priority         Priority
   blockedReason    String?
@@ -131,6 +142,8 @@ model Report {
   templateSnapshot Json
   status           ReportStatus @default(SUBMITTED)
   adminFeedback    String?
+  submittedAt      DateTime     @default(now())
+  turnaroundDays   Int?
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
   task             Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
@@ -191,4 +204,19 @@ model AuditLog {
   @@index([action])
   @@index([actorId])
   @@index([entityType, entityId])
+}
+
+model Notification {
+  id         String   @id @default(cuid())
+  userId     String
+  title      String
+  message    String
+  entityType String
+  entityId   String
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, isRead])
 }

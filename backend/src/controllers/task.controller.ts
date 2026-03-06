@@ -4,13 +4,15 @@ import { sendSuccess } from "../utils/response.js";
 
 export const taskController = {
   async create(req: Request, res: Response) {
+    const payload = {
+      ...req.body,
+      dueDate: new Date(req.body.dueDate),
+      createdById: req.user!.id,
+      status: "TODO"
+    };
+
     const result = await taskService.create(
-      {
-        ...req.body,
-        dueDate: new Date(req.body.dueDate),
-        createdById: req.user!.id,
-        status: "TODO"
-      },
+      payload,
       req.user!.id
     );
     return sendSuccess(res, result, 201);
@@ -37,7 +39,13 @@ export const taskController = {
   },
 
   async update(req: Request, res: Response) {
-    const payload = req.body.dueDate ? { ...req.body, dueDate: new Date(req.body.dueDate) } : req.body;
+    const payload = {
+      ...req.body,
+      dueDate: req.body.dueDate ? new Date(req.body.dueDate) : undefined,
+      submittedForReviewAt: req.body.submittedForReviewAt ? new Date(req.body.submittedForReviewAt) : req.body.submittedForReviewAt,
+      reviewCompletedAt: req.body.reviewCompletedAt ? new Date(req.body.reviewCompletedAt) : req.body.reviewCompletedAt,
+      actualCompletedAt: req.body.actualCompletedAt ? new Date(req.body.actualCompletedAt) : req.body.actualCompletedAt
+    };
     const result = await taskService.update(req.params.id, payload, req.user!.id);
     return sendSuccess(res, result);
   },
