@@ -10,15 +10,14 @@ import { api } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 
 const taskSchema = z.object({
-  title: z.string().min(3, "Title must be at least 3 characters"),
+  title: z.string().min(2, "Please select DPR activity"),
   description: z.string().min(10, "Description must be at least 10 characters"),
   projectCode: z.string().optional(),
   projectNumber: z.string().optional(),
   assignedToId: z.string().min(1, "Please assign to someone"),
   dueDate: z.string().min(1, "Due date is required"),
   allottedDays: z.string().optional(),
-  priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]),
-  reportTemplateId: z.string().min(1, "Template is required")
+  priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"])
 });
 
 type TaskFormValues = z.infer<typeof taskSchema>;
@@ -47,7 +46,7 @@ export default function CreateTask() {
   const [otherProject, setOtherProject] = useState(draft.otherProject ?? "");
 
   const { data: users = [] } = useQuery({ queryKey: ["users"], queryFn: () => api.getUsers() });
-  const { data: templates = [] } = useQuery({ queryKey: ["templates"], queryFn: () => api.getTemplates() });
+  const { data: dprActivities = [] } = useQuery({ queryKey: ["dpr-activities"], queryFn: () => api.getDprActivities() });
   const { data: projectsResult = [] } = useQuery({ queryKey: ["projects"], queryFn: () => api.getProjects() });
 
   const projects = useMemo(() => projectsResult.map((project) => project.name), [projectsResult]);
@@ -56,6 +55,8 @@ export default function CreateTask() {
     register,
     handleSubmit,
     watch,
+    setValue,
+    getValues,
     formState: { errors, isSubmitting }
   } = useForm<TaskFormValues>({
     resolver: zodResolver(taskSchema),
@@ -67,8 +68,7 @@ export default function CreateTask() {
       projectCode: draft.projectCode ?? "",
       projectNumber: draft.projectNumber ?? "",
       allottedDays: draft.allottedDays ?? "",
-      priority: draft.priority ?? "MEDIUM",
-      reportTemplateId: draft.reportTemplateId ?? ""
+      priority: draft.priority ?? "MEDIUM"
     }
   });
 
@@ -97,6 +97,7 @@ export default function CreateTask() {
         projectCode: data.projectCode?.trim() || undefined,
         projectNumber: data.projectNumber?.trim() || undefined,
         allottedDays: data.allottedDays ? Number(data.allottedDays) : undefined,
+        reportTemplateId: undefined,
         project
       });
       sessionStorage.removeItem(TASK_DRAFT_KEY);
@@ -125,12 +126,27 @@ export default function CreateTask() {
 
       <form onSubmit={handleSubmit(onSubmit)} className="glass-panel p-6 max-w-2xl space-y-5">
         <div>
-          <label className="text-sm font-medium mb-1.5 block">Title</label>
-          <input
-            {...register("title")}
-            className="w-full px-4 py-2.5 rounded-xl input-field bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
-            placeholder="Task title"
-          />
+          <label className="text-sm font-medium mb-1.5 block">DPR Activity</label>
+          <select
+            {...register("title", {
+              onChange: (event) => {
+                const selected = dprActivities.find((activity) => activity.label === event.target.value);
+                if (selected && !getValues("description")?.trim()) {
+                  setValue("description", selected.description, { shouldValidate: true, shouldDirty: true });
+                }
+              }
+            })}
+            aria-label="DPR Activity"
+            title="DPR Activity"
+            className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
+          >
+            <option value="">Select activity from DPR file</option>
+            {dprActivities.map((activity) => (
+              <option key={activity.id} value={activity.label}>
+                {activity.label}
+              </option>
+            ))}
+          </select>
           {errors.title && <p className="text-xs text-destructive mt-1">{errors.title.message}</p>}
         </div>
 
@@ -264,24 +280,6 @@ export default function CreateTask() {
               />
             </div>
           </div>
-        </div>
-
-        <div>
-          <label className="text-sm font-medium mb-1.5 block">Template</label>
-          <select
-            {...register("reportTemplateId")}
-            aria-label="Template"
-            title="Template"
-            className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
-          >
-            <option value="">Select template</option>
-            {templates.map((template) => (
-              <option key={template.id} value={template.id}>
-                {template.name}
-              </option>
-            ))}
-          </select>
-          {errors.reportTemplateId && <p className="text-xs text-destructive mt-1">{errors.reportTemplateId.message}</p>}
         </div>
 
         <button

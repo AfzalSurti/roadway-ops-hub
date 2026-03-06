@@ -4,7 +4,6 @@ import { SidebarNavItem } from "@/components/SidebarNavItem";
 import {
   LayoutDashboard,
   ListTodo,
-  FileText,
   Users,
   FolderKanban,
   FileCheck,
@@ -19,7 +18,6 @@ const adminNav = [
   { to: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/admin/tasks", icon: ListTodo, label: "Tasks" },
   { to: "/admin/reports", icon: FileCheck, label: "Reports" },
-  { to: "/admin/templates", icon: FileText, label: "Templates" },
   { to: "/admin/team", icon: Users, label: "Team" },
   { to: "/admin/projects", icon: FolderKanban, label: "Projects" },
 ];

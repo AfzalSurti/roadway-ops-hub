@@ -11,7 +11,7 @@ export const createTaskSchema = z.object({
   allottedDays: z.coerce.number().int().positive().optional(),
   priority: z.nativeEnum(Priority),
   assignedToId: z.string().min(1),
-  reportTemplateId: z.string().min(1)
+  reportTemplateId: z.string().min(1).optional()
 });
 
 export const updateTaskSchema = z

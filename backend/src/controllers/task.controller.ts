@@ -1,8 +1,14 @@
 import type { Request, Response } from "express";
 import { taskService } from "../services/task.service.js";
 import { sendSuccess } from "../utils/response.js";
+import { dprActivityService } from "../services/dpr-activity.service.js";
 
 export const taskController = {
+  async listDprActivities(_req: Request, res: Response) {
+    const result = await dprActivityService.list();
+    return sendSuccess(res, result);
+  },
+
   async create(req: Request, res: Response) {
     const payload = {
       ...req.body,

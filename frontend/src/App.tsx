@@ -12,7 +12,6 @@ import AdminDashboard from "./pages/admin/Dashboard";
 import AdminTasks from "./pages/admin/Tasks";
 import CreateTask from "./pages/admin/CreateTask";
 import AdminReports from "./pages/admin/Reports";
-import AdminTemplates from "./pages/admin/Templates";
 import AdminTeam from "./pages/admin/Team";
 import AdminProjects from "./pages/admin/Projects";
 import EmployeeDashboard from "./pages/employee/Dashboard";
@@ -43,7 +42,6 @@ function AppRoutes() {
         <Route path="tasks" element={<AdminTasks />} />
         <Route path="tasks/new" element={<CreateTask />} />
         <Route path="reports" element={<AdminReports />} />
-        <Route path="templates" element={<AdminTemplates />} />
         <Route path="team" element={<AdminTeam />} />
         <Route path="projects" element={<AdminProjects />} />
       </Route>

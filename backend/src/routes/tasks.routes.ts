@@ -14,6 +14,7 @@ tasksRouter.use(requireAuth);
 
 tasksRouter.post("/", requireRole("ADMIN"), validate(createTaskSchema), asyncHandler(taskController.create));
 tasksRouter.get("/", asyncHandler(taskController.list));
+tasksRouter.get("/dpr-activities", requireRole("ADMIN"), asyncHandler(taskController.listDprActivities));
 tasksRouter.get("/:id", asyncHandler(allowSelfOrAdmin("task")), asyncHandler(taskController.getById));
 tasksRouter.patch(
   "/:id",

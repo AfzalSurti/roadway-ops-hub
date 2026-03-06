@@ -182,7 +182,7 @@ export const api = {
     allottedDays?: number;
     priority: TaskItem["priority"];
     assignedToId: string;
-    reportTemplateId: string;
+    reportTemplateId?: string;
   }) {
     return request<TaskItem>("/tasks", {
       method: "POST",
@@ -256,6 +256,10 @@ export const api = {
 
   getProjects() {
     return request<Array<{ id: string; name: string; description?: string | null; createdAt: string; updatedAt: string }>>("/projects");
+  },
+
+  getDprActivities() {
+    return request<Array<{ id: string; label: string; description: string; reference?: string }>>("/tasks/dpr-activities");
   },
 
   createProject(payload: { name: string; description?: string }) {

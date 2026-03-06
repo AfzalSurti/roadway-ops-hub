@@ -1,5 +1,6 @@
 import type { Prisma, Role, TaskStatus } from "@prisma/client";
 import { taskRepository } from "../repositories/task.repository.js";
+import { templateRepository } from "../repositories/template.repository.js";
 import { notFound } from "../utils/errors.js";
 import { getPagination } from "../utils/pagination.js";
 import { auditService } from "./audit.service.js";
@@ -23,7 +24,26 @@ type TaskFilters = {
 
 export const taskService = {
   async create(payload: Prisma.TaskUncheckedCreateInput, actorId: string) {
-    const created = await taskRepository.create(payload);
+    let reportTemplateId = payload.reportTemplateId;
+
+    if (!reportTemplateId) {
+      const defaultName = "Default DPR Template";
+      const byName = await templateRepository.findByName(defaultName);
+      const existing = byName ?? (await templateRepository.findFirst());
+      const template =
+        existing ??
+        (await templateRepository.create({
+          name: defaultName,
+          description: "Auto-created default template for DPR task workflow",
+          fields: []
+        }));
+      reportTemplateId = template.id;
+    }
+
+    const created = await taskRepository.create({
+      ...payload,
+      reportTemplateId
+    });
     await auditService.log({
       action: "TASK_CREATED",
       actorId,
