@@ -1,11 +1,11 @@
 import { app } from "./app.js";
 import { env } from "./config/env.js";
 import { logger } from "./config/logger.js";
-import { configureSqlite, prisma } from "./prisma/client.js";
+import { configureDatabase, prisma } from "./prisma/client.js";
 
 async function bootstrap() {
   await prisma.$connect();
-  await configureSqlite();
+  await configureDatabase();
 
   app.listen(env.PORT, () => {
     logger.info({ port: env.PORT }, "HighwayOps backend started");

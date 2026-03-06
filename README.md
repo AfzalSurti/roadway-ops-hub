@@ -18,7 +18,7 @@ This project is designed to replace manual tracking (spreadsheets/messages) with
 Full-stack HighwayOps application with:
 
 - **Frontend**: React + Vite + Tailwind (now under `frontend/`)
-- **Backend**: Node.js + Express + Prisma + SQLite (under `backend/`)
+- **Backend**: Node.js + Express + Prisma + PostgreSQL (Neon) (under `backend/`)
 - **Auth**: JWT access + refresh tokens
 - **Roles**: `ADMIN`, `EMPLOYEE`
 
@@ -110,12 +110,12 @@ npm run dev:frontend   # frontend on 8080 (or passed port)
      npm run start
      ```
 
-### 2) Add persistent disk (required for SQLite)
+### 2) Create Neon PostgreSQL database
 
-1. In service settings, add a **Disk**.
-2. Mount path: `/var/data`
-3. Set env var:
-   - `DATABASE_URL=file:/var/data/dev.db`
+1. Create a free database in Neon.
+2. Copy the pooled connection string.
+3. In Render env vars, set:
+  - `DATABASE_URL=<your-neon-connection-string>`
 
 ### 3) Configure backend environment variables
 
@@ -123,14 +123,13 @@ Set these in Render **Environment**:
 
 - `NODE_ENV=production`
 - `PORT=4000`
-- `DATABASE_URL=file:/var/data/dev.db`
+- `DATABASE_URL=<your-neon-connection-string>`
 - `JWT_ACCESS_SECRET=<strong-random-secret>`
 - `JWT_REFRESH_SECRET=<strong-random-secret>`
 - `JWT_ACCESS_EXPIRES_IN=15m`
 - `JWT_REFRESH_EXPIRES_IN=7d`
 - `BCRYPT_SALT_ROUNDS=10`
 - `CORS_ORIGIN=https://<your-vercel-domain>`
-- `SQLITE_BUSY_TIMEOUT_MS=5000`
 
 ### 4) Create first admin in production
 
@@ -209,6 +208,5 @@ npm test
 
 ## Notes
 
-- SQLite is suitable for small/single-instance deployments.
-- Render disk is required to persist SQLite data across restarts.
+- Neon PostgreSQL is recommended for Render free tier persistence.
 - `uploads/` on ephemeral filesystem may not persist unless redirected to persistent storage (S3/R2 recommended for production files).

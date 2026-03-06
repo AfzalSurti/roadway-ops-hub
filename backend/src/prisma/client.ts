@@ -8,7 +8,12 @@ export const prisma = new PrismaClient({
 
 let sqliteConfigured = false;
 
-export async function configureSqlite(): Promise<void> {
+export async function configureDatabase(): Promise<void> {
+  const isSqlite = env.DATABASE_URL.startsWith("file:");
+  if (!isSqlite) {
+    return;
+  }
+
   if (sqliteConfigured) {
     return;
   }

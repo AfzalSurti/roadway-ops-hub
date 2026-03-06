@@ -5,17 +5,13 @@ services:
     plan: free
     buildCommand: npm ci --include=dev && npm run build:backend
     startCommand: npm run start:render
-    disk:
-      name: highwayops-data
-      mountPath: /var/data
-      sizeGB: 1
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 4000
       - key: DATABASE_URL
-        value: file:/var/data/dev.db
+        sync: false
       - key: JWT_ACCESS_SECRET
         sync: false
       - key: JWT_REFRESH_SECRET
