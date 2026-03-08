@@ -10,6 +10,14 @@ function calculateDayDifference(startAt: Date, endAt: Date): number {
   return Math.max(0, Math.ceil((endAt.getTime() - startAt.getTime()) / dayMs));
 }
 
+function ratingFromDelay(delayDays: number): number {
+  if (delayDays <= 0) return 5;
+  if (delayDays <= 3) return 4;
+  if (delayDays <= 6) return 3;
+  if (delayDays <= 9) return 2;
+  return 1;
+}
+
 type TaskFilters = {
   assignedToId?: string;
   status?: TaskStatus;
@@ -110,10 +118,12 @@ export const taskService = {
       const completedAt = data.actualCompletedAt ? new Date(String(data.actualCompletedAt)) : new Date();
       const completionDays = calculateDayDifference(previous.createdAt, completedAt);
       const baselineDays = previous.allottedDays ?? calculateDayDifference(previous.createdAt, previous.dueDate);
+      const completionDelayDays = Math.max(0, completionDays - baselineDays);
 
       normalizedData.actualCompletedAt = completedAt;
       normalizedData.completionDays = completionDays;
-      normalizedData.completionDelayDays = Math.max(0, completionDays - baselineDays);
+      normalizedData.completionDelayDays = completionDelayDays;
+      normalizedData.rating = ratingFromDelay(completionDelayDays);
       normalizedData.submittedForReviewAt = normalizedData.submittedForReviewAt ?? completedAt;
     }
 

@@ -14,6 +14,14 @@ function calculateDayDifference(startAt: Date, endAt: Date): number {
   return Math.max(0, Math.ceil((endAt.getTime() - startAt.getTime()) / dayMs));
 }
 
+function ratingFromDelay(delayDays: number): number {
+  if (delayDays <= 0) return 5;
+  if (delayDays <= 3) return 4;
+  if (delayDays <= 6) return 3;
+  if (delayDays <= 9) return 2;
+  return 1;
+}
+
 type ReportFilters = {
   status?: ReportStatus;
   reportTemplateId?: string;
@@ -98,10 +106,12 @@ export const reportService = {
       turnaroundDays
     });
 
+    const completionDelayDays = task.allottedDays ? Math.max(0, turnaroundDays - task.allottedDays) : undefined;
     await taskRepository.update(task.id, {
       submittedForReviewAt: submittedAt,
       completionDays: turnaroundDays,
-      completionDelayDays: task.allottedDays ? Math.max(0, turnaroundDays - task.allottedDays) : undefined
+      completionDelayDays,
+      rating: completionDelayDays === undefined ? undefined : ratingFromDelay(completionDelayDays)
     });
 
     await auditService.log({
@@ -169,12 +179,14 @@ export const reportService = {
     if (status === "APPROVED") {
       const completedAt = new Date();
       const completionDays = calculateDayDifference(existing.task.createdAt, completedAt);
+      const completionDelayDays = existing.task.allottedDays ? Math.max(0, completionDays - existing.task.allottedDays) : undefined;
       await taskRepository.update(existing.taskId, {
         status: "DONE",
         reviewCompletedAt: completedAt,
         actualCompletedAt: completedAt,
         completionDays,
-        completionDelayDays: existing.task.allottedDays ? Math.max(0, completionDays - existing.task.allottedDays) : undefined
+        completionDelayDays,
+        rating: completionDelayDays === undefined ? undefined : ratingFromDelay(completionDelayDays)
       });
     }
 

@@ -138,6 +138,10 @@ export default function TaskDetail() {
                 <p className="text-xs text-muted-foreground">Delay (Days)</p>
                 <p className="text-sm font-medium">{task.completionDelayDays ?? 0}</p>
               </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Rating</p>
+                <p className="text-sm font-medium">{task.rating ?? "-"}</p>
+              </div>
             </div>
           </div>
 
