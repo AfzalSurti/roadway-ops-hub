@@ -28,6 +28,20 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role !== "ADMIN") return <Navigate to="/app/dashboard" replace />;
+  return <>{children}</>;
+}
+
+function EmployeeRoute({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role !== "EMPLOYEE") return <Navigate to="/admin/dashboard" replace />;
+  return <>{children}</>;
+}
+
 function AppRoutes() {
   const { user } = useAuth();
 
@@ -37,7 +51,7 @@ function AppRoutes() {
       <Route path="/" element={user ? <Navigate to={user.role === "ADMIN" ? "/admin/dashboard" : "/app/dashboard"} replace /> : <Index />} />
 
       {/* Admin Routes */}
-      <Route path="/admin" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+      <Route path="/admin" element={<AdminRoute><AppLayout /></AdminRoute>}>
         <Route path="dashboard" element={<AdminDashboard />} />
         <Route path="tasks" element={<AdminTasks />} />
         <Route path="tasks/new" element={<CreateTask />} />
@@ -47,7 +61,7 @@ function AppRoutes() {
       </Route>
 
       {/* Employee Routes */}
-      <Route path="/app" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+      <Route path="/app" element={<EmployeeRoute><AppLayout /></EmployeeRoute>}>
         <Route path="dashboard" element={<EmployeeDashboard />} />
         <Route path="tasks" element={<EmployeeTasks />} />
         <Route path="task/:id" element={<TaskDetail />} />
