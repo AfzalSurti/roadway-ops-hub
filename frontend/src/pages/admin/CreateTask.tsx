@@ -44,7 +44,7 @@ export default function CreateTask() {
   const [projectMode, setProjectMode] = useState<"existing" | "other">(draft.projectMode ?? "existing");
   const [selectedProject, setSelectedProject] = useState(draft.selectedProject ?? "");
   const [otherProject, setOtherProject] = useState(draft.otherProject ?? "");
-  const [taskQuery, setTaskQuery] = useState("");
+  const [taskInput, setTaskInput] = useState(draft.title ?? "");
 
   const { data: users = [] } = useQuery({ queryKey: ["users"], queryFn: () => api.getUsers() });
   const {
@@ -55,14 +55,11 @@ export default function CreateTask() {
   const { data: projectsResult = [] } = useQuery({ queryKey: ["projects"], queryFn: () => api.getProjects() });
 
   const projects = useMemo(() => projectsResult.map((project) => project.name), [projectsResult]);
-  const filteredActivities = useMemo(() => {
-    const query = taskQuery.trim().toLowerCase();
-    if (!query) {
-      return dprActivities;
-    }
-
-    return dprActivities.filter((activity) => activity.label.toLowerCase().includes(query));
-  }, [dprActivities, taskQuery]);
+  const todayIso = useMemo(() => {
+    const now = new Date();
+    const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+    return local.toISOString().split("T")[0];
+  }, []);
 
   const {
     register,
@@ -141,40 +138,38 @@ export default function CreateTask() {
         <div>
           <label className="text-sm font-medium mb-1.5 block">DPR Activity</label>
           <input
-            value={taskQuery}
-            onChange={(event) => setTaskQuery(event.target.value)}
-            placeholder="Search task activity..."
-            className="w-full mb-2 px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
-          />
-          <select
-            {...register("title", {
-              onChange: (event) => {
-                const selected = dprActivities.find((activity) => activity.label === event.target.value);
-                if (selected && !getValues("description")?.trim()) {
-                  setValue("description", selected.description, { shouldValidate: true, shouldDirty: true });
-                }
+            {...register("title")}
+            value={taskInput}
+            onChange={(event) => {
+              const value = event.target.value;
+              setTaskInput(value);
+              setValue("title", value, { shouldValidate: true, shouldDirty: true });
+
+              const selected = dprActivities.find((activity) => activity.label === value);
+              if (selected && !getValues("description")?.trim()) {
+                setValue("description", selected.description, { shouldValidate: true, shouldDirty: true });
               }
-            })}
+            }}
+            list="dpr-activities-list"
             aria-label="DPR Activity"
             title="DPR Activity"
+            placeholder={
+              isDprActivitiesLoading
+                ? "Loading tasks..."
+                : isDprActivitiesError
+                  ? "Unable to load tasks"
+                  : dprActivities.length === 0
+                    ? "Task section is empty"
+                    : "Type and select task from DPR file"
+            }
             className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
             disabled={isDprActivitiesLoading || isDprActivitiesError || dprActivities.length === 0}
-          >
-            {isDprActivitiesLoading && <option value="">Loading tasks...</option>}
-            {!isDprActivitiesLoading && isDprActivitiesError && <option value="">Unable to load tasks</option>}
-            {!isDprActivitiesLoading && !isDprActivitiesError && dprActivities.length === 0 && <option value="">Task section is empty</option>}
-            {!isDprActivitiesLoading && !isDprActivitiesError && dprActivities.length > 0 && (
-              <option value="">Select task from DPR file</option>
-            )}
-            {!isDprActivitiesLoading && !isDprActivitiesError && filteredActivities.length === 0 && dprActivities.length > 0 && (
-              <option value="">No matching tasks</option>
-            )}
-            {filteredActivities.map((activity) => (
-              <option key={activity.id} value={activity.label}>
-                {activity.label}
-              </option>
+          />
+          <datalist id="dpr-activities-list">
+            {dprActivities.map((activity) => (
+              <option key={activity.id} value={activity.label} />
             ))}
-          </select>
+          </datalist>
           {errors.title && <p className="text-xs text-destructive mt-1">{errors.title.message}</p>}
         </div>
 
@@ -213,6 +208,7 @@ export default function CreateTask() {
             <input
               {...register("dueDate")}
               type="date"
+              min={todayIso}
               className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
             />
             {errors.dueDate && <p className="text-xs text-destructive mt-1">{errors.dueDate.message}</p>}
