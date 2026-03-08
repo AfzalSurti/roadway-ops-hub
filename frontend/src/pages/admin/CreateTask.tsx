@@ -46,7 +46,11 @@ export default function CreateTask() {
   const [otherProject, setOtherProject] = useState(draft.otherProject ?? "");
 
   const { data: users = [] } = useQuery({ queryKey: ["users"], queryFn: () => api.getUsers() });
-  const { data: dprActivities = [] } = useQuery({ queryKey: ["dpr-activities"], queryFn: () => api.getDprActivities() });
+  const {
+    data: dprActivities = [],
+    isLoading: isDprActivitiesLoading,
+    isError: isDprActivitiesError
+  } = useQuery({ queryKey: ["dpr-activities"], queryFn: () => api.getDprActivities() });
   const { data: projectsResult = [] } = useQuery({ queryKey: ["projects"], queryFn: () => api.getProjects() });
 
   const projects = useMemo(() => projectsResult.map((project) => project.name), [projectsResult]);
@@ -139,8 +143,14 @@ export default function CreateTask() {
             aria-label="DPR Activity"
             title="DPR Activity"
             className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
+            disabled={isDprActivitiesLoading || isDprActivitiesError || dprActivities.length === 0}
           >
-            <option value="">Select activity from DPR file</option>
+            {isDprActivitiesLoading && <option value="">Loading tasks...</option>}
+            {!isDprActivitiesLoading && isDprActivitiesError && <option value="">Unable to load tasks</option>}
+            {!isDprActivitiesLoading && !isDprActivitiesError && dprActivities.length === 0 && <option value="">Task section is empty</option>}
+            {!isDprActivitiesLoading && !isDprActivitiesError && dprActivities.length > 0 && (
+              <option value="">Select task from DPR file</option>
+            )}
             {dprActivities.map((activity) => (
               <option key={activity.id} value={activity.label}>
                 {activity.label}
