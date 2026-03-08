@@ -44,6 +44,7 @@ export default function CreateTask() {
   const [projectMode, setProjectMode] = useState<"existing" | "other">(draft.projectMode ?? "existing");
   const [selectedProject, setSelectedProject] = useState(draft.selectedProject ?? "");
   const [otherProject, setOtherProject] = useState(draft.otherProject ?? "");
+  const [taskQuery, setTaskQuery] = useState("");
 
   const { data: users = [] } = useQuery({ queryKey: ["users"], queryFn: () => api.getUsers() });
   const {
@@ -54,6 +55,14 @@ export default function CreateTask() {
   const { data: projectsResult = [] } = useQuery({ queryKey: ["projects"], queryFn: () => api.getProjects() });
 
   const projects = useMemo(() => projectsResult.map((project) => project.name), [projectsResult]);
+  const filteredActivities = useMemo(() => {
+    const query = taskQuery.trim().toLowerCase();
+    if (!query) {
+      return dprActivities;
+    }
+
+    return dprActivities.filter((activity) => activity.label.toLowerCase().includes(query));
+  }, [dprActivities, taskQuery]);
 
   const {
     register,
@@ -131,6 +140,12 @@ export default function CreateTask() {
       <form onSubmit={handleSubmit(onSubmit)} className="glass-panel p-6 max-w-2xl space-y-5">
         <div>
           <label className="text-sm font-medium mb-1.5 block">DPR Activity</label>
+          <input
+            value={taskQuery}
+            onChange={(event) => setTaskQuery(event.target.value)}
+            placeholder="Search task activity..."
+            className="w-full mb-2 px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
+          />
           <select
             {...register("title", {
               onChange: (event) => {
@@ -151,7 +166,10 @@ export default function CreateTask() {
             {!isDprActivitiesLoading && !isDprActivitiesError && dprActivities.length > 0 && (
               <option value="">Select task from DPR file</option>
             )}
-            {dprActivities.map((activity) => (
+            {!isDprActivitiesLoading && !isDprActivitiesError && filteredActivities.length === 0 && dprActivities.length > 0 && (
+              <option value="">No matching tasks</option>
+            )}
+            {filteredActivities.map((activity) => (
               <option key={activity.id} value={activity.label}>
                 {activity.label}
               </option>
