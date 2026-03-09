@@ -13,7 +13,6 @@ export const createTaskSchema = z.object({
   allocatedAt: z.coerce.date(),
   allottedDays: z.coerce.number().int().positive().optional(),
   ratingEnabled: z.boolean().optional(),
-  priority: z.nativeEnum(Priority),
   assignedToId: z.string().min(1),
   reportTemplateId: z.string().min(1).optional()
 });

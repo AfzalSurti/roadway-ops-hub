@@ -181,7 +181,6 @@ export const api = {
     allocatedAt: string;
     allottedDays?: number;
     ratingEnabled?: boolean;
-    priority: TaskItem["priority"];
     assignedToId: string;
     reportTemplateId?: string;
   }) {

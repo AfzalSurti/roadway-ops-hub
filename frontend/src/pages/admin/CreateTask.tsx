@@ -15,8 +15,7 @@ const taskSchema = z.object({
   assignedToId: z.string().min(1, "Please assign to someone"),
   allocatedAt: z.string().min(1, "Assigned date is required"),
   allottedDays: z.string().optional(),
-  ratingEnabled: z.boolean().default(true),
-  priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"])
+  ratingEnabled: z.boolean().default(true)
 });
 
 type TaskFormValues = z.infer<typeof taskSchema>;
@@ -212,8 +211,7 @@ export default function CreateTask() {
       assignedToId: draft.assignedToId ?? "",
       allocatedAt: draft.allocatedAt ?? new Date().toISOString().split("T")[0],
       allottedDays: draft.allottedDays ?? "",
-      ratingEnabled: draft.ratingEnabled ?? true,
-      priority: draft.priority ?? "MEDIUM"
+      ratingEnabled: draft.ratingEnabled ?? true
     }
   });
 
@@ -348,21 +346,6 @@ export default function CreateTask() {
               className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
               placeholder="e.g. 7"
             />
-          </div>
-
-          <div>
-            <label className="text-sm font-medium mb-1.5 block">Priority</label>
-            <select
-              {...register("priority")}
-              aria-label="Priority"
-              title="Priority"
-              className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
-            >
-              <option value="LOW">Low</option>
-              <option value="MEDIUM">Medium</option>
-              <option value="HIGH">High</option>
-              <option value="URGENT">Urgent</option>
-            </select>
           </div>
 
           <div className="sm:col-span-2">
