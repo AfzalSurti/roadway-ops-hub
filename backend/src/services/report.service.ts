@@ -93,7 +93,8 @@ export const reportService = {
     validateSubmission(template.fields, payload.submission);
 
     const submittedAt = new Date();
-    const turnaroundDays = calculateDayDifference(task.createdAt, submittedAt);
+    const baselineStart = task.allocatedAt ?? task.createdAt;
+    const turnaroundDays = calculateDayDifference(baselineStart, submittedAt);
 
     const report = await reportRepository.create({
       taskId: payload.taskId,
@@ -111,7 +112,7 @@ export const reportService = {
       submittedForReviewAt: submittedAt,
       completionDays: turnaroundDays,
       completionDelayDays,
-      rating: completionDelayDays === undefined ? undefined : ratingFromDelay(completionDelayDays)
+      rating: completionDelayDays === undefined ? undefined : (task.ratingEnabled ? ratingFromDelay(completionDelayDays) : null)
     });
 
     await auditService.log({
@@ -178,7 +179,8 @@ export const reportService = {
 
     if (status === "APPROVED") {
       const completedAt = new Date();
-      const completionDays = calculateDayDifference(existing.task.createdAt, completedAt);
+      const baselineStart = existing.task.allocatedAt ?? existing.task.createdAt;
+      const completionDays = calculateDayDifference(baselineStart, completedAt);
       const completionDelayDays = existing.task.allottedDays ? Math.max(0, completionDays - existing.task.allottedDays) : undefined;
       await taskRepository.update(existing.taskId, {
         status: "DONE",
@@ -186,7 +188,7 @@ export const reportService = {
         actualCompletedAt: completedAt,
         completionDays,
         completionDelayDays,
-        rating: completionDelayDays === undefined ? undefined : ratingFromDelay(completionDelayDays)
+        rating: completionDelayDays === undefined ? undefined : (existing.task.ratingEnabled ? ratingFromDelay(completionDelayDays) : null)
       });
     }
 

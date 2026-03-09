@@ -5,6 +5,7 @@ import { Plus, LayoutGrid, List, Search, Calendar } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
+import { useQuery } from "@tanstack/react-query";
 import type { TaskItem, TaskStatus } from "@/lib/domain";
 import { priorityConfig, statusConfig, toAvatarUrl } from "@/lib/domain";
 import { toast } from "sonner";
@@ -21,6 +22,12 @@ export default function AdminTasks() {
   const [search, setSearch] = useState("");
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedTask, setSelectedTask] = useState<TaskItem | null>(null);
+  const { data: selectedTaskComments = [] } = useQuery({
+    queryKey: ["task-comments", selectedTask?.id],
+    queryFn: () => api.getTaskComments(selectedTask!.id),
+    enabled: Boolean(selectedTask?.id)
+  });
 
   useEffect(() => {
     const run = async () => {
@@ -77,12 +84,16 @@ export default function AdminTasks() {
         <div className="flex items-center rounded-xl bg-secondary/50 border border-border/50 p-1">
           <button
             onClick={() => setView("kanban")}
+            title="Kanban view"
+            aria-label="Kanban view"
             className={cn("p-2 rounded-lg transition-colors", view === "kanban" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground")}
           >
             <LayoutGrid className="h-4 w-4" />
           </button>
           <button
             onClick={() => setView("list")}
+            title="List view"
+            aria-label="List view"
             className={cn("p-2 rounded-lg transition-colors", view === "list" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground")}
           >
             <List className="h-4 w-4" />
@@ -130,7 +141,7 @@ export default function AdminTasks() {
             </thead>
             <tbody>
               {filtered.map((task) => (
-                <tr key={task.id} className="border-b border-border/30 hover:bg-secondary/30 transition-colors">
+                <tr key={task.id} onClick={() => setSelectedTask(task)} className="border-b border-border/30 hover:bg-secondary/30 transition-colors cursor-pointer">
                   <td className="p-4">
                     <p className="font-medium">{task.title}</p>
                     <p className="text-xs text-muted-foreground">{task.reportTemplate?.name ?? "Template"}</p>
@@ -148,11 +159,39 @@ export default function AdminTasks() {
                   <td className="p-4 hidden lg:table-cell">
                     <span className={`status-badge ${priorityConfig[task.priority].color}`}>{priorityConfig[task.priority].label}</span>
                   </td>
-                  <td className="p-4 hidden lg:table-cell text-muted-foreground">{new Date(task.dueDate).toLocaleDateString()}</td>
+                  <td className="p-4 hidden lg:table-cell text-muted-foreground">{new Date(task.allocatedAt ?? task.createdAt).toLocaleDateString()}</td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {selectedTask && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm" onClick={() => setSelectedTask(null)}>
+          <div onClick={(event) => event.stopPropagation()} className="glass-panel-strong p-6 w-full max-w-2xl mx-4 max-h-[85vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold mb-4">Task Details</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm mb-4">
+              <p><span className="text-muted-foreground">Task:</span> {selectedTask.title}</p>
+              <p><span className="text-muted-foreground">Allocated:</span> {new Date(selectedTask.allocatedAt ?? selectedTask.createdAt).toLocaleDateString()}</p>
+              <p><span className="text-muted-foreground">Submission Days:</span> {selectedTask.allottedDays ?? "-"}</p>
+              <p><span className="text-muted-foreground">Submitted At:</span> {selectedTask.submittedForReviewAt ? new Date(selectedTask.submittedForReviewAt).toLocaleDateString() : "-"}</p>
+              <p><span className="text-muted-foreground">Completed At:</span> {selectedTask.actualCompletedAt ? new Date(selectedTask.actualCompletedAt).toLocaleDateString() : "-"}</p>
+              <p><span className="text-muted-foreground">Rating:</span> {selectedTask.rating ?? "-"}</p>
+            </div>
+            <p className="text-sm text-muted-foreground mb-2">Description</p>
+            <p className="text-sm mb-4">{selectedTask.description}</p>
+            <p className="text-sm text-muted-foreground mb-2">Messages</p>
+            <div className="space-y-2">
+              {selectedTaskComments.map((comment) => (
+                <div key={comment.id} className="rounded-xl border border-border/40 p-3">
+                  <p className="text-xs text-muted-foreground mb-1">{comment.author?.name ?? "User"} • {new Date(comment.createdAt).toLocaleString()}</p>
+                  <p className="text-sm">{comment.body}</p>
+                </div>
+              ))}
+              {selectedTaskComments.length === 0 && <p className="text-sm text-muted-foreground">No messages yet.</p>}
+            </div>
+          </div>
         </div>
       )}
     </PageWrapper>

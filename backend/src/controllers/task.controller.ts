@@ -10,9 +10,15 @@ export const taskController = {
   },
 
   async create(req: Request, res: Response) {
+    const allocatedAt = new Date(req.body.allocatedAt);
+    const allottedDays = req.body.allottedDays ? Number(req.body.allottedDays) : 0;
+    const dueDate = new Date(allocatedAt);
+    dueDate.setDate(dueDate.getDate() + allottedDays);
+
     const payload = {
       ...req.body,
-      dueDate: new Date(req.body.dueDate),
+      allocatedAt,
+      dueDate,
       createdById: req.user!.id,
       status: "TODO"
     };
@@ -59,5 +65,15 @@ export const taskController = {
   async remove(req: Request, res: Response) {
     await taskService.remove(req.params.id);
     return sendSuccess(res, { deleted: true });
+  },
+
+  async complete(req: Request, res: Response) {
+    const result = await taskService.completeByEmployee(req.params.id, req.user!.id, req.body.note);
+    return sendSuccess(res, result);
+  },
+
+  async acknowledgeComment(req: Request, res: Response) {
+    const result = await taskService.acknowledgeManagerComment(req.params.id, req.user!.id);
+    return sendSuccess(res, result);
   }
 };

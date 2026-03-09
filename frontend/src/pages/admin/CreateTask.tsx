@@ -13,8 +13,9 @@ const taskSchema = z.object({
   title: z.string().min(2, "Please select DPR activity"),
   description: z.string().min(10, "Description must be at least 10 characters"),
   assignedToId: z.string().min(1, "Please assign to someone"),
-  dueDate: z.string().min(1, "Due date is required"),
+  allocatedAt: z.string().min(1, "Assigned date is required"),
   allottedDays: z.string().optional(),
+  ratingEnabled: z.boolean().default(true),
   priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"])
 });
 
@@ -45,7 +46,6 @@ export default function CreateTask() {
     isLoading: isDprActivitiesLoading,
     isError: isDprActivitiesError
   } = useQuery({ queryKey: ["dpr-activities"], queryFn: () => api.getDprActivities() });
-  const minDueDate = useMemo(() => new Date().toISOString().split("T")[0], []);
   const filteredActivities = useMemo(() => {
     const query = taskQuery.trim().toLowerCase();
     if (!query) {
@@ -68,8 +68,9 @@ export default function CreateTask() {
       title: draft.title ?? "",
       description: draft.description ?? "",
       assignedToId: draft.assignedToId ?? "",
-      dueDate: draft.dueDate ?? "",
+      allocatedAt: draft.allocatedAt ?? new Date().toISOString().split("T")[0],
       allottedDays: draft.allottedDays ?? "",
+      ratingEnabled: draft.ratingEnabled ?? true,
       priority: draft.priority ?? "MEDIUM"
     }
   });
@@ -89,7 +90,9 @@ export default function CreateTask() {
       await api.createTask({
         ...data,
         allottedDays: data.allottedDays ? Number(data.allottedDays) : undefined,
+        ratingEnabled: data.ratingEnabled,
         reportTemplateId: undefined,
+        allocatedAt: data.allocatedAt,
         project: "DPR Activity"
       });
       sessionStorage.removeItem(TASK_DRAFT_KEY);
@@ -182,14 +185,13 @@ export default function CreateTask() {
           </div>
 
           <div>
-            <label className="text-sm font-medium mb-1.5 block">Due Date</label>
+            <label className="text-sm font-medium mb-1.5 block">Assigned Date</label>
             <input
-              {...register("dueDate")}
+              {...register("allocatedAt")}
               type="date"
-              min={minDueDate}
               className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
             />
-            {errors.dueDate && <p className="text-xs text-destructive mt-1">{errors.dueDate.message}</p>}
+            {errors.allocatedAt && <p className="text-xs text-destructive mt-1">{errors.allocatedAt.message}</p>}
           </div>
 
           <div>
@@ -216,6 +218,13 @@ export default function CreateTask() {
               <option value="HIGH">High</option>
               <option value="URGENT">Urgent</option>
             </select>
+          </div>
+
+          <div className="sm:col-span-2">
+            <label className="inline-flex items-center gap-2 text-sm font-medium">
+              <input type="checkbox" {...register("ratingEnabled")} className="rounded" />
+              Apply rating formula on this task
+            </label>
           </div>
 
         </div>

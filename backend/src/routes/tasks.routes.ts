@@ -6,6 +6,7 @@ import { allowSelfOrAdmin, requireRole } from "../middleware/rbac.js";
 import { validate } from "../middleware/validate.js";
 import { asyncHandler } from "../utils/async-handler.js";
 import { createCommentSchema } from "../validators/comment.validator.js";
+import { completeTaskSchema } from "../validators/task-complete.validator.js";
 import { createTaskSchema, employeeTaskUpdateSchema, updateTaskSchema } from "../validators/task.validator.js";
 
 export const tasksRouter = Router();
@@ -30,6 +31,8 @@ tasksRouter.patch(
   asyncHandler(taskController.update)
 );
 tasksRouter.delete("/:id", requireRole("ADMIN"), asyncHandler(taskController.remove));
+tasksRouter.post("/:id/complete", asyncHandler(allowSelfOrAdmin("task")), validate(completeTaskSchema), asyncHandler(taskController.complete));
+tasksRouter.post("/:id/comment-ack", asyncHandler(allowSelfOrAdmin("task")), asyncHandler(taskController.acknowledgeComment));
 
 tasksRouter.post("/:id/comments", validate(createCommentSchema), asyncHandler(commentController.create));
 tasksRouter.get("/:id/comments", asyncHandler(commentController.list));

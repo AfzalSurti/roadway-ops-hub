@@ -26,6 +26,7 @@ export type TaskItem = {
   projectNumber?: string | null;
   project: string;
   dueDate: string;
+  allocatedAt?: string;
   allottedDays?: number | null;
   submittedForReviewAt?: string | null;
   managerReviewComments?: string | null;
@@ -34,6 +35,7 @@ export type TaskItem = {
   completionDays?: number | null;
   completionDelayDays?: number | null;
   rating?: number | null;
+  ratingEnabled?: boolean;
   status: TaskStatus;
   priority: Priority;
   blockedReason?: string | null;

@@ -103,6 +103,7 @@ model Task {
   projectNumber    String?
   project          String
   dueDate          DateTime
+  allocatedAt      DateTime      @default(now())
   allottedDays     Int?
   submittedForReviewAt DateTime?
   managerReviewComments String?
@@ -111,6 +112,7 @@ model Task {
   completionDays   Int?
   completionDelayDays Int?
   rating           Float?
+  ratingEnabled    Boolean       @default(true)
   status           TaskStatus    @default(TODO)
   priority         Priority
   blockedReason    String?

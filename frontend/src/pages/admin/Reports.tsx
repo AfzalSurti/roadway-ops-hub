@@ -13,15 +13,41 @@ type ReportStatusFilter = "ALL" | ReportStatus;
 
 export default function AdminReports() {
   const [filter, setFilter] = useState<ReportStatusFilter>("ALL");
+  const [period, setPeriod] = useState<"MONTHLY" | "QUARTERLY" | "YEARLY">("MONTHLY");
+  const [employeeId, setEmployeeId] = useState<string>("ALL");
   const [selectedReport, setSelectedReport] = useState<string | null>(null);
   const [feedbackModal, setFeedbackModal] = useState<string | null>(null);
   const [feedback, setFeedback] = useState("");
   const [taskComment, setTaskComment] = useState("");
 
   const { data } = useQuery({ queryKey: ["reports", "admin"], queryFn: () => api.getReports({ limit: 100 }) });
+  const { data: users = [] } = useQuery({ queryKey: ["users", "report-summary"], queryFn: () => api.getUsers() });
+  const { data: tasksData } = useQuery({ queryKey: ["tasks", "report-summary"], queryFn: () => api.getTasks({ limit: 400 }) });
 
   const reports = data?.items ?? [];
-  const filtered = filter === "ALL" ? reports : reports.filter((report) => report.status === filter);
+  const tasks = tasksData?.items ?? [];
+
+  const startDate = useMemo(() => {
+    const now = new Date();
+    if (period === "MONTHLY") return new Date(now.getFullYear(), now.getMonth(), 1);
+    if (period === "QUARTERLY") return new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
+    return new Date(now.getFullYear(), 0, 1);
+  }, [period]);
+
+  const periodFilteredReports = useMemo(
+    () => reports.filter((report) => new Date(report.createdAt) >= startDate),
+    [reports, startDate]
+  );
+  const periodFilteredTasks = useMemo(
+    () => tasks.filter((task) => new Date(task.allocatedAt ?? task.createdAt) >= startDate),
+    [tasks, startDate]
+  );
+
+  const filtered = useMemo(() => {
+    const byStatus = filter === "ALL" ? periodFilteredReports : periodFilteredReports.filter((report) => report.status === filter);
+    if (employeeId === "ALL") return byStatus;
+    return byStatus.filter((report) => report.submittedById === employeeId);
+  }, [filter, periodFilteredReports, employeeId]);
   const selected = reports.find((report) => report.id === selectedReport);
   const { data: taskComments = [], refetch: refetchTaskComments } = useQuery({
     queryKey: ["task-comments", selected?.taskId],
@@ -87,6 +113,22 @@ export default function AdminReports() {
     [selected]
   );
 
+  const summary = useMemo(() => {
+    const scopedTasks = employeeId === "ALL" ? periodFilteredTasks : periodFilteredTasks.filter((task) => task.assignedToId === employeeId);
+    const scopedReports = employeeId === "ALL" ? periodFilteredReports : periodFilteredReports.filter((report) => report.submittedById === employeeId);
+    const taskCompleted = scopedTasks.filter((task) => task.status === "DONE").length;
+    const adminComments = scopedReports.filter((report) => Boolean(report.adminFeedback?.trim())).length;
+    const rated = scopedTasks.filter((task) => typeof task.rating === "number");
+    const avgRating = rated.length ? (rated.reduce((sum, task) => sum + Number(task.rating ?? 0), 0) / rated.length).toFixed(2) : "-";
+
+    return {
+      taskGiven: scopedTasks.length,
+      taskCompleted,
+      adminComments,
+      avgRating
+    };
+  }, [periodFilteredTasks, periodFilteredReports, employeeId]);
+
   return (
     <PageWrapper>
       <div className="page-header">
@@ -95,6 +137,29 @@ export default function AdminReports() {
       </div>
 
       <div className="flex flex-wrap gap-2 mb-6">
+        <select
+          value={period}
+          onChange={(event) => setPeriod(event.target.value as "MONTHLY" | "QUARTERLY" | "YEARLY")}
+          title="Select period"
+          aria-label="Select period"
+          className="px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 text-sm"
+        >
+          <option value="MONTHLY">Monthly</option>
+          <option value="QUARTERLY">Quarterly</option>
+          <option value="YEARLY">Yearly</option>
+        </select>
+        <select
+          value={employeeId}
+          onChange={(event) => setEmployeeId(event.target.value)}
+          title="Select employee"
+          aria-label="Select employee"
+          className="px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 text-sm"
+        >
+          <option value="ALL">All Employees</option>
+          {users.map((user) => (
+            <option key={user.id} value={user.id}>{user.name}</option>
+          ))}
+        </select>
         {statusFilters.map((statusFilter) => (
           <button
             key={statusFilter.value}
@@ -109,6 +174,13 @@ export default function AdminReports() {
             {statusFilter.label}
           </button>
         ))}
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+        <div className="glass-panel p-4"><p className="text-xs text-muted-foreground">Tasks Given</p><p className="text-xl font-semibold">{summary.taskGiven}</p></div>
+        <div className="glass-panel p-4"><p className="text-xs text-muted-foreground">Tasks Completed</p><p className="text-xl font-semibold">{summary.taskCompleted}</p></div>
+        <div className="glass-panel p-4"><p className="text-xs text-muted-foreground">Admin Comments</p><p className="text-xl font-semibold">{summary.adminComments}</p></div>
+        <div className="glass-panel p-4"><p className="text-xs text-muted-foreground">Average Rating</p><p className="text-xl font-semibold">{summary.avgRating}</p></div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -158,6 +230,8 @@ export default function AdminReports() {
                           event.stopPropagation();
                           void handleStatusUpdate(report.id, "APPROVED");
                         }}
+                        title="Approve report"
+                        aria-label="Approve report"
                         className="p-1.5 rounded-lg hover:bg-accent/10 text-accent transition-colors"
                       >
                         <CheckCircle className="h-4 w-4" />
@@ -167,6 +241,8 @@ export default function AdminReports() {
                           event.stopPropagation();
                           setFeedbackModal(report.id);
                         }}
+                        title="Request changes"
+                        aria-label="Request changes"
                         className="p-1.5 rounded-lg hover:bg-primary/10 text-primary transition-colors"
                       >
                         <MessageSquare className="h-4 w-4" />
@@ -176,6 +252,8 @@ export default function AdminReports() {
                           event.stopPropagation();
                           void handleStatusUpdate(report.id, "REJECTED");
                         }}
+                        title="Reject report"
+                        aria-label="Reject report"
                         className="p-1.5 rounded-lg hover:bg-destructive/10 text-destructive transition-colors"
                       >
                         <XCircle className="h-4 w-4" />
@@ -253,7 +331,7 @@ export default function AdminReports() {
           >
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold">Request Changes</h3>
-              <button onClick={() => setFeedbackModal(null)} className="p-1 rounded-lg hover:bg-secondary/50">
+              <button aria-label="Close" title="Close" onClick={() => setFeedbackModal(null)} className="p-1 rounded-lg hover:bg-secondary/50">
                 <X className="h-4 w-4" />
               </button>
             </div>

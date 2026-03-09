@@ -35,7 +35,18 @@ export default function AdminTeam() {
           employee,
           active: employeeTasks.filter((task) => task.status !== "DONE").length,
           done: employeeTasks.filter((task) => task.status === "DONE").length,
-          overdue: employeeTasks.filter((task) => new Date(task.dueDate) < new Date() && task.status !== "DONE").length
+          overdue: employeeTasks.filter((task) => new Date(task.dueDate) < new Date() && task.status !== "DONE").length,
+          avgRating:
+            employeeTasks.filter((task) => typeof task.rating === "number").length > 0
+              ? Number(
+                  (
+                    employeeTasks
+                      .filter((task) => typeof task.rating === "number")
+                      .reduce((sum, task) => sum + Number(task.rating ?? 0), 0) /
+                    employeeTasks.filter((task) => typeof task.rating === "number").length
+                  ).toFixed(2)
+                )
+              : null
         };
       }),
     [tasks, users]
@@ -139,6 +150,7 @@ export default function AdminTeam() {
             <p className="text-xs text-muted-foreground mb-3">{workload.employee.email}</p>
             <div className="flex justify-center gap-4 text-xs">
               <span className="flex items-center gap-1 text-primary"><ListTodo className="h-3 w-3" />{workload.active}</span>
+              <span className="text-muted-foreground">Rating: {workload.avgRating ?? "-"}</span>
               {workload.overdue > 0 && <span className="flex items-center gap-1 text-destructive"><AlertTriangle className="h-3 w-3" />{workload.overdue}</span>}
             </div>
           </motion.div>
@@ -163,6 +175,14 @@ export default function AdminTeam() {
               <img src={toAvatarUrl(selected.name)} alt="" className="w-16 h-16 rounded-full mx-auto mb-3" />
               <p className="font-semibold text-lg">{selected.name}</p>
               <p className="text-sm text-muted-foreground">{selected.email}</p>
+              <p className="text-sm mt-1">Rating: {selectedTasks.filter((task) => typeof task.rating === "number").length > 0
+                ? (
+                    selectedTasks
+                      .filter((task) => typeof task.rating === "number")
+                      .reduce((sum, task) => sum + Number(task.rating ?? 0), 0) /
+                    selectedTasks.filter((task) => typeof task.rating === "number").length
+                  ).toFixed(2)
+                : "-"}</p>
             </div>
 
             <h4 className="font-medium mb-3">Tasks ({selectedTasks.length})</h4>

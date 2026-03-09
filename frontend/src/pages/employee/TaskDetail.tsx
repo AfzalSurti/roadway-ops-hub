@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { PageWrapper } from "@/components/PageWrapper";
-import { ArrowLeft, Calendar, Play, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Calendar, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
@@ -11,10 +11,9 @@ import { priorityConfig, statusConfig, toAvatarUrl } from "@/lib/domain";
 export default function TaskDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [submission, setSubmission] = useState<Record<string, unknown>>({});
+  const [completionNote, setCompletionNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [commentBody, setCommentBody] = useState("");
-  const [postingComment, setPostingComment] = useState(false);
+  const [acknowledging, setAcknowledging] = useState(false);
 
   const { data: task } = useQuery({
     queryKey: ["task", id],
@@ -22,7 +21,6 @@ export default function TaskDetail() {
     enabled: Boolean(id)
   });
 
-  const templateFields = useMemo(() => task?.reportTemplate?.fields ?? [], [task]);
   const { data: comments = [], refetch: refetchComments } = useQuery({
     queryKey: ["task-comments", id],
     queryFn: () => api.getTaskComments(id as string),
@@ -39,50 +37,38 @@ export default function TaskDetail() {
 
   const isOverdue = new Date(task.dueDate) < new Date() && task.status !== "DONE";
 
-  const handleStatusUpdate = async (status: "IN_PROGRESS" | "BLOCKED" | "DONE") => {
-    try {
-      await api.updateTask(task.id, { status });
-      toast.success(`Task updated to ${status.replace("_", " ")}`);
-      window.location.reload();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to update task";
-      toast.error(message);
-    }
-  };
+  const managerComments = useMemo(
+    () => comments.filter((comment) => comment.author?.role === "ADMIN"),
+    [comments]
+  );
 
-  const handleSubmitReport = async () => {
+  const handleCompleteTask = async () => {
     try {
       setSubmitting(true);
-      await api.submitReport({
-        taskId: task.id,
-        reportTemplateId: task.reportTemplateId,
-        submission
-      });
-      toast.success("Report submitted!");
+      await api.completeTask(task.id, completionNote.trim() || undefined);
+      if (managerComments.length > 0) {
+        await api.acknowledgeTaskComment(task.id);
+      }
+      toast.success("Task marked as completed");
+      window.location.reload();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to submit report";
+      const message = error instanceof Error ? error.message : "Failed to complete task";
       toast.error(message);
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleAddComment = async () => {
-    if (!id || !commentBody.trim()) {
-      return;
-    }
-
+  const handleAcknowledgeComment = async () => {
     try {
-      setPostingComment(true);
-      await api.addTaskComment(id, commentBody.trim());
-      setCommentBody("");
-      await refetchComments();
-      toast.success("Comment sent to admin");
+      setAcknowledging(true);
+      await api.acknowledgeTaskComment(task.id);
+      toast.success("Comment acknowledgement sent to admin");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to send comment";
+      const message = error instanceof Error ? error.message : "Failed to acknowledge comment";
       toast.error(message);
     } finally {
-      setPostingComment(false);
+      setAcknowledging(false);
     }
   };
 
@@ -123,8 +109,8 @@ export default function TaskDetail() {
                 </div>
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Created</p>
-                <p className="text-sm font-medium">{new Date(task.createdAt).toLocaleDateString()}</p>
+                <p className="text-xs text-muted-foreground">Allocated At</p>
+                <p className="text-sm font-medium">{new Date(task.allocatedAt ?? task.createdAt).toLocaleDateString()}</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Submission Period</p>
@@ -146,82 +132,27 @@ export default function TaskDetail() {
           </div>
 
           <div className="glass-panel p-6">
-            <h3 className="font-semibold mb-4">Update Status</h3>
-            <div className="flex flex-wrap gap-3">
-              <button onClick={() => void handleStatusUpdate("IN_PROGRESS")} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary/10 text-primary border border-primary/20 text-sm font-medium hover:bg-primary/20 transition-colors">
-                <Play className="h-4 w-4" />Start Task
-              </button>
-              <button onClick={() => void handleStatusUpdate("BLOCKED")} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-warning/10 text-warning border border-warning/20 text-sm font-medium hover:bg-warning/20 transition-colors">
-                <AlertTriangle className="h-4 w-4" />Mark Blocked
-              </button>
-              <button onClick={() => void handleStatusUpdate("DONE")} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-accent/10 text-accent border border-accent/20 text-sm font-medium hover:bg-accent/20 transition-colors">
-                <CheckCircle2 className="h-4 w-4" />Mark Done
-              </button>
-            </div>
-          </div>
-
-          <div className="glass-panel p-6">
-            <h3 className="font-semibold mb-4">Submit Report — {task.reportTemplate?.name ?? "Template"}</h3>
-            <div className="space-y-4">
-              {templateFields.map((field) => (
-                <div key={field.id}>
-                  <label className="text-sm font-medium mb-1.5 block">{field.label} {field.required && <span className="text-destructive">*</span>}</label>
-                  {field.type === "textarea" ? (
-                    <textarea
-                      rows={3}
-                      title={field.label}
-                      placeholder={field.label}
-                      onChange={(event) => setSubmission((prev) => ({ ...prev, [field.id]: event.target.value }))}
-                      className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none resize-none focus:border-primary/50"
-                    />
-                  ) : field.type === "select" ? (
-                    <select
-                      title={field.label}
-                      aria-label={field.label}
-                      onChange={(event) => setSubmission((prev) => ({ ...prev, [field.id]: event.target.value }))}
-                      className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
-                    >
-                      <option value="">Select…</option>
-                      {field.options?.map((option) => <option key={option} value={option}>{option}</option>)}
-                    </select>
-                  ) : field.type === "checkbox" ? (
-                    <label className="flex items-center gap-2 text-sm">
-                      <input type="checkbox" onChange={(event) => setSubmission((prev) => ({ ...prev, [field.id]: event.target.checked }))} className="rounded" /> Yes
-                    </label>
-                  ) : (
-                    <input
-                      type={field.type === "number" ? "number" : field.type === "date" ? "date" : "text"}
-                      title={field.label}
-                      placeholder={field.label}
-                      onChange={(event) => {
-                        const rawValue = event.target.value;
-                        const parsedValue =
-                          field.type === "number"
-                            ? rawValue === ""
-                              ? undefined
-                              : Number(rawValue)
-                            : rawValue;
-                        setSubmission((prev) => ({ ...prev, [field.id]: parsedValue }));
-                      }}
-                      className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
-                    />
-                  )}
-                </div>
-              ))}
-              <button
-                onClick={() => void handleSubmitReport()}
-                disabled={submitting}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-primary to-accent text-primary-foreground font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
-              >
-                {submitting ? "Submitting…" : "Submit Report"}
-              </button>
-            </div>
+            <h3 className="font-semibold mb-4">Task Completion</h3>
+            <textarea
+              value={completionNote}
+              onChange={(event) => setCompletionNote(event.target.value)}
+              rows={3}
+              placeholder="Add optional completion note"
+              className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none resize-none focus:border-primary/50"
+            />
+            <button
+              onClick={() => void handleCompleteTask()}
+              disabled={submitting || task.status === "DONE"}
+              className="mt-3 w-full py-2.5 rounded-xl bg-gradient-to-r from-primary to-accent text-primary-foreground font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+            >
+              {submitting ? "Updating..." : task.status === "DONE" ? "Task Completed" : "Task Completed"}
+            </button>
           </div>
 
           <div className="glass-panel p-6">
             <h3 className="font-semibold mb-4">Manager Comments</h3>
             <div className="space-y-3 mb-4 max-h-64 overflow-y-auto pr-1">
-              {comments.map((comment) => (
+              {managerComments.map((comment) => (
                 <div key={comment.id} className="rounded-xl border border-border/40 bg-secondary/20 p-3">
                   <div className="flex items-center justify-between gap-2 mb-1">
                     <p className="text-sm font-medium">{comment.author?.name ?? "User"}</p>
@@ -230,40 +161,22 @@ export default function TaskDetail() {
                   <p className="text-sm text-muted-foreground">{comment.body}</p>
                 </div>
               ))}
-              {comments.length === 0 && <p className="text-sm text-muted-foreground">No comments yet.</p>}
+              {managerComments.length === 0 && <p className="text-sm text-muted-foreground">No manager comments yet.</p>}
             </div>
-
-            <textarea
-              value={commentBody}
-              onChange={(event) => setCommentBody(event.target.value)}
-              rows={3}
-              placeholder="Reply to manager comments..."
-              className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none resize-none focus:border-primary/50"
-            />
             <button
-              onClick={() => void handleAddComment()}
-              disabled={postingComment || !commentBody.trim()}
+              onClick={() => void handleAcknowledgeComment()}
+              disabled={acknowledging || managerComments.length === 0}
               className="mt-3 w-full py-2.5 rounded-xl bg-gradient-to-r from-primary to-accent text-primary-foreground font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
             >
-              {postingComment ? "Sending..." : "Send Reply"}
+              {acknowledging ? "Sending..." : "OK (Comment Compliant)"}
             </button>
           </div>
         </div>
 
         <div className="space-y-4">
           <div className="glass-panel p-4 text-center">
-            <p className="text-xs text-muted-foreground mb-1">Report Type</p>
-            <p className="font-medium text-sm">{task.reportTemplate?.name ?? "Template"}</p>
-          </div>
-          <div className="glass-panel p-4">
-            <p className="text-xs text-muted-foreground mb-2">Template Fields</p>
-            {templateFields.map((field) => (
-              <div key={field.id} className="flex items-center gap-2 py-1.5 text-sm">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary/50" />
-                <span className="text-muted-foreground">{field.label}</span>
-                {field.required && <span className="text-[10px] text-destructive">*</span>}
-              </div>
-            ))}
+            <p className="text-xs text-muted-foreground mb-1">Notifications</p>
+            <p className="font-medium text-sm">Check bell icon for full status updates</p>
           </div>
         </div>
       </div>

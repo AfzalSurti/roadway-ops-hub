@@ -1,9 +1,12 @@
 import type { Prisma, Role, TaskStatus } from "@prisma/client";
 import { taskRepository } from "../repositories/task.repository.js";
 import { templateRepository } from "../repositories/template.repository.js";
+import { commentRepository } from "../repositories/comment.repository.js";
 import { notFound } from "../utils/errors.js";
 import { getPagination } from "../utils/pagination.js";
 import { auditService } from "./audit.service.js";
+import { userRepository } from "../repositories/user.repository.js";
+import { notificationService } from "./notification.service.js";
 
 function calculateDayDifference(startAt: Date, endAt: Date): number {
   const dayMs = 1000 * 60 * 60 * 24;
@@ -116,14 +119,15 @@ export const taskService = {
 
     if (data.status === "DONE" && previous) {
       const completedAt = data.actualCompletedAt ? new Date(String(data.actualCompletedAt)) : new Date();
-      const completionDays = calculateDayDifference(previous.createdAt, completedAt);
-      const baselineDays = previous.allottedDays ?? calculateDayDifference(previous.createdAt, previous.dueDate);
+      const baselineStart = previous.allocatedAt ?? previous.createdAt;
+      const completionDays = calculateDayDifference(baselineStart, completedAt);
+      const baselineDays = previous.allottedDays ?? calculateDayDifference(baselineStart, previous.dueDate);
       const completionDelayDays = Math.max(0, completionDays - baselineDays);
 
       normalizedData.actualCompletedAt = completedAt;
       normalizedData.completionDays = completionDays;
       normalizedData.completionDelayDays = completionDelayDays;
-      normalizedData.rating = ratingFromDelay(completionDelayDays);
+      normalizedData.rating = previous.ratingEnabled ? ratingFromDelay(completionDelayDays) : null;
       normalizedData.submittedForReviewAt = normalizedData.submittedForReviewAt ?? completedAt;
     }
 
@@ -151,5 +155,64 @@ export const taskService = {
   async remove(id: string) {
     await this.getById(id);
     return taskRepository.delete(id);
+  },
+
+  async completeByEmployee(taskId: string, employeeId: string, note?: string) {
+    const task = await this.getById(taskId);
+    const completedAt = new Date();
+    const baselineStart = task.allocatedAt ?? task.createdAt;
+    const completionDays = calculateDayDifference(baselineStart, completedAt);
+    const baselineDays = task.allottedDays ?? calculateDayDifference(baselineStart, task.dueDate);
+    const completionDelayDays = Math.max(0, completionDays - baselineDays);
+
+    const updated = await taskRepository.update(taskId, {
+      status: "DONE",
+      submittedForReviewAt: completedAt,
+      actualCompletedAt: completedAt,
+      completionDays,
+      completionDelayDays,
+      rating: task.ratingEnabled ? ratingFromDelay(completionDelayDays) : null
+    });
+
+    if (note?.trim()) {
+      await commentRepository.create({
+        taskId,
+        body: note.trim(),
+        authorId: employeeId
+      });
+    }
+
+    const admins = await userRepository.findAdmins();
+    await notificationService.notifyUsers({
+      userIds: admins.map((admin) => admin.id),
+      title: "Task Completed",
+      message: `${task.title} was completed by employee.${note?.trim() ? ` Note: ${note.trim().slice(0, 80)}` : ""}`,
+      entityType: "Task",
+      entityId: taskId
+    });
+
+    return updated;
+  },
+
+  async acknowledgeManagerComment(taskId: string, employeeId: string) {
+    const task = await this.getById(taskId);
+    const admins = await userRepository.findAdmins();
+    await notificationService.notifyUsers({
+      userIds: admins.map((admin) => admin.id),
+      title: "Comment Acknowledged",
+      message: `${task.title}: employee accepted your comment.`,
+      entityType: "Task",
+      entityId: taskId
+    });
+
+    await auditService.log({
+      action: "TASK_UPDATED",
+      actorId: employeeId,
+      entityType: "Task",
+      entityId: taskId,
+      meta: { commentAcknowledged: true }
+    });
+
+    return { acknowledged: true };
   }
 };

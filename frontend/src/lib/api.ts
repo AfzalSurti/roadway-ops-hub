@@ -178,8 +178,9 @@ export const api = {
     projectCode?: string;
     projectNumber?: string;
     project: string;
-    dueDate: string;
+    allocatedAt: string;
     allottedDays?: number;
+    ratingEnabled?: boolean;
     priority: TaskItem["priority"];
     assignedToId: string;
     reportTemplateId?: string;
@@ -194,6 +195,20 @@ export const api = {
     return request<TaskItem>(`/tasks/${id}`, {
       method: "PATCH",
       body: JSON.stringify(payload)
+    });
+  },
+
+  completeTask(id: string, note?: string) {
+    return request<TaskItem>(`/tasks/${id}/complete`, {
+      method: "POST",
+      body: JSON.stringify({ note })
+    });
+  },
+
+  acknowledgeTaskComment(id: string) {
+    return request<{ acknowledged: boolean }>(`/tasks/${id}/comment-ack`, {
+      method: "POST",
+      body: JSON.stringify({})
     });
   },
 
