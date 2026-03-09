@@ -129,6 +129,57 @@ export default function AdminReports() {
     };
   }, [periodFilteredTasks, periodFilteredReports, employeeId]);
 
+  const employeeBreakdown = useMemo(() => {
+    const scopedUsers = employeeId === "ALL" ? users : users.filter((user) => user.id === employeeId);
+
+    return scopedUsers.map((user) => {
+      const employeeTasks = periodFilteredTasks.filter((task) => task.assignedToId === user.id);
+      const employeeReports = periodFilteredReports.filter((report) => report.submittedById === user.id);
+      const tasksCompleted = employeeTasks.filter((task) => task.status === "DONE").length;
+      const adminComments = employeeReports.filter((report) => Boolean(report.adminFeedback?.trim())).length;
+      const ratedTasks = employeeTasks.filter((task) => typeof task.rating === "number");
+      const avgRating = ratedTasks.length
+        ? Number((ratedTasks.reduce((sum, task) => sum + Number(task.rating ?? 0), 0) / ratedTasks.length).toFixed(2))
+        : null;
+
+      return {
+        userId: user.id,
+        name: user.name,
+        email: user.email,
+        tasksGiven: employeeTasks.length,
+        tasksCompleted,
+        adminComments,
+        avgRating
+      };
+    });
+  }, [users, periodFilteredTasks, periodFilteredReports, employeeId]);
+
+  const downloadBreakdownCsv = () => {
+    const headers = ["Employee", "Email", "Period", "Tasks Given", "Tasks Completed", "Admin Comments", "Average Rating"];
+    const rows = employeeBreakdown.map((row) => [
+      row.name,
+      row.email,
+      period,
+      String(row.tasksGiven),
+      String(row.tasksCompleted),
+      String(row.adminComments),
+      row.avgRating === null ? "-" : String(row.avgRating)
+    ]);
+
+    const escape = (value: string) => `"${value.replace(/\"/g, '""')}"`;
+    const csv = [headers, ...rows].map((line) => line.map(escape).join(",")).join("\n");
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `employee-breakdown-${period.toLowerCase()}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <PageWrapper>
       <div className="page-header">
@@ -181,6 +232,50 @@ export default function AdminReports() {
         <div className="glass-panel p-4"><p className="text-xs text-muted-foreground">Tasks Completed</p><p className="text-xl font-semibold">{summary.taskCompleted}</p></div>
         <div className="glass-panel p-4"><p className="text-xs text-muted-foreground">Admin Comments</p><p className="text-xl font-semibold">{summary.adminComments}</p></div>
         <div className="glass-panel p-4"><p className="text-xs text-muted-foreground">Average Rating</p><p className="text-xl font-semibold">{summary.avgRating}</p></div>
+      </div>
+
+      <div className="glass-panel overflow-hidden mb-6">
+        <div className="flex items-center justify-between p-4 border-b border-border/40">
+          <h3 className="text-sm font-semibold">Per-Employee Breakdown ({period.toLowerCase()})</h3>
+          <button
+            onClick={downloadBreakdownCsv}
+            className="px-3 py-2 rounded-lg bg-primary/10 text-primary border border-primary/20 text-xs font-medium hover:bg-primary/20"
+          >
+            Download CSV
+          </button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border/40 text-muted-foreground">
+                <th className="text-left p-3 font-medium">Employee</th>
+                <th className="text-left p-3 font-medium">Tasks Given</th>
+                <th className="text-left p-3 font-medium">Tasks Completed</th>
+                <th className="text-left p-3 font-medium">Admin Comments</th>
+                <th className="text-left p-3 font-medium">Average Rating</th>
+              </tr>
+            </thead>
+            <tbody>
+              {employeeBreakdown.map((row) => (
+                <tr key={row.userId} className="border-b border-border/20">
+                  <td className="p-3">
+                    <p className="font-medium">{row.name}</p>
+                    <p className="text-xs text-muted-foreground">{row.email}</p>
+                  </td>
+                  <td className="p-3">{row.tasksGiven}</td>
+                  <td className="p-3">{row.tasksCompleted}</td>
+                  <td className="p-3">{row.adminComments}</td>
+                  <td className="p-3">{row.avgRating ?? "-"}</td>
+                </tr>
+              ))}
+              {employeeBreakdown.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="p-4 text-sm text-muted-foreground">No employee data available for selected filters.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

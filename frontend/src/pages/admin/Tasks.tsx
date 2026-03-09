@@ -28,6 +28,19 @@ export default function AdminTasks() {
     queryFn: () => api.getTaskComments(selectedTask!.id),
     enabled: Boolean(selectedTask?.id)
   });
+  const completionNote = useMemo(() => {
+    if (!selectedTask) {
+      return null;
+    }
+
+    const employeeComments = selectedTaskComments.filter((comment) => comment.author?.role === "EMPLOYEE");
+    if (!employeeComments.length) {
+      return null;
+    }
+
+    // Treat the latest employee comment as completion note (submitted with task complete action).
+    return employeeComments[employeeComments.length - 1];
+  }, [selectedTask, selectedTaskComments]);
 
   useEffect(() => {
     const run = async () => {
@@ -181,6 +194,17 @@ export default function AdminTasks() {
             </div>
             <p className="text-sm text-muted-foreground mb-2">Description</p>
             <p className="text-sm mb-4">{selectedTask.description}</p>
+
+            {completionNote && (
+              <div className="mb-4 rounded-xl border border-accent/30 bg-accent/10 p-3">
+                <p className="text-xs font-semibold text-accent mb-1">Completion Note</p>
+                <p className="text-sm">{completionNote.body}</p>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  {completionNote.author?.name ?? "Employee"} • {new Date(completionNote.createdAt).toLocaleString()}
+                </p>
+              </div>
+            )}
+
             <p className="text-sm text-muted-foreground mb-2">Messages</p>
             <div className="space-y-2">
               {selectedTaskComments.map((comment) => (
