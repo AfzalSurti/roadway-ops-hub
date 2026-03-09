@@ -6,6 +6,9 @@ import { useQuery } from "@tanstack/react-query";
 import { Eye, CheckCircle, XCircle, MessageSquare, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import type { ReportItem, ReportStatus } from "@/lib/domain";
 import { reportStatusConfig, toAvatarUrl } from "@/lib/domain";
 
@@ -204,7 +207,7 @@ export default function AdminReports() {
   }, [users, periodFilteredTasks, periodFilteredReports, employeeId]);
 
   const downloadBreakdownCsv = () => {
-    const headers = ["Employee", "Email", "Period", "Tasks Given", "Tasks Completed", "Admin Comments", "Average Rating"];
+    const headers = ["Employee", "Email", "Period Type", "Period", "Tasks Given", "Tasks Completed", "Admin Comments", "Average Rating"];
     const rows = employeeBreakdown.map((row) => [
       row.name,
       row.email,
@@ -229,6 +232,54 @@ export default function AdminReports() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  };
+
+  const downloadBreakdownExcel = () => {
+    const rows = employeeBreakdown.map((row) => ({
+      Employee: row.name,
+      Email: row.email,
+      "Period Type": period,
+      Period: periodLabel,
+      "Tasks Given": row.tasksGiven,
+      "Tasks Completed": row.tasksCompleted,
+      "Admin Comments": row.adminComments,
+      "Average Rating": row.avgRating ?? "-"
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Breakdown");
+    const filePeriod = period === "MONTHLY" ? MONTH_OPTIONS[selectedMonth].toLowerCase() : period.toLowerCase();
+    XLSX.writeFile(workbook, `employee-breakdown-${filePeriod}.xlsx`);
+  };
+
+  const downloadBreakdownPdf = () => {
+    const filePeriod = period === "MONTHLY" ? MONTH_OPTIONS[selectedMonth].toLowerCase() : period.toLowerCase();
+    const doc = new jsPDF({ orientation: "landscape" });
+    doc.setFontSize(14);
+    doc.text(`Per-Employee Breakdown (${periodLabel})`, 14, 14);
+
+    const headers = [["Employee", "Email", "Period Type", "Period", "Tasks Given", "Tasks Completed", "Admin Comments", "Average Rating"]];
+    const body = employeeBreakdown.map((row) => [
+      row.name,
+      row.email,
+      period,
+      periodLabel,
+      String(row.tasksGiven),
+      String(row.tasksCompleted),
+      String(row.adminComments),
+      row.avgRating === null ? "-" : String(row.avgRating)
+    ]);
+
+    autoTable(doc, {
+      head: headers,
+      body,
+      startY: 20,
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [15, 23, 42] }
+    });
+
+    doc.save(`employee-breakdown-${filePeriod}.pdf`);
   };
 
   return (
@@ -303,12 +354,26 @@ export default function AdminReports() {
       <div className="glass-panel overflow-hidden mb-6">
         <div className="flex items-center justify-between p-4 border-b border-border/40">
           <h3 className="text-sm font-semibold">Per-Employee Breakdown ({periodLabel})</h3>
-          <button
-            onClick={downloadBreakdownCsv}
-            className="px-3 py-2 rounded-lg bg-primary/10 text-primary border border-primary/20 text-xs font-medium hover:bg-primary/20"
-          >
-            Download CSV
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={downloadBreakdownCsv}
+              className="px-3 py-2 rounded-lg bg-primary/10 text-primary border border-primary/20 text-xs font-medium hover:bg-primary/20"
+            >
+              CSV
+            </button>
+            <button
+              onClick={downloadBreakdownExcel}
+              className="px-3 py-2 rounded-lg bg-primary/10 text-primary border border-primary/20 text-xs font-medium hover:bg-primary/20"
+            >
+              Excel
+            </button>
+            <button
+              onClick={downloadBreakdownPdf}
+              className="px-3 py-2 rounded-lg bg-primary/10 text-primary border border-primary/20 text-xs font-medium hover:bg-primary/20"
+            >
+              PDF
+            </button>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
