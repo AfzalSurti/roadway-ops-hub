@@ -17,7 +17,7 @@ const taskSchema = z
     assignedToId: z.string().min(1, "Please assign to someone"),
     allocatedAt: z.string().min(1, "Assigned date is required"),
     allottedDays: z.string().optional(),
-    ratingEnabled: z.boolean().default(true)
+    ratingEnabled: z.boolean().default(false)
   })
   .superRefine((data, ctx) => {
     if (data.title === "Other" && (!data.customSubTask || data.customSubTask.trim().length < 2)) {
@@ -222,7 +222,7 @@ export default function CreateTask() {
       assignedToId: draft.assignedToId ?? "",
       allocatedAt: draft.allocatedAt ?? new Date().toISOString().split("T")[0],
       allottedDays: draft.allottedDays ?? "",
-      ratingEnabled: draft.ratingEnabled ?? true
+      ratingEnabled: draft.ratingEnabled ?? false
     }
   });
 
@@ -377,8 +377,9 @@ export default function CreateTask() {
           <div className="sm:col-span-2">
             <label className="inline-flex items-center gap-2 text-sm font-medium">
               <input type="checkbox" {...register("ratingEnabled")} className="rounded" />
-              Apply rating formula on this task
+              Rating on above task
             </label>
+            <p className="text-xs text-muted-foreground mt-1">Checked: rating applied. Unchecked: rating not applied.</p>
           </div>
 
         </div>
