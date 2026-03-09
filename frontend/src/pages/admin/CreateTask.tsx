@@ -12,7 +12,6 @@ import { useQuery } from "@tanstack/react-query";
 const taskSchema = z.object({
   taskCategory: z.string().min(1, "Please select main task"),
   title: z.string().min(2, "Please select sub task"),
-  description: z.string().optional(),
   assignedToId: z.string().min(1, "Please assign to someone"),
   allocatedAt: z.string().min(1, "Assigned date is required"),
   allottedDays: z.string().optional(),
@@ -210,7 +209,6 @@ export default function CreateTask() {
     defaultValues: {
       title: draft.title ?? "",
       taskCategory: draft.taskCategory ?? "",
-      description: draft.description ?? "-",
       assignedToId: draft.assignedToId ?? "",
       allocatedAt: draft.allocatedAt ?? new Date().toISOString().split("T")[0],
       allottedDays: draft.allottedDays ?? "",
@@ -235,7 +233,7 @@ export default function CreateTask() {
       const combinedTitle = `${data.taskCategory} - ${data.title}`;
       await api.createTask({
         ...data,
-        description: data.description?.trim() ? data.description : "-",
+        description: "-",
         title: combinedTitle,
         allottedDays: data.allottedDays ? Number(data.allottedDays) : undefined,
         ratingEnabled: data.ratingEnabled,
@@ -311,8 +309,6 @@ export default function CreateTask() {
             {errors.title && <p className="text-xs text-destructive mt-1">{errors.title.message}</p>}
           </div>
         </div>
-
-        <input type="hidden" {...register("description")} value="-" />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>

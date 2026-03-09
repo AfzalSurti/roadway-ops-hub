@@ -17,6 +17,7 @@ export const taskController = {
 
     const payload = {
       ...req.body,
+      description: typeof req.body.description === "string" && req.body.description.trim() ? req.body.description.trim() : "-",
       allocatedAt,
       dueDate,
       createdById: req.user!.id,
