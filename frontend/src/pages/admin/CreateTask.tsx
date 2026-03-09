@@ -9,14 +9,25 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 
-const taskSchema = z.object({
-  taskCategory: z.string().min(1, "Please select main task"),
-  title: z.string().min(2, "Please select sub task"),
-  assignedToId: z.string().min(1, "Please assign to someone"),
-  allocatedAt: z.string().min(1, "Assigned date is required"),
-  allottedDays: z.string().optional(),
-  ratingEnabled: z.boolean().default(true)
-});
+const taskSchema = z
+  .object({
+    taskCategory: z.string().min(1, "Please select main task"),
+    title: z.string().min(2, "Please select sub task"),
+    customSubTask: z.string().optional(),
+    assignedToId: z.string().min(1, "Please assign to someone"),
+    allocatedAt: z.string().min(1, "Assigned date is required"),
+    allottedDays: z.string().optional(),
+    ratingEnabled: z.boolean().default(true)
+  })
+  .superRefine((data, ctx) => {
+    if (data.title === "Other" && (!data.customSubTask || data.customSubTask.trim().length < 2)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["customSubTask"],
+        message: "Please enter custom sub task"
+      });
+    }
+  });
 
 type TaskFormValues = z.infer<typeof taskSchema>;
 
@@ -201,13 +212,13 @@ export default function CreateTask() {
     handleSubmit,
     watch,
     setValue,
-    getValues,
     formState: { errors, isSubmitting }
   } = useForm<TaskFormValues>({
     resolver: zodResolver(taskSchema),
     defaultValues: {
       title: draft.title ?? "",
       taskCategory: draft.taskCategory ?? "",
+      customSubTask: draft.customSubTask ?? "",
       assignedToId: draft.assignedToId ?? "",
       allocatedAt: draft.allocatedAt ?? new Date().toISOString().split("T")[0],
       allottedDays: draft.allottedDays ?? "",
@@ -217,6 +228,7 @@ export default function CreateTask() {
 
   const values = watch();
   const selectedCategory = watch("taskCategory");
+  const selectedSubTask = watch("title");
   const subTasks = useMemo(() => TASK_DATA[selectedCategory] ?? [], [selectedCategory]);
 
   useEffect(() => {
@@ -228,13 +240,14 @@ export default function CreateTask() {
 
   const onSubmit = async (data: TaskFormValues) => {
     try {
-      const combinedTitle = `${data.taskCategory} - ${data.title}`;
+      const resolvedSubTask = data.title === "Other" ? data.customSubTask!.trim() : data.title;
+      const combinedTitle = `${data.taskCategory} - ${resolvedSubTask}`;
       await api.createTask({
-        ...data,
         title: combinedTitle,
+        description: "-",
         allottedDays: data.allottedDays ? Number(data.allottedDays) : undefined,
         ratingEnabled: data.ratingEnabled,
-        reportTemplateId: undefined,
+        assignedToId: data.assignedToId,
         allocatedAt: data.allocatedAt,
         project: data.taskCategory
       });
@@ -275,6 +288,7 @@ export default function CreateTask() {
                 const nextCategory = event.target.value;
                 setValue("taskCategory", nextCategory, { shouldValidate: true, shouldDirty: true });
                 setValue("title", "", { shouldValidate: true, shouldDirty: true });
+                setValue("customSubTask", "", { shouldValidate: true, shouldDirty: true });
               }}
             >
               <option value="">Select main task</option>
@@ -306,6 +320,19 @@ export default function CreateTask() {
             {errors.title && <p className="text-xs text-destructive mt-1">{errors.title.message}</p>}
           </div>
         </div>
+
+        {selectedSubTask === "Other" && (
+          <div>
+            <label className="text-sm font-medium mb-1.5 block">Custom Sub Task</label>
+            <input
+              {...register("customSubTask")}
+              type="text"
+              className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
+              placeholder="Type your custom sub task"
+            />
+            {errors.customSubTask && <p className="text-xs text-destructive mt-1">{errors.customSubTask.message}</p>}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
