@@ -11,9 +11,25 @@ import { reportStatusConfig, toAvatarUrl } from "@/lib/domain";
 
 type ReportStatusFilter = "ALL" | ReportStatus;
 
+const MONTH_OPTIONS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December"
+] as const;
+
 export default function AdminReports() {
   const [filter, setFilter] = useState<ReportStatusFilter>("ALL");
   const [period, setPeriod] = useState<"MONTHLY" | "QUARTERLY" | "YEARLY">("MONTHLY");
+  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
   const [employeeId, setEmployeeId] = useState<string>("ALL");
   const [selectedReport, setSelectedReport] = useState<string | null>(null);
   const [feedbackModal, setFeedbackModal] = useState<string | null>(null);
@@ -27,20 +43,53 @@ export default function AdminReports() {
   const reports = data?.items ?? [];
   const tasks = tasksData?.items ?? [];
 
-  const startDate = useMemo(() => {
+  const periodRange = useMemo(() => {
     const now = new Date();
-    if (period === "MONTHLY") return new Date(now.getFullYear(), now.getMonth(), 1);
-    if (period === "QUARTERLY") return new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
-    return new Date(now.getFullYear(), 0, 1);
-  }, [period]);
+    const year = now.getFullYear();
+
+    if (period === "MONTHLY") {
+      const start = new Date(year, selectedMonth, 1);
+      const end = new Date(year, selectedMonth + 1, 1);
+      return { start, end };
+    }
+
+    if (period === "QUARTERLY") {
+      const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3;
+      const start = new Date(year, quarterStartMonth, 1);
+      const end = new Date(year, quarterStartMonth + 3, 1);
+      return { start, end };
+    }
+
+    return {
+      start: new Date(year, 0, 1),
+      end: new Date(year + 1, 0, 1)
+    };
+  }, [period, selectedMonth]);
+
+  const periodLabel = useMemo(() => {
+    if (period === "MONTHLY") {
+      return `${MONTH_OPTIONS[selectedMonth]} ${new Date().getFullYear()}`;
+    }
+    if (period === "QUARTERLY") {
+      const quarter = Math.floor(new Date().getMonth() / 3) + 1;
+      return `Q${quarter} ${new Date().getFullYear()}`;
+    }
+    return String(new Date().getFullYear());
+  }, [period, selectedMonth]);
 
   const periodFilteredReports = useMemo(
-    () => reports.filter((report) => new Date(report.createdAt) >= startDate),
-    [reports, startDate]
+    () => reports.filter((report) => {
+      const createdAt = new Date(report.createdAt);
+      return createdAt >= periodRange.start && createdAt < periodRange.end;
+    }),
+    [reports, periodRange]
   );
   const periodFilteredTasks = useMemo(
-    () => tasks.filter((task) => new Date(task.allocatedAt ?? task.createdAt) >= startDate),
-    [tasks, startDate]
+    () => tasks.filter((task) => {
+      const allocatedAt = new Date(task.allocatedAt ?? task.createdAt);
+      return allocatedAt >= periodRange.start && allocatedAt < periodRange.end;
+    }),
+    [tasks, periodRange]
   );
 
   const filtered = useMemo(() => {
@@ -160,6 +209,7 @@ export default function AdminReports() {
       row.name,
       row.email,
       period,
+      periodLabel,
       String(row.tasksGiven),
       String(row.tasksCompleted),
       String(row.adminComments),
@@ -173,7 +223,8 @@ export default function AdminReports() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `employee-breakdown-${period.toLowerCase()}.csv`;
+    const filePeriod = period === "MONTHLY" ? MONTH_OPTIONS[selectedMonth].toLowerCase() : period.toLowerCase();
+    link.download = `employee-breakdown-${filePeriod}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -199,6 +250,21 @@ export default function AdminReports() {
           <option value="QUARTERLY">Quarterly</option>
           <option value="YEARLY">Yearly</option>
         </select>
+        {period === "MONTHLY" && (
+          <select
+            value={selectedMonth}
+            onChange={(event) => setSelectedMonth(Number(event.target.value))}
+            title="Select month"
+            aria-label="Select month"
+            className="px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 text-sm"
+          >
+            {MONTH_OPTIONS.map((month, index) => (
+              <option key={month} value={index}>
+                {month}
+              </option>
+            ))}
+          </select>
+        )}
         <select
           value={employeeId}
           onChange={(event) => setEmployeeId(event.target.value)}
@@ -236,7 +302,7 @@ export default function AdminReports() {
 
       <div className="glass-panel overflow-hidden mb-6">
         <div className="flex items-center justify-between p-4 border-b border-border/40">
-          <h3 className="text-sm font-semibold">Per-Employee Breakdown ({period.toLowerCase()})</h3>
+          <h3 className="text-sm font-semibold">Per-Employee Breakdown ({periodLabel})</h3>
           <button
             onClick={downloadBreakdownCsv}
             className="px-3 py-2 rounded-lg bg-primary/10 text-primary border border-primary/20 text-xs font-medium hover:bg-primary/20"
