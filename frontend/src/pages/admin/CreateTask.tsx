@@ -12,7 +12,7 @@ import { useQuery } from "@tanstack/react-query";
 const taskSchema = z.object({
   taskCategory: z.string().min(1, "Please select main task"),
   title: z.string().min(2, "Please select sub task"),
-  description: z.string().min(10, "Description must be at least 10 characters"),
+  description: z.string().optional(),
   assignedToId: z.string().min(1, "Please assign to someone"),
   allocatedAt: z.string().min(1, "Assigned date is required"),
   allottedDays: z.string().optional(),
@@ -210,7 +210,7 @@ export default function CreateTask() {
     defaultValues: {
       title: draft.title ?? "",
       taskCategory: draft.taskCategory ?? "",
-      description: draft.description ?? "",
+      description: draft.description ?? "-",
       assignedToId: draft.assignedToId ?? "",
       allocatedAt: draft.allocatedAt ?? new Date().toISOString().split("T")[0],
       allottedDays: draft.allottedDays ?? "",
@@ -235,6 +235,7 @@ export default function CreateTask() {
       const combinedTitle = `${data.taskCategory} - ${data.title}`;
       await api.createTask({
         ...data,
+        description: data.description?.trim() ? data.description : "-",
         title: combinedTitle,
         allottedDays: data.allottedDays ? Number(data.allottedDays) : undefined,
         ratingEnabled: data.ratingEnabled,
@@ -311,16 +312,7 @@ export default function CreateTask() {
           </div>
         </div>
 
-        <div>
-          <label className="text-sm font-medium mb-1.5 block">Description</label>
-          <textarea
-            {...register("description")}
-            rows={3}
-            className="w-full px-4 py-2.5 rounded-xl input-field bg-secondary/50 border border-border/50 text-foreground outline-none resize-none focus:border-primary/50"
-            placeholder="Describe the task…"
-          />
-          {errors.description && <p className="text-xs text-destructive mt-1">{errors.description.message}</p>}
-        </div>
+        <input type="hidden" {...register("description")} value="-" />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
