@@ -174,7 +174,7 @@ export const api = {
 
   createTask(payload: {
     title: string;
-    description: string;
+    description?: string;
     projectCode?: string;
     projectNumber?: string;
     project: string;

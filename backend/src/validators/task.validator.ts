@@ -4,8 +4,12 @@ import { z } from "zod";
 export const createTaskSchema = z.object({
   title: z.string().min(2),
   description: z.preprocess(
-    (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
-    z.string().min(2).optional()
+    (value) => {
+      if (typeof value !== "string") return value;
+      const trimmed = value.trim();
+      return trimmed.length < 2 ? undefined : trimmed;
+    },
+    z.string().optional()
   ),
   projectCode: z.string().trim().min(1).optional(),
   projectNumber: z.string().trim().min(1).optional(),

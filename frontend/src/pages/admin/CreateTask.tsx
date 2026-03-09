@@ -231,7 +231,6 @@ export default function CreateTask() {
       const combinedTitle = `${data.taskCategory} - ${data.title}`;
       await api.createTask({
         ...data,
-        description: "-",
         title: combinedTitle,
         allottedDays: data.allottedDays ? Number(data.allottedDays) : undefined,
         ratingEnabled: data.ratingEnabled,
