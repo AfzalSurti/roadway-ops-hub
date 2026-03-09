@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { PageWrapper } from "@/components/PageWrapper";
 import { ArrowLeft } from "lucide-react";
@@ -10,7 +10,8 @@ import { api } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 
 const taskSchema = z.object({
-  title: z.string().min(2, "Please select DPR activity"),
+  taskCategory: z.string().min(1, "Please select main task"),
+  title: z.string().min(2, "Please select sub task"),
   description: z.string().min(10, "Description must be at least 10 characters"),
   assignedToId: z.string().min(1, "Please assign to someone"),
   allocatedAt: z.string().min(1, "Assigned date is required"),
@@ -24,7 +25,164 @@ type TaskFormValues = z.infer<typeof taskSchema>;
 const TASK_DRAFT_KEY = "highwayops_create_task_draft";
 
 type TaskDraft = Partial<TaskFormValues> & {
-  taskQuery?: string;
+  taskCategory?: string;
+};
+
+const TASK_DATA: Record<string, string[]> = {
+  "Project Management": [
+    "Submission of Monthly Progress Report",
+    "Submission of Quaterly Progress Report",
+    "Submission of Extension of Time Limit Proposal",
+    "Submission of Excess / Extra Proposal",
+    "Other"
+  ],
+  "Inception Report & QAP": [
+    "Kick-off Meeting with client & preliminary Project site visit",
+    "Geometric Design of Existing Alignment",
+    "Existing Road Inventory",
+    "Existing Bridges, Culverts & Structures Inventory",
+    "Submission of Draft Inception Report & QAP",
+    "Comments from Concern approval authority & Its Compliance",
+    "Submission of Final Inception Report & QAP",
+    "Approval of Final Inception Report & QAP",
+    "Other"
+  ],
+  "Feasibility Report": [
+    "Geometric Design for various Alignment options",
+    "Detailed Topographic Survey",
+    "Submission of Traffic surveys Report (incl. Volume count, Axel load, TMC, O-D survey etc..)",
+    "Submission of Black Spots audit report",
+    "Submission of Draft Alignment Option Report & Presentation",
+    "Submission of Final Alignment Report",
+    "Approval of Final Alignment Report",
+    "Collect & Testing of Various materials (Cement, Steel, Aggregates, Bitumen etc.) and Submission of Material Report",
+    "Submission of NSV Report",
+    "Condition survey for Existing CD works, Bridges & Structures",
+    "Submission of Inventory & Condition Survey Report",
+    "Subgrade Characteristics and Strength survey (soil sample testing)",
+    "Submission of Pavement Structural Strength Survey (BBD / FWD) Report",
+    "Submission of Geo Technical Investigation and sub soil Exploration Report",
+    "Submission of Hydraulic and Hydrological Survey report",
+    "Submission of Environment and Social Impact Assessment report",
+    "Submission of Draft Pavement Design report (With Alternative Design Options)",
+    "Submission of Rate Analysis",
+    "Submission of Cost / Block Estimate",
+    "Submission of Economic and financial analysis report",
+    "Submission of Preliminary land acquisition Report",
+    "Submission of Alignment/Strip plan and Alignment Drawing (TCS)",
+    "Submission of Draft Feasibility Report",
+    "Comments from Concern approval authority & Its Compliance",
+    "Submission of Final Feasibility Report",
+    "Other"
+  ],
+  "LA-I Report": [
+    "Collection of Village Maps & Land revenue records",
+    "Liasion for appointment of CALA & Publication of 3A Gazette Notification",
+    "Preparation of Draft 3A Notifications",
+    "Submission of Estimated Cost of Land Acquisition",
+    "Submission of LA-I Report incl. Strip / LA Plan",
+    "Comments from Concern approval authority & Its Compliance",
+    "Submission of Final LA-I Report incl. Strip/LA Plan",
+    "Other"
+  ],
+  "Utility-I Report": [
+    "Identification of surface utilities",
+    "Ground Penetrating Radar (GPR) Survey for sub-surface utilities",
+    "Submission of identification letter to Utility owner",
+    "Consultation with Utility agency & discussion on relocation cost",
+    "Submission of Utility Shifting proposals to user agency",
+    "Submission of Utility-I Report & Utility relocation plan",
+    "Other"
+  ],
+  "Clearance-I Report": [
+    "Initial consultation with Environment/Forest/Wildlife/CRZ authorities",
+    "Collection of Reserved Forest survey numbers",
+    "Details/cost of trees being felled from Forest Office",
+    "Preparation of EIA Report",
+    "Mapping of CRZ Boundary by authorised agency",
+    "Submission of Clearance proposals",
+    "Submission of Clearance-I Report",
+    "Other"
+  ],
+  "Detailed Project Report (DPR)": [
+    "Detailed Topography Survey on Approved Alignment",
+    "Submission of DPR Main Report & Draft DPR",
+    "Submission of Design Based Report (Road Design)",
+    "Submission of Traffic Report",
+    "Submission of NSV Report",
+    "Submission of FWD Report",
+    "Submission of Final Pavement Design report",
+    "Submission of Economic and financial analysis report",
+    "Submission of Black Spot Audit report",
+    "Submission of Design Based Report (Structure Design)",
+    "Submission of Inventory & Condition survey report",
+    "Submission of Geo-technical and sub-soil explorations report",
+    "Submission of Hydraulic & Hydrological Investigation report",
+    "Submission of Material Report",
+    "Submission of Environmental and Social Impact Assessment report",
+    "Submission of Technical Specifications",
+    "Submission of Rate Analysis",
+    "Submission of Detailed Estimates",
+    "Submission of Drawings (Road/Highway, Structure & Facilities)",
+    "Submission of Drainage Design Report",
+    "Submission of Drainage Plan",
+    "Comments from approval authority on Draft DPR",
+    "Submission of Final DPR",
+    "Approval of Final DPR",
+    "Other"
+  ],
+  "Bid documents and civil works contract agreement": [
+    "Submission of Draft Civil work contract Agreement with technical schedule",
+    "Submission of Draft Bid Documents (RFP / NIT)",
+    "Approval of Civil work contract Agreement & Bid Documents",
+    "Other"
+  ],
+  "LA-II Report": [
+    "Liasion for Publication of 3A Gazette Notification",
+    "Fixing of Boundary pillar for PROW marking",
+    "Joint measurement survey with authority",
+    "Valuation of existing properties",
+    "Liasion for Publication of 3D Gazette Notification",
+    "Submission of LA-II Report incl. Final Strip/LA Plan",
+    "Other"
+  ],
+  "Utility-II Report": [
+    "Joint site inspection with competent authority",
+    "Submission of Utility Shifting Estimates",
+    "Collection of NO upgradation certificate",
+    "Approval of Utility Shifting Estimates",
+    "Submission of Utility-II Report & Final Utility relocation plan",
+    "Other"
+  ],
+  "Clearance-II Report": [
+    "Liasion for Public Hearing (EC)",
+    "Final environment clearance by authority",
+    "Joint site inspection with DFO (Forest Clearance)",
+    "Liasion for FRA certificate",
+    "Stage I forest clearance approval",
+    "Stage II forest clearance approval",
+    "Joint site inspection for Wildlife clearance",
+    "Stage I Wild clearance approval",
+    "Stage II Wild clearance approval",
+    "Site Visit by GCZMA/State Govt (CRZ)",
+    "Presentation before committee (CRZ)",
+    "Final CRZ clearance",
+    "Final GAD Approval (Railway/Irrigation etc.)",
+    "Submission of Final Clearance-II Report",
+    "Other"
+  ],
+  "Land Award Report (LA-III Report)": [
+    "Liasion for Award Declaration (3G)",
+    "Submission of Land Award Report",
+    "Other"
+  ],
+  "Land possession Report (LA-IV Report)": [
+    "Liasion for Deposition of compensation amount by Govt to CALA",
+    "Liasion for Amount Disbursement to Land owners",
+    "Receipt of Land Possession Certificate 3(E)",
+    "Submission of Land possession Report",
+    "Other"
+  ]
 };
 
 export default function CreateTask() {
@@ -38,22 +196,7 @@ export default function CreateTask() {
     }
   }, []);
 
-  const [taskQuery, setTaskQuery] = useState(draft.taskQuery ?? "");
-
   const { data: users = [] } = useQuery({ queryKey: ["users"], queryFn: () => api.getUsers() });
-  const {
-    data: dprActivities = [],
-    isLoading: isDprActivitiesLoading,
-    isError: isDprActivitiesError
-  } = useQuery({ queryKey: ["dpr-activities"], queryFn: () => api.getDprActivities() });
-  const filteredActivities = useMemo(() => {
-    const query = taskQuery.trim().toLowerCase();
-    if (!query) {
-      return dprActivities;
-    }
-
-    return dprActivities.filter((activity) => activity.label.toLowerCase().includes(query));
-  }, [dprActivities, taskQuery]);
 
   const {
     register,
@@ -66,6 +209,7 @@ export default function CreateTask() {
     resolver: zodResolver(taskSchema),
     defaultValues: {
       title: draft.title ?? "",
+      taskCategory: draft.taskCategory ?? "",
       description: draft.description ?? "",
       assignedToId: draft.assignedToId ?? "",
       allocatedAt: draft.allocatedAt ?? new Date().toISOString().split("T")[0],
@@ -76,24 +220,27 @@ export default function CreateTask() {
   });
 
   const values = watch();
+  const selectedCategory = watch("taskCategory");
+  const subTasks = useMemo(() => TASK_DATA[selectedCategory] ?? [], [selectedCategory]);
 
   useEffect(() => {
     const payload: TaskDraft = {
-      ...values,
-      taskQuery
+      ...values
     };
     sessionStorage.setItem(TASK_DRAFT_KEY, JSON.stringify(payload));
-  }, [values, taskQuery]);
+  }, [values]);
 
   const onSubmit = async (data: TaskFormValues) => {
     try {
+      const combinedTitle = `${data.taskCategory} - ${data.title}`;
       await api.createTask({
         ...data,
+        title: combinedTitle,
         allottedDays: data.allottedDays ? Number(data.allottedDays) : undefined,
         ratingEnabled: data.ratingEnabled,
         reportTemplateId: undefined,
         allocatedAt: data.allocatedAt,
-        project: "DPR Activity"
+        project: data.taskCategory
       });
       sessionStorage.removeItem(TASK_DRAFT_KEY);
       toast.success("Task created successfully!");
@@ -120,38 +267,48 @@ export default function CreateTask() {
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="glass-panel p-6 max-w-2xl space-y-5">
-        <div>
-          <label className="text-sm font-medium mb-1.5 block">DPR Activity</label>
-          <input
-            value={taskQuery}
-            onChange={(event) => {
-              const value = event.target.value;
-              setTaskQuery(value);
-              setValue("title", value, { shouldValidate: true, shouldDirty: true });
-              const selected = dprActivities.find((activity) => activity.label === value);
-              if (selected && !getValues("description")?.trim()) {
-                setValue("description", selected.description, { shouldValidate: true, shouldDirty: true });
-              }
-            }}
-            list="dpr-activity-options"
-            title="DPR Activity"
-            placeholder={isDprActivitiesLoading ? "Loading tasks..." : "Type to search and select task"}
-            className="w-full mb-2 px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
-            disabled={isDprActivitiesLoading || isDprActivitiesError || dprActivities.length === 0}
-          />
-          <datalist id="dpr-activity-options">
-            {filteredActivities.map((activity) => (
-              <option key={activity.id} value={activity.label} />
-            ))}
-          </datalist>
-          <input type="hidden" {...register("title")} />
-          {!isDprActivitiesLoading && !isDprActivitiesError && dprActivities.length === 0 && (
-            <p className="text-xs text-muted-foreground mt-1">Task section is empty</p>
-          )}
-          {!isDprActivitiesLoading && !isDprActivitiesError && dprActivities.length > 0 && filteredActivities.length === 0 && (
-            <p className="text-xs text-muted-foreground mt-1">No matching tasks</p>
-          )}
-          {errors.title && <p className="text-xs text-destructive mt-1">{errors.title.message}</p>}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="text-sm font-medium mb-1.5 block">Main Task</label>
+            <select
+              {...register("taskCategory")}
+              aria-label="Main Task"
+              title="Main Task"
+              className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
+              onChange={(event) => {
+                const nextCategory = event.target.value;
+                setValue("taskCategory", nextCategory, { shouldValidate: true, shouldDirty: true });
+                setValue("title", "", { shouldValidate: true, shouldDirty: true });
+              }}
+            >
+              <option value="">Select main task</option>
+              {Object.keys(TASK_DATA).map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
+            </select>
+            {errors.taskCategory && <p className="text-xs text-destructive mt-1">{errors.taskCategory.message}</p>}
+          </div>
+
+          <div>
+            <label className="text-sm font-medium mb-1.5 block">Sub Task</label>
+            <select
+              {...register("title")}
+              aria-label="Sub Task"
+              title="Sub Task"
+              className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
+              disabled={!selectedCategory || subTasks.length === 0}
+            >
+              <option value="">{selectedCategory ? "Select sub task" : "Select main task first"}</option>
+              {subTasks.map((subTask) => (
+                <option key={subTask} value={subTask}>
+                  {subTask}
+                </option>
+              ))}
+            </select>
+            {errors.title && <p className="text-xs text-destructive mt-1">{errors.title.message}</p>}
+          </div>
         </div>
 
         <div>
