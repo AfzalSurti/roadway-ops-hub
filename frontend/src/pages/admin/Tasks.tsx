@@ -14,10 +14,9 @@ const columns = [
   { key: "TODO", label: "To Do" },
   { key: "DONE", label: "Done" }
 ] as const;
-];
 
 export default function AdminTasks() {
-  const [view, setView] = useState<"kanban" | "list">("kanban");
+  const [view, setView] = useState<"kanban" | "list">("list");
   const [search, setSearch] = useState("");
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -105,9 +104,17 @@ export default function AdminTasks() {
     [tasks, search]
   );
 
+  const sortedTasks = useMemo(() => {
+    return [...filtered].sort((a, b) => {
+      const dueA = new Date(a.dueDate).getTime();
+      const dueB = new Date(b.dueDate).getTime();
+      return dueA - dueB;
+    });
+  }, [filtered]);
+
   const projectBreakdown = useMemo(() => {
     const counts = new Map<string, number>();
-    filtered.forEach((task) => {
+    sortedTasks.forEach((task) => {
       const key = task.project?.trim() || "Uncategorized";
       counts.set(key, (counts.get(key) ?? 0) + 1);
     });
@@ -115,11 +122,11 @@ export default function AdminTasks() {
     return Array.from(counts.entries())
       .map(([project, count]) => ({ project, count }))
       .sort((a, b) => b.count - a.count || a.project.localeCompare(b.project));
-  }, [filtered]);
+  }, [sortedTasks]);
 
   const monthBreakdown = useMemo(() => {
     const counts = new Map<string, number>();
-    filtered.forEach((task) => {
+    sortedTasks.forEach((task) => {
       const date = new Date(task.allocatedAt ?? task.createdAt);
       const key = date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
       counts.set(key, (counts.get(key) ?? 0) + 1);
@@ -132,7 +139,7 @@ export default function AdminTasks() {
         const db = new Date(b.month).getTime();
         return db - da;
       });
-  }, [filtered]);
+  }, [sortedTasks]);
 
   return (
     <PageWrapper>
@@ -246,8 +253,8 @@ export default function AdminTasks() {
           {columns.map((column) => {
             const columnTasks =
               column.key === "DONE"
-                ? filtered.filter((task) => task.status === "DONE")
-                : filtered.filter((task) => task.status !== "DONE");
+                ? sortedTasks.filter((task) => task.status === "DONE")
+                : sortedTasks.filter((task) => task.status !== "DONE");
             const cfg = statusConfig[column.key];
             return (
               <div key={column.key} className="kanban-column min-w-[280px]">
@@ -269,34 +276,35 @@ export default function AdminTasks() {
         </div>
       ) : (
         <div className="glass-panel overflow-hidden">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[980px]">
             <thead>
               <tr className="border-b border-border/50 text-muted-foreground">
+                <th className="text-left p-4 font-medium">Project</th>
                 <th className="text-left p-4 font-medium">Task</th>
-                <th className="text-left p-4 font-medium hidden md:table-cell">Project</th>
-                <th className="text-left p-4 font-medium hidden sm:table-cell">Assigned</th>
+                <th className="text-left p-4 font-medium">Rating</th>
+                <th className="text-left p-4 font-medium">Remarks</th>
                 <th className="text-left p-4 font-medium">Status</th>
-                <th className="text-left p-4 font-medium hidden lg:table-cell">Due</th>
+                <th className="text-left p-4 font-medium">Assigned Date</th>
+                <th className="text-left p-4 font-medium">Due Date</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((task) => (
+              {sortedTasks.map((task) => (
                 <tr key={task.id} onClick={() => setSelectedTask(task)} className="border-b border-border/30 hover:bg-secondary/30 transition-colors cursor-pointer">
-                  <td className="p-4">
+                  <td className="p-4 text-muted-foreground">{task.project}</td>
+                  <td className="p-4 min-w-[320px]">
                     <p className="font-medium">{task.title}</p>
-                    <p className="text-xs text-muted-foreground">{task.reportTemplate?.name ?? "Template"}</p>
+                    <p className="text-xs text-muted-foreground line-clamp-2">{task.description || "-"}</p>
                   </td>
-                  <td className="p-4 hidden md:table-cell text-muted-foreground">{task.project}</td>
-                  <td className="p-4 hidden sm:table-cell">
-                    <div className="flex items-center gap-2">
-                      <img src={toAvatarUrl(task.assignedTo?.name ?? "User")} alt="" className="w-6 h-6 rounded-full" />
-                      <span className="text-muted-foreground">{task.assignedTo?.name ?? "—"}</span>
-                    </div>
+                  <td className="p-4">{task.rating ?? "-"}</td>
+                  <td className="p-4 text-muted-foreground max-w-[220px] truncate" title={task.managerReviewComments ?? "-"}>
+                    {task.managerReviewComments?.trim() || "-"}
                   </td>
                   <td className="p-4">
                     <span className={`status-badge ${statusConfig[task.status].color}`}>{statusConfig[task.status].label}</span>
                   </td>
-                  <td className="p-4 hidden lg:table-cell text-muted-foreground">{new Date(task.allocatedAt ?? task.createdAt).toLocaleDateString()}</td>
+                  <td className="p-4 text-muted-foreground">{new Date(task.allocatedAt ?? task.createdAt).toLocaleDateString()}</td>
+                  <td className="p-4 text-muted-foreground">{new Date(task.dueDate).toLocaleDateString()}</td>
                 </tr>
               ))}
             </tbody>
