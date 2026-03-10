@@ -6,15 +6,14 @@ import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
-import type { TaskItem, TaskStatus } from "@/lib/domain";
+import type { TaskItem } from "@/lib/domain";
 import { statusConfig, toAvatarUrl } from "@/lib/domain";
 import { toast } from "sonner";
 
-const columns: { status: TaskStatus; label: string }[] = [
-  { status: "TODO", label: "To Do" },
-  { status: "IN_PROGRESS", label: "In Progress" },
-  { status: "BLOCKED", label: "Blocked" },
-  { status: "DONE", label: "Done" }
+const columns = [
+  { key: "TODO", label: "To Do" },
+  { key: "DONE", label: "Done" }
+] as const;
 ];
 
 export default function AdminTasks() {
@@ -106,6 +105,35 @@ export default function AdminTasks() {
     [tasks, search]
   );
 
+  const projectBreakdown = useMemo(() => {
+    const counts = new Map<string, number>();
+    filtered.forEach((task) => {
+      const key = task.project?.trim() || "Uncategorized";
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    });
+
+    return Array.from(counts.entries())
+      .map(([project, count]) => ({ project, count }))
+      .sort((a, b) => b.count - a.count || a.project.localeCompare(b.project));
+  }, [filtered]);
+
+  const monthBreakdown = useMemo(() => {
+    const counts = new Map<string, number>();
+    filtered.forEach((task) => {
+      const date = new Date(task.allocatedAt ?? task.createdAt);
+      const key = date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    });
+
+    return Array.from(counts.entries())
+      .map(([month, count]) => ({ month, count }))
+      .sort((a, b) => {
+        const da = new Date(a.month).getTime();
+        const db = new Date(b.month).getTime();
+        return db - da;
+      });
+  }, [filtered]);
+
   return (
     <PageWrapper>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
@@ -153,15 +181,76 @@ export default function AdminTasks() {
         </div>
       </div>
 
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        <div className="glass-panel overflow-hidden">
+          <div className="px-4 py-3 border-b border-border/40">
+            <h3 className="text-sm font-semibold">Project-wise Task Count</h3>
+          </div>
+          <div className="max-h-52 overflow-y-auto">
+            {projectBreakdown.length === 0 ? (
+              <p className="text-sm text-muted-foreground p-4">No task data available.</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border/30 text-muted-foreground">
+                    <th className="text-left p-3 font-medium">Project</th>
+                    <th className="text-left p-3 font-medium">Tasks</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {projectBreakdown.map((row) => (
+                    <tr key={row.project} className="border-b border-border/20 last:border-b-0">
+                      <td className="p-3">{row.project}</td>
+                      <td className="p-3 font-medium">{row.count}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+
+        <div className="glass-panel overflow-hidden">
+          <div className="px-4 py-3 border-b border-border/40">
+            <h3 className="text-sm font-semibold">Month-wise Tasks Given</h3>
+          </div>
+          <div className="max-h-52 overflow-y-auto">
+            {monthBreakdown.length === 0 ? (
+              <p className="text-sm text-muted-foreground p-4">No task data available.</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border/30 text-muted-foreground">
+                    <th className="text-left p-3 font-medium">Month</th>
+                    <th className="text-left p-3 font-medium">Tasks Given</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {monthBreakdown.map((row) => (
+                    <tr key={row.month} className="border-b border-border/20 last:border-b-0">
+                      <td className="p-3">{row.month}</td>
+                      <td className="p-3 font-medium">{row.count}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      </div>
+
       {loading ? (
         <div className="glass-panel p-8 text-sm text-muted-foreground">Loading tasks…</div>
       ) : view === "kanban" ? (
         <div className="flex gap-4 overflow-x-auto pb-4">
           {columns.map((column) => {
-            const columnTasks = filtered.filter((task) => task.status === column.status);
-            const cfg = statusConfig[column.status];
+            const columnTasks =
+              column.key === "DONE"
+                ? filtered.filter((task) => task.status === "DONE")
+                : filtered.filter((task) => task.status !== "DONE");
+            const cfg = statusConfig[column.key];
             return (
-              <div key={column.status} className="kanban-column min-w-[280px]">
+              <div key={column.key} className="kanban-column min-w-[280px]">
                 <div className="flex items-center gap-2 mb-4">
                   <span className={`status-badge ${cfg.color}`}>{column.label}</span>
                   <span className="text-xs text-muted-foreground">{columnTasks.length}</span>
