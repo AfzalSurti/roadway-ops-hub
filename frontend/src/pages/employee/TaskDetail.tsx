@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
-import { priorityConfig, statusConfig, toAvatarUrl } from "@/lib/domain";
+import { statusConfig, toAvatarUrl } from "@/lib/domain";
 
 export default function TaskDetail() {
   const { id } = useParams();
@@ -83,7 +83,6 @@ export default function TaskDetail() {
           <div className="glass-panel p-6">
             <div className="flex flex-wrap items-center gap-2 mb-4">
               <span className={cn("status-badge", statusConfig[task.status].color)}>{statusConfig[task.status].label}</span>
-              <span className={cn("status-badge", priorityConfig[task.priority].color)}>{priorityConfig[task.priority].label}</span>
               <span className="text-xs px-2.5 py-0.5 rounded-full bg-muted text-muted-foreground">{task.reportTemplate?.name ?? "Template"}</span>
             </div>
             <h1 className="text-xl font-bold mb-2">{task.title}</h1>

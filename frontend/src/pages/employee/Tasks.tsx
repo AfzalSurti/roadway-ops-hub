@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { priorityConfig, statusConfig } from "@/lib/domain";
+import { statusConfig } from "@/lib/domain";
 
 export default function EmployeeTasks() {
   const { data } = useQuery({ queryKey: ["tasks", "employee"], queryFn: () => api.getTasks({ limit: 100 }) });
@@ -29,7 +29,6 @@ export default function EmployeeTasks() {
                   <p className="text-xs text-muted-foreground mt-1">{task.project} · {task.reportTemplate?.name ?? "Template"}</p>
                 </div>
                 <span className={cn("status-badge shrink-0", statusConfig[task.status].color)}>{statusConfig[task.status].label}</span>
-                <span className={cn("status-badge shrink-0", priorityConfig[task.priority].color)}>{priorityConfig[task.priority].label}</span>
                 <span className={cn("text-xs flex items-center gap-1 shrink-0", isOverdue ? "text-destructive" : "text-muted-foreground")}>
                   <Calendar className="h-3 w-3" />
                   {new Date(task.dueDate).toLocaleDateString("en", { month: "short", day: "numeric" })}
