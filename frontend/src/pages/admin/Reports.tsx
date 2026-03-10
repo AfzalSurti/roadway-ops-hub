@@ -4,15 +4,12 @@ import { motion } from "framer-motion";
 import { api } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 import { Eye, CheckCircle, XCircle, MessageSquare, X } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { ReportItem, ReportStatus } from "@/lib/domain";
 import { reportStatusConfig, toAvatarUrl } from "@/lib/domain";
-
-type ReportStatusFilter = "ALL" | ReportStatus;
 
 const MONTH_OPTIONS = [
   "January",
@@ -30,7 +27,6 @@ const MONTH_OPTIONS = [
 ] as const;
 
 export default function AdminReports() {
-  const [filter, setFilter] = useState<ReportStatusFilter>("ALL");
   const [period, setPeriod] = useState<"MONTHLY" | "QUARTERLY" | "YEARLY">("MONTHLY");
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
   const [employeeId, setEmployeeId] = useState<string>("ALL");
@@ -96,24 +92,15 @@ export default function AdminReports() {
   );
 
   const filtered = useMemo(() => {
-    const byStatus = filter === "ALL" ? periodFilteredReports : periodFilteredReports.filter((report) => report.status === filter);
-    if (employeeId === "ALL") return byStatus;
-    return byStatus.filter((report) => report.submittedById === employeeId);
-  }, [filter, periodFilteredReports, employeeId]);
+    if (employeeId === "ALL") return periodFilteredReports;
+    return periodFilteredReports.filter((report) => report.submittedById === employeeId);
+  }, [periodFilteredReports, employeeId]);
   const selected = reports.find((report) => report.id === selectedReport);
   const { data: taskComments = [], refetch: refetchTaskComments } = useQuery({
     queryKey: ["task-comments", selected?.taskId],
     queryFn: () => api.getTaskComments(selected!.taskId),
     enabled: Boolean(selected?.taskId)
   });
-
-  const statusFilters: { value: ReportStatusFilter; label: string }[] = [
-    { value: "ALL", label: "All" },
-    { value: "SUBMITTED", label: "Submitted" },
-    { value: "APPROVED", label: "Approved" },
-    { value: "CHANGES_REQUESTED", label: "Changes Requested" },
-    { value: "REJECTED", label: "Rejected" }
-  ];
 
   const handleStatusUpdate = async (id: string, status: "APPROVED" | "REJECTED") => {
     try {
@@ -328,20 +315,6 @@ export default function AdminReports() {
             <option key={user.id} value={user.id}>{user.name}</option>
           ))}
         </select>
-        {statusFilters.map((statusFilter) => (
-          <button
-            key={statusFilter.value}
-            onClick={() => setFilter(statusFilter.value)}
-            className={cn(
-              "px-4 py-2 rounded-xl text-sm font-medium transition-all",
-              filter === statusFilter.value
-                ? "bg-primary/10 text-primary border border-primary/20"
-                : "bg-secondary/50 text-muted-foreground border border-border/50 hover:text-foreground"
-            )}
-          >
-            {statusFilter.label}
-          </button>
-        ))}
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
