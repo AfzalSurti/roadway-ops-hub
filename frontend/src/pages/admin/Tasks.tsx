@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 import type { TaskItem, TaskStatus } from "@/lib/domain";
-import { priorityConfig, statusConfig, toAvatarUrl } from "@/lib/domain";
+import { statusConfig, toAvatarUrl } from "@/lib/domain";
 import { toast } from "sonner";
 
 const columns: { status: TaskStatus; label: string }[] = [
@@ -23,6 +23,11 @@ export default function AdminTasks() {
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTask, setSelectedTask] = useState<TaskItem | null>(null);
+  const [isEditingTask, setIsEditingTask] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editProject, setEditProject] = useState("");
+  const [editAssignedToId, setEditAssignedToId] = useState("");
+  const { data: users = [] } = useQuery({ queryKey: ["users", "task-edit"], queryFn: () => api.getUsers() });
   const { data: selectedTaskComments = [] } = useQuery({
     queryKey: ["task-comments", selectedTask?.id],
     queryFn: () => api.getTaskComments(selectedTask!.id),
@@ -56,6 +61,40 @@ export default function AdminTasks() {
     };
     void run();
   }, [search]);
+
+  useEffect(() => {
+    if (!selectedTask) {
+      setIsEditingTask(false);
+      return;
+    }
+    setEditTitle(selectedTask.title);
+    setEditProject(selectedTask.project);
+    setEditAssignedToId(selectedTask.assignedToId);
+    setIsEditingTask(false);
+  }, [selectedTask]);
+
+  const handleSaveTask = async () => {
+    if (!selectedTask) return;
+    if (!editTitle.trim() || !editProject.trim() || !editAssignedToId) {
+      toast.error("Please fill required task fields");
+      return;
+    }
+
+    try {
+      const updated = await api.updateTask(selectedTask.id, {
+        title: editTitle.trim(),
+        project: editProject.trim(),
+        assignedToId: editAssignedToId
+      });
+      setTasks((prev) => prev.map((task) => (task.id === updated.id ? updated : task)));
+      setSelectedTask(updated);
+      setIsEditingTask(false);
+      toast.success("Task updated");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to update task";
+      toast.error(message);
+    }
+  };
 
   const filtered = useMemo(
     () =>
@@ -129,7 +168,7 @@ export default function AdminTasks() {
                 </div>
                 <div className="space-y-3">
                   {columnTasks.map((task, index) => (
-                    <TaskCard key={task.id} task={task} index={index} />
+                    <TaskCard key={task.id} task={task} index={index} onOpen={() => setSelectedTask(task)} />
                   ))}
                   {columnTasks.length === 0 && (
                     <p className="text-sm text-muted-foreground text-center py-8">No tasks</p>
@@ -148,7 +187,6 @@ export default function AdminTasks() {
                 <th className="text-left p-4 font-medium hidden md:table-cell">Project</th>
                 <th className="text-left p-4 font-medium hidden sm:table-cell">Assigned</th>
                 <th className="text-left p-4 font-medium">Status</th>
-                <th className="text-left p-4 font-medium hidden lg:table-cell">Priority</th>
                 <th className="text-left p-4 font-medium hidden lg:table-cell">Due</th>
               </tr>
             </thead>
@@ -169,9 +207,6 @@ export default function AdminTasks() {
                   <td className="p-4">
                     <span className={`status-badge ${statusConfig[task.status].color}`}>{statusConfig[task.status].label}</span>
                   </td>
-                  <td className="p-4 hidden lg:table-cell">
-                    <span className={`status-badge ${priorityConfig[task.priority].color}`}>{priorityConfig[task.priority].label}</span>
-                  </td>
                   <td className="p-4 hidden lg:table-cell text-muted-foreground">{new Date(task.allocatedAt ?? task.createdAt).toLocaleDateString()}</td>
                 </tr>
               ))}
@@ -183,15 +218,77 @@ export default function AdminTasks() {
       {selectedTask && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm" onClick={() => setSelectedTask(null)}>
           <div onClick={(event) => event.stopPropagation()} className="glass-panel-strong p-6 w-full max-w-2xl mx-4 max-h-[85vh] overflow-y-auto">
-            <h3 className="text-lg font-semibold mb-4">Task Details</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm mb-4">
-              <p><span className="text-muted-foreground">Task:</span> {selectedTask.title}</p>
-              <p><span className="text-muted-foreground">Allocated:</span> {new Date(selectedTask.allocatedAt ?? selectedTask.createdAt).toLocaleDateString()}</p>
-              <p><span className="text-muted-foreground">Submission Days:</span> {selectedTask.allottedDays ?? "-"}</p>
-              <p><span className="text-muted-foreground">Submitted At:</span> {selectedTask.submittedForReviewAt ? new Date(selectedTask.submittedForReviewAt).toLocaleDateString() : "-"}</p>
-              <p><span className="text-muted-foreground">Completed At:</span> {selectedTask.actualCompletedAt ? new Date(selectedTask.actualCompletedAt).toLocaleDateString() : "-"}</p>
-              <p><span className="text-muted-foreground">Rating:</span> {selectedTask.rating ?? "-"}</p>
+            <div className="flex items-center justify-between mb-4 gap-2">
+              <h3 className="text-lg font-semibold">Task Details</h3>
+              <div className="flex items-center gap-2">
+                {isEditingTask ? (
+                  <>
+                    <button
+                      onClick={() => setIsEditingTask(false)}
+                      className="px-3 py-1.5 rounded-lg border border-border/50 text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => void handleSaveTask()}
+                      className="px-3 py-1.5 rounded-lg bg-primary/10 text-primary border border-primary/20 text-xs font-medium hover:bg-primary/20"
+                    >
+                      Save
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => setIsEditingTask(true)}
+                    className="px-3 py-1.5 rounded-lg bg-primary/10 text-primary border border-primary/20 text-xs font-medium hover:bg-primary/20"
+                  >
+                    Edit Task
+                  </button>
+                )}
+              </div>
             </div>
+
+            {isEditingTask ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm mb-4">
+                <div className="sm:col-span-2">
+                  <label className="text-xs text-muted-foreground mb-1 block">Task</label>
+                  <input
+                    value={editTitle}
+                    onChange={(event) => setEditTitle(event.target.value)}
+                    className="w-full px-3 py-2 rounded-lg bg-secondary/50 border border-border/50 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">Project</label>
+                  <input
+                    value={editProject}
+                    onChange={(event) => setEditProject(event.target.value)}
+                    className="w-full px-3 py-2 rounded-lg bg-secondary/50 border border-border/50 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">Assigned To</label>
+                  <select
+                    value={editAssignedToId}
+                    onChange={(event) => setEditAssignedToId(event.target.value)}
+                    className="w-full px-3 py-2 rounded-lg bg-secondary/50 border border-border/50 outline-none"
+                  >
+                    <option value="">Select employee</option>
+                    {users.map((user) => (
+                      <option key={user.id} value={user.id}>{user.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm mb-4">
+                <p><span className="text-muted-foreground">Task:</span> {selectedTask.title}</p>
+                <p><span className="text-muted-foreground">Allocated:</span> {new Date(selectedTask.allocatedAt ?? selectedTask.createdAt).toLocaleDateString()}</p>
+                <p><span className="text-muted-foreground">Submission Days:</span> {selectedTask.allottedDays ?? "-"}</p>
+                <p><span className="text-muted-foreground">Submitted At:</span> {selectedTask.submittedForReviewAt ? new Date(selectedTask.submittedForReviewAt).toLocaleDateString() : "-"}</p>
+                <p><span className="text-muted-foreground">Completed At:</span> {selectedTask.actualCompletedAt ? new Date(selectedTask.actualCompletedAt).toLocaleDateString() : "-"}</p>
+                <p><span className="text-muted-foreground">Rating:</span> {selectedTask.rating ?? "-"}</p>
+              </div>
+            )}
             <p className="text-sm text-muted-foreground mb-2">Description</p>
             <p className="text-sm mb-4">{selectedTask.description}</p>
 
@@ -222,7 +319,7 @@ export default function AdminTasks() {
   );
 }
 
-function TaskCard({ task, index }: { task: TaskItem; index: number }) {
+function TaskCard({ task, index, onOpen }: { task: TaskItem; index: number; onOpen: () => void }) {
   const isOverdue = new Date(task.dueDate) < new Date() && task.status !== "DONE";
 
   return (
@@ -230,13 +327,11 @@ function TaskCard({ task, index }: { task: TaskItem; index: number }) {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.05, duration: 0.3 }}
-      className="task-card"
+      onClick={onOpen}
+      className="task-card cursor-pointer"
     >
       <div className="flex items-start justify-between gap-2 mb-3">
         <h4 className="text-sm font-medium leading-snug">{task.title}</h4>
-        <span className={`status-badge text-[10px] shrink-0 ${priorityConfig[task.priority].color}`}>
-          {priorityConfig[task.priority].label}
-        </span>
       </div>
       <p className="text-xs text-muted-foreground mb-3">{task.project}</p>
       <div className="flex items-center justify-between">

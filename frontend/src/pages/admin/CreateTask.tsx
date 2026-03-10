@@ -212,6 +212,7 @@ export default function CreateTask() {
     handleSubmit,
     watch,
     setValue,
+    clearErrors,
     formState: { errors, isSubmitting }
   } = useForm<TaskFormValues>({
     resolver: zodResolver(taskSchema),
@@ -289,6 +290,7 @@ export default function CreateTask() {
                 setValue("taskCategory", nextCategory, { shouldValidate: true, shouldDirty: true });
                 setValue("title", "", { shouldValidate: true, shouldDirty: true });
                 setValue("customSubTask", "", { shouldValidate: true, shouldDirty: true });
+                clearErrors(["taskCategory", "title", "customSubTask"]);
               }}
             >
               <option value="">Select main task</option>
@@ -309,6 +311,15 @@ export default function CreateTask() {
               title="Sub Task"
               className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
               disabled={!selectedCategory || subTasks.length === 0}
+              onChange={(event) => {
+                const selected = event.target.value;
+                setValue("title", selected, { shouldValidate: true, shouldDirty: true });
+                if (selected !== "Other") {
+                  setValue("customSubTask", "", { shouldValidate: true, shouldDirty: true });
+                  clearErrors("customSubTask");
+                }
+                clearErrors("title");
+              }}
             >
               <option value="">{selectedCategory ? "Select sub task" : "Select main task first"}</option>
               {subTasks.map((subTask) => (
