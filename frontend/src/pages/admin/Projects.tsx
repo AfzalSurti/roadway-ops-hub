@@ -1,15 +1,18 @@
 import { useMemo, useState } from "react";
 import { PageWrapper } from "@/components/PageWrapper";
 import { motion } from "framer-motion";
-import { Plus, Trash2, X } from "lucide-react";
+import { Plus, Trash2, X, Search } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
+import { statusConfig } from "@/lib/domain";
 
 export default function AdminProjects() {
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ name: "", description: "" });
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
 
   const { data: tasksData, refetch: refetchTasks } = useQuery({
     queryKey: ["tasks", "projects-summary"],
@@ -32,12 +35,25 @@ export default function AdminProjects() {
       return {
         id: project.id,
         projectName: project.name,
+        description: project.description ?? "",
         totalTasks,
         pendingTasks,
-        overdueTasks
+        overdueTasks,
+        tasks: projectTasks
       };
     });
   }, [projects, tasks]);
+
+  const filteredRows = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return projectRows;
+    return projectRows.filter((row) => row.projectName.toLowerCase().includes(query));
+  }, [projectRows, search]);
+
+  const selectedProject = useMemo(
+    () => projectRows.find((row) => row.id === selectedProjectId) ?? null,
+    [projectRows, selectedProjectId]
+  );
 
   const handleCreateProject = async () => {
     if (!form.name.trim()) {
@@ -93,6 +109,17 @@ export default function AdminProjects() {
         </button>
       </div>
 
+      <div className="mb-4 flex items-center gap-2 px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 text-sm max-w-sm">
+        <Search className="h-4 w-4 text-muted-foreground" />
+        <input
+          type="text"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Search projects..."
+          className="bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground w-full"
+        />
+      </div>
+
       <div className="glass-panel overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[720px]">
@@ -105,19 +132,23 @@ export default function AdminProjects() {
               </tr>
             </thead>
             <tbody>
-              {projectRows.map((row, index) => (
+              {filteredRows.map((row, index) => (
                 <motion.tr
                   key={row.id}
                   initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.04 }}
-                  className="border-b border-border/30"
+                  onClick={() => setSelectedProjectId(row.id)}
+                  className="border-b border-border/30 cursor-pointer hover:bg-secondary/30 transition-colors"
                 >
                   <td className="p-4">
                     <div className="flex items-center justify-between gap-3">
                       <span className="font-medium">{row.projectName}</span>
                       <button
-                        onClick={() => void handleDeleteProject(row.id, row.projectName)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void handleDeleteProject(row.id, row.projectName);
+                        }}
                         disabled={deletingId === row.id}
                         className="p-1.5 rounded-lg border border-destructive/30 text-destructive hover:bg-destructive/10 disabled:opacity-50"
                         title="Delete project"
@@ -132,7 +163,7 @@ export default function AdminProjects() {
                   <td className="p-4 font-medium">{row.overdueTasks}</td>
                 </motion.tr>
               ))}
-              {projectRows.length === 0 && (
+              {filteredRows.length === 0 && (
                 <tr>
                   <td colSpan={4} className="p-6 text-muted-foreground">No projects found.</td>
                 </tr>
@@ -141,6 +172,74 @@ export default function AdminProjects() {
           </table>
         </div>
       </div>
+
+      {selectedProject && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm" onClick={() => setSelectedProjectId(null)}>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            onClick={(event) => event.stopPropagation()}
+            className="glass-panel-strong p-6 w-full max-w-3xl mx-4 max-h-[85vh] overflow-y-auto"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Project Details</h3>
+              <button onClick={() => setSelectedProjectId(null)} className="p-1 rounded-lg hover:bg-secondary/50" title="Close" aria-label="Close">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm mb-5">
+              <div className="sm:col-span-2">
+                <p className="text-xs text-muted-foreground">Project Name</p>
+                <p className="font-medium mt-1">{selectedProject.projectName}</p>
+              </div>
+              <div className="sm:col-span-2">
+                <p className="text-xs text-muted-foreground">Description</p>
+                <p className="mt-1 text-sm">{selectedProject.description.trim() || "No description added."}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Total Tasks</p>
+                <p className="font-medium mt-1">{selectedProject.totalTasks}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Pending</p>
+                <p className="font-medium mt-1">{selectedProject.pendingTasks}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Overdue</p>
+                <p className="font-medium mt-1">{selectedProject.overdueTasks}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Completed</p>
+                <p className="font-medium mt-1">{selectedProject.tasks.filter((task) => task.status === "DONE").length}</p>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-sm font-medium mb-3">Tasks In This Project</p>
+              {selectedProject.tasks.length ? (
+                <div className="space-y-2">
+                  {selectedProject.tasks.map((task) => (
+                    <div key={task.id} className="rounded-xl border border-border/40 bg-secondary/20 p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium">{task.title}</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Assigned to: {task.assignedTo?.name ?? "-"} | Due: {new Date(task.dueDate).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <span className={`status-badge text-[10px] ${statusConfig[task.status].color}`}>{statusConfig[task.status].label}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No tasks in this project yet.</p>
+              )}
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       {showCreate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
