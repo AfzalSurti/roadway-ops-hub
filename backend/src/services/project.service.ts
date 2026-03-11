@@ -1,5 +1,5 @@
 import { projectRepository } from "../repositories/project.repository.js";
-import { conflict } from "../utils/errors.js";
+import { conflict, notFound } from "../utils/errors.js";
 
 export const projectService = {
   list() {
@@ -15,5 +15,14 @@ export const projectService = {
       name: payload.name,
       description: payload.description
     });
+  },
+  async remove(id: string) {
+    const existing = await projectRepository.findById(id);
+    if (!existing) {
+      throw notFound("Project not found");
+    }
+
+    await projectRepository.delete(id);
+    return { deleted: true };
   }
 };

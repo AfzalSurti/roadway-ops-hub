@@ -1,53 +1,56 @@
 import { useMemo, useState } from "react";
 import { PageWrapper } from "@/components/PageWrapper";
 import { motion } from "framer-motion";
-import { FolderKanban, ArrowRight, Plus, X } from "lucide-react";
+import { Plus, Trash2, X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { statusConfig } from "@/lib/domain";
 import { toast } from "sonner";
 
 export default function AdminProjects() {
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ name: "", description: "" });
-  const [selectedProject, setSelectedProject] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const { data: tasksData } = useQuery({ queryKey: ["tasks", "projects"], queryFn: () => api.getTasks({ limit: 200 }) });
-  const { data: projects = [], refetch: refetchProjects } = useQuery({ queryKey: ["projects"], queryFn: () => api.getProjects() });
+  const { data: tasksData, refetch: refetchTasks } = useQuery({
+    queryKey: ["tasks", "projects-summary"],
+    queryFn: () => api.getTasks({ limit: 500 })
+  });
+  const { data: projects = [], refetch: refetchProjects } = useQuery({
+    queryKey: ["projects"],
+    queryFn: () => api.getProjects()
+  });
 
   const tasks = tasksData?.items ?? [];
 
-  const projectNames = useMemo(() => {
-    const fromDb = projects.map((project) => project.name);
-    const fromTasks = tasks.map((task) => task.project);
-    return Array.from(new Set([...fromDb, ...fromTasks]));
+  const projectRows = useMemo(() => {
+    return projects.map((project) => {
+      const projectTasks = tasks.filter((task) => task.project === project.name);
+      const totalTasks = projectTasks.length;
+      const pendingTasks = projectTasks.filter((task) => task.status !== "DONE").length;
+      const overdueTasks = projectTasks.filter((task) => task.status !== "DONE" && new Date(task.dueDate) < new Date()).length;
+
+      return {
+        id: project.id,
+        projectName: project.name,
+        totalTasks,
+        pendingTasks,
+        overdueTasks
+      };
+    });
   }, [projects, tasks]);
 
-  const selectedProjectName = selectedProject ?? projectNames[0] ?? null;
-  const selectedProjectInfo = selectedProjectName
-    ? projects.find((project) => project.name === selectedProjectName)
-    : undefined;
-  const selectedProjectTasks = selectedProjectName
-    ? tasks.filter((task) => task.project === selectedProjectName)
-    : [];
-
-  const selectedPeople = useMemo(() => {
-    const map = new Map<string, string>();
-    selectedProjectTasks.forEach((task) => {
-      const key = task.assignedToId;
-      const value = task.assignedTo?.name ?? "Unknown Employee";
-      map.set(key, value);
-    });
-    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
-  }, [selectedProjectTasks]);
-
-  const selectedDoneCount = selectedProjectTasks.filter((task) => task.status === "DONE").length;
-  const selectedProgress = selectedProjectTasks.length ? Math.round((selectedDoneCount / selectedProjectTasks.length) * 100) : 0;
-
   const handleCreateProject = async () => {
+    if (!form.name.trim()) {
+      toast.error("Project name is required");
+      return;
+    }
+
     try {
-      await api.createProject(form);
-      await refetchProjects();
+      await api.createProject({
+        name: form.name.trim(),
+        description: form.description.trim() || undefined
+      });
+      await Promise.all([refetchProjects(), refetchTasks()]);
       setForm({ name: "", description: "" });
       setShowCreate(false);
       toast.success("Project added");
@@ -57,12 +60,29 @@ export default function AdminProjects() {
     }
   };
 
+  const handleDeleteProject = async (id: string, name: string) => {
+    const shouldDelete = window.confirm(`Delete project \"${name}\"?`);
+    if (!shouldDelete) return;
+
+    try {
+      setDeletingId(id);
+      await api.deleteProject(id);
+      await Promise.all([refetchProjects(), refetchTasks()]);
+      toast.success("Project deleted");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to delete project";
+      toast.error(message);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   return (
     <PageWrapper>
       <div className="page-header flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="page-title">Projects</h1>
-          <p className="page-subtitle">Active highway projects and sites</p>
+          <p className="page-subtitle">Project-wise task status summary</p>
         </div>
         <button
           onClick={() => setShowCreate(true)}
@@ -73,144 +93,61 @@ export default function AdminProjects() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {projectNames.map((project, index) => {
-          const projectTasks = tasks.filter((task) => task.project === project);
-          const done = projectTasks.filter((task) => task.status === "DONE").length;
-          const progress = projectTasks.length ? Math.round((done / projectTasks.length) * 100) : 0;
-
-          return (
-            <motion.div
-              key={project}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.08 }}
-              onClick={() => setSelectedProject(project)}
-              className={`glass-panel p-6 hover:border-primary/20 transition-all cursor-pointer group ${selectedProjectName === project ? "border-primary/40" : ""}`}
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div className="p-2.5 rounded-xl bg-primary/10">
-                  <FolderKanban className="h-5 w-5 text-primary" />
-                </div>
-                <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-              </div>
-              <h3 className="font-semibold mb-1">{project}</h3>
-              <p className="text-sm text-muted-foreground mb-4">{projectTasks.length} tasks</p>
-
-              <div className="flex items-center gap-3">
-                <div className="flex-1 h-2 rounded-full bg-secondary overflow-hidden">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${progress}%` }}
-                    transition={{ duration: 0.8, delay: index * 0.1 }}
-                    className="h-full rounded-full bg-gradient-to-r from-primary to-accent"
-                  />
-                </div>
-                <span className="text-xs text-muted-foreground font-mono">{progress}%</span>
-              </div>
-
-              <div className="flex gap-2 mt-3 flex-wrap">
-                {(["TODO", "IN_PROGRESS", "BLOCKED", "DONE"] as const).map((status) => {
-                  const count = projectTasks.filter((task) => task.status === status).length;
-                  if (!count) return null;
-                  return (
-                    <span key={status} className={`status-badge text-[10px] ${statusConfig[status].color}`}>
-                      {statusConfig[status].label}: {count}
-                    </span>
-                  );
-                })}
-              </div>
-            </motion.div>
-          );
-        })}
-      </div>
-
-      {selectedProjectName && (
-        <div className="glass-panel p-6 mt-6">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h3 className="text-lg font-semibold">{selectedProjectName}</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                {selectedProjectInfo?.description?.trim() ? selectedProjectInfo.description : "No description provided."}
-              </p>
-            </div>
-            <span className="text-xs px-2.5 py-1 rounded-full bg-primary/10 text-primary font-medium">
-              {selectedProgress}% complete
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-5">
-            <div className="rounded-xl border border-border/40 bg-secondary/20 p-3">
-              <p className="text-xs text-muted-foreground">People Involved</p>
-              <p className="text-xl font-semibold mt-1">{selectedPeople.length}</p>
-            </div>
-            <div className="rounded-xl border border-border/40 bg-secondary/20 p-3">
-              <p className="text-xs text-muted-foreground">Total Tasks</p>
-              <p className="text-xl font-semibold mt-1">{selectedProjectTasks.length}</p>
-            </div>
-            <div className="rounded-xl border border-border/40 bg-secondary/20 p-3">
-              <p className="text-xs text-muted-foreground">Completed Tasks</p>
-              <p className="text-xl font-semibold mt-1">{selectedDoneCount}</p>
-            </div>
-          </div>
-
-          <div className="mt-4">
-            <div className="h-2 rounded-full bg-secondary overflow-hidden">
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${selectedProgress}%` }}
-                transition={{ duration: 0.6 }}
-                className="h-full rounded-full bg-gradient-to-r from-primary to-accent"
-              />
-            </div>
-          </div>
-
-          <div className="mt-5">
-            <p className="text-sm font-medium mb-2">Assigned Employees</p>
-            {selectedPeople.length ? (
-              <div className="flex flex-wrap gap-2">
-                {selectedPeople.map((person) => (
-                  <span key={person.id} className="text-xs px-2.5 py-1 rounded-full bg-secondary text-foreground border border-border/40">
-                    {person.name}
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">No employees assigned yet.</p>
-            )}
-          </div>
-
-          <div className="mt-5">
-            <p className="text-sm font-medium mb-2">Task Details</p>
-            {selectedProjectTasks.length ? (
-              <div className="space-y-2">
-                {selectedProjectTasks.map((task) => (
-                  <div key={task.id} className="rounded-xl border border-border/40 bg-secondary/20 p-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-medium">{task.title}</p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Assigned to: {task.assignedTo?.name ?? "Unknown Employee"}
-                        </p>
-                      </div>
-                      <span className={`status-badge text-[10px] ${statusConfig[task.status].color}`}>{statusConfig[task.status].label}</span>
+      <div className="glass-panel overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[720px]">
+            <thead>
+              <tr className="border-b border-border/50 text-muted-foreground">
+                <th className="text-left p-4 font-medium">Project Name</th>
+                <th className="text-left p-4 font-medium">Total Tasks</th>
+                <th className="text-left p-4 font-medium">Pending</th>
+                <th className="text-left p-4 font-medium">Overdue</th>
+              </tr>
+            </thead>
+            <tbody>
+              {projectRows.map((row, index) => (
+                <motion.tr
+                  key={row.id}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.04 }}
+                  className="border-b border-border/30"
+                >
+                  <td className="p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="font-medium">{row.projectName}</span>
+                      <button
+                        onClick={() => void handleDeleteProject(row.id, row.projectName)}
+                        disabled={deletingId === row.id}
+                        className="p-1.5 rounded-lg border border-destructive/30 text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                        title="Delete project"
+                        aria-label="Delete project"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">No tasks added for this project yet.</p>
-            )}
-          </div>
+                  </td>
+                  <td className="p-4 font-medium">{row.totalTasks}</td>
+                  <td className="p-4 font-medium">{row.pendingTasks}</td>
+                  <td className="p-4 font-medium">{row.overdueTasks}</td>
+                </motion.tr>
+              ))}
+              {projectRows.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="p-6 text-muted-foreground">No projects found.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
-      )}
+      </div>
 
       {showCreate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="glass-panel-strong p-6 w-full max-w-md mx-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold">Add Project</h3>
-              <button onClick={() => setShowCreate(false)} className="p-1 rounded-lg hover:bg-secondary/50">
+              <button onClick={() => setShowCreate(false)} className="p-1 rounded-lg hover:bg-secondary/50" title="Close" aria-label="Close">
                 <X className="h-4 w-4" />
               </button>
             </div>

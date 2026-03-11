@@ -11,6 +11,7 @@ import { useQuery } from "@tanstack/react-query";
 
 const taskSchema = z
   .object({
+    project: z.string().min(1, "Please select project"),
     taskCategory: z.string().min(1, "Please select main task"),
     title: z.string().min(2, "Please select sub task"),
     customSubTask: z.string().optional(),
@@ -218,6 +219,7 @@ export default function CreateTask() {
     resolver: zodResolver(taskSchema),
     defaultValues: {
       title: draft.title ?? "",
+      project: draft.project ?? "",
       taskCategory: draft.taskCategory ?? "",
       customSubTask: draft.customSubTask ?? "",
       assignedToId: draft.assignedToId ?? "",
@@ -228,9 +230,18 @@ export default function CreateTask() {
   });
 
   const values = watch();
+  const selectedProject = watch("project");
   const selectedCategory = watch("taskCategory");
   const selectedSubTask = watch("title");
   const subTasks = useMemo(() => TASK_DATA[selectedCategory] ?? [], [selectedCategory]);
+  const { data: projects = [] } = useQuery({ queryKey: ["projects", "create-task"], queryFn: () => api.getProjects() });
+
+  useEffect(() => {
+    if (!selectedProject && projects.length > 0) {
+      setValue("project", projects[0].name, { shouldValidate: true, shouldDirty: true });
+      clearErrors("project");
+    }
+  }, [selectedProject, projects, setValue, clearErrors]);
 
   useEffect(() => {
     const payload: TaskDraft = {
@@ -250,7 +261,7 @@ export default function CreateTask() {
         ratingEnabled: data.ratingEnabled,
         assignedToId: data.assignedToId,
         allocatedAt: data.allocatedAt,
-        project: data.taskCategory
+        project: data.project
       });
       sessionStorage.removeItem(TASK_DRAFT_KEY);
       toast.success("Task created successfully!");
@@ -278,6 +289,28 @@ export default function CreateTask() {
 
       <form onSubmit={handleSubmit(onSubmit)} className="glass-panel p-6 max-w-2xl space-y-5">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="text-sm font-medium mb-1.5 block">Project</label>
+            <select
+              {...register("project")}
+              aria-label="Project"
+              title="Project"
+              className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
+              onChange={(event) => {
+                setValue("project", event.target.value, { shouldValidate: true, shouldDirty: true });
+                clearErrors("project");
+              }}
+            >
+              <option value="">Select project</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.name}>
+                  {project.name}
+                </option>
+              ))}
+            </select>
+            {errors.project && <p className="text-xs text-destructive mt-1">{errors.project.message}</p>}
+          </div>
+
           <div>
             <label className="text-sm font-medium mb-1.5 block">Main Task</label>
             <select

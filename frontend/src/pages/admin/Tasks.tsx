@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { PageWrapper } from "@/components/PageWrapper";
 import { motion } from "framer-motion";
-import { Plus, LayoutGrid, List, Search, Calendar } from "lucide-react";
+import { Plus, LayoutGrid, List, Search, Calendar, Check, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
@@ -18,6 +18,7 @@ const columns = [
 export default function AdminTasks() {
   const [view, setView] = useState<"kanban" | "list">("list");
   const [search, setSearch] = useState("");
+  const [selectedProject, setSelectedProject] = useState<string>("ALL");
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTask, setSelectedTask] = useState<TaskItem | null>(null);
@@ -132,15 +133,23 @@ export default function AdminTasks() {
     }
   };
 
-  const filtered = useMemo(
-    () =>
-      tasks.filter(
-        (task) =>
-          task.title.toLowerCase().includes(search.toLowerCase()) ||
-          task.project.toLowerCase().includes(search.toLowerCase())
-      ),
-    [tasks, search]
-  );
+  const projectOptions = useMemo(() => {
+    const set = new Set<string>();
+    tasks.forEach((task) => {
+      if (task.project?.trim()) set.add(task.project.trim());
+    });
+    return ["ALL", ...Array.from(set).sort((a, b) => a.localeCompare(b))];
+  }, [tasks]);
+
+  const filtered = useMemo(() => {
+    return tasks.filter((task) => {
+      const matchesSearch =
+        task.title.toLowerCase().includes(search.toLowerCase()) ||
+        task.project.toLowerCase().includes(search.toLowerCase());
+      const matchesProject = selectedProject === "ALL" || task.project === selectedProject;
+      return matchesSearch && matchesProject;
+    });
+  }, [tasks, search, selectedProject]);
 
   const sortedTasks = useMemo(() => {
     return [...filtered].sort((a, b) => {
@@ -206,6 +215,19 @@ export default function AdminTasks() {
             className="bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground w-full"
           />
         </div>
+        <select
+          value={selectedProject}
+          onChange={(event) => setSelectedProject(event.target.value)}
+          title="Select project"
+          aria-label="Select project"
+          className="px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 text-sm min-w-[220px]"
+        >
+          {projectOptions.map((project) => (
+            <option key={project} value={project}>
+              {project === "ALL" ? "All Projects" : project}
+            </option>
+          ))}
+        </select>
         <div className="flex items-center rounded-xl bg-secondary/50 border border-border/50 p-1">
           <button
             onClick={() => setView("kanban")}
@@ -319,10 +341,9 @@ export default function AdminTasks() {
               <tr className="border-b border-border/50 text-muted-foreground">
                 <th className="text-left p-4 font-medium">Project</th>
                 <th className="text-left p-4 font-medium">Task</th>
-                <th className="text-left p-4 font-medium">Rating</th>
-                <th className="text-left p-4 font-medium">Remarks</th>
+                <th className="text-left p-4 font-medium">Rating Enabled</th>
                 <th className="text-left p-4 font-medium">Status</th>
-                <th className="text-left p-4 font-medium">Assigned Date</th>
+                <th className="text-left p-4 font-medium">Assigned To</th>
                 <th className="text-left p-4 font-medium">Due Date</th>
               </tr>
             </thead>
@@ -334,14 +355,21 @@ export default function AdminTasks() {
                     <p className="font-medium">{task.title}</p>
                     <p className="text-xs text-muted-foreground line-clamp-2">{task.description || "-"}</p>
                   </td>
-                  <td className="p-4">{task.rating ?? "-"}</td>
-                  <td className="p-4 text-muted-foreground max-w-[220px] truncate" title={task.managerReviewComments ?? "-"}>
-                    {task.managerReviewComments?.trim() || "-"}
+                  <td className="p-4">
+                    {task.ratingEnabled ? (
+                      <span className="inline-flex items-center text-accent" title="Yes" aria-label="Yes">
+                        <Check className="h-4 w-4" />
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center text-destructive" title="No" aria-label="No">
+                        <X className="h-4 w-4" />
+                      </span>
+                    )}
                   </td>
                   <td className="p-4">
                     <span className={`status-badge ${statusConfig[task.status].color}`}>{statusConfig[task.status].label}</span>
                   </td>
-                  <td className="p-4 text-muted-foreground">{new Date(task.allocatedAt ?? task.createdAt).toLocaleDateString()}</td>
+                  <td className="p-4 text-muted-foreground">{task.assignedTo?.name ?? "-"}</td>
                   <td className="p-4 text-muted-foreground">{new Date(task.dueDate).toLocaleDateString()}</td>
                 </tr>
               ))}

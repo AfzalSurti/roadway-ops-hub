@@ -297,6 +297,12 @@ export const api = {
     });
   },
 
+  deleteProject(id: string) {
+    return request<{ deleted: boolean }>(`/projects/${id}`, {
+      method: "DELETE"
+    });
+  },
+
   createEmployee(payload: { name: string; email: string; password: string }) {
     return request<ApiUser>("/users", {
       method: "POST",

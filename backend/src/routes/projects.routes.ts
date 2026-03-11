@@ -11,3 +11,4 @@ export const projectsRouter = Router();
 projectsRouter.use(requireAuth);
 projectsRouter.get("/", asyncHandler(projectController.list));
 projectsRouter.post("/", requireRole("ADMIN"), validate(createProjectSchema), asyncHandler(projectController.create));
+projectsRouter.delete("/:id", requireRole("ADMIN"), asyncHandler(projectController.remove));
