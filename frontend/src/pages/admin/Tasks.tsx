@@ -344,6 +344,7 @@ export default function AdminTasks() {
                 <th className="text-left p-4 font-medium">Rating Enabled</th>
                 <th className="text-left p-4 font-medium">Status</th>
                 <th className="text-left p-4 font-medium">Assigned To</th>
+                <th className="text-left p-4 font-medium">Assigned Date</th>
                 <th className="text-left p-4 font-medium">Due Date</th>
               </tr>
             </thead>
@@ -370,6 +371,7 @@ export default function AdminTasks() {
                     <span className={`status-badge ${statusConfig[task.status].color}`}>{statusConfig[task.status].label}</span>
                   </td>
                   <td className="p-4 text-muted-foreground">{task.assignedTo?.name ?? "-"}</td>
+                  <td className="p-4 text-muted-foreground">{new Date(task.allocatedAt ?? task.createdAt).toLocaleDateString()}</td>
                   <td className="p-4 text-muted-foreground">{new Date(task.dueDate).toLocaleDateString()}</td>
                 </tr>
               ))}
