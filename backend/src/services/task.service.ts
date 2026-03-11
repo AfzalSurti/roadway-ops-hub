@@ -2,7 +2,7 @@ import type { Prisma, Role, TaskStatus } from "@prisma/client";
 import { taskRepository } from "../repositories/task.repository.js";
 import { templateRepository } from "../repositories/template.repository.js";
 import { commentRepository } from "../repositories/comment.repository.js";
-import { notFound } from "../utils/errors.js";
+import { badRequest, notFound } from "../utils/errors.js";
 import { getPagination } from "../utils/pagination.js";
 import { auditService } from "./audit.service.js";
 import { userRepository } from "../repositories/user.repository.js";
@@ -159,19 +159,17 @@ export const taskService = {
 
   async completeByEmployee(taskId: string, employeeId: string, note?: string) {
     const task = await this.getById(taskId);
-    const completedAt = new Date();
-    const baselineStart = task.allocatedAt ?? task.createdAt;
-    const completionDays = calculateDayDifference(baselineStart, completedAt);
-    const baselineDays = task.allottedDays ?? calculateDayDifference(baselineStart, task.dueDate);
-    const completionDelayDays = Math.max(0, completionDays - baselineDays);
+    if (task.status === "DONE") {
+      throw badRequest("Task is already approved and completed");
+    }
+
+    const submittedAt = new Date();
 
     const updated = await taskRepository.update(taskId, {
-      status: "DONE",
-      submittedForReviewAt: completedAt,
-      actualCompletedAt: completedAt,
-      completionDays,
-      completionDelayDays,
-      rating: task.ratingEnabled ? ratingFromDelay(completionDelayDays) : null
+      status: "IN_PROGRESS",
+      submittedForReviewAt: submittedAt,
+      managerReviewComments: null,
+      reviewCompletedAt: null
     });
 
     if (note?.trim()) {
@@ -185,8 +183,8 @@ export const taskService = {
     const admins = await userRepository.findAdmins();
     await notificationService.notifyUsers({
       userIds: admins.map((admin) => admin.id),
-      title: "Task Completed",
-      message: `${task.title} was completed by employee.${note?.trim() ? ` Note: ${note.trim().slice(0, 80)}` : ""}`,
+      title: "Task Submitted",
+      message: `${task.title} was submitted by employee for approval.${note?.trim() ? ` Note: ${note.trim().slice(0, 80)}` : ""}`,
       entityType: "Task",
       entityId: taskId
     });
@@ -194,13 +192,95 @@ export const taskService = {
     return updated;
   },
 
+  async approveByAdmin(taskId: string, adminId: string) {
+    const task = await this.getById(taskId);
+    const reviewedAt = new Date();
+    const effectiveCompletedAt = task.submittedForReviewAt ?? reviewedAt;
+    const baselineStart = task.allocatedAt ?? task.createdAt;
+    const completionDays = calculateDayDifference(baselineStart, effectiveCompletedAt);
+    const baselineDays = task.allottedDays ?? calculateDayDifference(baselineStart, task.dueDate);
+    const completionDelayDays = Math.max(0, completionDays - baselineDays);
+
+    const updated = await taskRepository.update(taskId, {
+      status: "DONE",
+      reviewCompletedAt: reviewedAt,
+      actualCompletedAt: effectiveCompletedAt,
+      completionDays,
+      completionDelayDays,
+      rating: task.ratingEnabled ? ratingFromDelay(completionDelayDays) : null
+    });
+
+    await notificationService.notifyUsers({
+      userIds: [task.assignedToId],
+      title: "Task Approved",
+      message: `${task.title} was approved by admin and marked as done.`,
+      entityType: "Task",
+      entityId: taskId
+    });
+
+    await auditService.log({
+      action: "TASK_UPDATED",
+      actorId: adminId,
+      entityType: "Task",
+      entityId: taskId,
+      meta: { approved: true }
+    });
+
+    return updated;
+  },
+
+  async requestChangesByAdmin(taskId: string, adminId: string, comment: string) {
+    const task = await this.getById(taskId);
+    const trimmed = comment.trim();
+    if (!trimmed) {
+      throw badRequest("Comment is required");
+    }
+
+    await commentRepository.create({
+      taskId,
+      body: trimmed,
+      authorId: adminId
+    });
+
+    const updated = await taskRepository.update(taskId, {
+      status: "TODO",
+      managerReviewComments: trimmed,
+      reviewCompletedAt: null
+    });
+
+    await notificationService.notifyUsers({
+      userIds: [task.assignedToId],
+      title: "Changes Requested",
+      message: `${task.title}: admin added a comment. Please review and resubmit.`,
+      entityType: "Task",
+      entityId: taskId
+    });
+
+    await auditService.log({
+      action: "TASK_UPDATED",
+      actorId: adminId,
+      entityType: "Task",
+      entityId: taskId,
+      meta: { changesRequested: true }
+    });
+
+    return updated;
+  },
+
   async acknowledgeManagerComment(taskId: string, employeeId: string) {
     const task = await this.getById(taskId);
+    const resubmittedAt = new Date();
+
+    await taskRepository.update(taskId, {
+      status: "IN_PROGRESS",
+      submittedForReviewAt: resubmittedAt
+    });
+
     const admins = await userRepository.findAdmins();
     await notificationService.notifyUsers({
       userIds: admins.map((admin) => admin.id),
       title: "Comment Acknowledged",
-      message: `${task.title}: employee accepted your comment.`,
+      message: `${task.title}: employee accepted your comment and resubmitted task.`,
       entityType: "Task",
       entityId: taskId
     });

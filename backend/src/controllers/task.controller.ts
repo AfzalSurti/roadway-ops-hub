@@ -74,6 +74,16 @@ export const taskController = {
     return sendSuccess(res, result);
   },
 
+  async approve(req: Request, res: Response) {
+    const result = await taskService.approveByAdmin(req.params.id, req.user!.id);
+    return sendSuccess(res, result);
+  },
+
+  async requestChanges(req: Request, res: Response) {
+    const result = await taskService.requestChangesByAdmin(req.params.id, req.user!.id, req.body.body);
+    return sendSuccess(res, result);
+  },
+
   async acknowledgeComment(req: Request, res: Response) {
     const result = await taskService.acknowledgeManagerComment(req.params.id, req.user!.id);
     return sendSuccess(res, result);

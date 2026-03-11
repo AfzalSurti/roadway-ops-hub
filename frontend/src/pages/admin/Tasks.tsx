@@ -25,6 +25,8 @@ export default function AdminTasks() {
   const [editTitle, setEditTitle] = useState("");
   const [editProject, setEditProject] = useState("");
   const [editAssignedToId, setEditAssignedToId] = useState("");
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewing, setReviewing] = useState(false);
   const { data: users = [] } = useQuery({ queryKey: ["users", "task-edit"], queryFn: () => api.getUsers() });
   const { data: selectedTaskComments = [] } = useQuery({
     queryKey: ["task-comments", selectedTask?.id],
@@ -91,6 +93,42 @@ export default function AdminTasks() {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to update task";
       toast.error(message);
+    }
+  };
+
+  const handleApproveTask = async () => {
+    if (!selectedTask) return;
+    try {
+      setReviewing(true);
+      const updated = await api.approveTask(selectedTask.id);
+      setTasks((prev) => prev.map((task) => (task.id === updated.id ? updated : task)));
+      setSelectedTask(updated);
+      toast.success("Task approved");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to approve task";
+      toast.error(message);
+    } finally {
+      setReviewing(false);
+    }
+  };
+
+  const handleRequestChanges = async () => {
+    if (!selectedTask || !reviewComment.trim()) {
+      toast.error("Please add a comment");
+      return;
+    }
+    try {
+      setReviewing(true);
+      const updated = await api.requestTaskChanges(selectedTask.id, reviewComment.trim());
+      setTasks((prev) => prev.map((task) => (task.id === updated.id ? updated : task)));
+      setSelectedTask(updated);
+      setReviewComment("");
+      toast.success("Comment sent to employee");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to request changes";
+      toast.error(message);
+    } finally {
+      setReviewing(false);
     }
   };
 
@@ -409,6 +447,35 @@ export default function AdminTasks() {
               ))}
               {selectedTaskComments.length === 0 && <p className="text-sm text-muted-foreground">No messages yet.</p>}
             </div>
+
+            {selectedTask.status !== "DONE" && (
+              <div className="mt-4 border-t border-border/40 pt-4">
+                <p className="text-sm font-medium mb-2">Admin Review</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
+                  <button
+                    onClick={() => void handleApproveTask()}
+                    disabled={reviewing}
+                    className="py-2.5 rounded-xl bg-primary/10 text-primary border border-primary/20 text-sm font-medium hover:bg-primary/20 disabled:opacity-50"
+                  >
+                    {reviewing ? "Processing..." : "Approve"}
+                  </button>
+                  <button
+                    onClick={() => void handleRequestChanges()}
+                    disabled={reviewing || !reviewComment.trim()}
+                    className="py-2.5 rounded-xl bg-secondary/70 border border-border/50 text-sm font-medium hover:bg-secondary disabled:opacity-50"
+                  >
+                    Add Comment
+                  </button>
+                </div>
+                <textarea
+                  value={reviewComment}
+                  onChange={(event) => setReviewComment(event.target.value)}
+                  rows={3}
+                  className="w-full px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none resize-none focus:border-primary/50"
+                  placeholder="Write comment for employee"
+                />
+              </div>
+            )}
           </div>
         </div>
       )}

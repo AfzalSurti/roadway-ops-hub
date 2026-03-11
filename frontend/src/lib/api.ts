@@ -204,6 +204,20 @@ export const api = {
     });
   },
 
+  approveTask(id: string) {
+    return request<TaskItem>(`/tasks/${id}/approve`, {
+      method: "POST",
+      body: JSON.stringify({})
+    });
+  },
+
+  requestTaskChanges(id: string, body: string) {
+    return request<TaskItem>(`/tasks/${id}/request-changes`, {
+      method: "POST",
+      body: JSON.stringify({ body })
+    });
+  },
+
   acknowledgeTaskComment(id: string) {
     return request<{ acknowledged: boolean }>(`/tasks/${id}/comment-ack`, {
       method: "POST",

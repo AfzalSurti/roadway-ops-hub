@@ -32,6 +32,8 @@ tasksRouter.patch(
 );
 tasksRouter.delete("/:id", requireRole("ADMIN"), asyncHandler(taskController.remove));
 tasksRouter.post("/:id/complete", asyncHandler(allowSelfOrAdmin("task")), validate(completeTaskSchema), asyncHandler(taskController.complete));
+tasksRouter.post("/:id/approve", requireRole("ADMIN"), asyncHandler(taskController.approve));
+tasksRouter.post("/:id/request-changes", requireRole("ADMIN"), validate(createCommentSchema), asyncHandler(taskController.requestChanges));
 tasksRouter.post("/:id/comment-ack", asyncHandler(allowSelfOrAdmin("task")), asyncHandler(taskController.acknowledgeComment));
 
 tasksRouter.post("/:id/comments", validate(createCommentSchema), asyncHandler(commentController.create));

@@ -95,7 +95,7 @@ export default function EmployeeDashboard() {
             const isOverdue = new Date(task.dueDate) < new Date();
             const projectLabel = task.projectNumber?.trim() || task.projectCode?.trim() || task.project;
             return (
-              <Link key={task.id} to={`/app/task/${task.id}`} className="flex items-center gap-4 p-3 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors">
+              <Link key={task.id} to={`/app/tasks?taskId=${task.id}`} className="flex items-center gap-4 p-3 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{task.title}</p>
                   <p className="text-xs text-muted-foreground">{projectLabel} · {task.project} · {task.reportTemplate?.name ?? "Template"}</p>
