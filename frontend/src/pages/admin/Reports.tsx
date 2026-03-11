@@ -255,7 +255,7 @@ export default function AdminReports() {
             }}
             title="From date"
             aria-label="From date"
-            className="px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 text-sm"
+            className="report-date-input px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 text-sm"
             required
           />
         </div>
@@ -275,7 +275,7 @@ export default function AdminReports() {
             }}
             title="To date"
             aria-label="To date"
-            className="px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 text-sm"
+            className="report-date-input px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 text-sm"
             required
           />
         </div>
