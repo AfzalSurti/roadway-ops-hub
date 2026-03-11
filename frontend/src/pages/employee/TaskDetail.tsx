@@ -15,10 +15,16 @@ export default function TaskDetail() {
   const [submitting, setSubmitting] = useState(false);
   const [acknowledging, setAcknowledging] = useState(false);
 
-  const { data: task } = useQuery({
+  const {
+    data: task,
+    isLoading: isTaskLoading,
+    isError: isTaskError,
+    error: taskError
+  } = useQuery({
     queryKey: ["task", id],
     queryFn: () => api.getTask(id as string),
-    enabled: Boolean(id)
+    enabled: Boolean(id),
+    retry: 1
   });
 
   const { data: comments = [], refetch: refetchComments } = useQuery({
@@ -27,9 +33,40 @@ export default function TaskDetail() {
     enabled: Boolean(id)
   });
 
+  if (!id) {
+    return (
+      <PageWrapper>
+        <p className="text-muted-foreground">Invalid task link.</p>
+      </PageWrapper>
+    );
+  }
+
+  if (isTaskLoading) {
+    return (
+      <PageWrapper>
+        <p className="text-muted-foreground">Loading task...</p>
+      </PageWrapper>
+    );
+  }
+
+  if (isTaskError) {
+    const message = taskError instanceof Error ? taskError.message : "Failed to load task.";
+    return (
+      <PageWrapper>
+        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6 text-sm">
+          <ArrowLeft className="h-4 w-4" />Back
+        </button>
+        <p className="text-muted-foreground">{message}</p>
+      </PageWrapper>
+    );
+  }
+
   if (!task) {
     return (
       <PageWrapper>
+        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6 text-sm">
+          <ArrowLeft className="h-4 w-4" />Back
+        </button>
         <p className="text-muted-foreground">Task not found.</p>
       </PageWrapper>
     );
