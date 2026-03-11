@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { api } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 import { Eye, CheckCircle, XCircle, MessageSquare, X } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
@@ -11,24 +12,14 @@ import autoTable from "jspdf-autotable";
 import type { ReportItem, ReportStatus } from "@/lib/domain";
 import { reportStatusConfig, toAvatarUrl } from "@/lib/domain";
 
-const MONTH_OPTIONS = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December"
-] as const;
+const toInputDate = (date: Date) => date.toISOString().slice(0, 10);
 
 export default function AdminReports() {
-  const [period, setPeriod] = useState<"MONTHLY" | "QUARTERLY" | "YEARLY">("MONTHLY");
-  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
+  const [fromDate, setFromDate] = useState<string>(() => {
+    const now = new Date();
+    return toInputDate(new Date(now.getFullYear(), now.getMonth(), 1));
+  });
+  const [toDate, setToDate] = useState<string>(() => toInputDate(new Date()));
   const [employeeId, setEmployeeId] = useState<string>("ALL");
   const [selectedReport, setSelectedReport] = useState<string | null>(null);
   const [feedbackModal, setFeedbackModal] = useState<string | null>(null);
@@ -42,53 +33,29 @@ export default function AdminReports() {
   const reports = data?.items ?? [];
   const tasks = tasksData?.items ?? [];
 
-  const periodRange = useMemo(() => {
-    const now = new Date();
-    const year = now.getFullYear();
+  const range = useMemo(() => {
+    const start = new Date(`${fromDate}T00:00:00`);
+    const end = new Date(`${toDate}T23:59:59`);
+    return { start, end };
+  }, [fromDate, toDate]);
 
-    if (period === "MONTHLY") {
-      const start = new Date(year, selectedMonth, 1);
-      const end = new Date(year, selectedMonth + 1, 1);
-      return { start, end };
-    }
-
-    if (period === "QUARTERLY") {
-      const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3;
-      const start = new Date(year, quarterStartMonth, 1);
-      const end = new Date(year, quarterStartMonth + 3, 1);
-      return { start, end };
-    }
-
-    return {
-      start: new Date(year, 0, 1),
-      end: new Date(year + 1, 0, 1)
-    };
-  }, [period, selectedMonth]);
-
-  const periodLabel = useMemo(() => {
-    if (period === "MONTHLY") {
-      return `${MONTH_OPTIONS[selectedMonth]} ${new Date().getFullYear()}`;
-    }
-    if (period === "QUARTERLY") {
-      const quarter = Math.floor(new Date().getMonth() / 3) + 1;
-      return `Q${quarter} ${new Date().getFullYear()}`;
-    }
-    return String(new Date().getFullYear());
-  }, [period, selectedMonth]);
+  const rangeLabel = useMemo(() => {
+    return `${new Date(`${fromDate}T00:00:00`).toLocaleDateString()} - ${new Date(`${toDate}T00:00:00`).toLocaleDateString()}`;
+  }, [fromDate, toDate]);
 
   const periodFilteredReports = useMemo(
     () => reports.filter((report) => {
       const createdAt = new Date(report.createdAt);
-      return createdAt >= periodRange.start && createdAt < periodRange.end;
+      return createdAt >= range.start && createdAt <= range.end;
     }),
-    [reports, periodRange]
+    [reports, range]
   );
   const periodFilteredTasks = useMemo(
     () => tasks.filter((task) => {
       const allocatedAt = new Date(task.allocatedAt ?? task.createdAt);
-      return allocatedAt >= periodRange.start && allocatedAt < periodRange.end;
+      return allocatedAt >= range.start && allocatedAt <= range.end;
     }),
-    [tasks, periodRange]
+    [tasks, range]
   );
 
   const filtered = useMemo(() => {
@@ -194,12 +161,12 @@ export default function AdminReports() {
   }, [users, periodFilteredTasks, periodFilteredReports, employeeId]);
 
   const downloadBreakdownCsv = () => {
-    const headers = ["Employee", "Email", "Period Type", "Period", "Tasks Given", "Tasks Completed", "Admin Comments", "Average Rating"];
+    const headers = ["Employee", "Email", "From", "To", "Tasks Given", "Tasks Completed", "Admin Comments", "Average Rating"];
     const rows = employeeBreakdown.map((row) => [
       row.name,
       row.email,
-      period,
-      periodLabel,
+      fromDate,
+      toDate,
       String(row.tasksGiven),
       String(row.tasksCompleted),
       String(row.adminComments),
@@ -213,8 +180,7 @@ export default function AdminReports() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    const filePeriod = period === "MONTHLY" ? MONTH_OPTIONS[selectedMonth].toLowerCase() : period.toLowerCase();
-    link.download = `employee-breakdown-${filePeriod}.csv`;
+    link.download = `employee-breakdown-${fromDate}-to-${toDate}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -225,8 +191,8 @@ export default function AdminReports() {
     const rows = employeeBreakdown.map((row) => ({
       Employee: row.name,
       Email: row.email,
-      "Period Type": period,
-      Period: periodLabel,
+      From: fromDate,
+      To: toDate,
       "Tasks Given": row.tasksGiven,
       "Tasks Completed": row.tasksCompleted,
       "Admin Comments": row.adminComments,
@@ -236,22 +202,20 @@ export default function AdminReports() {
     const worksheet = XLSX.utils.json_to_sheet(rows);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Breakdown");
-    const filePeriod = period === "MONTHLY" ? MONTH_OPTIONS[selectedMonth].toLowerCase() : period.toLowerCase();
-    XLSX.writeFile(workbook, `employee-breakdown-${filePeriod}.xlsx`);
+    XLSX.writeFile(workbook, `employee-breakdown-${fromDate}-to-${toDate}.xlsx`);
   };
 
   const downloadBreakdownPdf = () => {
-    const filePeriod = period === "MONTHLY" ? MONTH_OPTIONS[selectedMonth].toLowerCase() : period.toLowerCase();
     const doc = new jsPDF({ orientation: "landscape" });
     doc.setFontSize(14);
-    doc.text(`Per-Employee Breakdown (${periodLabel})`, 14, 14);
+    doc.text(`Per-Employee Breakdown (${rangeLabel})`, 14, 14);
 
-    const headers = [["Employee", "Email", "Period Type", "Period", "Tasks Given", "Tasks Completed", "Admin Comments", "Average Rating"]];
+    const headers = [["Employee", "Email", "From", "To", "Tasks Given", "Tasks Completed", "Admin Comments", "Average Rating"]];
     const body = employeeBreakdown.map((row) => [
       row.name,
       row.email,
-      period,
-      periodLabel,
+      fromDate,
+      toDate,
       String(row.tasksGiven),
       String(row.tasksCompleted),
       String(row.adminComments),
@@ -266,7 +230,7 @@ export default function AdminReports() {
       headStyles: { fillColor: [15, 23, 42] }
     });
 
-    doc.save(`employee-breakdown-${filePeriod}.pdf`);
+    doc.save(`employee-breakdown-${fromDate}-to-${toDate}.pdf`);
   };
 
   return (
@@ -277,32 +241,44 @@ export default function AdminReports() {
       </div>
 
       <div className="flex flex-wrap gap-2 mb-6">
-        <select
-          value={period}
-          onChange={(event) => setPeriod(event.target.value as "MONTHLY" | "QUARTERLY" | "YEARLY")}
-          title="Select period"
-          aria-label="Select period"
-          className="px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 text-sm"
-        >
-          <option value="MONTHLY">Monthly</option>
-          <option value="QUARTERLY">Quarterly</option>
-          <option value="YEARLY">Yearly</option>
-        </select>
-        {period === "MONTHLY" && (
-          <select
-            value={selectedMonth}
-            onChange={(event) => setSelectedMonth(Number(event.target.value))}
-            title="Select month"
-            aria-label="Select month"
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">From</label>
+          <input
+            type="date"
+            value={fromDate}
+            onChange={(event) => {
+              const nextFrom = event.target.value;
+              setFromDate(nextFrom);
+              if (toDate < nextFrom) {
+                setToDate(nextFrom);
+              }
+            }}
+            title="From date"
+            aria-label="From date"
             className="px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 text-sm"
-          >
-            {MONTH_OPTIONS.map((month, index) => (
-              <option key={month} value={index}>
-                {month}
-              </option>
-            ))}
-          </select>
-        )}
+            required
+          />
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">To</label>
+          <input
+            type="date"
+            value={toDate}
+            min={fromDate}
+            onChange={(event) => {
+              const nextTo = event.target.value;
+              if (nextTo < fromDate) {
+                toast.error("To date must be after or equal to From date");
+                return;
+              }
+              setToDate(nextTo);
+            }}
+            title="To date"
+            aria-label="To date"
+            className="px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 text-sm"
+            required
+          />
+        </div>
         <select
           value={employeeId}
           onChange={(event) => setEmployeeId(event.target.value)}
@@ -326,7 +302,7 @@ export default function AdminReports() {
 
       <div className="glass-panel overflow-hidden mb-6">
         <div className="flex items-center justify-between p-4 border-b border-border/40">
-          <h3 className="text-sm font-semibold">Per-Employee Breakdown ({periodLabel})</h3>
+          <h3 className="text-sm font-semibold">Per-Employee Breakdown ({rangeLabel})</h3>
           <div className="flex items-center gap-2">
             <button
               onClick={downloadBreakdownCsv}
