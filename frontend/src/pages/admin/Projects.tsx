@@ -100,6 +100,12 @@ const DEFAULT_WIZARD: NumberWizardState = {
   baseCode: ""
 };
 
+function getFinancialYearShort(referenceDate = new Date()): number {
+  const month = referenceDate.getMonth();
+  const year = referenceDate.getFullYear();
+  return month >= 3 ? year % 100 : (year - 1) % 100;
+}
+
 export default function AdminProjects() {
   const [showCreate, setShowCreate] = useState(false);
   const [showNumberWizard, setShowNumberWizard] = useState(false);
@@ -191,8 +197,11 @@ export default function AdminProjects() {
   }, [wizard.subTechnicalUnitCode, numberingOptions]);
 
   const currentCodePreview = useMemo(() => {
-    const raw = `${wizard.companyCode}${wizard.technicalUnitCode}${wizard.subTechnicalUnitCode}${wizard.baseCode ? wizard.baseCode.slice(-4) : ""}${wizard.workCategoryCode}`;
-    return raw || "-";
+    if (wizard.baseCode) {
+      return `${wizard.baseCode}${wizard.workCategoryCode}`;
+    }
+    const prefixOnly = `${wizard.companyCode}${wizard.technicalUnitCode}${wizard.subTechnicalUnitCode}`;
+    return prefixOnly || "-";
   }, [wizard]);
 
   const resetWizard = () => {
@@ -261,6 +270,9 @@ export default function AdminProjects() {
         toast.error("Please select sub technical unit");
         return;
       }
+
+      const projectCodePrefix = `${wizard.companyCode}${wizard.technicalUnitCode}${wizard.subTechnicalUnitCode}`;
+
       try {
         const preview = await api.previewProjectNumber({
           companyCode: wizard.companyCode,
@@ -269,9 +281,18 @@ export default function AdminProjects() {
         });
         setWizard((prev) => ({ ...prev, baseCode: preview.baseCode }));
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Failed to generate project code";
-        toast.error(message);
-        return;
+        // Fallback: derive FY+serial locally if preview endpoint is unavailable in current deployment.
+        const fy = getFinancialYearShort();
+        const fyText = String(fy).padStart(2, "0");
+        const maxSerial = projects
+          .filter((project) => project.projectCodePrefix === projectCodePrefix && project.financialYearShort === fy)
+          .reduce((max, project) => Math.max(max, project.serialNumber ?? 0), 0);
+        const nextSerial = String(maxSerial + 1).padStart(2, "0");
+        const baseCode = `${projectCodePrefix}${fyText}${nextSerial}`;
+        setWizard((prev) => ({ ...prev, baseCode }));
+
+        const message = error instanceof Error ? error.message : "Preview route unavailable";
+        toast.warning(`${message}. Generated preview locally for now.`);
       }
     }
 
