@@ -43,7 +43,7 @@ export function AppSidebar() {
       {/* Logo */}
       <div className="h-16 flex items-center px-4 border-b border-sidebar-border">
         <div className="flex items-center gap-3 overflow-hidden">
-          <img src="/roadway-logo.svg" alt="HighwayOps" className="w-8 h-8 rounded-lg shrink-0" />
+          <img src="/roadway-logo.svg" alt="Sankalp" className="w-8 h-8 rounded-lg shrink-0" />
           <AnimatePresence>
             {!collapsed && (
               <motion.span
@@ -52,7 +52,7 @@ export function AppSidebar() {
                 exit={{ opacity: 0, width: 0 }}
                 className="font-bold text-foreground whitespace-nowrap overflow-hidden"
               >
-                HighwayOps
+                Sankalp
               </motion.span>
             )}
           </AnimatePresence>

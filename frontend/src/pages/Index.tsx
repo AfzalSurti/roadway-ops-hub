@@ -27,7 +27,7 @@ const Index = () => {
           <div className="flex items-center gap-3">
             <img src="/roadway-logo.svg" alt="RoadwayOps" className="h-9 w-9 rounded-lg" />
             <div>
-              <p className="text-lg font-semibold leading-none">HighwayOps</p>
+              <p className="text-lg font-semibold leading-none">Sankalp</p>
               <p className="text-xs text-muted-foreground mt-1">Task & Report Management</p>
             </div>
           </div>
@@ -55,7 +55,7 @@ const Index = () => {
             </h1>
 
             <p className="text-muted-foreground mt-5 text-base md:text-lg leading-relaxed max-w-xl">
-              HighwayOps centralizes admin planning and employee reporting into one workflow,
+              Sankalp centralizes admin planning and employee reporting into one workflow,
               so your team can execute faster and monitor progress in real time.
             </p>
 
@@ -71,7 +71,7 @@ const Index = () => {
           </div>
 
           <div className="glass-panel p-3 md:p-4">
-            <img src="/landing-hero.svg" alt="HighwayOps platform preview" className="w-full rounded-xl border border-border/40" />
+            <img src="/landing-hero.svg" alt="Sankalp platform preview" className="w-full rounded-xl border border-border/40" />
           </div>
         </section>
 

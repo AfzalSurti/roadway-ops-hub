@@ -44,7 +44,7 @@ export default function Login() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent mb-4 glow-primary">
             <HardHat className="h-8 w-8 text-primary-foreground" />
           </div>
-          <h1 className="text-3xl font-bold text-foreground">HighwayOps</h1>
+          <h1 className="text-3xl font-bold text-foreground">Sankalp</h1>
           <p className="text-muted-foreground mt-2">Task & Report Management</p>
         </div>
 
@@ -59,7 +59,7 @@ export default function Login() {
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
-                placeholder="you@highwayops.com"
+                placeholder="you@sankalp.com"
                 type="email"
               />
             </div>
