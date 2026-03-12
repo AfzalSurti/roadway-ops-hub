@@ -7,6 +7,22 @@ export const projectController = {
     const projects = await projectService.list();
     return sendSuccess(res, projects);
   },
+  async listWithoutNumber(_req: Request, res: Response) {
+    const projects = await projectService.listWithoutNumber();
+    return sendSuccess(res, projects);
+  },
+  async numberingOptions(_req: Request, res: Response) {
+    const options = projectService.getNumberingOptions();
+    return sendSuccess(res, options);
+  },
+  async previewProjectNumber(req: Request, res: Response) {
+    const preview = await projectService.previewProjectNumber(req.body);
+    return sendSuccess(res, preview);
+  },
+  async assignProjectNumber(req: Request, res: Response) {
+    const project = await projectService.assignProjectNumber(req.params.id, req.body);
+    return sendSuccess(res, project);
+  },
   async create(req: Request, res: Response) {
     const project = await projectService.create(req.body);
     return sendSuccess(res, project, 201);

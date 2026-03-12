@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { PageWrapper } from "@/components/PageWrapper";
 import { ArrowLeft } from "lucide-react";
@@ -233,15 +233,56 @@ export default function CreateTask() {
   const selectedProject = watch("project");
   const selectedCategory = watch("taskCategory");
   const selectedSubTask = watch("title");
+  const [projectCodeFilter, setProjectCodeFilter] = useState<string>("ALL");
+  const [fromDate, setFromDate] = useState<string>(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+  });
+  const [toDate, setToDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const subTasks = useMemo(() => TASK_DATA[selectedCategory] ?? [], [selectedCategory]);
   const { data: projects = [] } = useQuery({ queryKey: ["projects", "create-task"], queryFn: () => api.getProjects() });
 
+  const projectCodeOptions = useMemo(() => {
+    const set = new Set<string>();
+    projects.forEach((project) => {
+      const code = project.projectCodePrefix?.trim();
+      if (code) set.add(code.slice(0, 4));
+    });
+    return ["ALL", ...Array.from(set).sort((a, b) => a.localeCompare(b))];
+  }, [projects]);
+
+  const filteredProjects = useMemo(() => {
+    const from = fromDate ? new Date(`${fromDate}T00:00:00`) : null;
+    const to = toDate ? new Date(`${toDate}T23:59:59`) : null;
+    return projects.filter((project) => {
+      const prefix = project.projectCodePrefix?.trim()?.slice(0, 4) ?? "";
+      const createdAt = new Date(project.createdAt);
+      const matchesCode = projectCodeFilter === "ALL" || prefix === projectCodeFilter;
+      const matchesFrom = !from || createdAt >= from;
+      const matchesTo = !to || createdAt <= to;
+      return matchesCode && matchesFrom && matchesTo;
+    });
+  }, [projects, projectCodeFilter, fromDate, toDate]);
+
+  const selectedProjectRecord = useMemo(
+    () => filteredProjects.find((project) => project.name === selectedProject) ?? projects.find((project) => project.name === selectedProject),
+    [filteredProjects, projects, selectedProject]
+  );
+
   useEffect(() => {
-    if (!selectedProject && projects.length > 0) {
-      setValue("project", projects[0].name, { shouldValidate: true, shouldDirty: true });
+    if (!selectedProject && filteredProjects.length > 0) {
+      setValue("project", filteredProjects[0].name, { shouldValidate: true, shouldDirty: true });
       clearErrors("project");
     }
-  }, [selectedProject, projects, setValue, clearErrors]);
+  }, [selectedProject, filteredProjects, setValue, clearErrors]);
+
+  useEffect(() => {
+    if (!selectedProject) return;
+    const stillVisible = filteredProjects.some((project) => project.name === selectedProject);
+    if (!stillVisible) {
+      setValue("project", "", { shouldValidate: true, shouldDirty: true });
+    }
+  }, [selectedProject, filteredProjects, setValue]);
 
   useEffect(() => {
     const payload: TaskDraft = {
@@ -257,6 +298,8 @@ export default function CreateTask() {
       await api.createTask({
         title: combinedTitle,
         description: "-",
+        projectCode: selectedProjectRecord?.projectCodePrefix ?? undefined,
+        projectNumber: selectedProjectRecord?.projectNumber ?? undefined,
         allottedDays: data.allottedDays ? Number(data.allottedDays) : undefined,
         ratingEnabled: data.ratingEnabled,
         assignedToId: data.assignedToId,
@@ -288,6 +331,57 @@ export default function CreateTask() {
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="glass-panel p-6 max-w-2xl space-y-5">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label className="text-sm font-medium mb-1.5 block">Project Code</label>
+            <select
+              value={projectCodeFilter}
+              onChange={(event) => setProjectCodeFilter(event.target.value)}
+              title="Project code"
+              aria-label="Project code"
+              className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
+            >
+              {projectCodeOptions.map((code) => (
+                <option key={code} value={code}>
+                  {code === "ALL" ? "All Codes" : code}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium mb-1.5 block">From Date</label>
+            <input
+              type="date"
+              value={fromDate}
+              title="From date"
+              aria-label="From date"
+              onChange={(event) => {
+                const next = event.target.value;
+                setFromDate(next);
+                if (toDate && next && toDate < next) {
+                  setToDate(next);
+                  toast.error("To date cannot be before from date");
+                }
+              }}
+              className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium mb-1.5 block">To Date</label>
+            <input
+              type="date"
+              value={toDate}
+              min={fromDate}
+              title="To date"
+              aria-label="To date"
+              onChange={(event) => setToDate(event.target.value)}
+              className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
+            />
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="text-sm font-medium mb-1.5 block">Project</label>
@@ -302,9 +396,9 @@ export default function CreateTask() {
               }}
             >
               <option value="">Select project</option>
-              {projects.map((project) => (
+              {filteredProjects.map((project) => (
                 <option key={project.id} value={project.name}>
-                  {project.name}
+                  {project.name} {project.projectNumber ? `(${project.projectNumber})` : ""}
                 </option>
               ))}
             </select>

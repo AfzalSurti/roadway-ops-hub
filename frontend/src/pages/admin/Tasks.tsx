@@ -19,6 +19,12 @@ export default function AdminTasks() {
   const [view, setView] = useState<"kanban" | "list">("list");
   const [search, setSearch] = useState("");
   const [selectedProject, setSelectedProject] = useState<string>("ALL");
+  const [selectedProjectCode, setSelectedProjectCode] = useState<string>("ALL");
+  const [fromDate, setFromDate] = useState<string>(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+  });
+  const [toDate, setToDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTask, setSelectedTask] = useState<TaskItem | null>(null);
@@ -141,15 +147,31 @@ export default function AdminTasks() {
     return ["ALL", ...Array.from(set).sort((a, b) => a.localeCompare(b))];
   }, [tasks]);
 
+  const projectCodeOptions = useMemo(() => {
+    const set = new Set<string>();
+    tasks.forEach((task) => {
+      const code = task.projectCode?.trim();
+      if (code) set.add(code.slice(0, 4));
+    });
+    return ["ALL", ...Array.from(set).sort((a, b) => a.localeCompare(b))];
+  }, [tasks]);
+
   const filtered = useMemo(() => {
+    const from = fromDate ? new Date(`${fromDate}T00:00:00`) : null;
+    const to = toDate ? new Date(`${toDate}T23:59:59`) : null;
     return tasks.filter((task) => {
       const matchesSearch =
         task.title.toLowerCase().includes(search.toLowerCase()) ||
         task.project.toLowerCase().includes(search.toLowerCase());
       const matchesProject = selectedProject === "ALL" || task.project === selectedProject;
-      return matchesSearch && matchesProject;
+      const taskCode = task.projectCode?.trim()?.slice(0, 4) ?? "";
+      const matchesProjectCode = selectedProjectCode === "ALL" || taskCode === selectedProjectCode;
+      const allocatedDate = new Date(task.allocatedAt ?? task.createdAt);
+      const matchesFrom = !from || allocatedDate >= from;
+      const matchesTo = !to || allocatedDate <= to;
+      return matchesSearch && matchesProject && matchesProjectCode && matchesFrom && matchesTo;
     });
-  }, [tasks, search, selectedProject]);
+  }, [tasks, search, selectedProject, selectedProjectCode, fromDate, toDate]);
 
   const sortedTasks = useMemo(() => {
     return [...filtered].sort((a, b) => {
@@ -217,6 +239,19 @@ export default function AdminTasks() {
           />
         </div>
         <select
+          value={selectedProjectCode}
+          onChange={(event) => setSelectedProjectCode(event.target.value)}
+          title="Select project code"
+          aria-label="Select project code"
+          className="px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 text-sm min-w-[180px]"
+        >
+          {projectCodeOptions.map((code) => (
+            <option key={code} value={code}>
+              {code === "ALL" ? "All Codes" : code}
+            </option>
+          ))}
+        </select>
+        <select
           value={selectedProject}
           onChange={(event) => setSelectedProject(event.target.value)}
           title="Select project"
@@ -229,6 +264,29 @@ export default function AdminTasks() {
             </option>
           ))}
         </select>
+        <input
+          type="date"
+          value={fromDate}
+          onChange={(event) => {
+            const next = event.target.value;
+            setFromDate(next);
+            if (toDate && next && toDate < next) {
+              setToDate(next);
+            }
+          }}
+          className="px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 text-sm"
+          title="From date"
+          aria-label="From date"
+        />
+        <input
+          type="date"
+          value={toDate}
+          min={fromDate}
+          onChange={(event) => setToDate(event.target.value)}
+          className="px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 text-sm"
+          title="To date"
+          aria-label="To date"
+        />
         <div className="flex items-center rounded-xl bg-secondary/50 border border-border/50 p-1">
           <button
             onClick={() => setView("kanban")}
@@ -420,6 +478,8 @@ export default function AdminTasks() {
                   <input
                     value={editTitle}
                     onChange={(event) => setEditTitle(event.target.value)}
+                    title="Task"
+                    aria-label="Task"
                     className="w-full px-3 py-2 rounded-lg bg-secondary/50 border border-border/50 outline-none"
                   />
                 </div>
@@ -428,6 +488,8 @@ export default function AdminTasks() {
                   <input
                     value={editProject}
                     onChange={(event) => setEditProject(event.target.value)}
+                    title="Project"
+                    aria-label="Project"
                     className="w-full px-3 py-2 rounded-lg bg-secondary/50 border border-border/50 outline-none"
                   />
                 </div>
@@ -436,6 +498,8 @@ export default function AdminTasks() {
                   <select
                     value={editAssignedToId}
                     onChange={(event) => setEditAssignedToId(event.target.value)}
+                    title="Assigned To"
+                    aria-label="Assigned To"
                     className="w-full px-3 py-2 rounded-lg bg-secondary/50 border border-border/50 outline-none"
                   >
                     <option value="">Select employee</option>

@@ -1,14 +1,38 @@
 import { useMemo, useState } from "react";
 import { PageWrapper } from "@/components/PageWrapper";
 import { motion } from "framer-motion";
-import { Plus, Trash2, X, Search } from "lucide-react";
+import { Plus, Trash2, X, Search, Hash } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { statusConfig } from "@/lib/domain";
 
+type WizardStep = 1 | 2 | 3 | 4 | 5;
+
+type NumberWizardState = {
+  projectId: string;
+  companyCode: "G" | "S" | "I" | "H" | "";
+  technicalUnitCode: "T" | "S" | "D" | "";
+  subTechnicalUnitCode: string;
+  workCategoryCode: string;
+  baseCode: string;
+};
+
+const DEFAULT_WIZARD: NumberWizardState = {
+  projectId: "",
+  companyCode: "",
+  technicalUnitCode: "",
+  subTechnicalUnitCode: "",
+  workCategoryCode: "",
+  baseCode: ""
+};
+
 export default function AdminProjects() {
   const [showCreate, setShowCreate] = useState(false);
+  const [showNumberWizard, setShowNumberWizard] = useState(false);
+  const [wizardStep, setWizardStep] = useState<WizardStep>(1);
+  const [wizard, setWizard] = useState<NumberWizardState>(DEFAULT_WIZARD);
+  const [assigningNumber, setAssigningNumber] = useState(false);
   const [form, setForm] = useState({ name: "", description: "" });
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -18,9 +42,15 @@ export default function AdminProjects() {
     queryKey: ["tasks", "projects-summary"],
     queryFn: () => api.getTasks({ limit: 500 })
   });
+
   const { data: projects = [], refetch: refetchProjects } = useQuery({
     queryKey: ["projects"],
     queryFn: () => api.getProjects()
+  });
+
+  const { data: numberingOptions } = useQuery({
+    queryKey: ["project-numbering-options"],
+    queryFn: () => api.getProjectNumberingOptions()
   });
 
   const tasks = tasksData?.items ?? [];
@@ -36,6 +66,8 @@ export default function AdminProjects() {
         id: project.id,
         projectName: project.name,
         description: project.description ?? "",
+        projectNumber: project.projectNumber ?? "-",
+        projectCodePrefix: project.projectCodePrefix ?? "",
         totalTasks,
         pendingTasks,
         overdueTasks,
@@ -47,13 +79,48 @@ export default function AdminProjects() {
   const filteredRows = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!query) return projectRows;
-    return projectRows.filter((row) => row.projectName.toLowerCase().includes(query));
+    return projectRows.filter((row) => {
+      return row.projectName.toLowerCase().includes(query) || row.projectNumber.toLowerCase().includes(query);
+    });
   }, [projectRows, search]);
 
   const selectedProject = useMemo(
     () => projectRows.find((row) => row.id === selectedProjectId) ?? null,
     [projectRows, selectedProjectId]
   );
+
+  const projectsWithoutNumber = useMemo(
+    () => projects.filter((project) => !project.projectNumber),
+    [projects]
+  );
+
+  const wizardProject = useMemo(
+    () => projects.find((project) => project.id === wizard.projectId) ?? null,
+    [projects, wizard.projectId]
+  );
+
+  const subTechnicalOptions = useMemo(() => {
+    if (!wizard.technicalUnitCode || !numberingOptions) return [];
+    return numberingOptions.subTechnicalUnits[wizard.technicalUnitCode] ?? [];
+  }, [wizard.technicalUnitCode, numberingOptions]);
+
+  const workCategoryOptions = useMemo(() => {
+    if (!numberingOptions) return [];
+    return wizard.subTechnicalUnitCode === "FH"
+      ? numberingOptions.workCategories.fieldHighwayTesting
+      : numberingOptions.workCategories.default;
+  }, [wizard.subTechnicalUnitCode, numberingOptions]);
+
+  const currentCodePreview = useMemo(() => {
+    const raw = `${wizard.companyCode}${wizard.technicalUnitCode}${wizard.subTechnicalUnitCode}${wizard.baseCode ? wizard.baseCode.slice(-4) : ""}${wizard.workCategoryCode}`;
+    return raw || "-";
+  }, [wizard]);
+
+  const resetWizard = () => {
+    setWizard(DEFAULT_WIZARD);
+    setWizardStep(1);
+    setShowNumberWizard(false);
+  };
 
   const handleCreateProject = async () => {
     if (!form.name.trim()) {
@@ -93,6 +160,80 @@ export default function AdminProjects() {
     }
   };
 
+  const goNextWizard = async () => {
+    if (wizardStep === 1 && !wizard.projectId) {
+      toast.error("Please select a project");
+      return;
+    }
+    if (wizardStep === 2 && !wizard.companyCode) {
+      toast.error("Please select company");
+      return;
+    }
+    if (wizardStep === 3 && !wizard.technicalUnitCode) {
+      toast.error("Please select technical unit");
+      return;
+    }
+    if (wizardStep === 4) {
+      if (!wizard.technicalUnitCode) {
+        toast.error("Please select technical unit");
+        return;
+      }
+      if (!wizard.subTechnicalUnitCode) {
+        toast.error("Please select sub technical unit");
+        return;
+      }
+      try {
+        const preview = await api.previewProjectNumber({
+          companyCode: wizard.companyCode,
+          technicalUnitCode: wizard.technicalUnitCode,
+          subTechnicalUnitCode: wizard.subTechnicalUnitCode
+        });
+        setWizard((prev) => ({ ...prev, baseCode: preview.baseCode }));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to generate project code";
+        toast.error(message);
+        return;
+      }
+    }
+
+    setWizardStep((prev) => {
+      if (prev >= 5) return 5;
+      return (prev + 1) as WizardStep;
+    });
+  };
+
+  const goBackWizard = () => {
+    setWizardStep((prev) => {
+      if (prev <= 1) return 1;
+      return (prev - 1) as WizardStep;
+    });
+  };
+
+  const handleAssignProjectNumber = async () => {
+    if (!wizard.projectId || !wizard.companyCode || !wizard.technicalUnitCode || !wizard.subTechnicalUnitCode || !wizard.workCategoryCode) {
+      toast.error("Please complete all required selections");
+      return;
+    }
+
+    try {
+      setAssigningNumber(true);
+      await api.assignProjectNumber(wizard.projectId, {
+        companyCode: wizard.companyCode,
+        technicalUnitCode: wizard.technicalUnitCode,
+        subTechnicalUnitCode: wizard.subTechnicalUnitCode,
+        workCategoryCode: wizard.workCategoryCode
+      });
+      await refetchProjects();
+      toast.success("Project number assigned");
+      resetWizard();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to assign project number";
+      toast.error(message);
+    } finally {
+      setAssigningNumber(false);
+    }
+  };
+
   return (
     <PageWrapper>
       <div className="page-header flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -100,13 +241,26 @@ export default function AdminProjects() {
           <h1 className="page-title">Projects</h1>
           <p className="page-subtitle">Project-wise task status summary</p>
         </div>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-primary to-accent text-primary-foreground font-medium text-sm hover:opacity-90 transition-opacity"
-        >
-          <Plus className="h-4 w-4" />
-          Add Project
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => {
+              setShowNumberWizard(true);
+              setWizardStep(1);
+              setWizard(DEFAULT_WIZARD);
+            }}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-primary/40 text-primary font-medium text-sm hover:bg-primary/10 transition-colors"
+          >
+            <Hash className="h-4 w-4" />
+            Add Project Number
+          </button>
+          <button
+            onClick={() => setShowCreate(true)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-primary to-accent text-primary-foreground font-medium text-sm hover:opacity-90 transition-opacity"
+          >
+            <Plus className="h-4 w-4" />
+            Add Project
+          </button>
+        </div>
       </div>
 
       <div className="mb-4 flex items-center gap-2 px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 text-sm max-w-sm">
@@ -115,17 +269,18 @@ export default function AdminProjects() {
           type="text"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search projects..."
+          placeholder="Search projects or number..."
           className="bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground w-full"
         />
       </div>
 
       <div className="glass-panel overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[720px]">
+          <table className="w-full text-sm min-w-[860px]">
             <thead>
               <tr className="border-b border-border/50 text-muted-foreground">
                 <th className="text-left p-4 font-medium">Project Name</th>
+                <th className="text-left p-4 font-medium">Project Number</th>
                 <th className="text-left p-4 font-medium">Total Tasks</th>
                 <th className="text-left p-4 font-medium">Pending</th>
                 <th className="text-left p-4 font-medium">Overdue</th>
@@ -137,7 +292,7 @@ export default function AdminProjects() {
                   key={row.id}
                   initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.04 }}
+                  transition={{ delay: index * 0.03 }}
                   onClick={() => setSelectedProjectId(row.id)}
                   className="border-b border-border/30 cursor-pointer hover:bg-secondary/30 transition-colors"
                 >
@@ -158,6 +313,7 @@ export default function AdminProjects() {
                       </button>
                     </div>
                   </td>
+                  <td className="p-4 font-medium">{row.projectNumber}</td>
                   <td className="p-4 font-medium">{row.totalTasks}</td>
                   <td className="p-4 font-medium">{row.pendingTasks}</td>
                   <td className="p-4 font-medium">{row.overdueTasks}</td>
@@ -165,7 +321,7 @@ export default function AdminProjects() {
               ))}
               {filteredRows.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="p-6 text-muted-foreground">No projects found.</td>
+                  <td colSpan={5} className="p-6 text-muted-foreground">No projects found.</td>
                 </tr>
               )}
             </tbody>
@@ -193,6 +349,14 @@ export default function AdminProjects() {
                 <p className="text-xs text-muted-foreground">Project Name</p>
                 <p className="font-medium mt-1">{selectedProject.projectName}</p>
               </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Project Number</p>
+                <p className="font-medium mt-1">{selectedProject.projectNumber}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Project Code Prefix</p>
+                <p className="font-medium mt-1">{selectedProject.projectCodePrefix || "-"}</p>
+              </div>
               <div className="sm:col-span-2">
                 <p className="text-xs text-muted-foreground">Description</p>
                 <p className="mt-1 text-sm">{selectedProject.description.trim() || "No description added."}</p>
@@ -219,24 +383,26 @@ export default function AdminProjects() {
               <p className="text-sm font-medium mb-3">Tasks In This Project</p>
               {selectedProject.tasks.length ? (
                 <div className="space-y-2">
-                  {[...selectedProject.tasks].sort((a, b) => {
-                    const aDone = a.status === "DONE" ? 1 : 0;
-                    const bDone = b.status === "DONE" ? 1 : 0;
-                    if (aDone !== bDone) return aDone - bDone;
-                    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-                  }).map((task) => (
-                    <div key={task.id} className="rounded-xl border border-border/40 bg-secondary/20 p-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-medium">{task.title}</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Assigned to: {task.assignedTo?.name ?? "-"} | Due: {new Date(task.dueDate).toLocaleDateString()}
-                          </p>
+                  {[...selectedProject.tasks]
+                    .sort((a, b) => {
+                      const aDone = a.status === "DONE" ? 1 : 0;
+                      const bDone = b.status === "DONE" ? 1 : 0;
+                      if (aDone !== bDone) return aDone - bDone;
+                      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+                    })
+                    .map((task) => (
+                      <div key={task.id} className="rounded-xl border border-border/40 bg-secondary/20 p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-medium">{task.title}</p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Assigned to: {task.assignedTo?.name ?? "-"} | Due: {new Date(task.dueDate).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <span className={`status-badge text-[10px] ${statusConfig[task.status].color}`}>{statusConfig[task.status].label}</span>
                         </div>
-                        <span className={`status-badge text-[10px] ${statusConfig[task.status].color}`}>{statusConfig[task.status].label}</span>
                       </div>
-                    </div>
-                  ))}
+                    ))}
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">No tasks in this project yet.</p>
@@ -275,6 +441,171 @@ export default function AdminProjects() {
               >
                 Create Project
               </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {showNumberWizard && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-background/85 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="glass-panel-strong p-6 w-full max-w-2xl mx-4"
+          >
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <div>
+                <h3 className="text-lg font-semibold">Add Project Number</h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Step {wizardStep} of 5 | Project: {wizardProject?.name ?? "Not selected"} | Current Code: {currentCodePreview}
+                </p>
+              </div>
+              <button
+                onClick={resetWizard}
+                className="px-3 py-1.5 rounded-lg border border-destructive/30 text-destructive hover:bg-destructive/10 text-xs"
+              >
+                Discard
+              </button>
+            </div>
+
+            {wizardStep === 1 && (
+              <div className="space-y-3">
+                <p className="text-sm font-medium">Select Project (only projects without number)</p>
+                <select
+                  value={wizard.projectId}
+                  onChange={(event) => setWizard((prev) => ({ ...prev, projectId: event.target.value }))}
+                  title="Select project"
+                  aria-label="Select project"
+                  className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50"
+                >
+                  <option value="">Select project</option>
+                  {projectsWithoutNumber.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </select>
+                {projectsWithoutNumber.length === 0 && <p className="text-xs text-muted-foreground">All projects already have numbers.</p>}
+              </div>
+            )}
+
+            {wizardStep === 2 && (
+              <div className="space-y-3">
+                <p className="text-sm font-medium">a) Initial of Company Name (select one)</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {numberingOptions?.companies.map((item) => (
+                    <button
+                      key={item.code}
+                      onClick={() => setWizard((prev) => ({ ...prev, companyCode: item.code as NumberWizardState["companyCode"] }))}
+                      className={`text-left px-3 py-2 rounded-xl border ${wizard.companyCode === item.code ? "border-primary bg-primary/10" : "border-border/50 bg-secondary/20"}`}
+                    >
+                      <p className="text-sm font-medium">{item.label}</p>
+                      <p className="text-xs text-muted-foreground">Code: {item.code}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {wizardStep === 3 && (
+              <div className="space-y-3">
+                <p className="text-sm font-medium">b) Initial of Technical Unit (select one)</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {numberingOptions?.technicalUnits.map((item) => (
+                    <button
+                      key={item.code}
+                      onClick={() =>
+                        setWizard((prev) => ({
+                          ...prev,
+                          technicalUnitCode: item.code as NumberWizardState["technicalUnitCode"],
+                          subTechnicalUnitCode: "",
+                          workCategoryCode: "",
+                          baseCode: ""
+                        }))
+                      }
+                      className={`text-left px-3 py-2 rounded-xl border ${wizard.technicalUnitCode === item.code ? "border-primary bg-primary/10" : "border-border/50 bg-secondary/20"}`}
+                    >
+                      <p className="text-sm font-medium">{item.label}</p>
+                      <p className="text-xs text-muted-foreground">Code: {item.code}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {wizardStep === 4 && (
+              <div className="space-y-3">
+                <p className="text-sm font-medium">c) Initial of Sub Technical Unit ({wizard.technicalUnitCode})</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1">
+                  {subTechnicalOptions.map((item) => (
+                    <button
+                      key={item.code}
+                      onClick={() => setWizard((prev) => ({ ...prev, subTechnicalUnitCode: item.code, workCategoryCode: "", baseCode: "" }))}
+                      className={`text-left px-3 py-2 rounded-xl border ${wizard.subTechnicalUnitCode === item.code ? "border-primary bg-primary/10" : "border-border/50 bg-secondary/20"}`}
+                    >
+                      <p className="text-sm font-medium">{item.label}</p>
+                      <p className="text-xs text-muted-foreground">Code: {item.code}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {wizardStep === 5 && (
+              <div className="space-y-3">
+                <p className="text-sm font-medium">f) Prefix Initial of Work Category</p>
+                <p className="text-xs text-muted-foreground">
+                  {wizard.subTechnicalUnitCode === "FH"
+                    ? "Field Highway Testing selected, choose one service code"
+                    : "Choose one work category code"}
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1">
+                  {workCategoryOptions.map((item) => (
+                    <button
+                      key={item.code}
+                      onClick={() => setWizard((prev) => ({ ...prev, workCategoryCode: item.code }))}
+                      className={`text-left px-3 py-2 rounded-xl border ${wizard.workCategoryCode === item.code ? "border-primary bg-primary/10" : "border-border/50 bg-secondary/20"}`}
+                    >
+                      <p className="text-sm font-medium">{item.label}</p>
+                      <p className="text-xs text-muted-foreground">Code: {item.code}</p>
+                    </button>
+                  ))}
+                </div>
+                {wizard.baseCode && (
+                  <div className="rounded-xl border border-primary/30 bg-primary/5 p-3">
+                    <p className="text-xs text-muted-foreground">Generated Base Code</p>
+                    <p className="text-base font-semibold mt-1">{wizard.baseCode}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Final Project Number: {wizard.baseCode}{wizard.workCategoryCode || ""}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between gap-2 mt-5">
+              <button
+                onClick={goBackWizard}
+                disabled={wizardStep === 1}
+                className="px-4 py-2 rounded-lg border border-border/50 text-sm disabled:opacity-40"
+              >
+                Back
+              </button>
+
+              {wizardStep < 5 ? (
+                <button
+                  onClick={() => void goNextWizard()}
+                  className="px-4 py-2 rounded-lg bg-gradient-to-r from-primary to-accent text-primary-foreground text-sm font-medium"
+                >
+                  Next
+                </button>
+              ) : (
+                <button
+                  onClick={() => void handleAssignProjectNumber()}
+                  disabled={assigningNumber || !wizard.workCategoryCode}
+                  className="px-4 py-2 rounded-lg bg-gradient-to-r from-primary to-accent text-primary-foreground text-sm font-medium disabled:opacity-60"
+                >
+                  {assigningNumber ? "Assigning..." : "Finish"}
+                </button>
+              )}
             </div>
           </motion.div>
         </div>

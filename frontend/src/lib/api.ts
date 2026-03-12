@@ -1,4 +1,4 @@
-import type { ApiUser, AppNotification, ReportItem, ReportStatus, ReportTemplate, TaskComment, TaskItem, TaskStatus } from "./domain";
+import type { ApiUser, AppNotification, ProjectItem, ReportItem, ReportStatus, ReportTemplate, TaskComment, TaskItem, TaskStatus } from "./domain";
 
   const API_BASE_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:4000").replace(/\/+$/, "");
 
@@ -283,7 +283,40 @@ export const api = {
   },
 
   getProjects() {
-    return request<Array<{ id: string; name: string; description?: string | null; createdAt: string; updatedAt: string }>>("/projects");
+    return request<ProjectItem[]>("/projects");
+  },
+
+  getProjectsWithoutNumber() {
+    return request<ProjectItem[]>("/projects/without-number");
+  },
+
+  getProjectNumberingOptions() {
+    return request<{
+      companies: Array<{ label: string; code: string }>;
+      technicalUnits: Array<{ label: string; code: string }>;
+      subTechnicalUnits: Record<string, Array<{ label: string; code: string }>>;
+      workCategories: {
+        fieldHighwayTesting: Array<{ label: string; code: string }>;
+        default: Array<{ label: string; code: string }>;
+      };
+    }>("/projects/numbering-options");
+  },
+
+  previewProjectNumber(payload: { companyCode: string; technicalUnitCode: "T" | "S" | "D"; subTechnicalUnitCode: string }) {
+    return request<{ projectCodePrefix: string; financialYearShort: number; serialNumber: number; baseCode: string }>("/projects/preview-number", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+  },
+
+  assignProjectNumber(
+    projectId: string,
+    payload: { companyCode: string; technicalUnitCode: "T" | "S" | "D"; subTechnicalUnitCode: string; workCategoryCode: string }
+  ) {
+    return request<ProjectItem>(`/projects/${projectId}/assign-number`, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
   },
 
   getDprActivities() {
@@ -291,7 +324,7 @@ export const api = {
   },
 
   createProject(payload: { name: string; description?: string }) {
-    return request<{ id: string; name: string; description?: string | null; createdAt: string; updatedAt: string }>("/projects", {
+    return request<ProjectItem>("/projects", {
       method: "POST",
       body: JSON.stringify(payload)
     });

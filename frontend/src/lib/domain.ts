@@ -18,6 +18,23 @@ export type ApiUser = {
   role: Role;
 };
 
+export type ProjectItem = {
+  id: string;
+  name: string;
+  description?: string | null;
+  projectNumber?: string | null;
+  projectCodePrefix?: string | null;
+  companyCode?: string | null;
+  technicalUnitCode?: string | null;
+  subTechnicalUnitCode?: string | null;
+  workCategoryCode?: string | null;
+  financialYearShort?: number | null;
+  serialNumber?: number | null;
+  projectNumberAssignedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type TaskItem = {
   id: string;
   title: string;
