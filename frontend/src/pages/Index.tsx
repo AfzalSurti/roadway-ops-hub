@@ -25,7 +25,7 @@ const Index = () => {
       <header className="border-b border-border/60 bg-background/80 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src="/roadway-logo.svg" alt="RoadwayOps" className="h-9 w-9 rounded-lg" />
+            <img src="/roadway-logo.svg" alt="Sankalp" className="h-9 w-9 rounded-lg" />
             <div>
               <p className="text-lg font-semibold leading-none">Sankalp</p>
               <p className="text-xs text-muted-foreground mt-1">Task & Report Management</p>

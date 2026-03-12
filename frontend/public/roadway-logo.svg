@@ -1,7 +1,41 @@
 <svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="128" height="128" rx="28" fill="#0F172A"/>
-  <rect x="16" y="16" width="96" height="96" rx="22" fill="#0EA5E9" fill-opacity="0.15"/>
-  <path d="M38 96L52 32H76L90 96H72L68 78H60L56 96H38ZM62 62H66L64 50L62 62Z" fill="#38BDF8"/>
-  <path d="M30 88C45 75 58 70 70 70C82 70 95 75 108 88" stroke="#22D3EE" stroke-width="6" stroke-linecap="round"/>
-  <path d="M20 102C37 89 52 82 70 82C88 82 103 89 118 102" stroke="#7DD3FC" stroke-width="4" stroke-linecap="round" opacity="0.9"/>
+  <defs>
+    <linearGradient id="lineGrad" x1="16" y1="116" x2="112" y2="14" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#22D3EE"/>
+      <stop offset="1" stop-color="#10B981"/>
+    </linearGradient>
+    <radialGradient id="glowGrad" cx="64" cy="22" r="26" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#22D3EE" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#22D3EE" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#111827"/>
+      <stop offset="1" stop-color="#0d1520"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="128" height="128" rx="26" fill="url(#bgGrad)"/>
+
+  <!-- Subtle road surface fill -->
+  <path d="M 14 116 L 50 22 L 78 22 L 114 116 Z" fill="#1a2c44" fill-opacity="0.45"/>
+
+  <!-- Glow at vanishing point -->
+  <circle cx="64" cy="22" r="26" fill="url(#glowGrad)"/>
+
+  <!-- Left road edge -->
+  <line x1="14" y1="116" x2="50" y2="22" stroke="url(#lineGrad)" stroke-width="4.5" stroke-linecap="round"/>
+
+  <!-- Right road edge -->
+  <line x1="114" y1="116" x2="78" y2="22" stroke="url(#lineGrad)" stroke-width="4.5" stroke-linecap="round"/>
+
+  <!-- Center dashes — diminish with perspective -->
+  <line x1="64" y1="112" x2="64" y2="96" stroke="url(#lineGrad)" stroke-width="6" stroke-linecap="round"/>
+  <line x1="64" y1="85" x2="64" y2="71" stroke="url(#lineGrad)" stroke-width="5" stroke-linecap="round" opacity="0.82"/>
+  <line x1="64" y1="62" x2="64" y2="50" stroke="url(#lineGrad)" stroke-width="4" stroke-linecap="round" opacity="0.64"/>
+  <line x1="64" y1="43" x2="64" y2="33" stroke="url(#lineGrad)" stroke-width="3" stroke-linecap="round" opacity="0.45"/>
+
+  <!-- Destination dot at vanishing point -->
+  <circle cx="64" cy="22" r="6" fill="#22D3EE" opacity="0.95"/>
+  <circle cx="64" cy="22" r="3.2" fill="#10B981"/>
 </svg>
