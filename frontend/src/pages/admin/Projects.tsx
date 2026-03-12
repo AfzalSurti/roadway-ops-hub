@@ -340,7 +340,7 @@ export default function AdminProjects() {
       resetWizard();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to assign project number";
-      if (/route not found|404/i.test(message)) {
+      if (/route not found|404|unavailable/i.test(message)) {
         try {
           await api.updateProject(wizard.projectId, {
             projectNumber: finalProjectNumber,

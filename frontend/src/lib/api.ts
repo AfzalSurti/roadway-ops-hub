@@ -372,10 +372,34 @@ export const api = {
       >
     >
   ) {
-    return request<ProjectItem>(`/projects/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify(payload)
-    });
+    const candidates: Array<{ path: string; method: "PATCH" | "POST" }> = [
+      { path: `/projects/${id}`, method: "PATCH" },
+      { path: `/projects/update/${id}`, method: "PATCH" },
+      { path: `/projects/${id}/update`, method: "PATCH" },
+      { path: `/projects/${id}`, method: "POST" }
+    ];
+
+    const tryNext = async (index: number): Promise<ProjectItem> => {
+      if (index >= candidates.length) {
+        throw new Error("Project update API is unavailable on the configured backend.");
+      }
+
+      const candidate = candidates[index];
+      try {
+        return await request<ProjectItem>(candidate.path, {
+          method: candidate.method,
+          body: JSON.stringify(payload)
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Request failed";
+        if (/route not found|404|cannot patch|cannot post/i.test(message)) {
+          return tryNext(index + 1);
+        }
+        throw error;
+      }
+    };
+
+    return tryNext(0);
   },
 
   deleteProject(id: string) {
