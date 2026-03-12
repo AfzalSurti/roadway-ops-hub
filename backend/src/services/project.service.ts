@@ -149,7 +149,7 @@ export const projectService = {
 
     const base = await buildBaseCode(payload);
 
-    const validWorkCategoryCodes = payload.subTechnicalUnitCode === "FH"
+    const validWorkCategoryCodes: string[] = payload.subTechnicalUnitCode === "FH"
       ? FH_WORK_CATEGORY_OPTIONS.map((item) => item.code)
       : DEFAULT_WORK_CATEGORY_OPTIONS.map((item) => item.code);
     if (!validWorkCategoryCodes.includes(payload.workCategoryCode)) {
