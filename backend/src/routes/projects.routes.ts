@@ -16,6 +16,7 @@ projectsRouter.post("/preview-number", requireRole("ADMIN"), validate(previewPro
 projectsRouter.post("/number-preview", requireRole("ADMIN"), validate(previewProjectNumberSchema), asyncHandler(projectController.previewProjectNumber));
 projectsRouter.post("/:id/assign-number", requireRole("ADMIN"), validate(assignProjectNumberSchema), asyncHandler(projectController.assignProjectNumber));
 projectsRouter.post("/assign-number/:id", requireRole("ADMIN"), validate(assignProjectNumberSchema), asyncHandler(projectController.assignProjectNumber));
+projectsRouter.post("/:id/project-number", requireRole("ADMIN"), validate(assignProjectNumberSchema), asyncHandler(projectController.assignProjectNumber));
 projectsRouter.post("/", requireRole("ADMIN"), validate(createProjectSchema), asyncHandler(projectController.create));
 projectsRouter.patch("/:id", requireRole("ADMIN"), validate(updateProjectSchema), asyncHandler(projectController.update));
 projectsRouter.delete("/:id", requireRole("ADMIN"), asyncHandler(projectController.remove));
