@@ -18,6 +18,79 @@ type NumberWizardState = {
   baseCode: string;
 };
 
+const FALLBACK_COMPANIES = [
+  { label: "Geo Designs & Research Pvt. Ltd", code: "G" },
+  { label: "Sai Geotechnical Lab", code: "S" },
+  { label: "Inertia Engineering Solution", code: "I" },
+  { label: "Shree Hari Testing Lab", code: "H" }
+];
+
+const FALLBACK_TECHNICAL_UNITS = [
+  { label: "Testing Consultancy", code: "T" },
+  { label: "Supervision Consultancy", code: "S" },
+  { label: "Building Designs Consultancy", code: "D" }
+];
+
+const FALLBACK_SUB_TECHNICAL_UNITS: Record<string, Array<{ label: string; code: string }>> = {
+  T: [
+    { label: "Geotechnical Exploration", code: "GE" },
+    { label: "Laboratory Testing", code: "MT" },
+    { label: "Load Testing Services (Bridge/Pile)", code: "LT" },
+    { label: "Chemical Environment Testing", code: "CE" },
+    { label: "NDT", code: "ND" }
+  ],
+  S: [
+    { label: "Authority Engineer", code: "AE" },
+    { label: "Independent Engineer", code: "IE" },
+    { label: "Project Management Consultant", code: "PM" },
+    { label: "Third Party Inspection", code: "TP" },
+    { label: "Proof Checking", code: "PC" },
+    { label: "Field Highway Testing", code: "FH" },
+    { label: "Road Safety Audit", code: "RS" },
+    { label: "Environment Audit", code: "EA" }
+  ],
+  D: [
+    { label: "Architectural Design", code: "AR" },
+    { label: "Structural Design", code: "ST" },
+    { label: "BIM Services", code: "BM" },
+    { label: "Utilities Design Services", code: "UD" },
+    { label: "Quantity Survey & Estimation", code: "QS" },
+    { label: "Energy Audit Services", code: "EN" },
+    { label: "Green Building Services", code: "GB" },
+    { label: "Building Infrastructure Designs", code: "BU" },
+    { label: "Road Infrastructure Designs", code: "IR" },
+    { label: "Bridge Infrastructure Designs", code: "IB" },
+    { label: "Industrial Infrastructure & Park", code: "IS" },
+    { label: "Marine Infrastructure", code: "MS" },
+    { label: "Detail Design Infrastructure", code: "DD" },
+    { label: "Hydro Engineering", code: "HE" },
+    { label: "Tunnel Engineering", code: "TE" }
+  ]
+};
+
+const FALLBACK_FH_WORK_CATEGORIES = [
+  { label: "NSV Test", code: "N" },
+  { label: "FWD Test", code: "F" },
+  { label: "BBD Test", code: "B" },
+  { label: "Roughness Index (BI/IRI) Test", code: "I" },
+  { label: "Pavement Design", code: "P" },
+  { label: "Retro Reflectometer Test", code: "R" },
+  { label: "Topography / LiDAR Survey", code: "S" },
+  { label: "Traffic Survey (Incl. ATCC / TMC / Videography / Axel load etc.)", code: "T" },
+  { label: "Bridge Load Test", code: "L" },
+  { label: "Mobile Bridge Inspection Unit", code: "M" }
+];
+
+const FALLBACK_DEFAULT_WORK_CATEGORIES = [
+  { label: "Road", code: "R" },
+  { label: "Building", code: "B" },
+  { label: "Canal", code: "C" },
+  { label: "Irrigation", code: "I" },
+  { label: "Bridge", code: "G" },
+  { label: "Pre Bid", code: "P" },
+  { label: "Drainage", code: "D" }
+];
+
 const DEFAULT_WIZARD: NumberWizardState = {
   projectId: "",
   companyCode: "",
@@ -52,6 +125,9 @@ export default function AdminProjects() {
     queryKey: ["project-numbering-options"],
     queryFn: () => api.getProjectNumberingOptions()
   });
+
+  const resolvedCompanies = numberingOptions?.companies ?? FALLBACK_COMPANIES;
+  const resolvedTechnicalUnits = numberingOptions?.technicalUnits ?? FALLBACK_TECHNICAL_UNITS;
 
   const tasks = tasksData?.items ?? [];
 
@@ -100,15 +176,18 @@ export default function AdminProjects() {
   );
 
   const subTechnicalOptions = useMemo(() => {
-    if (!wizard.technicalUnitCode || !numberingOptions) return [];
-    return numberingOptions.subTechnicalUnits[wizard.technicalUnitCode] ?? [];
+    if (!wizard.technicalUnitCode) return [];
+    return (
+      numberingOptions?.subTechnicalUnits[wizard.technicalUnitCode] ??
+      FALLBACK_SUB_TECHNICAL_UNITS[wizard.technicalUnitCode] ??
+      []
+    );
   }, [wizard.technicalUnitCode, numberingOptions]);
 
   const workCategoryOptions = useMemo(() => {
-    if (!numberingOptions) return [];
     return wizard.subTechnicalUnitCode === "FH"
-      ? numberingOptions.workCategories.fieldHighwayTesting
-      : numberingOptions.workCategories.default;
+      ? numberingOptions?.workCategories.fieldHighwayTesting ?? FALLBACK_FH_WORK_CATEGORIES
+      : numberingOptions?.workCategories.default ?? FALLBACK_DEFAULT_WORK_CATEGORIES;
   }, [wizard.subTechnicalUnitCode, numberingOptions]);
 
   const currentCodePreview = useMemo(() => {
@@ -493,7 +572,7 @@ export default function AdminProjects() {
               <div className="space-y-3">
                 <p className="text-sm font-medium">a) Initial of Company Name (select one)</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {numberingOptions?.companies.map((item) => (
+                  {resolvedCompanies.map((item) => (
                     <button
                       key={item.code}
                       onClick={() => setWizard((prev) => ({ ...prev, companyCode: item.code as NumberWizardState["companyCode"] }))}
@@ -511,7 +590,7 @@ export default function AdminProjects() {
               <div className="space-y-3">
                 <p className="text-sm font-medium">b) Initial of Technical Unit (select one)</p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  {numberingOptions?.technicalUnits.map((item) => (
+                  {resolvedTechnicalUnits.map((item) => (
                     <button
                       key={item.code}
                       onClick={() =>
