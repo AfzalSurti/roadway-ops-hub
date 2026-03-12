@@ -35,7 +35,12 @@ export default function EmployeeTasks() {
       return label === selectedProject;
     });
 
-    return [...filtered].sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+    return [...filtered].sort((a, b) => {
+      const aDone = a.status === "DONE" ? 1 : 0;
+      const bDone = b.status === "DONE" ? 1 : 0;
+      if (aDone !== bDone) return aDone - bDone;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
   }, [myTasks, selectedProject]);
 
   const selectedTask = useMemo(

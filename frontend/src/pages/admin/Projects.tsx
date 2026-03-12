@@ -219,7 +219,12 @@ export default function AdminProjects() {
               <p className="text-sm font-medium mb-3">Tasks In This Project</p>
               {selectedProject.tasks.length ? (
                 <div className="space-y-2">
-                  {selectedProject.tasks.map((task) => (
+                  {[...selectedProject.tasks].sort((a, b) => {
+                    const aDone = a.status === "DONE" ? 1 : 0;
+                    const bDone = b.status === "DONE" ? 1 : 0;
+                    if (aDone !== bDone) return aDone - bDone;
+                    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+                  }).map((task) => (
                     <div key={task.id} className="rounded-xl border border-border/40 bg-secondary/20 p-3">
                       <div className="flex items-start justify-between gap-3">
                         <div>

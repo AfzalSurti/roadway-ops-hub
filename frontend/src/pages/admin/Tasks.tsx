@@ -153,9 +153,10 @@ export default function AdminTasks() {
 
   const sortedTasks = useMemo(() => {
     return [...filtered].sort((a, b) => {
-      const dueA = new Date(a.dueDate).getTime();
-      const dueB = new Date(b.dueDate).getTime();
-      return dueA - dueB;
+      const aDone = a.status === "DONE" ? 1 : 0;
+      const bDone = b.status === "DONE" ? 1 : 0;
+      if (aDone !== bDone) return aDone - bDone;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
   }, [filtered]);
 

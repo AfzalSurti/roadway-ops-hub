@@ -30,14 +30,19 @@ export default function EmployeeDashboard() {
   }, [myTasks]);
 
   const tasksByProject = useMemo(() => {
-    const base = pendingTasks.filter((task) => {
+    const base = myTasks.filter((task) => {
       if (selectedProject === "ALL") return true;
       const label = task.projectNumber?.trim() || task.projectCode?.trim() || task.project?.trim();
       return label === selectedProject;
     });
 
-    return [...base].sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
-  }, [pendingTasks, selectedProject]);
+    return [...base].sort((a, b) => {
+      const aDone = a.status === "DONE" ? 1 : 0;
+      const bDone = b.status === "DONE" ? 1 : 0;
+      if (aDone !== bDone) return aDone - bDone;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+  }, [myTasks, selectedProject]);
 
   const kpis = [
     { label: "My Tasks", value: myTasks.length, icon: ListTodo, color: "text-primary", bg: "bg-primary/10" },
