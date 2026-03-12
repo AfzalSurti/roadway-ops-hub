@@ -13,6 +13,8 @@ projectsRouter.get("/", asyncHandler(projectController.list));
 projectsRouter.get("/without-number", requireRole("ADMIN"), asyncHandler(projectController.listWithoutNumber));
 projectsRouter.get("/numbering-options", requireRole("ADMIN"), asyncHandler(projectController.numberingOptions));
 projectsRouter.post("/preview-number", requireRole("ADMIN"), validate(previewProjectNumberSchema), asyncHandler(projectController.previewProjectNumber));
+projectsRouter.post("/number-preview", requireRole("ADMIN"), validate(previewProjectNumberSchema), asyncHandler(projectController.previewProjectNumber));
 projectsRouter.post("/:id/assign-number", requireRole("ADMIN"), validate(assignProjectNumberSchema), asyncHandler(projectController.assignProjectNumber));
+projectsRouter.post("/assign-number/:id", requireRole("ADMIN"), validate(assignProjectNumberSchema), asyncHandler(projectController.assignProjectNumber));
 projectsRouter.post("/", requireRole("ADMIN"), validate(createProjectSchema), asyncHandler(projectController.create));
 projectsRouter.delete("/:id", requireRole("ADMIN"), asyncHandler(projectController.remove));

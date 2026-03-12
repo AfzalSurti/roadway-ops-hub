@@ -276,28 +276,28 @@ export default function AdminProjects() {
       }
 
       const projectCodePrefix = `${wizard.companyCode}${wizard.technicalUnitCode}${wizard.subTechnicalUnitCode}`;
+      const fy = getFinancialYearShort();
+      const fyText = String(fy).padStart(2, "0");
 
-      try {
-        const preview = await api.previewProjectNumber({
-          companyCode: wizard.companyCode,
-          technicalUnitCode: wizard.technicalUnitCode,
-          subTechnicalUnitCode: wizard.subTechnicalUnitCode
-        });
-        setWizard((prev) => ({ ...prev, baseCode: preview.baseCode }));
-      } catch (error) {
-        // Fallback: derive FY+serial locally if preview endpoint is unavailable in current deployment.
-        const fy = getFinancialYearShort();
-        const fyText = String(fy).padStart(2, "0");
-        const maxSerial = projects
-          .filter((project) => project.projectCodePrefix === projectCodePrefix && project.financialYearShort === fy)
-          .reduce((max, project) => Math.max(max, project.serialNumber ?? 0), 0);
-        const nextSerial = String(maxSerial + 1).padStart(2, "0");
-        const baseCode = `${projectCodePrefix}${fyText}${nextSerial}`;
-        setWizard((prev) => ({ ...prev, baseCode }));
+      // Use persisted fields when available; otherwise infer from existing projectNumber format.
+      const maxSerial = projects
+        .map((project) => {
+          if (project.projectCodePrefix === projectCodePrefix && project.financialYearShort === fy) {
+            return project.serialNumber ?? 0;
+          }
+          const number = project.projectNumber?.trim();
+          if (!number) return 0;
+          const match = number.match(/^([A-Z]{4})(\d{2})(\d{2})[A-Z]$/);
+          if (!match) return 0;
+          const [, prefix, year, serial] = match;
+          if (prefix !== projectCodePrefix || Number(year) !== fy) return 0;
+          return Number(serial) || 0;
+        })
+        .reduce((max, value) => Math.max(max, value), 0);
 
-        const message = error instanceof Error ? error.message : "Preview route unavailable";
-        toast.warning(`${message}. Generated preview locally for now.`);
-      }
+      const nextSerial = String(maxSerial + 1).padStart(2, "0");
+      const baseCode = `${projectCodePrefix}${fyText}${nextSerial}`;
+      setWizard((prev) => ({ ...prev, baseCode }));
     }
 
     setWizardStep((prev) => {
@@ -320,9 +320,6 @@ export default function AdminProjects() {
     }
 
     const finalProjectNumber = `${wizard.baseCode}${wizard.workCategoryCode}`;
-    const projectCodePrefix = `${wizard.companyCode}${wizard.technicalUnitCode}${wizard.subTechnicalUnitCode}`;
-    const financialYearShort = Number(wizard.baseCode.slice(4, 6));
-    const serialNumber = Number(wizard.baseCode.slice(6, 8));
 
     try {
       setAssigningNumber(true);
@@ -332,7 +329,7 @@ export default function AdminProjects() {
         subTechnicalUnitCode: wizard.subTechnicalUnitCode,
         workCategoryCode: wizard.workCategoryCode
       });
-      await refetchProjects();
+      await Promise.all([refetchProjects(), queryClient.invalidateQueries({ queryKey: ["projects"] })]);
       setGeneratedProjectNumber(finalProjectNumber);
       setGeneratedProjectName(wizardProject?.name ?? "Project");
       setShowGeneratedModal(true);
@@ -340,35 +337,10 @@ export default function AdminProjects() {
       resetWizard();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to assign project number";
-      const routeMissing = /route not found|404/i.test(message);
-
-      if (routeMissing) {
-        queryClient.setQueryData(["projects"], (prev: unknown) => {
-          if (!Array.isArray(prev)) return prev;
-          return prev.map((project: any) => {
-            if (project.id !== wizard.projectId) return project;
-            return {
-              ...project,
-              projectNumber: finalProjectNumber,
-              projectCodePrefix,
-              companyCode: wizard.companyCode,
-              technicalUnitCode: wizard.technicalUnitCode,
-              subTechnicalUnitCode: wizard.subTechnicalUnitCode,
-              workCategoryCode: wizard.workCategoryCode,
-              financialYearShort,
-              serialNumber,
-              projectNumberAssignedAt: new Date().toISOString()
-            };
-          });
-        });
-        setGeneratedProjectNumber(finalProjectNumber);
-        setGeneratedProjectName(wizardProject?.name ?? "Project");
-        setShowGeneratedModal(true);
-        toast.success("Project number generated");
-        resetWizard();
+      if (/route not found|404/i.test(message)) {
+        toast.error("Assign-number API is missing on backend deployment. Please redeploy backend with latest routes.");
         return;
       }
-
       toast.error(message);
     } finally {
       setAssigningNumber(false);
