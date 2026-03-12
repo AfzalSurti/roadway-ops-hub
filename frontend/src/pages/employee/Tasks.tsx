@@ -101,7 +101,7 @@ export default function EmployeeTasks() {
     <PageWrapper>
       <div className="page-header">
         <h1 className="page-title">My Tasks</h1>
-        <p className="page-subtitle">Tasks assigned to you (sorted by due date)</p>
+
       </div>
 
       <div className="mb-4">
