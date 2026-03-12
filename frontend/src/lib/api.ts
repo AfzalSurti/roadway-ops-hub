@@ -97,10 +97,18 @@ async function request<T>(path: string, init: RequestInit = {}, useAuth = true, 
     }
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers
-  });
+  const doFetch = (targetPath: string) =>
+    fetch(`${API_BASE_URL}${targetPath}`, {
+      ...init,
+      headers
+    });
+
+  let response = await doFetch(path);
+
+  // Some deployments expose routes under /api. Retry once on 404.
+  if (response.status === 404 && !path.startsWith("/api/")) {
+    response = await doFetch(`/api${path}`);
+  }
 
   if (response.status === 401 && useAuth && retryOnUnauthorized) {
     try {
