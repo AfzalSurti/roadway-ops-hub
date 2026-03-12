@@ -181,10 +181,31 @@ export const taskService = {
     }
 
     const admins = await userRepository.findAdmins();
+    const assignedOn = new Date(task.allocatedAt ?? task.createdAt).toLocaleString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+    const submittedOn = submittedAt.toLocaleString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+    const dueOn = new Date(task.dueDate).toLocaleString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
     await notificationService.notifyUsers({
       userIds: admins.map((admin) => admin.id),
       title: "Task Submitted",
-      message: `${task.title} was submitted by employee for approval.${note?.trim() ? ` Note: ${note.trim().slice(0, 80)}` : ""}`,
+      message: `Submitted by ${task.assignedTo?.name ?? "Employee"} | Project: ${task.project} | Task: ${task.title} | Assigned: ${assignedOn} | Submitted: ${submittedOn} | Due: ${dueOn}${note?.trim() ? ` | Note: ${note.trim().slice(0, 120)}` : ""}`,
       entityType: "Task",
       entityId: taskId
     });
@@ -277,10 +298,17 @@ export const taskService = {
     });
 
     const admins = await userRepository.findAdmins();
+    const resubmittedOn = resubmittedAt.toLocaleString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
     await notificationService.notifyUsers({
       userIds: admins.map((admin) => admin.id),
       title: "Comment Acknowledged",
-      message: `${task.title}: employee accepted your comment and resubmitted task.`,
+      message: `${task.assignedTo?.name ?? "Employee"} resubmitted task "${task.title}" for project "${task.project}" at ${resubmittedOn}.`,
       entityType: "Task",
       entityId: taskId
     });
