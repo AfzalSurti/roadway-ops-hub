@@ -313,10 +313,33 @@ export const api = {
     projectId: string,
     payload: { companyCode: string; technicalUnitCode: "T" | "S" | "D"; subTechnicalUnitCode: string; workCategoryCode: string }
   ) {
-    return request<ProjectItem>(`/projects/${projectId}/assign-number`, {
-      method: "POST",
-      body: JSON.stringify(payload)
-    });
+    const candidates = [
+      `/projects/${projectId}/assign-number`,
+      `/projects/assign-number/${projectId}`,
+      `/projects/${projectId}/number`,
+      `/projects/${projectId}/project-number`
+    ];
+
+    const tryNext = async (index: number): Promise<ProjectItem> => {
+      if (index >= candidates.length) {
+        throw new Error("Assign-number API is unavailable on the configured backend.");
+      }
+
+      try {
+        return await request<ProjectItem>(candidates[index], {
+          method: "POST",
+          body: JSON.stringify(payload)
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Request failed";
+        if (/route not found|404|cannot post/i.test(message)) {
+          return tryNext(index + 1);
+        }
+        throw error;
+      }
+    };
+
+    return tryNext(0);
   },
 
   getDprActivities() {
