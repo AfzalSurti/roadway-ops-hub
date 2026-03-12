@@ -353,6 +353,31 @@ export const api = {
     });
   },
 
+  updateProject(
+    id: string,
+    payload: Partial<
+      Pick<
+        ProjectItem,
+        | "name"
+        | "description"
+        | "projectNumber"
+        | "projectCodePrefix"
+        | "companyCode"
+        | "technicalUnitCode"
+        | "subTechnicalUnitCode"
+        | "workCategoryCode"
+        | "financialYearShort"
+        | "serialNumber"
+        | "projectNumberAssignedAt"
+      >
+    >
+  ) {
+    return request<ProjectItem>(`/projects/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    });
+  },
+
   deleteProject(id: string) {
     return request<{ deleted: boolean }>(`/projects/${id}`, {
       method: "DELETE"

@@ -320,6 +320,9 @@ export default function AdminProjects() {
     }
 
     const finalProjectNumber = `${wizard.baseCode}${wizard.workCategoryCode}`;
+    const projectCodePrefix = `${wizard.companyCode}${wizard.technicalUnitCode}${wizard.subTechnicalUnitCode}`;
+    const financialYearShort = Number(wizard.baseCode.slice(4, 6));
+    const serialNumber = Number(wizard.baseCode.slice(6, 8));
 
     try {
       setAssigningNumber(true);
@@ -338,8 +341,30 @@ export default function AdminProjects() {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to assign project number";
       if (/route not found|404/i.test(message)) {
-        toast.error("Assign-number API is missing on backend deployment. Please redeploy backend with latest routes.");
-        return;
+        try {
+          await api.updateProject(wizard.projectId, {
+            projectNumber: finalProjectNumber,
+            projectCodePrefix,
+            companyCode: wizard.companyCode,
+            technicalUnitCode: wizard.technicalUnitCode,
+            subTechnicalUnitCode: wizard.subTechnicalUnitCode,
+            workCategoryCode: wizard.workCategoryCode,
+            financialYearShort,
+            serialNumber,
+            projectNumberAssignedAt: new Date().toISOString()
+          });
+          await Promise.all([refetchProjects(), queryClient.invalidateQueries({ queryKey: ["projects"] })]);
+          setGeneratedProjectNumber(finalProjectNumber);
+          setGeneratedProjectName(wizardProject?.name ?? "Project");
+          setShowGeneratedModal(true);
+          toast.success("Project number generated");
+          resetWizard();
+          return;
+        } catch (fallbackError) {
+          const fallbackMessage = fallbackError instanceof Error ? fallbackError.message : "Failed to persist project number";
+          toast.error(fallbackMessage);
+          return;
+        }
       }
       toast.error(message);
     } finally {

@@ -181,6 +181,44 @@ export const projectService = {
       description: payload.description
     });
   },
+  async update(
+    id: string,
+    payload: {
+      name?: string;
+      description?: string;
+      projectNumber?: string;
+      projectCodePrefix?: string;
+      companyCode?: string;
+      technicalUnitCode?: string;
+      subTechnicalUnitCode?: string;
+      workCategoryCode?: string;
+      financialYearShort?: number;
+      serialNumber?: number;
+      projectNumberAssignedAt?: Date;
+    }
+  ) {
+    const existing = await projectRepository.findById(id);
+    if (!existing) {
+      throw notFound("Project not found");
+    }
+
+    if (payload.name && payload.name !== existing.name) {
+      const byName = await projectRepository.findByName(payload.name);
+      if (byName && byName.id !== id) {
+        throw conflict("Project with this name already exists");
+      }
+    }
+
+    if (payload.projectNumber && payload.projectNumber !== existing.projectNumber) {
+      const duplicate = await projectRepository.findMany();
+      const numberExists = duplicate.some((project) => project.id !== id && project.projectNumber === payload.projectNumber);
+      if (numberExists) {
+        throw conflict("Project number already exists");
+      }
+    }
+
+    return projectRepository.update(id, payload);
+  },
   async remove(id: string) {
     const existing = await projectRepository.findById(id);
     if (!existing) {

@@ -27,6 +27,10 @@ export const projectController = {
     const project = await projectService.create(req.body);
     return sendSuccess(res, project, 201);
   },
+  async update(req: Request, res: Response) {
+    const project = await projectService.update(req.params.id, req.body);
+    return sendSuccess(res, project);
+  },
   async remove(req: Request, res: Response) {
     const result = await projectService.remove(req.params.id);
     return sendSuccess(res, result);

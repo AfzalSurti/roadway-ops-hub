@@ -20,6 +20,9 @@ export const projectRepository = {
   create(data: Prisma.ProjectCreateInput) {
     return prisma.project.create({ data });
   },
+  update(id: string, data: Prisma.ProjectUncheckedUpdateInput) {
+    return prisma.project.update({ where: { id }, data });
+  },
   findMaxSerialForPrefixYear(projectCodePrefix: string, financialYearShort: number) {
     return prisma.project.findFirst({
       where: {

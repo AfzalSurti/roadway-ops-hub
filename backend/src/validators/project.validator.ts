@@ -5,6 +5,22 @@ export const createProjectSchema = z.object({
   description: z.string().optional()
 });
 
+export const updateProjectSchema = z
+  .object({
+    name: z.string().min(2).optional(),
+    description: z.string().optional(),
+    projectNumber: z.string().trim().min(1).optional(),
+    projectCodePrefix: z.string().trim().min(1).optional(),
+    companyCode: z.string().trim().min(1).optional(),
+    technicalUnitCode: z.string().trim().min(1).optional(),
+    subTechnicalUnitCode: z.string().trim().min(1).optional(),
+    workCategoryCode: z.string().trim().min(1).optional(),
+    financialYearShort: z.coerce.number().int().min(0).max(99).optional(),
+    serialNumber: z.coerce.number().int().min(1).optional(),
+    projectNumberAssignedAt: z.coerce.date().optional()
+  })
+  .refine((payload) => Object.keys(payload).length > 0, "At least one field is required");
+
 const companyCodeSchema = z.enum(["G", "S", "I", "H"]);
 const technicalUnitCodeSchema = z.enum(["T", "S", "D"]);
 const subTechnicalUnitCodeSchema = z.enum([

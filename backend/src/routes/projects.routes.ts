@@ -4,7 +4,7 @@ import { requireAuth } from "../middleware/auth.js";
 import { requireRole } from "../middleware/rbac.js";
 import { validate } from "../middleware/validate.js";
 import { asyncHandler } from "../utils/async-handler.js";
-import { assignProjectNumberSchema, createProjectSchema, previewProjectNumberSchema } from "../validators/project.validator.js";
+import { assignProjectNumberSchema, createProjectSchema, previewProjectNumberSchema, updateProjectSchema } from "../validators/project.validator.js";
 
 export const projectsRouter = Router();
 
@@ -17,4 +17,5 @@ projectsRouter.post("/number-preview", requireRole("ADMIN"), validate(previewPro
 projectsRouter.post("/:id/assign-number", requireRole("ADMIN"), validate(assignProjectNumberSchema), asyncHandler(projectController.assignProjectNumber));
 projectsRouter.post("/assign-number/:id", requireRole("ADMIN"), validate(assignProjectNumberSchema), asyncHandler(projectController.assignProjectNumber));
 projectsRouter.post("/", requireRole("ADMIN"), validate(createProjectSchema), asyncHandler(projectController.create));
+projectsRouter.patch("/:id", requireRole("ADMIN"), validate(updateProjectSchema), asyncHandler(projectController.update));
 projectsRouter.delete("/:id", requireRole("ADMIN"), asyncHandler(projectController.remove));
