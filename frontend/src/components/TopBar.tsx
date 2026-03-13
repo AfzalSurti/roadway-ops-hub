@@ -1,4 +1,4 @@
-import { Bell, Search } from "lucide-react";
+import { Bell, Search, X } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
@@ -37,10 +37,11 @@ export function TopBar() {
   };
 
   const openDetails = async (item: AppNotification) => {
+    setOpen(false);
     setSelectedNotification(item);
     setComment("");
     if (!item.isRead) {
-      await markOneRead(item.id);
+      void markOneRead(item.id);
     }
   };
 
@@ -135,8 +136,14 @@ export function TopBar() {
           </div>
         )}
         {selectedNotification && (
-          <div className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="w-full max-w-2xl rounded-2xl border border-border/50 bg-background shadow-xl p-5">
+          <div
+            className="fixed inset-0 z-[90] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={() => setSelectedNotification(null)}
+          >
+            <div
+              className="w-full max-w-2xl rounded-2xl border border-border/50 bg-background shadow-xl p-5"
+              onClick={(event) => event.stopPropagation()}
+            >
               <div className="flex items-start justify-between gap-3 mb-4">
                 <div>
                   <p className="text-base font-semibold">{selectedNotification.title}</p>
@@ -144,9 +151,11 @@ export function TopBar() {
                 </div>
                 <button
                   onClick={() => setSelectedNotification(null)}
-                  className="text-xs px-2 py-1 rounded-md bg-secondary/60 hover:bg-secondary"
+                  className="p-2 rounded-md bg-secondary/60 hover:bg-secondary"
+                  aria-label="Close notification details"
+                  title="Close"
                 >
-                  Close
+                  <X className="h-4 w-4" />
                 </button>
               </div>
 
