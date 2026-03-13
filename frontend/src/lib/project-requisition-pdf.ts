@@ -19,8 +19,8 @@ function toDisplay(value?: string | number | null) {
 }
 
 function drawTextInBox(doc: jsPDF, text: string, x: number, y: number, w: number, h: number, opts?: { fontSize?: number; lineHeight?: number; align?: "left" | "center" | "right" }) {
-  const fontSize = opts?.fontSize ?? 7;
-  const lineHeight = opts?.lineHeight ?? 3.2;
+  const fontSize = opts?.fontSize ?? 7.8;
+  const lineHeight = opts?.lineHeight ?? 3.6;
   const align = opts?.align ?? "left";
   const usableW = Math.max(1, w - 1.8);
   const usableH = Math.max(1, h - 1.8);
@@ -56,29 +56,30 @@ function drawField(doc: jsPDF, args: { x: number; y: number; w: number; h: numbe
   doc.rect(x, y, w, h);
   doc.line(x + labelW, y, x + labelW, y + h);
   doc.setFont("times", "bold");
-  drawTextInBox(doc, label, x, y, labelW, h, { fontSize: 6.8, lineHeight: 3.1 });
+  drawTextInBox(doc, label, x, y, labelW, h, { fontSize: 7.2, lineHeight: 3.4 });
   doc.setFont("times", "normal");
-  drawTextInBox(doc, value, x + labelW, y, valueW, h, { fontSize: 7, lineHeight: 3.2, align: valueAlign });
+  drawTextInBox(doc, value, x + labelW, y, valueW, h, { fontSize: 7.6, lineHeight: 3.6, align: valueAlign });
 }
 
 export function downloadProjectRequisitionPdf(form: ProjectRequisitionFormItem, projectName: string) {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
-  const margin = 8;
+  const pageH = doc.internal.pageSize.getHeight();
+  const margin = 4;
   const contentW = pageW - margin * 2;
 
-  doc.setLineWidth(0.3);
-  doc.rect(margin, margin, contentW, 194);
+  doc.setLineWidth(0.35);
+  doc.rect(margin, margin, contentW, pageH - margin * 2);
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(12);
-  doc.text("PROJECT NO. REQUISITION FORM", margin + contentW / 2, 14, { align: "center" });
+  doc.setFontSize(14);
+  doc.text("PROJECT NO. REQUISITION FORM", margin + contentW / 2, 12.5, { align: "center" });
 
   drawField(doc, {
     x: margin + contentW - 72,
-    y: 9,
+    y: 6,
     w: 68,
-    h: 8,
+    h: 10,
     label: "Application Date",
     value: fmtDate(form.applicationDate),
     labelRatio: 0.55,
@@ -86,11 +87,11 @@ export function downloadProjectRequisitionPdf(form: ProjectRequisitionFormItem, 
   });
 
   const x = margin + 2;
-  let y = 20;
+  let y = 18;
   const totalW = contentW - 4;
   const leftW = 178;
   const rightW = totalW - leftW;
-  const rowH = 8;
+  const rowH = 10;
 
   drawField(doc, { x, y, w: 86, h: rowH, label: "Cost Centre / Dept", value: toDisplay(form.costCentreDepartment), labelRatio: 0.47, valueAlign: "center" });
   drawField(doc, { x: x + 86, y, w: 52, h: rowH, label: "Name of HOD / DIR", value: toDisplay(form.hodDirectorName), labelRatio: 0.54, valueAlign: "center" });
@@ -106,8 +107,8 @@ export function downloadProjectRequisitionPdf(form: ProjectRequisitionFormItem, 
   drawField(doc, { x: x + leftW, y, w: rightW, h: rowH, label: "GST Number", value: toDisplay(form.gstNumber), labelRatio: 0.42 });
 
   y += rowH;
-  drawField(doc, { x, y, w: leftW - 42, h: 16, label: "Address with Pin Code", value: toDisplay(form.addressWithPincode), labelRatio: 0.28 });
-  drawField(doc, { x: x + leftW - 42, y, w: 42, h: 16, label: "Pincode", value: toDisplay(form.pincode), labelRatio: 0.44, valueAlign: "center" });
+  drawField(doc, { x, y, w: leftW - 42, h: rowH * 2, label: "Address with Pin Code", value: toDisplay(form.addressWithPincode), labelRatio: 0.28 });
+  drawField(doc, { x: x + leftW - 42, y, w: 42, h: rowH * 2, label: "Pincode", value: toDisplay(form.pincode), labelRatio: 0.44, valueAlign: "center" });
   drawField(doc, { x: x + leftW, y, w: rightW, h: rowH, label: "Contact Name", value: toDisplay(form.contactName), labelRatio: 0.42 });
 
   y += rowH;
@@ -139,7 +140,7 @@ export function downloadProjectRequisitionPdf(form: ProjectRequisitionFormItem, 
   drawField(doc, { x: x + leftW, y, w: rightW, h: rowH, label: "Project Completion Date", value: fmtDate(form.projectCompletionDate), labelRatio: 0.58, valueAlign: "center" });
 
   y += rowH;
-  drawField(doc, { x, y, w: leftW, h: 20, label: "Name of Work", value: toDisplay(form.nameOfWork), labelRatio: 0.18 });
+  drawField(doc, { x, y, w: leftW, h: 26, label: "Name of Work", value: toDisplay(form.nameOfWork), labelRatio: 0.18 });
   drawField(doc, { x: x + leftW, y, w: rightW, h: rowH, label: "Location (District)", value: toDisplay(form.locationDistrict), labelRatio: 0.58 });
 
   y += rowH;
@@ -159,19 +160,19 @@ export function downloadProjectRequisitionPdf(form: ProjectRequisitionFormItem, 
   drawField(doc, { x: x + leftW, y, w: rightW / 2, h: rowH, label: "P.G. Date", value: fmtDate(form.pgDate), labelRatio: 0.54, valueAlign: "center" });
   drawField(doc, { x: x + leftW + rightW / 2, y, w: rightW / 2, h: rowH, label: "P.G. Expiry Date", value: fmtDate(form.pgExpiryDate), labelRatio: 0.58, valueAlign: "center" });
 
-  const footerY = 182;
+  const footerY = 194;
   doc.setFont("times", "bold");
-  doc.setFontSize(8);
+  doc.setFontSize(9);
   doc.text("MANAGER ADMINISTRATION", x + 34, footerY);
   doc.text("CHECKED BY", x + 36, footerY + 7);
   doc.text("APPROVED BY", x + leftW + rightW - 42, footerY + 7);
 
   doc.setFont("times", "normal");
-  doc.setFontSize(7);
-  doc.text("Name & Signature:", x + 2, 198);
-  doc.line(x + 34, 198, x + 88, 198);
-  doc.text("Signature:", x + leftW + rightW - 64, 198);
-  doc.line(x + leftW + rightW - 40, 198, x + leftW + rightW - 2, 198);
+  doc.setFontSize(7.6);
+  doc.text("Name & Signature:", x + 2, 204);
+  doc.line(x + 34, 204, x + 88, 204);
+  doc.text("Signature:", x + leftW + rightW - 64, 204);
+  doc.line(x + leftW + rightW - 40, 204, x + leftW + rightW - 2, 204);
 
   doc.save(`${projectName.replace(/\s+/g, "-").toLowerCase()}-project-requisition-form.pdf`);
 }
