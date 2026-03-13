@@ -63,13 +63,21 @@ export const authStorage = {
 
 let refreshPromise: Promise<string> | null = null;
 
+async function fetchWithApiFallback(path: string, init: RequestInit) {
+  let response = await fetch(`${API_BASE_URL}${path}`, init);
+  if (response.status === 404 && !path.startsWith("/api/")) {
+    response = await fetch(`${API_BASE_URL}/api${path}`, init);
+  }
+  return response;
+}
+
 async function refreshAccessToken(): Promise<string> {
   const refreshToken = authStorage.getRefreshToken();
   if (!refreshToken) {
     throw new Error("Session expired. Please login again.");
   }
 
-  const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+  const response = await fetchWithApiFallback("/auth/refresh", {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
@@ -77,7 +85,13 @@ async function refreshAccessToken(): Promise<string> {
     body: JSON.stringify({ refreshToken })
   });
 
-  const json = (await response.json()) as ApiResponse<{ accessToken: string }>;
+  let json: ApiResponse<{ accessToken: string }>;
+  try {
+    json = (await response.json()) as ApiResponse<{ accessToken: string }>;
+  } catch {
+    throw new Error("Session expired. Please login again.");
+  }
+
   if (!response.ok || !json.success || !json.data?.accessToken) {
     throw new Error(json.error?.message ?? "Session expired. Please login again.");
   }
