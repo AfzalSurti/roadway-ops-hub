@@ -30,7 +30,14 @@ export const SUB_TECHNICAL_UNIT_OPTIONS = {
     { label: "Proof Checking", code: "PC" },
     { label: "Field Highway Testing", code: "FH" },
     { label: "Road Safety Audit", code: "RS" },
-    { label: "Environment Audit", code: "EA" }
+    { label: "Environment Audit", code: "EA" },
+    { label: "Road Infrastructure Designs", code: "IR" },
+    { label: "Bridge Infrastructure Designs", code: "IB" },
+    { label: "Industrial Infrastructure & Park", code: "IS" },
+    { label: "Marine Infrastructure", code: "MS" },
+    { label: "Detail Design Infrastructure", code: "DD" },
+    { label: "Hydro Engineering", code: "HE" },
+    { label: "Tunnel Engineering", code: "TE" }
   ],
   D: [
     { label: "Architectural Design", code: "AR" },
@@ -40,14 +47,7 @@ export const SUB_TECHNICAL_UNIT_OPTIONS = {
     { label: "Quantity Survey & Estimation", code: "QS" },
     { label: "Energy Audit Services", code: "EN" },
     { label: "Green Building Services", code: "GB" },
-    { label: "Building Infrastructure Designs", code: "BU" },
-    { label: "Road Infrastructure Designs", code: "IR" },
-    { label: "Bridge Infrastructure Designs", code: "IB" },
-    { label: "Industrial Infrastructure & Park", code: "IS" },
-    { label: "Marine Infrastructure", code: "MS" },
-    { label: "Detail Design Infrastructure", code: "DD" },
-    { label: "Hydro Engineering", code: "HE" },
-    { label: "Tunnel Engineering", code: "TE" }
+    { label: "Building Infrastructure Designs", code: "BU" }
   ]
 } as const;
 
