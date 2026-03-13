@@ -1,4 +1,4 @@
-import type { ApiUser, AppNotification, ProjectItem, ReportItem, ReportStatus, ReportTemplate, TaskComment, TaskItem, TaskStatus } from "./domain";
+import type { ApiUser, AppNotification, ProjectItem, ProjectRequisitionFormItem, ReportItem, ReportStatus, ReportTemplate, TaskComment, TaskItem, TaskStatus } from "./domain";
 
   const API_BASE_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:4000").replace(/\/+$/, "");
 
@@ -292,6 +292,24 @@ export const api = {
 
   getProjects() {
     return request<ProjectItem[]>("/projects");
+  },
+
+  getProjectRequisitionForms() {
+    return request<ProjectRequisitionFormItem[]>("/project-requisition-forms");
+  },
+
+  getProjectRequisitionForm(projectId: string) {
+    return request<ProjectRequisitionFormItem>(`/project-requisition-forms/${projectId}`);
+  },
+
+  upsertProjectRequisitionForm(
+    projectId: string,
+    payload: Omit<ProjectRequisitionFormItem, "id" | "projectId" | "createdAt" | "updatedAt">
+  ) {
+    return request<ProjectRequisitionFormItem>(`/project-requisition-forms/${projectId}`, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
   },
 
   getProjectsWithoutNumber() {

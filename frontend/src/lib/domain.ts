@@ -35,6 +35,48 @@ export type ProjectItem = {
   updatedAt: string;
 };
 
+export type ProjectRequisitionFormItem = {
+  id: string;
+  projectId: string;
+  costCentreDepartment: string;
+  hodDirectorName: string;
+  applicationDate: string;
+  clientName: string;
+  billingName: string;
+  addressWithPincode: string;
+  pincode: string;
+  gstNumber: string;
+  gstType: "REGISTERED" | "UNREGISTERED";
+  contactName: string;
+  contactNumber: string;
+  designation: string;
+  department: string;
+  panTanNumber: string;
+  email: string;
+  workOrderValue: string;
+  workOrderDate?: string | null;
+  agreementNumber?: string | null;
+  agreementDate?: string | null;
+  projectStartingDate: string;
+  projectDurationDays: number;
+  projectCompletionDate: string;
+  workOrderNumber: string;
+  newProjectNumber: string;
+  amountOfWorkOrder: string;
+  gstAmount: string;
+  emdAmount: string;
+  pgSdAmount: string;
+  pgDate?: string | null;
+  pgExpiryDate?: string | null;
+  nameOfWork: string;
+  locationDistrict: string;
+  state: string;
+  approvedProjectNumber: string;
+  approvedBy: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type TaskItem = {
   id: string;
   title: string;

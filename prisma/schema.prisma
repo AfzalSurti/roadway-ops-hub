@@ -99,11 +99,58 @@ model Project {
   financialYearShort    Int?
   serialNumber          Int?
   projectNumberAssignedAt DateTime?
+  requisitionForm       ProjectRequisitionForm?
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
   @@index([name])
   @@index([projectCodePrefix, financialYearShort])
+}
+
+model ProjectRequisitionForm {
+  id                   String   @id @default(cuid())
+  projectId            String   @unique
+  costCentreDepartment String
+  hodDirectorName      String
+  applicationDate      DateTime
+  clientName           String
+  billingName          String
+  addressWithPincode   String
+  pincode              String
+  gstNumber            String
+  gstType              String
+  contactName          String
+  contactNumber        String
+  designation          String
+  department           String
+  panTanNumber         String
+  email                String
+  workOrderValue       String
+  workOrderDate        DateTime?
+  agreementNumber      String?
+  agreementDate        DateTime?
+  projectStartingDate  DateTime
+  projectDurationDays  Int
+  projectCompletionDate DateTime
+  workOrderNumber      String
+  newProjectNumber     String
+  amountOfWorkOrder    String
+  gstAmount            String
+  emdAmount            String
+  pgSdAmount           String
+  pgDate               DateTime?
+  pgExpiryDate         DateTime?
+  nameOfWork           String
+  locationDistrict     String
+  state                String
+  approvedProjectNumber String
+  approvedBy           String
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  project              Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@map("project_requisition_forms")
 }
 
 model Task {
