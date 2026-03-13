@@ -72,12 +72,14 @@ export function downloadProjectRequisitionPdf(form: ProjectRequisitionFormItem, 
   doc.rect(margin, margin, contentW, pageH - margin * 2);
 
   doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.text("GEO DESIGNS & RESEARCH PVT. LTD.", margin + contentW / 2, 9, { align: "center" });
   doc.setFontSize(14);
-  doc.text("PROJECT NO. REQUISITION FORM", margin + contentW / 2, 12.5, { align: "center" });
+  doc.text("PROJECT NO. REQUISITION FORM", margin + contentW / 2, 14.5, { align: "center" });
 
   drawField(doc, {
     x: margin + contentW - 72,
-    y: 6,
+    y: 5,
     w: 68,
     h: 10,
     label: "Application Date",
@@ -87,15 +89,15 @@ export function downloadProjectRequisitionPdf(form: ProjectRequisitionFormItem, 
   });
 
   const x = margin + 2;
-  let y = 18;
+  let y = 20;
   const totalW = contentW - 4;
   const leftW = 178;
   const rightW = totalW - leftW;
   const rowH = 10;
 
-  drawField(doc, { x, y, w: 86, h: rowH, label: "Cost Centre / Dept", value: toDisplay(form.costCentreDepartment), labelRatio: 0.47, valueAlign: "center" });
+  drawField(doc, { x, y, w: 86, h: rowH, label: "Cost Centre / Department", value: toDisplay(form.costCentreDepartment), labelRatio: 0.54, valueAlign: "center" });
   drawField(doc, { x: x + 86, y, w: 52, h: rowH, label: "Name of HOD / DIR", value: toDisplay(form.hodDirectorName), labelRatio: 0.54, valueAlign: "center" });
-  drawField(doc, { x: x + 138, y, w: 40, h: rowH, label: "HOD / DIR Sign", value: "", labelRatio: 1 });
+  drawField(doc, { x: x + 138, y, w: 40, h: rowH, label: "HOD / DIR (Signature)", value: "", labelRatio: 1 });
   drawField(doc, { x: x + leftW, y, w: rightW, h: rowH, label: "Approved Project No.", value: toDisplay(form.approvedProjectNumber), labelRatio: 0.58, valueAlign: "center" });
 
   y += rowH;

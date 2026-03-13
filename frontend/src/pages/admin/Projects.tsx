@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { PageWrapper } from "@/components/PageWrapper";
 import { motion } from "framer-motion";
-import { Download, FileText, Hash, Plus, Search, Trash2, X } from "lucide-react";
+import { Download, FileText, Hash, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
@@ -392,7 +392,6 @@ export default function AdminProjects() {
   const [generatedProjectNumber, setGeneratedProjectNumber] = useState("");
   const [generatedProjectName, setGeneratedProjectName] = useState("");
   const [showRequisitionWizard, setShowRequisitionWizard] = useState(false);
-  const [requisitionStep, setRequisitionStep] = useState<RequisitionStep>(1);
   const [requisitionProjectId, setRequisitionProjectId] = useState<string | null>(null);
   const [requisitionDraft, setRequisitionDraft] = useState<RequisitionFormDraft>(DEFAULT_REQUISITION_DRAFT);
   const [savingRequisition, setSavingRequisition] = useState(false);
@@ -489,7 +488,6 @@ export default function AdminProjects() {
       : { ...DEFAULT_REQUISITION_DRAFT, newProjectNumber: project?.projectNumber ?? "", approvedProjectNumber: project?.projectNumber ?? "" };
     setRequisitionProjectId(projectId);
     setRequisitionDraft(nextDraft);
-    setRequisitionStep(1);
     setShowRequisitionWizard(true);
   };
 
@@ -600,18 +598,8 @@ export default function AdminProjects() {
     }
   };
 
-  const nextRequisitionStep = () => {
-    const error = validateRequisitionStep(requisitionStep, requisitionDraft);
-    if (error) return toast.error(error);
-    setRequisitionStep((prev) => (prev >= 8 ? 8 : ((prev + 1) as RequisitionStep)));
-  };
-
-  const previousRequisitionStep = () => setRequisitionStep((prev) => (prev <= 1 ? 1 : ((prev - 1) as RequisitionStep)));
-
   const saveRequisitionForm = async () => {
     if (!requisitionProjectId) return;
-    const error = validateRequisitionStep(8, requisitionDraft);
-    if (error) return toast.error(error);
     try {
       setSavingRequisition(true);
       await api.upsertProjectRequisitionForm(requisitionProjectId, toPayload(requisitionDraft));
@@ -663,7 +651,10 @@ export default function AdminProjects() {
                   <td className="p-4 font-medium">{row.projectNumber}</td>
                   <td className="p-4" onClick={(event) => event.stopPropagation()}>
                     {!row.projectNumber || row.projectNumber === "-" ? null : row.requisitionForm ? (
-                      <button onClick={() => downloadProjectRequisitionPdf(row.requisitionForm, row.projectName)} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-accent/15 text-accent font-medium hover:bg-accent/20"><Download className="h-4 w-4" />Download PDF</button>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => downloadProjectRequisitionPdf(row.requisitionForm, row.projectName)} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-accent/15 text-accent font-medium hover:bg-accent/20"><Download className="h-4 w-4" />Download PDF</button>
+                        <button onClick={() => openRequisitionWizard(row.id)} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/15 text-primary font-medium hover:bg-primary/20"><Pencil className="h-4 w-4" />Edit</button>
+                      </div>
                     ) : (
                       <button onClick={() => openRequisitionWizard(row.id)} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/15 text-primary font-medium hover:bg-primary/20"><FileText className="h-4 w-4" />Generate</button>
                     )}
@@ -743,10 +734,38 @@ export default function AdminProjects() {
       {showRequisitionWizard && requisitionProject && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-background/85 backdrop-blur-sm">
           <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} className="glass-panel-strong p-6 w-full max-w-5xl mx-4 max-h-[92vh] overflow-y-auto">
-            <div className="flex items-center justify-between gap-3 mb-4"><div><h3 className="text-lg font-semibold">Project No. Requisition Form</h3><p className="text-xs text-muted-foreground mt-1">Step {requisitionStep} of 8 | Project: {requisitionProject.projectName}</p></div><button onClick={() => setShowRequisitionWizard(false)} className="px-3 py-1.5 rounded-lg border border-destructive/30 text-destructive hover:bg-destructive/10 text-xs">Close</button></div>
-            <div className="mb-5 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm font-medium">{["Department Information", "Client Information", "Contact Information", "Work Order Details", "Project Details", "Financial Details", "Work Description", "Approval"][requisitionStep - 1]}</div>
-            <ProjectRequisitionStepContent step={requisitionStep} draft={requisitionDraft} setDraft={setRequisitionDraft} />
-            <div className="flex items-center justify-between gap-2 mt-6"><button onClick={previousRequisitionStep} disabled={requisitionStep === 1} className="px-4 py-2 rounded-lg border border-border/50 text-sm disabled:opacity-40">Back</button>{requisitionStep < 8 ? <button onClick={nextRequisitionStep} className="px-4 py-2 rounded-lg bg-gradient-to-r from-primary to-accent text-primary-foreground text-sm font-medium">Next</button> : <button onClick={() => void saveRequisitionForm()} disabled={savingRequisition} className="px-4 py-2 rounded-lg bg-gradient-to-r from-primary to-accent text-primary-foreground text-sm font-medium disabled:opacity-60">{savingRequisition ? "Saving..." : "Generate"}</button>}</div>
+            <div className="flex items-center justify-between gap-3 mb-4"><div><h3 className="text-lg font-semibold">Project No. Requisition Form</h3><p className="text-xs text-muted-foreground mt-1">Project: {requisitionProject.projectName}</p></div><button onClick={() => setShowRequisitionWizard(false)} className="px-3 py-1.5 rounded-lg border border-destructive/30 text-destructive hover:bg-destructive/10 text-xs">Close</button></div>
+
+            <div className="space-y-4">
+              <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-2.5 text-sm font-medium">Department Information</div>
+              <ProjectRequisitionStepContent step={1} draft={requisitionDraft} setDraft={setRequisitionDraft} />
+
+              <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-2.5 text-sm font-medium">Client Information</div>
+              <ProjectRequisitionStepContent step={2} draft={requisitionDraft} setDraft={setRequisitionDraft} />
+
+              <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-2.5 text-sm font-medium">Contact Information</div>
+              <ProjectRequisitionStepContent step={3} draft={requisitionDraft} setDraft={setRequisitionDraft} />
+
+              <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-2.5 text-sm font-medium">Work Order Details</div>
+              <ProjectRequisitionStepContent step={4} draft={requisitionDraft} setDraft={setRequisitionDraft} />
+
+              <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-2.5 text-sm font-medium">Project Details</div>
+              <ProjectRequisitionStepContent step={5} draft={requisitionDraft} setDraft={setRequisitionDraft} />
+
+              <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-2.5 text-sm font-medium">Financial Details</div>
+              <ProjectRequisitionStepContent step={6} draft={requisitionDraft} setDraft={setRequisitionDraft} />
+
+              <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-2.5 text-sm font-medium">Work Description</div>
+              <ProjectRequisitionStepContent step={7} draft={requisitionDraft} setDraft={setRequisitionDraft} />
+
+              <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-2.5 text-sm font-medium">Approval</div>
+              <ProjectRequisitionStepContent step={8} draft={requisitionDraft} setDraft={setRequisitionDraft} />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 mt-6">
+              <button onClick={() => setShowRequisitionWizard(false)} className="px-4 py-2 rounded-lg border border-border/50 text-sm">Cancel</button>
+              <button onClick={() => void saveRequisitionForm()} disabled={savingRequisition} className="px-4 py-2 rounded-lg bg-gradient-to-r from-primary to-accent text-primary-foreground text-sm font-medium disabled:opacity-60">{savingRequisition ? "Saving..." : "Generate"}</button>
+            </div>
           </motion.div>
         </div>
       )}
