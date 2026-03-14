@@ -61,6 +61,40 @@ function drawField(doc: jsPDF, args: { x: number; y: number; w: number; h: numbe
   drawTextInBox(doc, value, x + labelW, y, valueW, h, { fontSize: 7.6, lineHeight: 3.6, align: valueAlign });
 }
 
+function countLines(doc: jsPDF, text: string, width: number) {
+  const usableW = Math.max(1, width - 1.8);
+  const lines = doc.splitTextToSize(text || "", usableW) as string[];
+  return Math.max(1, lines.length);
+}
+
+function measureFieldHeight(
+  doc: jsPDF,
+  args: { w: number; label: string; value: string; labelRatio?: number; minH?: number }
+) {
+  const { w, label, value, labelRatio = 0.36, minH = 7 } = args;
+  const labelW = Math.max(24, Math.min(w * labelRatio, w - 20));
+  const valueW = w - labelW;
+
+  const labelLines = countLines(doc, label, labelW);
+  const valueLines = countLines(doc, value, valueW);
+
+  const labelNeeded = labelLines * 3.4 + 2;
+  const valueNeeded = valueLines * 3.6 + 2;
+  return Math.max(minH, labelNeeded, valueNeeded);
+}
+
+type FieldLayout = {
+  label: string;
+  value: string;
+  labelRatio?: number;
+  valueAlign?: "left" | "center" | "right";
+  minH?: number;
+};
+
+type LayoutRow =
+  | { kind: "pair"; left: FieldLayout; right: FieldLayout }
+  | { kind: "full"; field: FieldLayout };
+
 export function downloadProjectRequisitionPdf(form: ProjectRequisitionFormItem, projectName: string) {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
@@ -91,79 +125,172 @@ export function downloadProjectRequisitionPdf(form: ProjectRequisitionFormItem, 
     valueAlign: "center"
   });
 
-  let rowY = y + 15;
-  const rowH = 7;
+  const contentTop = y + 15;
+  const footerH = 20;
+  const footerY = y + h - footerH;
+
   const leftColW = (w - 4) / 2;
   const rightColX = x + leftColW + 4;
+  const rows: LayoutRow[] = [
+    {
+      kind: "pair",
+      left: { label: "Cost Centre / Department", value: toDisplay(form.costCentreDepartment), labelRatio: 0.52, valueAlign: "center" },
+      right: { label: "Name of HOD/DIR", value: toDisplay(form.hodDirectorName), labelRatio: 0.5, valueAlign: "center" }
+    },
+    {
+      kind: "pair",
+      left: { label: "Client Name", value: toDisplay(form.clientName), labelRatio: 0.4 },
+      right: { label: "Billing Name", value: toDisplay(form.billingName), labelRatio: 0.4 }
+    },
+    {
+      kind: "pair",
+      left: { label: "Address with Pin Code", value: toDisplay(form.addressWithPincode), labelRatio: 0.4, minH: 10 },
+      right: { label: "Pincode", value: toDisplay(form.pincode), labelRatio: 0.4, valueAlign: "center" }
+    },
+    {
+      kind: "pair",
+      left: { label: "GST Type", value: form.gstType === "REGISTERED" ? "REGISTERED" : "UNREGISTERED", labelRatio: 0.4, valueAlign: "center" },
+      right: { label: "GST Tin Number", value: toDisplay(form.gstNumber), labelRatio: 0.4 }
+    },
+    {
+      kind: "pair",
+      left: { label: "Contact No.", value: toDisplay(form.contactNumber), labelRatio: 0.4 },
+      right: { label: "Contact Name", value: toDisplay(form.contactName), labelRatio: 0.4 }
+    },
+    {
+      kind: "pair",
+      left: { label: "Department", value: toDisplay(form.department), labelRatio: 0.4 },
+      right: { label: "Designation", value: toDisplay(form.designation), labelRatio: 0.4 }
+    },
+    {
+      kind: "pair",
+      left: { label: "TAN / PAN No.", value: toDisplay(form.panTanNumber), labelRatio: 0.4 },
+      right: { label: "Email ID", value: toDisplay(form.email), labelRatio: 0.4 }
+    },
+    {
+      kind: "pair",
+      left: { label: "Work Order / PO / LOI Value", value: money(form.workOrderValue), labelRatio: 0.52 },
+      right: { label: "WO/PO/LOI Date", value: fmtDate(form.workOrderDate), labelRatio: 0.52, valueAlign: "center" }
+    },
+    {
+      kind: "pair",
+      left: { label: "Amount of W.O./Agreement", value: money(form.amountOfWorkOrder), labelRatio: 0.52 },
+      right: { label: "Agreement Date", value: fmtDate(form.agreementDate), labelRatio: 0.52, valueAlign: "center" }
+    },
+    {
+      kind: "pair",
+      left: { label: "GST Amount", value: money(form.gstAmount), labelRatio: 0.4 },
+      right: { label: "Project Starting Date", value: fmtDate(form.projectStartingDate), labelRatio: 0.52, valueAlign: "center" }
+    },
+    {
+      kind: "pair",
+      left: { label: "WO/PO/LOI/LOA No.", value: toDisplay(form.workOrderNumber), labelRatio: 0.52 },
+      right: { label: "Project Duration", value: form.projectDurationDays ? `${form.projectDurationDays} Days` : "", labelRatio: 0.52, valueAlign: "center" }
+    },
+    {
+      kind: "pair",
+      left: { label: "New Project Number", value: toDisplay(form.newProjectNumber), labelRatio: 0.52 },
+      right: { label: "Project Completion Date", value: fmtDate(form.projectCompletionDate), labelRatio: 0.52, valueAlign: "center" }
+    },
+    {
+      kind: "full",
+      field: { label: "Name of Work", value: toDisplay(form.nameOfWork), labelRatio: 0.2, minH: 14 }
+    },
+    {
+      kind: "pair",
+      left: { label: "Location of Work - District", value: toDisplay(form.locationDistrict), labelRatio: 0.52 },
+      right: { label: "State", value: toDisplay(form.state), labelRatio: 0.4 }
+    },
+    {
+      kind: "pair",
+      left: { label: "EMD", value: money(form.emdAmount), labelRatio: 0.4 },
+      right: { label: "P.G./SD Amount", value: money(form.pgSdAmount), labelRatio: 0.4 }
+    },
+    {
+      kind: "pair",
+      left: { label: "P.G. Date", value: fmtDate(form.pgDate), labelRatio: 0.4, valueAlign: "center" },
+      right: { label: "P.G. Expiry Date", value: fmtDate(form.pgExpiryDate), labelRatio: 0.45, valueAlign: "center" }
+    },
+    {
+      kind: "pair",
+      left: { label: "Approved Project No.", value: toDisplay(form.approvedProjectNumber), labelRatio: 0.52, valueAlign: "center" },
+      right: { label: "Approved By", value: toDisplay(form.approvedBy), labelRatio: 0.4 }
+    }
+  ];
 
-  drawField(doc, { x, y: rowY, w: leftColW, h: rowH, label: "Cost Centre / Department", value: toDisplay(form.costCentreDepartment), labelRatio: 0.52, valueAlign: "center" });
-  drawField(doc, { x: rightColX, y: rowY, w: leftColW, h: rowH, label: "Name of HOD/DIR", value: toDisplay(form.hodDirectorName), labelRatio: 0.5, valueAlign: "center" });
+  const baseHeights = rows.map((row) => {
+    if (row.kind === "full") {
+      return measureFieldHeight(doc, {
+        w,
+        label: row.field.label,
+        value: row.field.value,
+        labelRatio: row.field.labelRatio,
+        minH: row.field.minH ?? 7
+      });
+    }
 
-  rowY += rowH;
-  drawField(doc, { x, y: rowY, w: leftColW, h: rowH, label: "Client Name", value: toDisplay(form.clientName), labelRatio: 0.4 });
-  drawField(doc, { x: rightColX, y: rowY, w: leftColW, h: rowH, label: "Billing Name", value: toDisplay(form.billingName), labelRatio: 0.4 });
+    const leftH = measureFieldHeight(doc, {
+      w: leftColW,
+      label: row.left.label,
+      value: row.left.value,
+      labelRatio: row.left.labelRatio,
+      minH: row.left.minH ?? 7
+    });
+    const rightH = measureFieldHeight(doc, {
+      w: leftColW,
+      label: row.right.label,
+      value: row.right.value,
+      labelRatio: row.right.labelRatio,
+      minH: row.right.minH ?? 7
+    });
+    return Math.max(leftH, rightH);
+  });
 
-  rowY += rowH;
-  drawField(doc, { x, y: rowY, w: leftColW, h: rowH * 2, label: "Address with Pin Code", value: toDisplay(form.addressWithPincode), labelRatio: 0.4 });
-  drawField(doc, { x: rightColX, y: rowY, w: leftColW, h: rowH, label: "Pincode", value: toDisplay(form.pincode), labelRatio: 0.4, valueAlign: "center" });
-  drawField(doc, { x: rightColX, y: rowY + rowH, w: leftColW, h: rowH, label: "GST Tin Number", value: toDisplay(form.gstNumber), labelRatio: 0.4 });
+  const availableContentH = footerY - contentTop;
+  const baseTotalH = baseHeights.reduce((sum, item) => sum + item, 0);
+  const extraPerRow = baseTotalH < availableContentH ? (availableContentH - baseTotalH) / rows.length : 0;
 
-  rowY += rowH * 2;
-  drawField(doc, { x, y: rowY, w: leftColW, h: rowH, label: "GST Type", value: form.gstType === "REGISTERED" ? "REGISTERED" : "UNREGISTERED", labelRatio: 0.4, valueAlign: "center" });
-  drawField(doc, { x: rightColX, y: rowY, w: leftColW, h: rowH, label: "Contact Name", value: toDisplay(form.contactName), labelRatio: 0.4 });
+  let rowY = contentTop;
+  rows.forEach((row, index) => {
+    const rowH = baseHeights[index] + extraPerRow;
 
-  rowY += rowH;
-  drawField(doc, { x, y: rowY, w: leftColW, h: rowH, label: "Contact No.", value: toDisplay(form.contactNumber), labelRatio: 0.4 });
-  drawField(doc, { x: rightColX, y: rowY, w: leftColW, h: rowH, label: "Designation", value: toDisplay(form.designation), labelRatio: 0.4 });
+    if (row.kind === "full") {
+      drawField(doc, {
+        x,
+        y: rowY,
+        w,
+        h: rowH,
+        label: row.field.label,
+        value: row.field.value,
+        labelRatio: row.field.labelRatio,
+        valueAlign: row.field.valueAlign
+      });
+    } else {
+      drawField(doc, {
+        x,
+        y: rowY,
+        w: leftColW,
+        h: rowH,
+        label: row.left.label,
+        value: row.left.value,
+        labelRatio: row.left.labelRatio,
+        valueAlign: row.left.valueAlign
+      });
+      drawField(doc, {
+        x: rightColX,
+        y: rowY,
+        w: leftColW,
+        h: rowH,
+        label: row.right.label,
+        value: row.right.value,
+        labelRatio: row.right.labelRatio,
+        valueAlign: row.right.valueAlign
+      });
+    }
 
-  rowY += rowH;
-  drawField(doc, { x, y: rowY, w: leftColW, h: rowH, label: "Department", value: toDisplay(form.department), labelRatio: 0.4 });
-  drawField(doc, { x: rightColX, y: rowY, w: leftColW, h: rowH, label: "Email ID", value: toDisplay(form.email), labelRatio: 0.4 });
+    rowY += rowH;
+  });
 
-  rowY += rowH;
-  drawField(doc, { x, y: rowY, w: leftColW, h: rowH, label: "TAN / PAN No.", value: toDisplay(form.panTanNumber), labelRatio: 0.4 });
-  drawField(doc, { x: rightColX, y: rowY, w: leftColW, h: rowH, label: "Agreement No.", value: toDisplay(form.agreementNumber), labelRatio: 0.4 });
-
-  rowY += rowH;
-  drawField(doc, { x, y: rowY, w: leftColW, h: rowH, label: "Work Order / PO / LOI Value", value: money(form.workOrderValue), labelRatio: 0.52 });
-  drawField(doc, { x: rightColX, y: rowY, w: leftColW, h: rowH, label: "WO/PO/LOI Date", value: fmtDate(form.workOrderDate), labelRatio: 0.52, valueAlign: "center" });
-
-  rowY += rowH;
-  drawField(doc, { x, y: rowY, w: leftColW, h: rowH, label: "Amount of W.O./Agreement", value: money(form.amountOfWorkOrder), labelRatio: 0.52 });
-  drawField(doc, { x: rightColX, y: rowY, w: leftColW, h: rowH, label: "Agreement Date", value: fmtDate(form.agreementDate), labelRatio: 0.52, valueAlign: "center" });
-
-  rowY += rowH;
-  drawField(doc, { x, y: rowY, w: leftColW, h: rowH, label: "GST Amount", value: money(form.gstAmount), labelRatio: 0.4 });
-  drawField(doc, { x: rightColX, y: rowY, w: leftColW, h: rowH, label: "Project Starting Date", value: fmtDate(form.projectStartingDate), labelRatio: 0.52, valueAlign: "center" });
-
-  rowY += rowH;
-  drawField(doc, { x, y: rowY, w: leftColW, h: rowH, label: "WO/PO/LOI/LOA No.", value: toDisplay(form.workOrderNumber), labelRatio: 0.52 });
-  drawField(doc, { x: rightColX, y: rowY, w: leftColW, h: rowH, label: "Project Duration", value: form.projectDurationDays ? `${form.projectDurationDays} Days` : "", labelRatio: 0.52, valueAlign: "center" });
-
-  rowY += rowH;
-  drawField(doc, { x, y: rowY, w: leftColW, h: rowH, label: "New Project Number", value: toDisplay(form.newProjectNumber), labelRatio: 0.52 });
-  drawField(doc, { x: rightColX, y: rowY, w: leftColW, h: rowH, label: "Project Completion Date", value: fmtDate(form.projectCompletionDate), labelRatio: 0.52, valueAlign: "center" });
-
-  rowY += rowH + 1;
-  drawField(doc, { x, y: rowY, w, h: 18, label: "Name of Work", value: toDisplay(form.nameOfWork), labelRatio: 0.2 });
-
-  rowY += 19;
-  drawField(doc, { x, y: rowY, w: leftColW, h: rowH, label: "Location of Work - District", value: toDisplay(form.locationDistrict), labelRatio: 0.52 });
-  drawField(doc, { x: rightColX, y: rowY, w: leftColW, h: rowH, label: "State", value: toDisplay(form.state), labelRatio: 0.4 });
-
-  rowY += rowH;
-  drawField(doc, { x, y: rowY, w: leftColW, h: rowH, label: "EMD", value: money(form.emdAmount), labelRatio: 0.4 });
-  drawField(doc, { x: rightColX, y: rowY, w: leftColW, h: rowH, label: "P.G./SD Amount", value: money(form.pgSdAmount), labelRatio: 0.4 });
-
-  rowY += rowH;
-  drawField(doc, { x, y: rowY, w: leftColW, h: rowH, label: "P.G. Date", value: fmtDate(form.pgDate), labelRatio: 0.4, valueAlign: "center" });
-  drawField(doc, { x: rightColX, y: rowY, w: leftColW, h: rowH, label: "P.G. Expiry Date", value: fmtDate(form.pgExpiryDate), labelRatio: 0.45, valueAlign: "center" });
-
-  rowY += rowH + 1;
-  drawField(doc, { x, y: rowY, w: leftColW, h: rowH, label: "Approved Project No.", value: toDisplay(form.approvedProjectNumber), labelRatio: 0.52, valueAlign: "center" });
-  drawField(doc, { x: rightColX, y: rowY, w: leftColW, h: rowH, label: "Approved By", value: toDisplay(form.approvedBy), labelRatio: 0.4 });
-
-  const footerY = y + h - 20;
   doc.rect(x, footerY, w, 7);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7);
