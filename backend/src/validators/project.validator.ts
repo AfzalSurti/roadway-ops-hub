@@ -63,3 +63,30 @@ export const previewProjectNumberSchema = z.object({
 export const assignProjectNumberSchema = previewProjectNumberSchema.extend({
   workCategoryCode: z.enum(["N", "F", "B", "I", "P", "R", "S", "T", "L", "M", "C", "G", "D"])
 });
+
+export const upsertFinancialPlanSchema = z.object({
+  items: z.array(
+    z.object({
+      itemNumber: z.coerce.number().int().min(1).max(6),
+      particulars: z.string().trim().min(1),
+      percentage: z.coerce.number().min(0).max(100)
+    })
+  ).length(6, "All 6 financial planning items are required")
+});
+
+export const createFinancialBillsSchema = z.object({
+  bills: z.array(
+    z.object({
+      itemId: z.string().trim().min(1),
+      status: z.enum(["PLANNING", "PUT_UP", "RECEIVED"]).default("PLANNING"),
+      remark: z.string().trim().max(500).optional().nullable()
+    })
+  ).min(1, "Select at least one item")
+});
+
+export const updateFinancialBillSchema = z.object({
+  status: z.enum(["PLANNING", "PUT_UP", "RECEIVED"]).optional(),
+  receivedAmount: z.coerce.number().min(0).optional(),
+  receivedDate: z.union([z.coerce.date(), z.null()]).optional(),
+  remark: z.string().trim().max(500).optional().nullable()
+}).refine((payload) => Object.keys(payload).length > 0, "At least one field is required");

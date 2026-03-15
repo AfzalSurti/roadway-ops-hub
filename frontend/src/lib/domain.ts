@@ -2,6 +2,7 @@ export type Role = "ADMIN" | "EMPLOYEE";
 export type Priority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 export type TaskStatus = "TODO" | "IN_PROGRESS" | "BLOCKED" | "DONE";
 export type ReportStatus = "SUBMITTED" | "APPROVED" | "CHANGES_REQUESTED" | "REJECTED";
+export type FinancialBillStatus = "PLANNING" | "PUT_UP" | "RECEIVED";
 
 export type TemplateField = {
   id: string;
@@ -161,6 +162,65 @@ export type AppNotification = {
   createdAt: string;
 };
 
+export type FinancialPlanItem = {
+  id: string;
+  planId: string;
+  itemNumber: number;
+  particulars: string;
+  percentage: number;
+  amount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type FinancialBillItem = {
+  id: string;
+  planId: string;
+  itemId: string;
+  status: FinancialBillStatus;
+  receivedPercentage: number;
+  receivedAmount: number;
+  receivedDate?: string | null;
+  remark?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  item?: FinancialPlanItem;
+};
+
+export type FinancialProjectSummary = {
+  id: string;
+  name: string;
+  projectNumber: string;
+  requisitionFormId: string;
+  contractValue: number;
+  taxAmount: number;
+  totalAmount: number;
+};
+
+export type FinancialItemTemplate = {
+  itemNumber: number;
+  particulars: string;
+};
+
+export type FinancialPlan = {
+  id: string;
+  projectId: string;
+  contractValue: number;
+  taxAmount: number;
+  totalAmount: number;
+  createdAt: string;
+  updatedAt: string;
+  project?: ProjectItem;
+  items: FinancialPlanItem[];
+  bills: FinancialBillItem[];
+};
+
+export type FinancialProjectDetail = {
+  project: FinancialProjectSummary;
+  itemTemplates: FinancialItemTemplate[];
+  plan: FinancialPlan | null;
+};
+
 export const statusConfig: Record<TaskStatus, { label: string; color: string }> = {
   TODO: { label: "To Do", color: "text-muted-foreground bg-muted" },
   IN_PROGRESS: { label: "In Progress", color: "text-primary bg-primary/10" },
@@ -180,6 +240,12 @@ export const reportStatusConfig: Record<ReportStatus, { label: string; color: st
   APPROVED: { label: "Approved", color: "text-accent bg-accent/10" },
   CHANGES_REQUESTED: { label: "Changes Requested", color: "text-primary bg-primary/10" },
   REJECTED: { label: "Rejected", color: "text-destructive bg-destructive/10" }
+};
+
+export const financialBillStatusConfig: Record<FinancialBillStatus, { label: string; color: string }> = {
+  PLANNING: { label: "Planning", color: "text-muted-foreground bg-muted" },
+  PUT_UP: { label: "Put Up", color: "text-primary bg-primary/10" },
+  RECEIVED: { label: "Received", color: "text-accent bg-accent/10" }
 };
 
 export const toAvatarUrl = (name: string) =>

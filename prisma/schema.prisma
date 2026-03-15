@@ -34,6 +34,12 @@ enum ReportStatus {
   REJECTED
 }
 
+enum FinancialBillStatus {
+  PLANNING
+  PUT_UP
+  RECEIVED
+}
+
 enum AuditAction {
   TASK_CREATED
   TASK_UPDATED
@@ -105,6 +111,7 @@ model Project {
   serialNumber          Int?
   projectNumberAssignedAt DateTime?
   requisitionForm       ProjectRequisitionForm?
+  financialPlan         ProjectFinancialPlan?
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
@@ -269,6 +276,56 @@ model AuditLog {
   @@index([action])
   @@index([actorId])
   @@index([entityType, entityId])
+}
+
+model ProjectFinancialPlan {
+  id            String                 @id @default(cuid())
+  projectId     String                 @unique
+  contractValue Float
+  taxAmount     Float
+  totalAmount   Float
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+  project       Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  items         ProjectFinancialItem[]
+  bills         ProjectFinancialBill[]
+
+  @@index([projectId])
+}
+
+model ProjectFinancialItem {
+  id          String                 @id @default(cuid())
+  planId      String
+  itemNumber  Int
+  particulars String
+  percentage  Float
+  amount      Float
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+  plan        ProjectFinancialPlan   @relation(fields: [planId], references: [id], onDelete: Cascade)
+  bills       ProjectFinancialBill[]
+
+  @@unique([planId, itemNumber])
+  @@index([planId])
+}
+
+model ProjectFinancialBill {
+  id                 String              @id @default(cuid())
+  planId             String
+  itemId             String
+  status             FinancialBillStatus @default(PLANNING)
+  receivedPercentage Float               @default(0)
+  receivedAmount     Float               @default(0)
+  receivedDate       DateTime?
+  remark             String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  plan               ProjectFinancialPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  item               ProjectFinancialItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([planId])
+  @@index([itemId])
+  @@index([status])
 }
 
 model Notification {

@@ -1,4 +1,4 @@
-import type { ApiUser, AppNotification, ProjectItem, ProjectRequisitionFormItem, ReportItem, ReportStatus, ReportTemplate, TaskComment, TaskItem, TaskStatus } from "./domain";
+import type { ApiUser, AppNotification, FinancialBillItem, FinancialBillStatus, FinancialPlan, FinancialProjectDetail, FinancialProjectSummary, ProjectItem, ProjectRequisitionFormItem, ReportItem, ReportStatus, ReportTemplate, TaskComment, TaskItem, TaskStatus } from "./domain";
 
   const API_BASE_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:4000").replace(/\/+$/, "");
 
@@ -445,6 +445,44 @@ export const api = {
   deleteProject(id: string) {
     return request<{ deleted: boolean }>(`/projects/${id}`, {
       method: "DELETE"
+    });
+  },
+
+  getFinancialProjects() {
+    return request<FinancialProjectSummary[]>("/financials/projects");
+  },
+
+  getProjectFinancial(projectId: string) {
+    return request<FinancialProjectDetail>(`/financials/${projectId}`);
+  },
+
+  upsertFinancialPlan(
+    projectId: string,
+    payload: { items: Array<{ itemNumber: number; particulars: string; percentage: number }> }
+  ) {
+    return request<FinancialPlan>(`/financials/${projectId}/plan`, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+  },
+
+  createFinancialBills(
+    projectId: string,
+    payload: { bills: Array<{ itemId: string; status: FinancialBillStatus; remark?: string | null }> }
+  ) {
+    return request<FinancialPlan>(`/financials/${projectId}/bills`, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+  },
+
+  updateFinancialBill(
+    billId: string,
+    payload: { status?: FinancialBillStatus; receivedAmount?: number; receivedDate?: string | null; remark?: string | null }
+  ) {
+    return request<FinancialBillItem>(`/financials/bills/${billId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload)
     });
   },
 

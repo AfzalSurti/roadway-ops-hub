@@ -7,6 +7,7 @@ import {
   Users,
   FolderKanban,
   FileCheck,
+  Landmark,
   ChevronLeft,
   ChevronRight,
   LogOut,
@@ -19,6 +20,7 @@ const adminNav = [
   { to: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/admin/tasks", icon: ListTodo, label: "Tasks" },
   { to: "/admin/reports", icon: FileCheck, label: "Reports" },
+  { to: "/admin/financial", icon: Landmark, label: "Financial" },
   { to: "/admin/team", icon: Users, label: "Team" },
   { to: "/admin/projects", icon: FolderKanban, label: "Projects" },
 ];
