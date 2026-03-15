@@ -32,6 +32,9 @@ export const userRepository = {
   create(data: Prisma.UserCreateInput) {
     return prisma.user.create({ data });
   },
+  updateById(id: string, data: Prisma.UserUpdateInput) {
+    return prisma.user.update({ where: { id }, data });
+  },
   deleteById(id: string) {
     return prisma.user.delete({ where: { id } });
   }

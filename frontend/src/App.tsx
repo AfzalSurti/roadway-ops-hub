@@ -18,6 +18,7 @@ import EmployeeDashboard from "./pages/employee/Dashboard";
 import EmployeeTasks from "./pages/employee/Tasks";
 import TaskDetail from "./pages/employee/TaskDetail";
 import EmployeeReports from "./pages/employee/Reports";
+import EmployeeProfile from "./pages/employee/Profile";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -77,6 +78,7 @@ function AppRoutes() {
         <Route path="tasks" element={<EmployeeTasks />} />
         <Route path="task/:id" element={<TaskDetail />} />
         <Route path="reports" element={<EmployeeReports />} />
+        <Route path="profile" element={<EmployeeProfile />} />
       </Route>
 
       <Route path="*" element={<NotFound />} />

@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
+import type React from "react";
 import { PageWrapper } from "@/components/PageWrapper";
 import { motion } from "framer-motion";
-import { X, ListTodo, AlertTriangle, Plus } from "lucide-react";
+import { X, ListTodo, AlertTriangle, Plus, Phone, GraduationCap, Calendar, Briefcase, IndianRupee } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { toAvatarUrl } from "@/lib/domain";
@@ -185,6 +186,20 @@ export default function AdminTeam() {
                 : "-"}</p>
             </div>
 
+            {/* Profile Details */}
+            <div className="mb-6 p-4 rounded-xl bg-secondary/20 border border-border/30 space-y-3">
+              <h4 className="font-medium text-sm mb-2">Profile Details</h4>
+              <ProfileDetailRow icon={<Phone className="h-3.5 w-3.5" />} label="Contact" value={selected.contactNumber} />
+              <ProfileDetailRow icon={<GraduationCap className="h-3.5 w-3.5" />} label="Education" value={selected.education} />
+              <ProfileDetailRow
+                icon={<Calendar className="h-3.5 w-3.5" />}
+                label="Date of Joining"
+                value={selected.dateOfJoining ? new Date(selected.dateOfJoining).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : null}
+              />
+              <ProfileDetailRow icon={<Briefcase className="h-3.5 w-3.5" />} label="Experience" value={selected.experienceInOrg} />
+              <ProfileDetailRow icon={<IndianRupee className="h-3.5 w-3.5" />} label="Current CTC" value={selected.currentCtc} />
+            </div>
+
             <h4 className="font-medium mb-3">Tasks ({selectedTasks.length})</h4>
             <div className="space-y-2 mb-6">
               {selectedTasks.map((task) => (
@@ -316,5 +331,15 @@ export default function AdminTeam() {
         </div>
       )}
     </PageWrapper>
+  );
+}
+
+function ProfileDetailRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string | null | undefined }) {
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <span className="text-muted-foreground shrink-0">{icon}</span>
+      <span className="text-muted-foreground w-24 shrink-0">{label}</span>
+      <span className={value ? "text-foreground" : "text-muted-foreground italic"}>{value ?? "Not provided"}</span>
+    </div>
   );
 }

@@ -16,6 +16,11 @@ export type ApiUser = {
   name: string;
   email: string;
   role: Role;
+  contactNumber?: string | null;
+  education?: string | null;
+  dateOfJoining?: string | null;
+  experienceInOrg?: string | null;
+  currentCtc?: string | null;
 };
 
 export type ProjectItem = {

@@ -45,14 +45,19 @@ enum AuditAction {
 }
 
 model User {
-  id            String         @id @default(cuid())
-  name          String
-  email         String         @unique
-  passwordHash  String
-  role          Role
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  assignedTasks Task[]         @relation("TaskAssignee")
+  id                 String         @id @default(cuid())
+  name               String
+  email              String         @unique
+  passwordHash       String
+  role               Role
+  contactNumber      String?
+  education          String?
+  dateOfJoining      DateTime?
+  experienceInOrg    String?
+  currentCtc         String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  assignedTasks      Task[]         @relation("TaskAssignee")
   createdTasks  Task[]         @relation("TaskCreator")
   reports       Report[]
   comments      Comment[]

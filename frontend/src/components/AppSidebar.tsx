@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   ChevronRight,
   LogOut,
+  UserCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -26,6 +27,7 @@ const employeeNav = [
   { to: "/app/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/app/tasks", icon: ListTodo, label: "My Tasks" },
   { to: "/app/reports", icon: FileCheck, label: "My Reports" },
+  { to: "/app/profile", icon: UserCircle, label: "My Profile" },
 ];
 
 export function AppSidebar() {

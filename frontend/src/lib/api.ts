@@ -461,6 +461,23 @@ export const api = {
     });
   },
 
+  getProfile() {
+    return request<ApiUser>("/users/me");
+  },
+
+  updateProfile(payload: {
+    contactNumber?: string | null;
+    education?: string | null;
+    dateOfJoining?: string | null;
+    experienceInOrg?: string | null;
+    currentCtc?: string | null;
+  }) {
+    return request<ApiUser>("/users/me", {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    });
+  },
+
   getNotifications(limit = 30) {
     return request<AppNotification[]>(`/notifications?limit=${limit}`);
   },

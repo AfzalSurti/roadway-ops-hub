@@ -1,5 +1,6 @@
 import { userRepository } from "../repositories/user.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
+
 import { hashPassword } from "../utils/password.js";
 import { emailService } from "./email.service.js";
 import { logger } from "../config/logger.js";
@@ -7,6 +8,26 @@ import { logger } from "../config/logger.js";
 export const userService = {
   listEmployees() {
     return userRepository.findEmployees();
+  },
+  async getProfile(id: string) {
+    const user = await userRepository.findById(id);
+    if (!user) throw notFound("User not found");
+    return user;
+  },
+  async updateProfile(id: string, payload: {
+    contactNumber?: string | null;
+    education?: string | null;
+    dateOfJoining?: string | null;
+    experienceInOrg?: string | null;
+    currentCtc?: string | null;
+  }) {
+    return userRepository.updateById(id, {
+      contactNumber: payload.contactNumber,
+      education: payload.education,
+      dateOfJoining: payload.dateOfJoining ? new Date(payload.dateOfJoining) : null,
+      experienceInOrg: payload.experienceInOrg,
+      currentCtc: payload.currentCtc
+    });
   },
   async createEmployee(payload: { name: string; email: string; password: string }) {
     const existing = await userRepository.findByEmail(payload.email);
