@@ -19,7 +19,7 @@ export default function AdminTasks() {
   const [view, setView] = useState<"kanban" | "list">("list");
   const [search, setSearch] = useState("");
   const [selectedProject, setSelectedProject] = useState<string>("ALL");
-  const [selectedProjectCode, setSelectedProjectCode] = useState<string>("ALL");
+  const [selectedAssignedToId, setSelectedAssignedToId] = useState<string>("ALL");
   const [fromDate, setFromDate] = useState<string>(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
@@ -147,14 +147,12 @@ export default function AdminTasks() {
     return ["ALL", ...Array.from(set).sort((a, b) => a.localeCompare(b))];
   }, [tasks]);
 
-  const projectCodeOptions = useMemo(() => {
-    const set = new Set<string>();
-    tasks.forEach((task) => {
-      const code = task.projectCode?.trim();
-      if (code) set.add(code.slice(0, 4));
-    });
-    return ["ALL", ...Array.from(set).sort((a, b) => a.localeCompare(b))];
-  }, [tasks]);
+  const employeeOptions = useMemo(() => {
+    return users
+      .filter((user) => user.role === "EMPLOYEE")
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [users]);
 
   const filtered = useMemo(() => {
     const from = fromDate ? new Date(`${fromDate}T00:00:00`) : null;
@@ -164,14 +162,13 @@ export default function AdminTasks() {
         task.title.toLowerCase().includes(search.toLowerCase()) ||
         task.project.toLowerCase().includes(search.toLowerCase());
       const matchesProject = selectedProject === "ALL" || task.project === selectedProject;
-      const taskCode = task.projectCode?.trim()?.slice(0, 4) ?? "";
-      const matchesProjectCode = selectedProjectCode === "ALL" || taskCode === selectedProjectCode;
+      const matchesAssignedTo = selectedAssignedToId === "ALL" || task.assignedToId === selectedAssignedToId;
       const allocatedDate = new Date(task.allocatedAt ?? task.createdAt);
       const matchesFrom = !from || allocatedDate >= from;
       const matchesTo = !to || allocatedDate <= to;
-      return matchesSearch && matchesProject && matchesProjectCode && matchesFrom && matchesTo;
+      return matchesSearch && matchesProject && matchesAssignedTo && matchesFrom && matchesTo;
     });
-  }, [tasks, search, selectedProject, selectedProjectCode, fromDate, toDate]);
+  }, [tasks, search, selectedProject, selectedAssignedToId, fromDate, toDate]);
 
   const sortedTasks = useMemo(() => {
     return [...filtered].sort((a, b) => {
@@ -239,15 +236,16 @@ export default function AdminTasks() {
           />
         </div>
         <select
-          value={selectedProjectCode}
-          onChange={(event) => setSelectedProjectCode(event.target.value)}
-          title="Select project code"
-          aria-label="Select project code"
-          className="px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 text-sm min-w-[180px]"
+          value={selectedAssignedToId}
+          onChange={(event) => setSelectedAssignedToId(event.target.value)}
+          title="Select employee"
+          aria-label="Select employee"
+          className="px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 text-sm min-w-[220px]"
         >
-          {projectCodeOptions.map((code) => (
-            <option key={code} value={code}>
-              {code === "ALL" ? "All Codes" : code}
+          <option value="ALL">All Employees</option>
+          {employeeOptions.map((employee) => (
+            <option key={employee.id} value={employee.id}>
+              {employee.name}
             </option>
           ))}
         </select>
