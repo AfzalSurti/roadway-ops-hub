@@ -93,10 +93,9 @@ export const financialService = {
     const totalAmount = round2(contractValue + taxAmount);
 
     const byItemNumber = [...payload.items].sort((a, b) => a.itemNumber - b.itemNumber);
-    const expectedNumbers = FINANCIAL_ITEM_TEMPLATES.map((item) => item.itemNumber).join(",");
-    const receivedNumbers = byItemNumber.map((item) => item.itemNumber).join(",");
-    if (expectedNumbers !== receivedNumbers) {
-      throw badRequest("Financial planning items are invalid");
+    const unique = new Set(byItemNumber.map((item) => item.itemNumber));
+    if (unique.size !== byItemNumber.length) {
+      throw badRequest("Item numbers must be unique");
     }
 
     const items = byItemNumber.map((item) => ({

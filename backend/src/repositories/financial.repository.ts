@@ -106,6 +106,15 @@ export const financialRepository = {
         });
       }
 
+      await tx.projectFinancialItem.deleteMany({
+        where: {
+          planId: plan.id,
+          itemNumber: {
+            notIn: args.items.map((item) => item.itemNumber)
+          }
+        }
+      });
+
       const items = await tx.projectFinancialItem.findMany({
         where: { planId: plan.id }
       });

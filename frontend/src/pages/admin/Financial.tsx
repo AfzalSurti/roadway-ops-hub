@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { PageWrapper } from "@/components/PageWrapper";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { financialBillStatusConfig, type FinancialBillStatus, type FinancialItemTemplate } from "@/lib/domain";
+import { financialBillStatusConfig, type FinancialBillStatus } from "@/lib/domain";
 import { toast } from "sonner";
 import { Receipt, Save, X } from "lucide-react";
 
@@ -19,7 +19,7 @@ export default function AdminFinancial() {
   const queryClient = useQueryClient();
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [selectedItemInfo, setSelectedItemInfo] = useState<{ itemNumber: number; particulars: string } | null>(null);
-  const [planningDraft, setPlanningDraft] = useState<Record<number, string>>({});
+  const [planningRows, setPlanningRows] = useState<Array<{ itemNumber: number; particulars: string; percentage: string }>>([]);
   const [showPlanning, setShowPlanning] = useState(false);
   const [showBillSelection, setShowBillSelection] = useState(false);
   const [billSelection, setBillSelection] = useState<Record<string, { selected: boolean; includePreviousRemaining: boolean }>>({});
@@ -44,14 +44,10 @@ export default function AdminFinancial() {
 
   useEffect(() => {
     if (!detail) return;
-    const nextDraft: Record<number, string> = {};
     const source = detail.plan?.items.length
-      ? detail.plan.items.map((item) => ({ itemNumber: item.itemNumber, percentage: item.percentage }))
-      : detail.itemTemplates.map((item) => ({ itemNumber: item.itemNumber, percentage: 0 }));
-    source.forEach((item) => {
-      nextDraft[item.itemNumber] = String(item.percentage ?? 0);
-    });
-    setPlanningDraft(nextDraft);
+      ? detail.plan.items.map((item) => ({ itemNumber: item.itemNumber, particulars: item.particulars, percentage: String(item.percentage) }))
+      : detail.itemTemplates.map((item) => ({ itemNumber: item.itemNumber, particulars: item.particulars, percentage: "0" }));
+    setPlanningRows(source);
   }, [detail?.plan?.updatedAt, detail?.project?.id]);
 
   useEffect(() => {
@@ -80,9 +76,22 @@ export default function AdminFinancial() {
   }, [detail?.plan?.updatedAt, detail?.project?.id]);
 
   const totalPercentage = useMemo(
-    () => (detail?.itemTemplates ?? []).reduce((sum, item) => sum + Number(planningDraft[item.itemNumber] || 0), 0),
-    [planningDraft, detail?.itemTemplates]
+    () => planningRows.reduce((sum, item) => sum + Number(item.percentage || 0), 0),
+    [planningRows]
   );
+
+  const addPlanningRow = () => {
+    const nextNumber = planningRows.length > 0 ? Math.max(...planningRows.map((row) => row.itemNumber)) + 1 : 1;
+    setPlanningRows((prev) => [...prev, { itemNumber: nextNumber, particulars: "", percentage: "0" }]);
+  };
+
+  const removePlanningRow = (index: number) => {
+    setPlanningRows((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const updatePlanningRow = (index: number, patch: Partial<{ itemNumber: number; particulars: string; percentage: string }>) => {
+    setPlanningRows((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
+  };
 
   const receivedByItem = useMemo(() => {
     const map = new Map<string, number>();
@@ -105,10 +114,10 @@ export default function AdminFinancial() {
   const savePlanMutation = useMutation({
     mutationFn: () =>
       api.upsertFinancialPlan(selectedProjectId, {
-        items: (detail?.itemTemplates ?? []).map((item) => ({
-          itemNumber: item.itemNumber,
-          particulars: item.particulars,
-          percentage: Number(planningDraft[item.itemNumber] || 0)
+        items: planningRows.map((item) => ({
+          itemNumber: Number(item.itemNumber),
+          particulars: item.particulars.trim(),
+          percentage: Number(item.percentage || 0)
         }))
       }),
     onSuccess: async () => {
@@ -362,13 +371,33 @@ export default function AdminFinancial() {
                     </tr>
                   </thead>
                   <tbody>
-                    {(detail.itemTemplates ?? []).map((item: FinancialItemTemplate) => {
-                      const percentage = Number(planningDraft[item.itemNumber] || 0);
+                    {planningRows.map((item, index) => {
+                      const percentage = Number(item.percentage || 0);
                       const amount = (detail.project.totalAmount * percentage) / 100;
                       return (
-                        <tr key={item.itemNumber} className="border-b border-border/20 align-top">
-                          <td className="p-3 font-medium">{item.itemNumber}</td>
-                          <td className="p-3 leading-6">{item.particulars}</td>
+                        <tr key={`${item.itemNumber}-${index}`} className="border-b border-border/20 align-top">
+                          <td className="p-3 font-medium w-28">
+                            <input
+                              type="number"
+                              min="1"
+                              step="1"
+                              value={item.itemNumber}
+                              onChange={(event) => updatePlanningRow(index, { itemNumber: Number(event.target.value || 0) })}
+                              className="w-20 px-3 py-2 rounded-xl bg-secondary/50 border border-border/50"
+                              title={`Item number row ${index + 1}`}
+                              aria-label={`Item number row ${index + 1}`}
+                            />
+                          </td>
+                          <td className="p-3 leading-6">
+                            <textarea
+                              value={item.particulars}
+                              onChange={(event) => updatePlanningRow(index, { particulars: event.target.value })}
+                              rows={2}
+                              className="w-full px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 resize-y"
+                              title={`Particulars row ${index + 1}`}
+                              aria-label={`Particulars row ${index + 1}`}
+                            />
+                          </td>
                           <td className="p-3 w-36">
                             <div className="flex items-center gap-2">
                               <input
@@ -376,14 +405,22 @@ export default function AdminFinancial() {
                                 min="0"
                                 max="100"
                                 step="0.01"
-                                value={planningDraft[item.itemNumber] ?? "0"}
-                                onChange={(event) => setPlanningDraft((prev) => ({ ...prev, [item.itemNumber]: event.target.value }))}
+                                value={item.percentage}
+                                onChange={(event) => updatePlanningRow(index, { percentage: event.target.value })}
                                 className="w-24 px-3 py-2 rounded-xl bg-secondary/50 border border-border/50"
                                 title={`Percentage for item ${item.itemNumber}`}
                                 aria-label={`Percentage for item ${item.itemNumber}`}
                               />
                               <span>%</span>
                             </div>
+                            <button
+                              type="button"
+                              onClick={() => removePlanningRow(index)}
+                              disabled={planningRows.length <= 1}
+                              className="mt-2 text-xs text-destructive disabled:text-muted-foreground"
+                            >
+                              Remove
+                            </button>
                           </td>
                           <td className="p-3 font-medium">{money(amount)}</td>
                         </tr>
@@ -397,10 +434,19 @@ export default function AdminFinancial() {
                   </tbody>
                 </table>
               </div>
+              <div className="flex items-center justify-between mt-4">
+                <button
+                  type="button"
+                  onClick={addPlanningRow}
+                  className="px-4 py-2 rounded-xl border border-border/50 text-sm hover:bg-secondary/40"
+                >
+                  Add Item
+                </button>
+              </div>
               <div className="flex justify-end mt-4">
                 <button
                   onClick={() => savePlanMutation.mutate()}
-                  disabled={savePlanMutation.isPending}
+                  disabled={savePlanMutation.isPending || planningRows.some((row) => !row.particulars.trim() || row.itemNumber < 1)}
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary/10 text-primary border border-primary/20 text-sm font-medium hover:bg-primary/20 disabled:opacity-50"
                 >
                   <Save className="h-4 w-4" />

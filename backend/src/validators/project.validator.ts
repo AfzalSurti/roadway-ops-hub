@@ -67,11 +67,11 @@ export const assignProjectNumberSchema = previewProjectNumberSchema.extend({
 export const upsertFinancialPlanSchema = z.object({
   items: z.array(
     z.object({
-      itemNumber: z.coerce.number().int().min(1).max(6),
+      itemNumber: z.coerce.number().int().min(1).max(999),
       particulars: z.string().trim().min(1),
       percentage: z.coerce.number().min(0).max(100)
     })
-  ).length(6, "All 6 financial planning items are required")
+  ).min(1, "At least one planning item is required")
 });
 
 export const createFinancialBillsSchema = z.object({
