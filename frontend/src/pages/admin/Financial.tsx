@@ -1,37 +1,10 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PageWrapper } from "@/components/PageWrapper";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { financialBillStatusConfig, type FinancialBillStatus } from "@/lib/domain";
+import { financialBillStatusConfig, type FinancialBillStatus, type FinancialItemTemplate } from "@/lib/domain";
 import { toast } from "sonner";
-import { CheckCircle2, Landmark, Receipt, Save } from "lucide-react";
-
-const ITEM_TEMPLATES = [
-  {
-    itemNumber: 1,
-    particulars: "Submission of Alignment option including Marking of ROW & Inception report. Preparation of LA Proposal, Forest Clearance proposal & CRZ Clearance"
-  },
-  {
-    itemNumber: 2,
-    particulars: "Survey / Investigation / Approval of GAD of Proposed ROB / Flyover / VUP / River Bridge from GoG and Indian Railway including its approaches & Survey, Investigation, Pavement analysis, Cross drainage condition survey, & Design of Highway"
-  },
-  {
-    itemNumber: 3,
-    particulars: "Preparation and approval of BOQ / Detailed Estimate by concern authority & Preparation and approval of Draft Tender Paper"
-  },
-  {
-    itemNumber: 4,
-    particulars: "Design and approval of drawings of all components of Bridge / ROB / RUB / VUP / Flyover / other structures"
-  },
-  {
-    itemNumber: 5,
-    particulars: "Completion of 11 months or complete submission of design, drawings etc with satisfactory work, whichever is earlier"
-  },
-  {
-    itemNumber: 6,
-    particulars: "On physical completion of civil work"
-  }
-] as const;
+import { Receipt, Save, X } from "lucide-react";
 
 function money(value: number) {
   return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(value || 0);
@@ -46,7 +19,9 @@ export default function AdminFinancial() {
   const queryClient = useQueryClient();
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [planningDraft, setPlanningDraft] = useState<Record<number, string>>({});
-  const [billSelection, setBillSelection] = useState<Record<string, { selected: boolean; status: FinancialBillStatus; remark: string }>>({});
+  const [showPlanning, setShowPlanning] = useState(false);
+  const [showBillSelection, setShowBillSelection] = useState(false);
+  const [billSelection, setBillSelection] = useState<Record<string, { selected: boolean }>>({});
   const [billEdits, setBillEdits] = useState<Record<string, { status: FinancialBillStatus; receivedAmount: string; receivedDate: string; remark: string }>>({});
 
   const { data: eligibleProjects = [], isLoading: loadingProjects } = useQuery({
@@ -71,7 +46,7 @@ export default function AdminFinancial() {
     const nextDraft: Record<number, string> = {};
     const source = detail.plan?.items.length
       ? detail.plan.items.map((item) => ({ itemNumber: item.itemNumber, percentage: item.percentage }))
-      : ITEM_TEMPLATES.map((item) => ({ itemNumber: item.itemNumber, percentage: 0 }));
+      : detail.itemTemplates.map((item) => ({ itemNumber: item.itemNumber, percentage: 0 }));
     source.forEach((item) => {
       nextDraft[item.itemNumber] = String(item.percentage ?? 0);
     });
@@ -85,9 +60,9 @@ export default function AdminFinancial() {
       return;
     }
 
-    const nextSelection: Record<string, { selected: boolean; status: FinancialBillStatus; remark: string }> = {};
+    const nextSelection: Record<string, { selected: boolean }> = {};
     detail.plan.items.forEach((item) => {
-      nextSelection[item.id] = { selected: false, status: "PLANNING", remark: "" };
+      nextSelection[item.id] = { selected: false };
     });
     setBillSelection(nextSelection);
 
@@ -104,8 +79,8 @@ export default function AdminFinancial() {
   }, [detail?.plan?.updatedAt, detail?.project?.id]);
 
   const totalPercentage = useMemo(
-    () => ITEM_TEMPLATES.reduce((sum, item) => sum + Number(planningDraft[item.itemNumber] || 0), 0),
-    [planningDraft]
+    () => (detail?.itemTemplates ?? []).reduce((sum, item) => sum + Number(planningDraft[item.itemNumber] || 0), 0),
+    [planningDraft, detail?.itemTemplates]
   );
 
   const receivedByItem = useMemo(() => {
@@ -129,7 +104,7 @@ export default function AdminFinancial() {
   const savePlanMutation = useMutation({
     mutationFn: () =>
       api.upsertFinancialPlan(selectedProjectId, {
-        items: ITEM_TEMPLATES.map((item) => ({
+        items: (detail?.itemTemplates ?? []).map((item) => ({
           itemNumber: item.itemNumber,
           particulars: item.particulars,
           percentage: Number(planningDraft[item.itemNumber] || 0)
@@ -137,6 +112,7 @@ export default function AdminFinancial() {
       }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["financial-project", selectedProjectId] });
+      setShowPlanning(false);
       toast.success("Financial item planning saved");
     },
     onError: (error) => {
@@ -149,10 +125,11 @@ export default function AdminFinancial() {
       api.createFinancialBills(selectedProjectId, {
         bills: Object.entries(billSelection)
           .filter(([, value]) => value.selected)
-          .map(([itemId, value]) => ({ itemId, status: value.status, remark: value.remark || null }))
+          .map(([itemId]) => ({ itemId, status: "PLANNING" as FinancialBillStatus }))
       }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["financial-project", selectedProjectId] });
+      setShowBillSelection(false);
       toast.success("Financial bill rows created");
     },
     onError: (error) => {
@@ -208,156 +185,32 @@ export default function AdminFinancial() {
         <div className="glass-panel p-8 text-sm text-muted-foreground">{loadingDetail ? "Loading financial details..." : "Select a project to continue."}</div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <StatCard title="Contract Value" value={money(detail.project.contractValue)} icon={<Landmark className="h-5 w-5" />} />
-            <StatCard title="Tax Amount" value={money(detail.project.taxAmount)} icon={<Receipt className="h-5 w-5" />} />
-            <StatCard title="Total Amount" value={money(detail.project.totalAmount)} icon={<CheckCircle2 className="h-5 w-5" />} />
-            <StatCard title="Pending Amount" value={money(detail.project.totalAmount - totalReceived)} icon={<Receipt className="h-5 w-5" />} />
-          </div>
-
           <div className="glass-panel p-5 mb-6">
-            <div className="flex items-center justify-between gap-3 mb-4">
-              <div>
-                <h2 className="text-base font-semibold">1. Item Planning</h2>
-                <p className="text-sm text-muted-foreground">Set percentage for the 6 fixed financial items. Total must be 100%.</p>
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 flex-1">
+                <DetailTile label="Project" value={`${detail.project.projectNumber} · ${detail.project.name}`} />
+                <DetailTile label="Contract Value" value={money(detail.project.contractValue)} />
+                <DetailTile label="Tax" value={money(detail.project.taxAmount)} />
+                <DetailTile label="Total Amount" value={money(detail.project.totalAmount)} />
               </div>
-              <button
-                onClick={() => savePlanMutation.mutate()}
-                disabled={savePlanMutation.isPending || Math.abs(totalPercentage - 100) > 0.01}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary/10 text-primary border border-primary/20 text-sm font-medium hover:bg-primary/20 disabled:opacity-50"
-              >
-                <Save className="h-4 w-4" />
-                {savePlanMutation.isPending ? "Saving..." : "Save Planning"}
-              </button>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[820px]">
-                <thead>
-                  <tr className="border-b border-border/40 text-muted-foreground">
-                    <th className="text-left p-3 font-medium">Sr. No.</th>
-                    <th className="text-left p-3 font-medium">Particulars</th>
-                    <th className="text-left p-3 font-medium">Percentage</th>
-                    <th className="text-left p-3 font-medium">Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {ITEM_TEMPLATES.map((item) => {
-                    const percentage = Number(planningDraft[item.itemNumber] || 0);
-                    const amount = (detail.project.totalAmount * percentage) / 100;
-                    return (
-                      <tr key={item.itemNumber} className="border-b border-border/20 align-top">
-                        <td className="p-3 font-medium">{item.itemNumber}</td>
-                        <td className="p-3 leading-6">{item.particulars}</td>
-                        <td className="p-3 w-36">
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="number"
-                              min="0"
-                              max="100"
-                              step="0.01"
-                              value={planningDraft[item.itemNumber] ?? "0"}
-                              onChange={(event) => setPlanningDraft((prev) => ({ ...prev, [item.itemNumber]: event.target.value }))}
-                              className="w-24 px-3 py-2 rounded-xl bg-secondary/50 border border-border/50"
-                              title={`Percentage for item ${item.itemNumber}`}
-                              aria-label={`Percentage for item ${item.itemNumber}`}
-                            />
-                            <span>%</span>
-                          </div>
-                        </td>
-                        <td className="p-3 font-medium">{money(amount)}</td>
-                      </tr>
-                    );
-                  })}
-                  <tr className="bg-secondary/20 font-medium">
-                    <td className="p-3" colSpan={2}>Total</td>
-                    <td className={`p-3 ${Math.abs(totalPercentage - 100) > 0.01 ? "text-destructive" : "text-accent"}`}>{totalPercentage.toFixed(2)}%</td>
-                    <td className="p-3">{money(detail.project.totalAmount)}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div className="glass-panel p-5 mb-6">
-            <div className="flex items-center justify-between gap-3 mb-4">
-              <div>
-                <h2 className="text-base font-semibold">2. Bill Creation</h2>
-                <p className="text-sm text-muted-foreground">Select planned items to create bill rows. Initial received percentage stays at 0 until bill update.</p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setShowPlanning(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary/10 text-primary border border-primary/20 text-sm font-medium hover:bg-primary/20"
+                >
+                  <Save className="h-4 w-4" />
+                  Item Planning
+                </button>
+                <button
+                  onClick={() => setShowBillSelection(true)}
+                  disabled={!detail.plan}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary/10 text-primary border border-primary/20 text-sm font-medium hover:bg-primary/20 disabled:opacity-50"
+                >
+                  <Receipt className="h-4 w-4" />
+                  Bill Selection
+                </button>
               </div>
-              <button
-                onClick={() => createBillsMutation.mutate()}
-                disabled={createBillsMutation.isPending || !detail.plan || selectedBillsCount === 0}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary/10 text-primary border border-primary/20 text-sm font-medium hover:bg-primary/20 disabled:opacity-50"
-              >
-                <Receipt className="h-4 w-4" />
-                {createBillsMutation.isPending ? "Creating..." : `Create Bill Rows (${selectedBillsCount})`}
-              </button>
             </div>
-
-            {!detail.plan ? (
-              <p className="text-sm text-muted-foreground">Save item planning first to enable bill creation.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm min-w-[980px]">
-                  <thead>
-                    <tr className="border-b border-border/40 text-muted-foreground">
-                      <th className="text-left p-3 font-medium">Select</th>
-                      <th className="text-left p-3 font-medium">Item</th>
-                      <th className="text-left p-3 font-medium">Particulars</th>
-                      <th className="text-left p-3 font-medium">Planned %</th>
-                      <th className="text-left p-3 font-medium">Item Amount</th>
-                      <th className="text-left p-3 font-medium">% Received</th>
-                      <th className="text-left p-3 font-medium">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {detail.plan.items.map((item) => {
-                      const receivedAmount = receivedByItem.get(item.id) ?? 0;
-                      const receivedPct = item.amount > 0 ? (receivedAmount / item.amount) * 100 : 0;
-                      const selection = billSelection[item.id] ?? { selected: false, status: "PLANNING" as FinancialBillStatus, remark: "" };
-                      return (
-                        <tr key={item.id} className="border-b border-border/20 align-top">
-                          <td className="p-3">
-                            <input
-                              type="checkbox"
-                              checked={selection.selected}
-                              onChange={(event) => setBillSelection((prev) => ({
-                                ...prev,
-                                [item.id]: { ...selection, selected: event.target.checked }
-                              }))}
-                              title={`Select item ${item.itemNumber}`}
-                              aria-label={`Select item ${item.itemNumber}`}
-                            />
-                          </td>
-                          <td className="p-3 font-medium">{item.itemNumber}</td>
-                          <td className="p-3 leading-6">{item.particulars}</td>
-                          <td className="p-3">{item.percentage.toFixed(2)}%</td>
-                          <td className="p-3">{money(item.amount)}</td>
-                          <td className="p-3">{receivedPct.toFixed(2)}%</td>
-                          <td className="p-3">
-                            <select
-                              value={selection.status}
-                              onChange={(event) => setBillSelection((prev) => ({
-                                ...prev,
-                                [item.id]: { ...selection, status: event.target.value as FinancialBillStatus }
-                              }))}
-                              className="px-3 py-2 rounded-xl bg-secondary/50 border border-border/50"
-                              title={`Status for item ${item.itemNumber}`}
-                              aria-label={`Status for item ${item.itemNumber}`}
-                            >
-                              {(Object.keys(financialBillStatusConfig) as FinancialBillStatus[]).map((status) => (
-                                <option key={status} value={status}>{financialBillStatusConfig[status].label}</option>
-                              ))}
-                            </select>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
           </div>
 
           <div className="glass-panel p-5">
@@ -473,18 +326,162 @@ export default function AdminFinancial() {
               </div>
             )}
           </div>
+
+          {showPlanning && (
+            <FinancialModal title="Item Planning" onClose={() => setShowPlanning(false)}>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4 text-sm">
+                <DetailTile label="Contract Value" value={money(detail.project.contractValue)} />
+                <DetailTile label="Tax" value={money(detail.project.taxAmount)} />
+                <DetailTile label="Total Amount" value={money(detail.project.totalAmount)} />
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm min-w-[820px]">
+                  <thead>
+                    <tr className="border-b border-border/40 text-muted-foreground">
+                      <th className="text-left p-3 font-medium">Sr. No.</th>
+                      <th className="text-left p-3 font-medium">Particulars</th>
+                      <th className="text-left p-3 font-medium">Percentage</th>
+                      <th className="text-left p-3 font-medium">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(detail.itemTemplates ?? []).map((item: FinancialItemTemplate) => {
+                      const percentage = Number(planningDraft[item.itemNumber] || 0);
+                      const amount = (detail.project.totalAmount * percentage) / 100;
+                      return (
+                        <tr key={item.itemNumber} className="border-b border-border/20 align-top">
+                          <td className="p-3 font-medium">{item.itemNumber}</td>
+                          <td className="p-3 leading-6">{item.particulars}</td>
+                          <td className="p-3 w-36">
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.01"
+                                value={planningDraft[item.itemNumber] ?? "0"}
+                                onChange={(event) => setPlanningDraft((prev) => ({ ...prev, [item.itemNumber]: event.target.value }))}
+                                className="w-24 px-3 py-2 rounded-xl bg-secondary/50 border border-border/50"
+                                title={`Percentage for item ${item.itemNumber}`}
+                                aria-label={`Percentage for item ${item.itemNumber}`}
+                              />
+                              <span>%</span>
+                            </div>
+                          </td>
+                          <td className="p-3 font-medium">{money(amount)}</td>
+                        </tr>
+                      );
+                    })}
+                    <tr className="bg-secondary/20 font-medium">
+                      <td className="p-3" colSpan={2}>Total</td>
+                      <td className={`p-3 ${Math.abs(totalPercentage - 100) > 0.01 ? "text-destructive" : "text-accent"}`}>{totalPercentage.toFixed(2)}%</td>
+                      <td className="p-3">{money(detail.project.totalAmount)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex justify-end mt-4">
+                <button
+                  onClick={() => savePlanMutation.mutate()}
+                  disabled={savePlanMutation.isPending || Math.abs(totalPercentage - 100) > 0.01}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary/10 text-primary border border-primary/20 text-sm font-medium hover:bg-primary/20 disabled:opacity-50"
+                >
+                  <Save className="h-4 w-4" />
+                  {savePlanMutation.isPending ? "Saving..." : "Save Planning"}
+                </button>
+              </div>
+            </FinancialModal>
+          )}
+
+          {showBillSelection && (
+            <FinancialModal title="Bill Selection" onClose={() => setShowBillSelection(false)}>
+              {!detail.plan ? (
+                <p className="text-sm text-muted-foreground">Save item planning first to enable bill selection.</p>
+              ) : (
+                <>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm min-w-[900px]">
+                      <thead>
+                        <tr className="border-b border-border/40 text-muted-foreground">
+                          <th className="text-left p-3 font-medium">Select</th>
+                          <th className="text-left p-3 font-medium">Item</th>
+                          <th className="text-left p-3 font-medium">Particulars</th>
+                          <th className="text-left p-3 font-medium">Planned %</th>
+                          <th className="text-left p-3 font-medium">Item Amount</th>
+                          <th className="text-left p-3 font-medium">% Received</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {detail.plan.items.map((item) => {
+                          const receivedAmount = receivedByItem.get(item.id) ?? 0;
+                          const receivedPct = item.amount > 0 ? (receivedAmount / item.amount) * 100 : 0;
+                          const selection = billSelection[item.id] ?? { selected: false };
+                          return (
+                            <tr key={item.id} className="border-b border-border/20 align-top">
+                              <td className="p-3">
+                                <input
+                                  type="checkbox"
+                                  checked={selection.selected}
+                                  onChange={(event) => setBillSelection((prev) => ({
+                                    ...prev,
+                                    [item.id]: { selected: event.target.checked }
+                                  }))}
+                                  title={`Select item ${item.itemNumber}`}
+                                  aria-label={`Select item ${item.itemNumber}`}
+                                />
+                              </td>
+                              <td className="p-3 font-medium">{item.itemNumber}</td>
+                              <td className="p-3 leading-6">{item.particulars}</td>
+                              <td className="p-3">{item.percentage.toFixed(2)}%</td>
+                              <td className="p-3">{money(item.amount)}</td>
+                              <td className="p-3">{receivedPct.toFixed(2)}%</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="flex justify-end mt-4">
+                    <button
+                      onClick={() => createBillsMutation.mutate()}
+                      disabled={createBillsMutation.isPending || selectedBillsCount === 0}
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary/10 text-primary border border-primary/20 text-sm font-medium hover:bg-primary/20 disabled:opacity-50"
+                    >
+                      <Receipt className="h-4 w-4" />
+                      {createBillsMutation.isPending ? "Creating..." : `Create Bill (${selectedBillsCount})`}
+                    </button>
+                  </div>
+                </>
+              )}
+            </FinancialModal>
+          )}
         </>
       )}
     </PageWrapper>
   );
 }
 
-function StatCard({ title, value, icon }: { title: string; value: string; icon: ReactNode }) {
+function DetailTile({ label, value }: { label: string; value: string }) {
   return (
-    <div className="kpi-card">
-      <div className="p-2.5 rounded-xl bg-primary/10 w-fit mb-3 text-primary">{icon}</div>
-      <p className="text-xl font-bold">{value}</p>
-      <p className="text-sm text-muted-foreground">{title}</p>
+    <div className="rounded-xl border border-border/40 bg-secondary/20 p-3">
+      <p className="text-xs text-muted-foreground mb-1">{label}</p>
+      <p className="text-sm font-medium">{value}</p>
+    </div>
+  );
+}
+
+function FinancialModal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm" onClick={onClose}>
+      <div onClick={(event) => event.stopPropagation()} className="glass-panel-strong p-6 w-full max-w-6xl mx-4 max-h-[88vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold">{title}</h3>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-secondary/50" title="Close" aria-label="Close">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        {children}
+      </div>
     </div>
   );
 }
