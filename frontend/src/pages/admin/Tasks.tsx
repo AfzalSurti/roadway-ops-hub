@@ -7,11 +7,29 @@ import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 import type { TaskItem } from "@/lib/domain";
-import { statusConfig, toAvatarUrl } from "@/lib/domain";
+import { toAvatarUrl } from "@/lib/domain";
 import { toast } from "sonner";
+
+type AdminTaskStatus = "TODO" | "UNDER_REVIEW" | "IN_PROGRESS" | "DONE";
+
+const adminStatusConfig: Record<AdminTaskStatus, { label: string; color: string }> = {
+  TODO: { label: "To Do", color: "text-muted-foreground bg-muted" },
+  UNDER_REVIEW: { label: "Under Review", color: "text-warning bg-warning/10" },
+  IN_PROGRESS: { label: "In Progress", color: "text-primary bg-primary/10" },
+  DONE: { label: "Done", color: "text-accent bg-accent/10" }
+};
+
+function getAdminTaskStatus(task: TaskItem): AdminTaskStatus {
+  if (task.status === "DONE") return "DONE";
+  if (task.status === "IN_PROGRESS") return "UNDER_REVIEW";
+  if (task.status === "TODO" && !!task.managerReviewComments) return "IN_PROGRESS";
+  return "TODO";
+}
 
 const columns = [
   { key: "TODO", label: "To Do" },
+  { key: "UNDER_REVIEW", label: "Under Review" },
+  { key: "IN_PROGRESS", label: "In Progress" },
   { key: "DONE", label: "Done" }
 ] as const;
 
@@ -20,6 +38,7 @@ export default function AdminTasks() {
   const [search, setSearch] = useState("");
   const [selectedProject, setSelectedProject] = useState<string>("ALL");
   const [selectedAssignedToId, setSelectedAssignedToId] = useState<string>("ALL");
+  const [selectedStatus, setSelectedStatus] = useState<"ALL" | AdminTaskStatus>("ALL");
   const [fromDate, setFromDate] = useState<string>(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
@@ -163,12 +182,14 @@ export default function AdminTasks() {
         task.project.toLowerCase().includes(search.toLowerCase());
       const matchesProject = selectedProject === "ALL" || task.project === selectedProject;
       const matchesAssignedTo = selectedAssignedToId === "ALL" || task.assignedToId === selectedAssignedToId;
+      const taskStatus = getAdminTaskStatus(task);
+      const matchesStatus = selectedStatus === "ALL" || taskStatus === selectedStatus;
       const allocatedDate = new Date(task.allocatedAt ?? task.createdAt);
       const matchesFrom = !from || allocatedDate >= from;
       const matchesTo = !to || allocatedDate <= to;
-      return matchesSearch && matchesProject && matchesAssignedTo && matchesFrom && matchesTo;
+      return matchesSearch && matchesProject && matchesAssignedTo && matchesStatus && matchesFrom && matchesTo;
     });
-  }, [tasks, search, selectedProject, selectedAssignedToId, fromDate, toDate]);
+  }, [tasks, search, selectedProject, selectedAssignedToId, selectedStatus, fromDate, toDate]);
 
   const sortedTasks = useMemo(() => {
     return [...filtered].sort((a, b) => {
@@ -247,6 +268,18 @@ export default function AdminTasks() {
             <option key={employee.id} value={employee.id}>
               {employee.name}
             </option>
+          ))}
+        </select>
+        <select
+          value={selectedStatus}
+          onChange={(event) => setSelectedStatus(event.target.value as "ALL" | AdminTaskStatus)}
+          title="Select status"
+          aria-label="Select status"
+          className="px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 text-sm min-w-[180px]"
+        >
+          <option value="ALL">All Status</option>
+          {columns.map((column) => (
+            <option key={column.key} value={column.key}>{column.label}</option>
           ))}
         </select>
         <select
@@ -368,11 +401,8 @@ export default function AdminTasks() {
       ) : view === "kanban" ? (
         <div className="flex gap-4 overflow-x-auto pb-4">
           {columns.map((column) => {
-            const columnTasks =
-              column.key === "DONE"
-                ? sortedTasks.filter((task) => task.status === "DONE")
-                : sortedTasks.filter((task) => task.status !== "DONE");
-            const cfg = statusConfig[column.key];
+            const columnTasks = sortedTasks.filter((task) => getAdminTaskStatus(task) === column.key);
+            const cfg = adminStatusConfig[column.key];
             return (
               <div key={column.key} className="kanban-column min-w-[280px]">
                 <div className="flex items-center gap-2 mb-4">
@@ -399,6 +429,7 @@ export default function AdminTasks() {
                 <th className="text-left p-4 font-medium">Project</th>
                 <th className="text-left p-4 font-medium">Task</th>
                 <th className="text-left p-4 font-medium">Rating Enabled</th>
+                <th className="text-left p-4 font-medium">Rating</th>
                 <th className="text-left p-4 font-medium">Status</th>
                 <th className="text-left p-4 font-medium">Assigned To</th>
                 <th className="text-left p-4 font-medium">Assigned Date</th>
@@ -425,7 +456,17 @@ export default function AdminTasks() {
                     )}
                   </td>
                   <td className="p-4">
-                    <span className={`status-badge ${statusConfig[task.status].color}`}>{statusConfig[task.status].label}</span>
+                    {task.status === "DONE" && task.ratingEnabled ? (
+                      <span className="font-semibold text-accent">{task.rating ?? "-"}</span>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
+                  </td>
+                  <td className="p-4">
+                    {(() => {
+                      const mappedStatus = getAdminTaskStatus(task);
+                      return <span className={`status-badge ${adminStatusConfig[mappedStatus].color}`}>{adminStatusConfig[mappedStatus].label}</span>;
+                    })()}
                   </td>
                   <td className="p-4 text-muted-foreground">{task.assignedTo?.name ?? "-"}</td>
                   <td className="p-4 text-muted-foreground">{new Date(task.allocatedAt ?? task.createdAt).toLocaleDateString()}</td>
@@ -511,6 +552,7 @@ export default function AdminTasks() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm mb-4">
                 <p><span className="text-muted-foreground">Task:</span> {selectedTask.title}</p>
                 <p><span className="text-muted-foreground">Allocated:</span> {new Date(selectedTask.allocatedAt ?? selectedTask.createdAt).toLocaleDateString()}</p>
+                <p><span className="text-muted-foreground">Status:</span> {adminStatusConfig[getAdminTaskStatus(selectedTask)].label}</p>
                 <p><span className="text-muted-foreground">Submission Days:</span> {selectedTask.allottedDays ?? "-"}</p>
                 <p><span className="text-muted-foreground">Submitted At:</span> {selectedTask.submittedForReviewAt ? new Date(selectedTask.submittedForReviewAt).toLocaleDateString() : "-"}</p>
                 <p><span className="text-muted-foreground">Completed At:</span> {selectedTask.actualCompletedAt ? new Date(selectedTask.actualCompletedAt).toLocaleDateString() : "-"}</p>
