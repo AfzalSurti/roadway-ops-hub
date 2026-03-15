@@ -193,10 +193,16 @@ export default function AdminTeam() {
               <ProfileDetailRow icon={<GraduationCap className="h-3.5 w-3.5" />} label="Education" value={selected.education} />
               <ProfileDetailRow
                 icon={<Calendar className="h-3.5 w-3.5" />}
+                label="Year of Passing"
+                value={selected.yearOfPassing ? new Date(`${selected.yearOfPassing}-01T00:00:00`).toLocaleDateString("en-IN", { month: "short", year: "numeric" }) : null}
+              />
+              <ProfileDetailRow icon={<Briefcase className="h-3.5 w-3.5" />} label="Total Experience" value={selected.totalExperience} />
+              <ProfileDetailRow
+                icon={<Calendar className="h-3.5 w-3.5" />}
                 label="Date of Joining"
                 value={selected.dateOfJoining ? new Date(selected.dateOfJoining).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : null}
               />
-              <ProfileDetailRow icon={<Briefcase className="h-3.5 w-3.5" />} label="Experience" value={selected.experienceInOrg} />
+              <ProfileDetailRow icon={<Briefcase className="h-3.5 w-3.5" />} label="Experience in Organization" value={selected.experienceInOrg} />
               <ProfileDetailRow icon={<IndianRupee className="h-3.5 w-3.5" />} label="Current CTC" value={selected.currentCtc} />
             </div>
 

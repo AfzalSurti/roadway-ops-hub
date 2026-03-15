@@ -5,14 +5,45 @@ import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { User, Phone, GraduationCap, Calendar, Briefcase, IndianRupee, Pencil, Check, X } from "lucide-react";
 
+function computeExperienceFromDate(dateValue?: string | null) {
+  if (!dateValue) return null;
+  const start = new Date(dateValue);
+  if (Number.isNaN(start.getTime())) return null;
+
+  const now = new Date();
+  let months = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
+  if (months < 0) months = 0;
+
+  const years = Math.floor(months / 12);
+  const remMonths = months % 12;
+
+  if (years === 0) return `${remMonths} month${remMonths === 1 ? "" : "s"}`;
+  if (remMonths === 0) return `${years} year${years === 1 ? "" : "s"}`;
+  return `${years} year${years === 1 ? "" : "s"} ${remMonths} month${remMonths === 1 ? "" : "s"}`;
+}
+
+function computeExperienceFromMonth(monthValue?: string | null) {
+  if (!monthValue) return null;
+  return computeExperienceFromDate(`${monthValue}-01`);
+}
+
+function formatMonthYear(monthValue?: string | null) {
+  if (!monthValue) return null;
+  const date = new Date(`${monthValue}-01T00:00:00`);
+  if (Number.isNaN(date.getTime())) return monthValue;
+  return date.toLocaleDateString("en-IN", { month: "short", year: "numeric" });
+}
+
 export default function EmployeeProfile() {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
+    name: "",
+    email: "",
     contactNumber: "",
     education: "",
+    yearOfPassing: "",
     dateOfJoining: "",
-    experienceInOrg: "",
     currentCtc: ""
   });
 
@@ -36,10 +67,12 @@ export default function EmployeeProfile() {
 
   const startEditing = () => {
     setForm({
+      name: profile?.name ?? "",
+      email: profile?.email ?? "",
       contactNumber: profile?.contactNumber ?? "",
       education: profile?.education ?? "",
+      yearOfPassing: profile?.yearOfPassing ?? "",
       dateOfJoining: profile?.dateOfJoining ? profile.dateOfJoining.slice(0, 10) : "",
-      experienceInOrg: profile?.experienceInOrg ?? "",
       currentCtc: profile?.currentCtc ?? ""
     });
     setEditing(true);
@@ -47,15 +80,25 @@ export default function EmployeeProfile() {
 
   const handleSave = () => {
     mutation.mutate({
+      name: form.name.trim(),
+      email: form.email.trim(),
       contactNumber: form.contactNumber.trim() || null,
       education: form.education.trim() || null,
+      yearOfPassing: form.yearOfPassing || null,
       dateOfJoining: form.dateOfJoining
         ? new Date(form.dateOfJoining).toISOString()
         : null,
-      experienceInOrg: form.experienceInOrg.trim() || null,
       currentCtc: form.currentCtc.trim() || null
-    } as typeof form);
+    });
   };
+
+  const totalExperienceValue = editing
+    ? computeExperienceFromMonth(form.yearOfPassing)
+    : profile?.totalExperience ?? computeExperienceFromMonth(profile?.yearOfPassing);
+
+  const orgExperienceValue = editing
+    ? computeExperienceFromDate(form.dateOfJoining ? `${form.dateOfJoining}T00:00:00` : null)
+    : profile?.experienceInOrg ?? computeExperienceFromDate(profile?.dateOfJoining);
 
   if (isLoading) {
     return (
@@ -103,13 +146,33 @@ export default function EmployeeProfile() {
       </div>
 
       <div className="max-w-2xl space-y-6">
-        {/* Account Info (read-only) */}
+        {/* Account Info */}
         <div className="glass-panel p-6">
           <h3 className="font-semibold mb-4 text-sm uppercase tracking-wider text-muted-foreground">Account Information</h3>
-          <div className="space-y-4">
-            <ProfileRow icon={<User className="h-4 w-4" />} label="Full Name" value={profile?.name ?? "-"} readOnly />
-            <ProfileRow icon={<User className="h-4 w-4" />} label="Email Address" value={profile?.email ?? "-"} readOnly />
-          </div>
+          {editing ? (
+            <div className="space-y-4">
+              <EditRow
+                icon={<User className="h-4 w-4" />}
+                label="Full Name"
+                value={form.name}
+                onChange={(v) => setForm((p) => ({ ...p, name: v }))}
+                placeholder="e.g. Rahul Sharma"
+              />
+              <EditRow
+                icon={<User className="h-4 w-4" />}
+                label="Email Address"
+                value={form.email}
+                onChange={(v) => setForm((p) => ({ ...p, email: v }))}
+                placeholder="e.g. name@company.com"
+                type="email"
+              />
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <ProfileRow icon={<User className="h-4 w-4" />} label="Full Name" value={profile?.name ?? "-"} readOnly />
+              <ProfileRow icon={<User className="h-4 w-4" />} label="Email Address" value={profile?.email ?? "-"} readOnly />
+            </div>
+          )}
         </div>
 
         {/* Editable Details */}
@@ -135,18 +198,20 @@ export default function EmployeeProfile() {
                 />
                 <EditRow
                   icon={<Calendar className="h-4 w-4" />}
+                  label="Year of Passing"
+                  value={form.yearOfPassing}
+                  onChange={(v) => setForm((p) => ({ ...p, yearOfPassing: v }))}
+                  type="month"
+                />
+                <EditRow
+                  icon={<Calendar className="h-4 w-4" />}
                   label="Date of Joining"
                   value={form.dateOfJoining}
                   onChange={(v) => setForm((p) => ({ ...p, dateOfJoining: v }))}
                   type="date"
                 />
-                <EditRow
-                  icon={<Briefcase className="h-4 w-4" />}
-                  label="Experience in Organization"
-                  value={form.experienceInOrg}
-                  onChange={(v) => setForm((p) => ({ ...p, experienceInOrg: v }))}
-                  placeholder="e.g. 2 years 3 months"
-                />
+                <ProfileRow icon={<Briefcase className="h-4 w-4" />} label="Total Experience" value={totalExperienceValue ?? "Not available yet"} readOnly />
+                <ProfileRow icon={<Briefcase className="h-4 w-4" />} label="Experience in Organization" value={orgExperienceValue ?? "Not available yet"} readOnly />
                 <EditRow
                   icon={<IndianRupee className="h-4 w-4" />}
                   label="Current CTC"
@@ -159,11 +224,13 @@ export default function EmployeeProfile() {
               <>
                 <ProfileRow icon={<Phone className="h-4 w-4" />} label="Contact Number" value={profile?.contactNumber ?? null} />
                 <ProfileRow icon={<GraduationCap className="h-4 w-4" />} label="Education" value={profile?.education ?? null} />
+                <ProfileRow icon={<Calendar className="h-4 w-4" />} label="Year of Passing" value={formatMonthYear(profile?.yearOfPassing)} />
                 <ProfileRow
                   icon={<Calendar className="h-4 w-4" />}
                   label="Date of Joining"
                   value={profile?.dateOfJoining ? new Date(profile.dateOfJoining).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : null}
                 />
+                <ProfileRow icon={<Briefcase className="h-4 w-4" />} label="Total Experience" value={profile?.totalExperience ?? null} />
                 <ProfileRow icon={<Briefcase className="h-4 w-4" />} label="Experience in Organization" value={profile?.experienceInOrg ?? null} />
                 <ProfileRow icon={<IndianRupee className="h-4 w-4" />} label="Current CTC" value={profile?.currentCtc ?? null} />
               </>

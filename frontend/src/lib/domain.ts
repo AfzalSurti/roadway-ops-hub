@@ -19,6 +19,8 @@ export type ApiUser = {
   role: Role;
   contactNumber?: string | null;
   education?: string | null;
+  yearOfPassing?: string | null;
+  totalExperience?: string | null;
   dateOfJoining?: string | null;
   experienceInOrg?: string | null;
   currentCtc?: string | null;

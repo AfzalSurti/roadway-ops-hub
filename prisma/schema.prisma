@@ -58,6 +58,7 @@ model User {
   role               Role
   contactNumber      String?
   education          String?
+  yearOfPassing      String?
   dateOfJoining      DateTime?
   experienceInOrg    String?
   currentCtc         String?

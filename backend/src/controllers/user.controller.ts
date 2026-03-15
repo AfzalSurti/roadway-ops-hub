@@ -5,9 +5,32 @@ import { sendSuccess } from "../utils/response.js";
 function serializeUser(user: {
   id: string; name: string; email: string; role: string;
   contactNumber?: string | null; education?: string | null;
+  yearOfPassing?: string | null;
   dateOfJoining?: Date | null; experienceInOrg?: string | null;
   currentCtc?: string | null; createdAt: Date; updatedAt: Date;
 }) {
+  const formatExperience = (fromDate: Date | null | undefined) => {
+    if (!fromDate) return null;
+
+    const start = new Date(fromDate);
+    if (Number.isNaN(start.getTime())) return null;
+
+    const now = new Date();
+    let months = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
+    if (months < 0) months = 0;
+
+    const years = Math.floor(months / 12);
+    const remainingMonths = months % 12;
+
+    if (years === 0) return `${remainingMonths} month${remainingMonths === 1 ? "" : "s"}`;
+    if (remainingMonths === 0) return `${years} year${years === 1 ? "" : "s"}`;
+    return `${years} year${years === 1 ? "" : "s"} ${remainingMonths} month${remainingMonths === 1 ? "" : "s"}`;
+  };
+
+  const passingDate = user.yearOfPassing ? new Date(`${user.yearOfPassing}-01T00:00:00.000Z`) : null;
+  const totalExperience = formatExperience(passingDate);
+  const experienceInOrganization = formatExperience(user.dateOfJoining);
+
   return {
     id: user.id,
     name: user.name,
@@ -15,8 +38,10 @@ function serializeUser(user: {
     role: user.role,
     contactNumber: user.contactNumber ?? null,
     education: user.education ?? null,
+    yearOfPassing: user.yearOfPassing ?? null,
+    totalExperience,
     dateOfJoining: user.dateOfJoining ? user.dateOfJoining.toISOString() : null,
-    experienceInOrg: user.experienceInOrg ?? null,
+    experienceInOrg: experienceInOrganization,
     currentCtc: user.currentCtc ?? null,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt

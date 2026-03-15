@@ -15,17 +15,30 @@ export const userService = {
     return user;
   },
   async updateProfile(id: string, payload: {
+    name?: string;
+    email?: string;
     contactNumber?: string | null;
     education?: string | null;
+    yearOfPassing?: string | null;
     dateOfJoining?: string | null;
     experienceInOrg?: string | null;
     currentCtc?: string | null;
   }) {
+    if (payload.email) {
+      const normalizedEmail = payload.email.trim().toLowerCase();
+      const existing = await userRepository.findByEmail(normalizedEmail);
+      if (existing && existing.id !== id) {
+        throw conflict("User with this email already exists");
+      }
+    }
+
     return userRepository.updateById(id, {
+      name: payload.name?.trim(),
+      email: payload.email?.trim().toLowerCase(),
       contactNumber: payload.contactNumber,
       education: payload.education,
+      yearOfPassing: payload.yearOfPassing,
       dateOfJoining: payload.dateOfJoining ? new Date(payload.dateOfJoining) : null,
-      experienceInOrg: payload.experienceInOrg,
       currentCtc: payload.currentCtc
     });
   },

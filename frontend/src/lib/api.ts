@@ -63,6 +63,10 @@ export const authStorage = {
     localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
     emitAuthChanged();
   },
+  setUser(user: ApiUser) {
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+    emitAuthChanged();
+  },
   clear() {
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);
@@ -537,8 +541,11 @@ export const api = {
   },
 
   updateProfile(payload: {
+    name?: string;
+    email?: string;
     contactNumber?: string | null;
     education?: string | null;
+    yearOfPassing?: string | null;
     dateOfJoining?: string | null;
     experienceInOrg?: string | null;
     currentCtc?: string | null;
@@ -546,6 +553,13 @@ export const api = {
     return request<ApiUser>("/users/me", {
       method: "PATCH",
       body: JSON.stringify(payload)
+    }).then((updatedUser) => {
+      const accessToken = authStorage.getAccessToken();
+      const refreshToken = authStorage.getRefreshToken();
+      if (accessToken && refreshToken) {
+        authStorage.setUser(updatedUser);
+      }
+      return updatedUser;
     });
   },
 
