@@ -12,7 +12,7 @@ export default function EmployeeReports() {
   const [fromDate, setFromDate] = useState<string>("");
   const [toDate, setToDate] = useState<string>("");
   const { data } = useQuery({ queryKey: ["reports", "employee"], queryFn: () => api.getReports({ limit: 100 }) });
-  const { data: tasksData } = useQuery({ queryKey: ["tasks", "employee-report-ratings"], queryFn: () => api.getTasks({ limit: 200 }) });
+  const { data: tasksData } = useQuery({ queryKey: ["tasks", "employee-shared"], queryFn: () => api.getTasks({ limit: 200 }) });
   const myReports = data?.items ?? [];
   const myTasks = tasksData?.items ?? [];
 
@@ -111,6 +111,8 @@ export default function EmployeeReports() {
             type="date"
             value={fromDate}
             onChange={(event) => setFromDate(event.target.value)}
+            title="From date"
+            aria-label="From date"
             className="w-full px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 text-sm"
           />
         </div>
@@ -121,6 +123,8 @@ export default function EmployeeReports() {
             type="date"
             value={toDate}
             onChange={(event) => setToDate(event.target.value)}
+            title="To date"
+            aria-label="To date"
             className="w-full px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 text-sm"
           />
         </div>

@@ -3,21 +3,32 @@ import { PageWrapper } from "@/components/PageWrapper";
 import { Calendar, ArrowRight, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { statusConfig } from "@/lib/domain";
+import { statusConfig, type TaskItem } from "@/lib/domain";
 import { toast } from "sonner";
 import { useSearchParams } from "react-router-dom";
 
 export default function EmployeeTasks() {
+  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedProject, setSelectedProject] = useState<string>("ALL");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [completionNote, setCompletionNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [acknowledging, setAcknowledging] = useState(false);
-  const { data, refetch } = useQuery({ queryKey: ["tasks", "employee"], queryFn: () => api.getTasks({ limit: 100 }) });
+  const { data } = useQuery({ queryKey: ["tasks", "employee-shared"], queryFn: () => api.getTasks({ limit: 100 }) });
   const myTasks = data?.items ?? [];
+
+  const patchTaskInCache = (updatedTask: TaskItem) => {
+    queryClient.setQueryData<{ items: TaskItem[]; pagination: unknown }>(["tasks", "employee-shared"], (prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        items: prev.items.map((task) => (task.id === updatedTask.id ? updatedTask : task))
+      };
+    });
+  };
 
   const projectOptions = useMemo(() => {
     const projects = new Set<string>();
@@ -70,8 +81,9 @@ export default function EmployeeTasks() {
     if (!selectedTask) return;
     try {
       setSubmitting(true);
-      await api.completeTask(selectedTask.id, completionNote.trim() || undefined);
-      await Promise.all([refetch(), refetchComments()]);
+      const updated = await api.completeTask(selectedTask.id, completionNote.trim() || undefined);
+      patchTaskInCache(updated);
+      await refetchComments();
       setCompletionNote("");
       toast.success("Task submitted to admin");
     } catch (error) {
@@ -86,8 +98,8 @@ export default function EmployeeTasks() {
     if (!selectedTask) return;
     try {
       setAcknowledging(true);
-      await api.acknowledgeTaskComment(selectedTask.id);
-      await refetch();
+      const updated = await api.acknowledgeTaskComment(selectedTask.id);
+      patchTaskInCache(updated);
       toast.success("Comment accepted and sent back to admin");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to accept comment";

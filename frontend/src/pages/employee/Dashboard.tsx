@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 
 export default function EmployeeDashboard() {
   const { user } = useAuth();
-  const { data: tasksData } = useQuery({ queryKey: ["tasks", "employee-dashboard"], queryFn: () => api.getTasks({ limit: 100 }) });
+  const { data: tasksData } = useQuery({ queryKey: ["tasks", "employee-shared"], queryFn: () => api.getTasks({ limit: 100 }) });
 
   const myTasks = tasksData?.items ?? [];
   const pendingTasks = myTasks.filter((task) => task.status === "TODO" && !task.managerReviewComments);
