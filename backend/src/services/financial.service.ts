@@ -52,22 +52,23 @@ export const financialService = {
   async listEligibleProjects() {
     const projects = await financialRepository.findEligibleProjects();
     return projects.map((project: { id: string; name: string; projectNumber: string; requisitionForm: { id: string; amountOfWorkOrder: string; workOrderValue: string; gstAmount: string } }) => ({
+      contractValue: round2(parseMoney(project.requisitionForm!.amountOfWorkOrder || project.requisitionForm!.workOrderValue)),
+      taxAmount: round2(parseMoney(project.requisitionForm!.amountOfWorkOrder || project.requisitionForm!.workOrderValue) * 0.18),
+      totalAmount: round2(
+        parseMoney(project.requisitionForm!.amountOfWorkOrder || project.requisitionForm!.workOrderValue) +
+          parseMoney(project.requisitionForm!.amountOfWorkOrder || project.requisitionForm!.workOrderValue) * 0.18
+      ),
       id: project.id,
       name: project.name,
       projectNumber: project.projectNumber!,
-      requisitionFormId: project.requisitionForm!.id,
-      contractValue: round2(parseMoney(project.requisitionForm!.amountOfWorkOrder || project.requisitionForm!.workOrderValue)),
-      taxAmount: round2(parseMoney(project.requisitionForm!.gstAmount)),
-      totalAmount: round2(
-        parseMoney(project.requisitionForm!.amountOfWorkOrder || project.requisitionForm!.workOrderValue) + parseMoney(project.requisitionForm!.gstAmount)
-      )
+      requisitionFormId: project.requisitionForm!.id
     }));
   },
 
   async getProjectFinancial(projectId: string) {
     const project = await getEligibleProjectOrThrow(projectId);
     const contractValue = round2(parseMoney(project.requisitionForm!.amountOfWorkOrder || project.requisitionForm!.workOrderValue));
-    const taxAmount = round2(parseMoney(project.requisitionForm!.gstAmount));
+    const taxAmount = round2(contractValue * 0.18);
     const totalAmount = round2(contractValue + taxAmount);
     const plan = await financialRepository.findPlanByProjectId(projectId);
 
@@ -89,7 +90,7 @@ export const financialService = {
   async upsertPlan(projectId: string, payload: { items: Array<{ itemNumber: number; particulars: string; percentage: number }> }) {
     const project = await getEligibleProjectOrThrow(projectId);
     const contractValue = round2(parseMoney(project.requisitionForm!.amountOfWorkOrder || project.requisitionForm!.workOrderValue));
-    const taxAmount = round2(parseMoney(project.requisitionForm!.gstAmount));
+    const taxAmount = round2(contractValue * 0.18);
     const totalAmount = round2(contractValue + taxAmount);
 
     const byItemNumber = [...payload.items].sort((a, b) => a.itemNumber - b.itemNumber);
@@ -102,7 +103,7 @@ export const financialService = {
       itemNumber: item.itemNumber,
       particulars: item.particulars,
       percentage: round2(Number(item.percentage)),
-      amount: round2((totalAmount * Number(item.percentage)) / 100)
+      amount: round2((contractValue * Number(item.percentage)) / 100)
     }));
 
     return financialRepository.upsertPlan({

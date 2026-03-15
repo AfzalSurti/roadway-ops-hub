@@ -368,12 +368,16 @@ export default function AdminFinancial() {
                       <th className="text-left p-3 font-medium">Particulars</th>
                       <th className="text-left p-3 font-medium">Percentage</th>
                       <th className="text-left p-3 font-medium">Amount</th>
+                      <th className="text-left p-3 font-medium">Tax (18%)</th>
+                      <th className="text-left p-3 font-medium">Total</th>
                     </tr>
                   </thead>
                   <tbody>
                     {planningRows.map((item, index) => {
                       const percentage = Number(item.percentage || 0);
-                      const amount = (detail.project.totalAmount * percentage) / 100;
+                      const amount = (detail.project.contractValue * percentage) / 100;
+                      const tax = amount * 0.18;
+                      const total = amount + tax;
                       return (
                         <tr key={`${item.itemNumber}-${index}`} className="border-b border-border/20 align-top">
                           <td className="p-3 font-medium w-28">
@@ -423,12 +427,16 @@ export default function AdminFinancial() {
                             </button>
                           </td>
                           <td className="p-3 font-medium">{money(amount)}</td>
+                          <td className="p-3 font-medium">{money(tax)}</td>
+                          <td className="p-3 font-medium">{money(total)}</td>
                         </tr>
                       );
                     })}
                     <tr className="bg-secondary/20 font-medium">
                       <td className="p-3" colSpan={2}>Total</td>
                       <td className={`p-3 ${Math.abs(totalPercentage - 100) > 0.01 ? "text-destructive" : "text-accent"}`}>{totalPercentage.toFixed(2)}%</td>
+                      <td className="p-3">{money(detail.project.contractValue)}</td>
+                      <td className="p-3">{money(detail.project.taxAmount)}</td>
                       <td className="p-3">{money(detail.project.totalAmount)}</td>
                     </tr>
                   </tbody>
