@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import type { TaskItem } from "@/lib/domain";
 import { toast } from "sonner";
 import { useSearchParams } from "react-router-dom";
+import { usePersistentState } from "@/hooks/use-persistent-state";
 
 type EmployeeTaskStatus = "TODO" | "UNDER_REVIEW" | "IN_PROGRESS" | "DONE";
 
@@ -24,17 +25,21 @@ function getEmployeeTaskStatus(task: TaskItem): EmployeeTaskStatus {
   return "TODO";
 }
 
+function getProjectLabel(task: TaskItem): string {
+  return task.projectNumber?.trim() || task.projectCode?.trim() || task.project?.trim() || "Unknown";
+}
+
 export default function EmployeeTasks() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [search, setSearch] = useState("");
-  const [selectedProject, setSelectedProject] = useState<string>("ALL");
-  const [selectedStatus, setSelectedStatus] = useState<"ALL" | EmployeeTaskStatus>("ALL");
-  const [fromDate, setFromDate] = useState<string>(() => {
+  const [search, setSearch] = usePersistentState<string>("employee.tasks.search", "");
+  const [selectedProject, setSelectedProject] = usePersistentState<string>("employee.tasks.selectedProject", "ALL");
+  const [selectedStatus, setSelectedStatus] = usePersistentState<"ALL" | EmployeeTaskStatus>("employee.tasks.selectedStatus", "ALL");
+  const [fromDate, setFromDate] = usePersistentState<string>("employee.tasks.fromDate", () => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
   });
-  const [toDate, setToDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  const [toDate, setToDate] = usePersistentState<string>("employee.tasks.toDate", () => new Date().toISOString().slice(0, 10));
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [completionNote, setCompletionNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -56,7 +61,8 @@ export default function EmployeeTasks() {
   const projectOptions = useMemo(() => {
     const projects = new Set<string>();
     myTasks.forEach((task) => {
-      if (task.project?.trim()) projects.add(task.project.trim());
+      const label = getProjectLabel(task);
+      if (label) projects.add(label);
     });
     return ["ALL", ...Array.from(projects).sort((a, b) => a.localeCompare(b))];
   }, [myTasks]);
@@ -68,10 +74,11 @@ export default function EmployeeTasks() {
     return myTasks.filter((task) => {
       const taskDate = new Date(task.allocatedAt ?? task.createdAt);
       const mapped = getEmployeeTaskStatus(task);
+      const projectLabel = getProjectLabel(task);
       const matchesSearch =
         task.title.toLowerCase().includes(search.toLowerCase()) ||
-        task.project.toLowerCase().includes(search.toLowerCase());
-      const matchesProject = selectedProject === "ALL" || task.project === selectedProject;
+        projectLabel.toLowerCase().includes(search.toLowerCase());
+      const matchesProject = selectedProject === "ALL" || projectLabel === selectedProject;
       const matchesStatus = selectedStatus === "ALL" || mapped === selectedStatus;
       const matchesFrom = !from || taskDate >= from;
       const matchesTo = !to || taskDate <= to;
@@ -240,7 +247,7 @@ export default function EmployeeTasks() {
                   }}
                   className="border-b border-border/30 hover:bg-secondary/30 transition-colors cursor-pointer"
                 >
-                  <td className="p-4 text-muted-foreground">{task.project}</td>
+                  <td className="p-4 text-muted-foreground">{getProjectLabel(task)}</td>
                   <td className="p-4 min-w-[320px]">
                     <p className="font-medium">{task.title}</p>
                     <p className="text-xs text-muted-foreground line-clamp-2">{task.description || "-"}</p>
@@ -290,7 +297,7 @@ export default function EmployeeTasks() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm mb-4">
               <p><span className="text-muted-foreground">Task:</span> {selectedTask.title}</p>
-              <p><span className="text-muted-foreground">Project:</span> {selectedTask.project}</p>
+              <p><span className="text-muted-foreground">Project:</span> {getProjectLabel(selectedTask)}</p>
               <p><span className="text-muted-foreground">Allocated:</span> {new Date(selectedTask.allocatedAt ?? selectedTask.createdAt).toLocaleDateString()}</p>
               <p><span className="text-muted-foreground">Due:</span> {new Date(selectedTask.dueDate).toLocaleDateString()}</p>
               <p><span className="text-muted-foreground">Status:</span> {employeeStatusConfig[getEmployeeTaskStatus(selectedTask)].label}</p>

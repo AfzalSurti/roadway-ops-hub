@@ -6,11 +6,12 @@ import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { reportStatusConfig } from "@/lib/domain";
+import { usePersistentState } from "@/hooks/use-persistent-state";
 
 export default function EmployeeReports() {
-  const [selectedProject, setSelectedProject] = useState<string>("ALL");
-  const [fromDate, setFromDate] = useState<string>("");
-  const [toDate, setToDate] = useState<string>("");
+  const [selectedProject, setSelectedProject] = usePersistentState<string>("employee.reports.selectedProject", "ALL");
+  const [fromDate, setFromDate] = usePersistentState<string>("employee.reports.fromDate", "");
+  const [toDate, setToDate] = usePersistentState<string>("employee.reports.toDate", "");
   const { data } = useQuery({ queryKey: ["reports", "employee"], queryFn: () => api.getReports({ limit: 100 }) });
   const { data: tasksData } = useQuery({ queryKey: ["tasks", "employee-shared"], queryFn: () => api.getTasks({ limit: 200 }) });
   const myReports = data?.items ?? [];
