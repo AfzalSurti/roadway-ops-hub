@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { PageWrapper } from "@/components/PageWrapper";
 import { motion } from "framer-motion";
-import { Plus, LayoutGrid, List, Search, Calendar, Check, X } from "lucide-react";
+import { Plus, LayoutGrid, List, Search, Calendar, Check, X, Download, FileDown } from "lucide-react";
+import { downloadTaskReport, downloadProjectReport } from "@/lib/reports-pdf";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
@@ -253,13 +254,30 @@ export default function AdminTasks() {
         >
           <Plus className="h-4 w-4" />
           New Task
-        </Link>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3 mb-6">
-        <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 text-sm flex-1 max-w-sm">
-          <Search className="h-4 w-4 text-muted-foreground" />
-          <input
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() =>
+              downloadProjectReport({
+                tasks: sortedTasks,
+                projectName: selectedProject === "ALL" ? "All Projects" : selectedProject,
+                fromDate,
+                toDate
+              })
+            }
+            title="Download filtered tasks as PDF report"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-primary/40 text-primary font-medium text-sm hover:bg-primary/10 transition-colors shrink-0"
+          >
+            <FileDown className="h-4 w-4" />
+            Download Report
+          </button>
+          <Link
+            to="/admin/tasks/new"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-primary to-accent text-primary-foreground font-medium text-sm hover:opacity-90 transition-opacity shrink-0"
+          >
+            <Plus className="h-4 w-4" />
+            New Task
+          </Link>
+        </div>
             type="text"
             placeholder="Search tasks…"
             value={search}
@@ -445,6 +463,7 @@ export default function AdminTasks() {
                 <th className="text-left p-4 font-medium">Assigned To</th>
                 <th className="text-left p-4 font-medium">Assigned Date</th>
                 <th className="text-left p-4 font-medium">Due Date</th>
+                <th className="p-4 font-medium w-10"></th>
               </tr>
             </thead>
             <tbody>
@@ -482,6 +501,15 @@ export default function AdminTasks() {
                   <td className="p-4 text-muted-foreground">{task.assignedTo?.name ?? "-"}</td>
                   <td className="p-4 text-muted-foreground">{new Date(task.allocatedAt ?? task.createdAt).toLocaleDateString()}</td>
                   <td className="p-4 text-muted-foreground">{new Date(task.dueDate).toLocaleDateString()}</td>
+                  <td className="p-4">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); downloadTaskReport(task); }}
+                      title="Download task report"
+                      className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                    >
+                      <Download className="h-4 w-4" />
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>

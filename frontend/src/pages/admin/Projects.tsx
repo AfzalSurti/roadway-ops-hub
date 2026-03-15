@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { downloadProjectRequisitionPdf } from "@/lib/project-requisition-pdf";
+import { downloadProjectReport } from "@/lib/reports-pdf";
 import { statusConfig, type ProjectRequisitionFormItem } from "@/lib/domain";
 
 type WizardStep = 1 | 2 | 3 | 4 | 5;
@@ -650,6 +651,14 @@ export default function AdminProjects() {
                   <td className="p-4"><div className="flex items-center justify-between gap-3"><span className="font-medium">{row.projectName}</span><button onClick={(event) => { event.stopPropagation(); void handleDeleteProject(row.id, row.projectName); }} disabled={deletingId === row.id} className="p-1.5 rounded-lg border border-destructive/30 text-destructive hover:bg-destructive/10 disabled:opacity-50" title="Delete project" aria-label="Delete project"><Trash2 className="h-4 w-4" /></button></div></td>
                   <td className="p-4 font-medium">{row.projectNumber}</td>
                   <td className="p-4" onClick={(event) => event.stopPropagation()}>
+                    <button
+                      onClick={(event) => { event.stopPropagation(); downloadProjectReport({ tasks: row.tasks, projectName: row.projectName }); }}
+                      title="Download project task report"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-primary/30 text-primary text-xs font-medium hover:bg-primary/10 transition-colors mb-2"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      Task Report
+                    </button>
                     {!row.projectNumber || row.projectNumber === "-" ? null : row.requisitionForm ? (
                       <div className="flex items-center gap-2">
                         <button onClick={() => downloadProjectRequisitionPdf(row.requisitionForm, row.projectName)} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-accent/15 text-accent font-medium hover:bg-accent/20"><Download className="h-4 w-4" />Download PDF</button>
@@ -683,6 +692,15 @@ export default function AdminProjects() {
               <div><p className="text-xs text-muted-foreground">Pending</p><p className="font-medium mt-1">{selectedProject.pendingTasks}</p></div>
               <div><p className="text-xs text-muted-foreground">Overdue</p><p className="font-medium mt-1">{selectedProject.overdueTasks}</p></div>
               <div><p className="text-xs text-muted-foreground">Completed</p><p className="font-medium mt-1">{selectedProject.tasks.filter((task) => task.status === "DONE").length}</p></div>
+              <div className="sm:col-span-2 mt-1">
+                <button
+                  onClick={() => downloadProjectReport({ tasks: selectedProject.tasks, projectName: selectedProject.projectName })}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-primary/40 text-primary text-sm font-medium hover:bg-primary/10 transition-colors"
+                >
+                  <Download className="h-4 w-4" />
+                  Download Project Task Report
+                </button>
+              </div>
             </div>
             <div>
               <p className="text-sm font-medium mb-3">Tasks In This Project</p>
