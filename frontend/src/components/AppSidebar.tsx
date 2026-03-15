@@ -37,6 +37,12 @@ export function AppSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const navItems = isAdmin ? adminNav : employeeNav;
 
+  const handleLogout = async () => {
+    const confirmed = window.confirm("Are you sure you want to logout?");
+    if (!confirmed) return;
+    await logout();
+  };
+
   return (
     <motion.aside
       initial={false}
@@ -83,7 +89,7 @@ export function AppSidebar() {
             )}
           </div>
         )}
-        <button onClick={logout} className={cn("nav-item w-full text-destructive hover:text-destructive", collapsed && "justify-center")}>
+        <button onClick={() => void handleLogout()} className={cn("nav-item w-full text-destructive hover:text-destructive", collapsed && "justify-center")}>
           <LogOut className="h-4 w-4 shrink-0" />
           {!collapsed && <span>Logout</span>}
         </button>
