@@ -12,7 +12,7 @@ function getProjectLabel(task: TaskItem): string {
 function computeStats(tasks: TaskItem[]) {
   const now = new Date();
   return {
-    open: tasks.filter((t) => t.status !== "DONE").length,
+    total: tasks.length,
     pending: tasks.filter((t) => t.status === "TODO" && !t.managerReviewComments).length,
     overdue: tasks.filter((t) => new Date(t.dueDate) < now && t.status !== "DONE").length,
     commentPending: tasks.filter((t) => t.status === "TODO" && !!t.managerReviewComments).length,
@@ -50,7 +50,7 @@ export default function AdminDashboard() {
   const tableRows = selectedProject === "ALL" ? projectRows : projectRows.filter((r) => r.name === selectedProject);
 
   const kpis = [
-    { label: "Open Tasks", value: totals.open, icon: ListTodo, color: "text-primary", bg: "bg-primary/10" },
+    { label: "Total Tasks", value: totals.total, icon: ListTodo, color: "text-primary", bg: "bg-primary/10" },
     { label: "Pending", value: totals.pending, icon: Clock, color: "text-blue-400", bg: "bg-blue-400/10" },
     { label: "Overdue", value: totals.overdue, icon: AlertTriangle, color: "text-warning", bg: "bg-warning/10" },
     { label: "Comment Pending", value: totals.commentPending, icon: MessageSquare, color: "text-orange-400", bg: "bg-orange-400/10" },
@@ -104,7 +104,7 @@ export default function AdminDashboard() {
               <thead>
                 <tr className="border-b border-border/40">
                   <th className="text-left py-3 pr-4 font-medium text-muted-foreground">Project</th>
-                  <th className="text-center py-3 px-4 font-medium text-primary">Open Tasks</th>
+                  <th className="text-center py-3 px-4 font-medium text-primary">Total Tasks</th>
                   <th className="text-center py-3 px-4 font-medium text-blue-400">Pending</th>
                   <th className="text-center py-3 px-4 font-medium text-warning">Overdue</th>
                   <th className="text-center py-3 px-4 font-medium text-orange-400">Comment Pending</th>
@@ -116,7 +116,7 @@ export default function AdminDashboard() {
                   <tr key={row.name} className="border-b border-border/20 hover:bg-secondary/20 transition-colors">
                     <td className="py-3 pr-4 font-medium truncate max-w-[200px]">{row.name}</td>
                     <td className="text-center py-3 px-4">
-                      <span className="inline-block min-w-[2rem] px-2 py-0.5 rounded-lg bg-primary/10 text-primary font-semibold">{row.open}</span>
+                      <span className="inline-block min-w-[2rem] px-2 py-0.5 rounded-lg bg-primary/10 text-primary font-semibold">{row.total}</span>
                     </td>
                     <td className="text-center py-3 px-4">
                       <span className="inline-block min-w-[2rem] px-2 py-0.5 rounded-lg bg-blue-400/10 text-blue-400 font-semibold">{row.pending}</span>
@@ -136,7 +136,7 @@ export default function AdminDashboard() {
                   <tr className="border-t-2 border-border/50 bg-secondary/10">
                     <td className="py-3 pr-4 font-bold">Total</td>
                     <td className="text-center py-3 px-4">
-                      <span className="inline-block min-w-[2rem] px-2 py-0.5 rounded-lg bg-primary/10 text-primary font-bold">{totals.open}</span>
+                      <span className="inline-block min-w-[2rem] px-2 py-0.5 rounded-lg bg-primary/10 text-primary font-bold">{totals.total}</span>
                     </td>
                     <td className="text-center py-3 px-4">
                       <span className="inline-block min-w-[2rem] px-2 py-0.5 rounded-lg bg-blue-400/10 text-blue-400 font-bold">{totals.pending}</span>
