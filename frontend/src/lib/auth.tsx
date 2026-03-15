@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useMemo, useState } from "react";
-import { api, authStorage } from "@/lib/api";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { api, authStorage, bootstrapSession, subscribeAuthChanges } from "@/lib/api";
 import type { ApiUser } from "@/lib/domain";
 import { toAvatarUrl } from "@/lib/domain";
 
@@ -38,6 +38,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(nextUser);
     return nextUser;
   };
+
+  useEffect(() => {
+    const stop = subscribeAuthChanges(() => {
+      const stored = authStorage.getUser();
+      setUser(stored ? { ...stored, avatar: toAvatarUrl(stored.name) } : null);
+    });
+
+    void (async () => {
+      const stored = authStorage.getUser();
+      if (!stored) {
+        setUser(null);
+        return;
+      }
+
+      const ok = await bootstrapSession();
+      if (!ok) {
+        setUser(null);
+        return;
+      }
+
+      const refreshedUser = authStorage.getUser();
+      setUser(refreshedUser ? { ...refreshedUser, avatar: toAvatarUrl(refreshedUser.name) } : null);
+    })();
+
+    return stop;
+  }, []);
 
   const logout = async () => {
     await api.logout();

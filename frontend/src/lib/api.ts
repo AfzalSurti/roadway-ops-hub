@@ -38,6 +38,13 @@ function buildErrorMessage<T>(response: Response, json: ApiResponse<T>): string 
 const ACCESS_TOKEN_KEY = "highwayops_access_token";
 const REFRESH_TOKEN_KEY = "highwayops_refresh_token";
 const USER_KEY = "highwayops_user";
+const AUTH_CHANGED_EVENT = "highwayops-auth-changed";
+
+function emitAuthChanged() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
+  }
+}
 
 export const authStorage = {
   getAccessToken: () => localStorage.getItem(ACCESS_TOKEN_KEY),
@@ -50,14 +57,17 @@ export const authStorage = {
     localStorage.setItem(ACCESS_TOKEN_KEY, args.accessToken);
     localStorage.setItem(REFRESH_TOKEN_KEY, args.refreshToken);
     localStorage.setItem(USER_KEY, JSON.stringify(args.user));
+    emitAuthChanged();
   },
   setAccessToken(accessToken: string) {
     localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+    emitAuthChanged();
   },
   clear() {
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+    emitAuthChanged();
   }
 };
 
@@ -98,6 +108,29 @@ async function refreshAccessToken(): Promise<string> {
 
   authStorage.setAccessToken(json.data.accessToken);
   return json.data.accessToken;
+}
+
+export async function bootstrapSession(): Promise<boolean> {
+  const refreshToken = authStorage.getRefreshToken();
+  const user = authStorage.getUser();
+  if (!refreshToken || !user) {
+    authStorage.clear();
+    return false;
+  }
+
+  try {
+    await refreshAccessToken();
+    return true;
+  } catch {
+    authStorage.clear();
+    return false;
+  }
+}
+
+export function subscribeAuthChanges(handler: () => void): () => void {
+  if (typeof window === "undefined") return () => undefined;
+  window.addEventListener(AUTH_CHANGED_EVENT, handler);
+  return () => window.removeEventListener(AUTH_CHANGED_EVENT, handler);
 }
 
 async function request<T>(path: string, init: RequestInit = {}, useAuth = true, retryOnUnauthorized = true): Promise<T> {
