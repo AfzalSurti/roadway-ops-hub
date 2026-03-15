@@ -5,7 +5,7 @@ import { Plus, LayoutGrid, List, Search, Calendar, Check, X } from "lucide-react
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { TaskItem } from "@/lib/domain";
 import { toAvatarUrl } from "@/lib/domain";
 import { toast } from "sonner";
@@ -34,6 +34,7 @@ const columns = [
 ] as const;
 
 export default function AdminTasks() {
+  const queryClient = useQueryClient();
   const [view, setView] = useState<"kanban" | "list">("list");
   const [search, setSearch] = useState("");
   const [selectedProject, setSelectedProject] = useState<string>("ALL");
@@ -44,8 +45,6 @@ export default function AdminTasks() {
     return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
   });
   const [toDate, setToDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
-  const [tasks, setTasks] = useState<TaskItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [selectedTask, setSelectedTask] = useState<TaskItem | null>(null);
   const [isEditingTask, setIsEditingTask] = useState(false);
   const [editTitle, setEditTitle] = useState("");
@@ -53,6 +52,17 @@ export default function AdminTasks() {
   const [editAssignedToId, setEditAssignedToId] = useState("");
   const [reviewComment, setReviewComment] = useState("");
   const [reviewing, setReviewing] = useState(false);
+  const {
+    data: tasksData,
+    isLoading: loading,
+    isError: tasksError,
+    error
+  } = useQuery({
+    queryKey: ["tasks", "admin-shared"],
+    queryFn: () => api.getTasks({ limit: 500 })
+  });
+  const tasks = tasksData?.items ?? [];
+
   const { data: users = [] } = useQuery({ queryKey: ["users", "task-edit"], queryFn: () => api.getUsers() });
   const { data: selectedTaskComments = [] } = useQuery({
     queryKey: ["task-comments", selectedTask?.id],
@@ -74,19 +84,10 @@ export default function AdminTasks() {
   }, [selectedTask, selectedTaskComments]);
 
   useEffect(() => {
-    const run = async () => {
-      try {
-        const result = await api.getTasks({ limit: 100, search: search || undefined });
-        setTasks(result.items);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "Failed to load tasks";
-        toast.error(message);
-      } finally {
-        setLoading(false);
-      }
-    };
-    void run();
-  }, [search]);
+    if (!tasksError) return;
+    const message = error instanceof Error ? error.message : "Failed to load tasks";
+    toast.error(message);
+  }, [tasksError, error]);
 
   useEffect(() => {
     if (!selectedTask) {
@@ -98,6 +99,16 @@ export default function AdminTasks() {
     setEditAssignedToId(selectedTask.assignedToId);
     setIsEditingTask(false);
   }, [selectedTask]);
+
+  const patchTaskInCache = (updatedTask: TaskItem) => {
+    queryClient.setQueryData<{ items: TaskItem[]; pagination: unknown }>(["tasks", "admin-shared"], (prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        items: prev.items.map((task) => (task.id === updatedTask.id ? updatedTask : task))
+      };
+    });
+  };
 
   const handleSaveTask = async () => {
     if (!selectedTask) return;
@@ -112,7 +123,7 @@ export default function AdminTasks() {
         project: editProject.trim(),
         assignedToId: editAssignedToId
       });
-      setTasks((prev) => prev.map((task) => (task.id === updated.id ? updated : task)));
+      patchTaskInCache(updated);
       setSelectedTask(updated);
       setIsEditingTask(false);
       toast.success("Task updated");
@@ -127,7 +138,7 @@ export default function AdminTasks() {
     try {
       setReviewing(true);
       const updated = await api.approveTask(selectedTask.id);
-      setTasks((prev) => prev.map((task) => (task.id === updated.id ? updated : task)));
+      patchTaskInCache(updated);
       setSelectedTask(updated);
       toast.success("Task approved");
     } catch (error) {
@@ -146,7 +157,7 @@ export default function AdminTasks() {
     try {
       setReviewing(true);
       const updated = await api.requestTaskChanges(selectedTask.id, reviewComment.trim());
-      setTasks((prev) => prev.map((task) => (task.id === updated.id ? updated : task)));
+      patchTaskInCache(updated);
       setSelectedTask(updated);
       setReviewComment("");
       toast.success("Comment sent to employee");

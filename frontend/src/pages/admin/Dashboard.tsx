@@ -24,7 +24,10 @@ function computeStats(tasks: TaskItem[]) {
 export default function AdminDashboard() {
   const [selectedProject, setSelectedProject] = useState<string>("ALL");
 
-  const { data: tasksData } = useQuery({ queryKey: ["tasks", "admin-dashboard"], queryFn: () => api.getTasks({ limit: 500 }) });
+  const { data: tasksData } = useQuery({
+    queryKey: ["tasks", "admin-shared"],
+    queryFn: () => api.getTasks({ limit: 500 })
+  });
   const tasks = tasksData?.items ?? [];
 
   const projectRows = useMemo(() => {

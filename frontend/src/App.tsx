@@ -20,7 +20,18 @@ import TaskDetail from "./pages/employee/TaskDetail";
 import EmployeeReports from "./pages/employee/Reports";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5000,
+      gcTime: 10 * 60 * 1000,
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
+      refetchInterval: 10000,
+      refetchIntervalInBackground: true
+    }
+  }
+});
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
