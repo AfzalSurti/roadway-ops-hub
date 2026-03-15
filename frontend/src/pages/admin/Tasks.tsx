@@ -248,12 +248,6 @@ export default function AdminTasks() {
           <h1 className="page-title">Tasks</h1>
           <p className="page-subtitle">Manage and track all assignments</p>
         </div>
-        <Link
-          to="/admin/tasks/new"
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-primary to-accent text-primary-foreground font-medium text-sm hover:opacity-90 transition-opacity shrink-0"
-        >
-          <Plus className="h-4 w-4" />
-          New Task
         <div className="flex items-center gap-2">
           <button
             onClick={() =>
@@ -278,6 +272,12 @@ export default function AdminTasks() {
             New Task
           </Link>
         </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3 mb-6">
+        <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 text-sm flex-1 max-w-sm">
+          <Search className="h-4 w-4 text-muted-foreground" />
+          <input
             type="text"
             placeholder="Search tasks…"
             value={search}
