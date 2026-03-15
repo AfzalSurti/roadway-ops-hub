@@ -18,6 +18,7 @@ function shortDate(value?: string | null) {
 export default function AdminFinancial() {
   const queryClient = useQueryClient();
   const [selectedProjectId, setSelectedProjectId] = useState("");
+  const [selectedItemInfo, setSelectedItemInfo] = useState<{ itemNumber: number; particulars: string } | null>(null);
   const [planningDraft, setPlanningDraft] = useState<Record<number, string>>({});
   const [showPlanning, setShowPlanning] = useState(false);
   const [showBillSelection, setShowBillSelection] = useState(false);
@@ -231,7 +232,6 @@ export default function AdminFinancial() {
                   <thead>
                     <tr className="border-b border-border/40 text-muted-foreground">
                       <th className="text-left p-3 font-medium">Created</th>
-                      <th className="text-left p-3 font-medium">Item</th>
                       <th className="text-left p-3 font-medium">Particulars</th>
                       <th className="text-left p-3 font-medium">Planned Amount</th>
                       <th className="text-left p-3 font-medium">Received Amount</th>
@@ -252,14 +252,27 @@ export default function AdminFinancial() {
                         remark: bill.remark ?? ""
                       };
                       const receivedAmount = Number(edit.receivedAmount || 0);
-                      const percent = bill.billAmount > 0 ? (receivedAmount / bill.billAmount) * 100 : 0;
-                      const remaining = Math.max(0, Number(bill.billAmount ?? 0) - receivedAmount);
+                      const plannedAmount = Number(bill.billAmount && bill.billAmount > 0 ? bill.billAmount : (bill.item?.amount ?? 0));
+                      const percent = plannedAmount > 0 ? (receivedAmount / plannedAmount) * 100 : 0;
+                      const remaining = Math.max(0, plannedAmount - receivedAmount);
                       return (
                         <tr key={bill.id} className="border-b border-border/20 align-top">
                           <td className="p-3">{shortDate(bill.createdAt)}</td>
-                          <td className="p-3 font-medium">{bill.item?.itemNumber ?? "-"}</td>
-                          <td className="p-3 leading-6">{bill.item?.particulars ?? "-"}</td>
-                          <td className="p-3">{money(Number(bill.billAmount ?? 0))}</td>
+                          <td className="p-3">
+                            {bill.item?.itemNumber ? (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedItemInfo({ itemNumber: bill.item!.itemNumber, particulars: bill.item!.particulars })}
+                                className="px-2.5 py-1 rounded-lg border border-primary/30 text-primary text-xs font-medium hover:bg-primary/10"
+                                title="View item details"
+                              >
+                                Item {bill.item.itemNumber}
+                              </button>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </td>
+                          <td className="p-3">{money(plannedAmount)}</td>
                           <td className="p-3 w-40">
                             <input
                               type="number"
@@ -484,6 +497,14 @@ export default function AdminFinancial() {
                   </div>
                 </>
               )}
+            </FinancialModal>
+          )}
+
+          {selectedItemInfo && (
+            <FinancialModal title={`Item ${selectedItemInfo.itemNumber} Details`} onClose={() => setSelectedItemInfo(null)}>
+              <div className="rounded-xl border border-border/40 bg-secondary/20 p-4">
+                <p className="text-sm leading-7">{selectedItemInfo.particulars}</p>
+              </div>
             </FinancialModal>
           )}
         </>
