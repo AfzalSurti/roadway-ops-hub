@@ -78,6 +78,7 @@ export const createFinancialBillsSchema = z.object({
   bills: z.array(
     z.object({
       itemId: z.string().trim().min(1),
+      includePreviousRemaining: z.coerce.boolean().optional().default(false),
       status: z.enum(["PLANNING", "PUT_UP", "RECEIVED"]).default("PLANNING"),
       remark: z.string().trim().max(500).optional().nullable()
     })

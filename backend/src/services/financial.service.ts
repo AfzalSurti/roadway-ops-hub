@@ -99,11 +99,6 @@ export const financialService = {
       throw badRequest("Financial planning items are invalid");
     }
 
-    const totalPercentage = round2(byItemNumber.reduce((sum, item) => sum + Number(item.percentage), 0));
-    if (Math.abs(totalPercentage - 100) > 0.01) {
-      throw badRequest("Total percentage must be exactly 100%");
-    }
-
     const items = byItemNumber.map((item) => ({
       itemNumber: item.itemNumber,
       particulars: item.particulars,
@@ -120,7 +115,7 @@ export const financialService = {
     });
   },
 
-  async createBills(projectId: string, payload: { bills: Array<{ itemId: string; status: FinancialBillStatus; remark?: string | null }> }) {
+  async createBills(projectId: string, payload: { bills: Array<{ itemId: string; includePreviousRemaining?: boolean; status: FinancialBillStatus; remark?: string | null }> }) {
     const plan = await financialRepository.findPlanByProjectId(projectId);
     if (!plan) {
       throw badRequest("Create financial item planning first");
@@ -131,7 +126,35 @@ export const financialService = {
       throw badRequest("One or more selected items do not belong to this project plan");
     }
 
-    return financialRepository.createBills(plan.id, payload.bills);
+    const billsToCreate = payload.bills.map((entry) => {
+      const item = plan.items.find((i: { id: string; amount: number }) => i.id === entry.itemId);
+      if (!item) {
+        throw badRequest("Invalid financial item selected");
+      }
+
+      const itemBills = plan.bills
+        .filter((bill: { itemId: string; createdAt: string; receivedAmount: number; billAmount?: number }) => bill.itemId === entry.itemId)
+        .sort((a: { createdAt: string }, b: { createdAt: string }) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+      const totalReceived = itemBills.reduce((sum: number, bill: { receivedAmount: number }) => sum + Number(bill.receivedAmount ?? 0), 0);
+      const baseAvailable = Math.max(0, round2(item.amount - totalReceived));
+      const latestBill = itemBills[0];
+      const latestRemaining = latestBill ? Math.max(0, round2((latestBill.billAmount ?? item.amount) - Number(latestBill.receivedAmount ?? 0))) : 0;
+
+      const includePreviousRemaining = Boolean(entry.includePreviousRemaining);
+      const carryForwardAmount = includePreviousRemaining ? latestRemaining : 0;
+      const billAmount = includePreviousRemaining && latestRemaining > 0 ? latestRemaining : baseAvailable;
+
+      return {
+        itemId: entry.itemId,
+        status: entry.status,
+        remark: entry.remark ?? null,
+        billAmount,
+        carryForwardAmount
+      };
+    });
+
+    return financialRepository.createBills(plan.id, billsToCreate);
   },
 
   async updateBill(billId: string, payload: { status?: FinancialBillStatus; receivedAmount?: number; receivedDate?: Date | null; remark?: string | null }) {
@@ -141,6 +164,10 @@ export const financialService = {
     }
 
     if (payload.receivedAmount !== undefined) {
+      if (payload.receivedAmount > existing.billAmount + 0.01) {
+        throw badRequest("Received amount cannot exceed this bill amount");
+      }
+
       const totalReceivedOtherBills = existing.planId
         ? (await financialRepository.findPlanByProjectId(existing.plan.projectId))?.bills
             .filter((bill: { itemId: string; id: string }) => bill.itemId === existing.itemId && bill.id !== billId)

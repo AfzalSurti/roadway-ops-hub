@@ -501,7 +501,7 @@ export const api = {
 
   createFinancialBills(
     projectId: string,
-    payload: { bills: Array<{ itemId: string; status: FinancialBillStatus; remark?: string | null }> }
+    payload: { bills: Array<{ itemId: string; includePreviousRemaining?: boolean; status: FinancialBillStatus; remark?: string | null }> }
   ) {
     return request<FinancialPlan>(`/financials/${projectId}/bills`, {
       method: "POST",

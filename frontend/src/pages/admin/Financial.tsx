@@ -21,7 +21,7 @@ export default function AdminFinancial() {
   const [planningDraft, setPlanningDraft] = useState<Record<number, string>>({});
   const [showPlanning, setShowPlanning] = useState(false);
   const [showBillSelection, setShowBillSelection] = useState(false);
-  const [billSelection, setBillSelection] = useState<Record<string, { selected: boolean }>>({});
+  const [billSelection, setBillSelection] = useState<Record<string, { selected: boolean; includePreviousRemaining: boolean }>>({});
   const [billEdits, setBillEdits] = useState<Record<string, { status: FinancialBillStatus; receivedAmount: string; receivedDate: string; remark: string }>>({});
 
   const { data: eligibleProjects = [], isLoading: loadingProjects } = useQuery({
@@ -60,9 +60,9 @@ export default function AdminFinancial() {
       return;
     }
 
-    const nextSelection: Record<string, { selected: boolean }> = {};
+    const nextSelection: Record<string, { selected: boolean; includePreviousRemaining: boolean }> = {};
     detail.plan.items.forEach((item) => {
-      nextSelection[item.id] = { selected: false };
+      nextSelection[item.id] = { selected: false, includePreviousRemaining: false };
     });
     setBillSelection(nextSelection);
 
@@ -125,7 +125,11 @@ export default function AdminFinancial() {
       api.createFinancialBills(selectedProjectId, {
         bills: Object.entries(billSelection)
           .filter(([, value]) => value.selected)
-          .map(([itemId]) => ({ itemId, status: "PLANNING" as FinancialBillStatus }))
+          .map(([itemId, value]) => ({
+            itemId,
+            includePreviousRemaining: value.includePreviousRemaining,
+            status: "PLANNING" as FinancialBillStatus
+          }))
       }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["financial-project", selectedProjectId] });
@@ -248,14 +252,14 @@ export default function AdminFinancial() {
                         remark: bill.remark ?? ""
                       };
                       const receivedAmount = Number(edit.receivedAmount || 0);
-                      const percent = bill.item && bill.item.amount > 0 ? (receivedAmount / bill.item.amount) * 100 : 0;
-                      const remaining = Math.max(0, Number(bill.item?.amount ?? 0) - receivedAmount);
+                      const percent = bill.billAmount > 0 ? (receivedAmount / bill.billAmount) * 100 : 0;
+                      const remaining = Math.max(0, Number(bill.billAmount ?? 0) - receivedAmount);
                       return (
                         <tr key={bill.id} className="border-b border-border/20 align-top">
                           <td className="p-3">{shortDate(bill.createdAt)}</td>
                           <td className="p-3 font-medium">{bill.item?.itemNumber ?? "-"}</td>
                           <td className="p-3 leading-6">{bill.item?.particulars ?? "-"}</td>
-                          <td className="p-3">{money(Number(bill.item?.amount ?? 0))}</td>
+                          <td className="p-3">{money(Number(bill.billAmount ?? 0))}</td>
                           <td className="p-3 w-40">
                             <input
                               type="number"
@@ -383,7 +387,7 @@ export default function AdminFinancial() {
               <div className="flex justify-end mt-4">
                 <button
                   onClick={() => savePlanMutation.mutate()}
-                  disabled={savePlanMutation.isPending || Math.abs(totalPercentage - 100) > 0.01}
+                  disabled={savePlanMutation.isPending}
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary/10 text-primary border border-primary/20 text-sm font-medium hover:bg-primary/20 disabled:opacity-50"
                 >
                   <Save className="h-4 w-4" />
@@ -409,13 +413,18 @@ export default function AdminFinancial() {
                           <th className="text-left p-3 font-medium">Planned %</th>
                           <th className="text-left p-3 font-medium">Item Amount</th>
                           <th className="text-left p-3 font-medium">% Received</th>
+                          <th className="text-left p-3 font-medium">Previous Bill Remaining</th>
+                          <th className="text-left p-3 font-medium">Carry Forward?</th>
                         </tr>
                       </thead>
                       <tbody>
                         {detail.plan.items.map((item) => {
                           const receivedAmount = receivedByItem.get(item.id) ?? 0;
                           const receivedPct = item.amount > 0 ? (receivedAmount / item.amount) * 100 : 0;
-                          const selection = billSelection[item.id] ?? { selected: false };
+                          const selection = billSelection[item.id] ?? { selected: false, includePreviousRemaining: false };
+                          const previousBills = detail.plan?.bills.filter((bill) => bill.itemId === item.id) ?? [];
+                          const latestBill = previousBills.length > 0 ? previousBills[0] : null;
+                          const previousRemaining = latestBill ? Math.max(0, Number(latestBill.billAmount ?? item.amount) - Number(latestBill.receivedAmount ?? 0)) : 0;
                           return (
                             <tr key={item.id} className="border-b border-border/20 align-top">
                               <td className="p-3">
@@ -424,7 +433,7 @@ export default function AdminFinancial() {
                                   checked={selection.selected}
                                   onChange={(event) => setBillSelection((prev) => ({
                                     ...prev,
-                                    [item.id]: { selected: event.target.checked }
+                                    [item.id]: { ...selection, selected: event.target.checked }
                                   }))}
                                   title={`Select item ${item.itemNumber}`}
                                   aria-label={`Select item ${item.itemNumber}`}
@@ -435,6 +444,28 @@ export default function AdminFinancial() {
                               <td className="p-3">{item.percentage.toFixed(2)}%</td>
                               <td className="p-3">{money(item.amount)}</td>
                               <td className="p-3">{receivedPct.toFixed(2)}%</td>
+                              <td className="p-3">{money(previousRemaining)}</td>
+                              <td className="p-3">
+                                <input
+                                  type="checkbox"
+                                  checked={selection.includePreviousRemaining}
+                                  disabled={previousRemaining <= 0}
+                                  onChange={(event) => {
+                                    if (event.target.checked) {
+                                      const confirmed = window.confirm("Do you want to add remaining amount of previous bill in this new bill?");
+                                      if (!confirmed) {
+                                        return;
+                                      }
+                                    }
+                                    setBillSelection((prev) => ({
+                                      ...prev,
+                                      [item.id]: { ...selection, includePreviousRemaining: event.target.checked }
+                                    }));
+                                  }}
+                                  title={`Include previous remaining for item ${item.itemNumber}`}
+                                  aria-label={`Include previous remaining for item ${item.itemNumber}`}
+                                />
+                              </td>
                             </tr>
                           );
                         })}

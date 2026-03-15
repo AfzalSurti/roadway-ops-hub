@@ -313,6 +313,8 @@ model ProjectFinancialBill {
   id                 String              @id @default(cuid())
   planId             String
   itemId             String
+  billAmount         Float               @default(0)
+  carryForwardAmount Float               @default(0)
   status             FinancialBillStatus @default(PLANNING)
   receivedPercentage Float               @default(0)
   receivedAmount     Float               @default(0)

@@ -177,6 +177,8 @@ export type FinancialBillItem = {
   id: string;
   planId: string;
   itemId: string;
+  billAmount: number;
+  carryForwardAmount: number;
   status: FinancialBillStatus;
   receivedPercentage: number;
   receivedAmount: number;

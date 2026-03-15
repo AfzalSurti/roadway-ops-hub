@@ -133,7 +133,7 @@ export const financialRepository = {
     });
   },
 
-  createBills(planId: string, bills: Array<{ itemId: string; status: FinancialBillStatus; remark?: string | null }>) {
+  createBills(planId: string, bills: Array<{ itemId: string; status: FinancialBillStatus; remark?: string | null; billAmount: number; carryForwardAmount: number }>) {
     return db.$transaction(async (txClient: any) => {
       const tx = txClient as any;
       for (const bill of bills) {
@@ -141,6 +141,8 @@ export const financialRepository = {
           data: {
             planId,
             itemId: bill.itemId,
+            billAmount: bill.billAmount,
+            carryForwardAmount: bill.carryForwardAmount,
             status: bill.status,
             remark: bill.remark ?? null
           }
@@ -173,7 +175,7 @@ export const financialRepository = {
       });
 
       const nextAmount = args.receivedAmount ?? existing.receivedAmount;
-      const receivedPercentage = existing.item.amount > 0 ? Number(((nextAmount / existing.item.amount) * 100).toFixed(2)) : 0;
+      const receivedPercentage = existing.billAmount > 0 ? Number(((nextAmount / existing.billAmount) * 100).toFixed(2)) : 0;
 
       return tx.projectFinancialBill.update({
         where: { id: args.billId },
