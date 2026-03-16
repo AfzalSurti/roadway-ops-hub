@@ -19,14 +19,11 @@ export default function AdminTeam() {
 
   const { data: users = [], refetch: refetchUsers } = useQuery({ queryKey: ["users"], queryFn: () => api.getUsers() });
   const { data: tasksData, refetch: refetchTasks } = useQuery({ queryKey: ["tasks", "team"], queryFn: () => api.getTasks({ limit: 200 }) });
-  const { data: reportsData, refetch: refetchReports } = useQuery({ queryKey: ["reports", "team"], queryFn: () => api.getReports({ limit: 200 }) });
 
   const tasks = tasksData?.items ?? [];
-  const reports = reportsData?.items ?? [];
 
   const selected = users.find((user) => user.id === selectedUser);
   const selectedTasks = tasks.filter((task) => task.assignedToId === selectedUser);
-  const selectedReports = reports.filter((report) => report.submittedById === selectedUser);
 
   const workloadData = useMemo(
     () =>
@@ -109,7 +106,7 @@ export default function AdminTeam() {
     setIsDeleting(true);
     try {
       await api.deleteEmployee(selectedUser);
-      await Promise.all([refetchUsers(), refetchTasks(), refetchReports()]);
+      await Promise.all([refetchUsers(), refetchTasks()]);
       setSelectedUser(null);
       toast.success("Employee deleted");
     } catch (error) {
@@ -204,27 +201,6 @@ export default function AdminTeam() {
               />
               <ProfileDetailRow icon={<Briefcase className="h-3.5 w-3.5" />} label="Experience in Organization" value={selected.experienceInOrg} />
               <ProfileDetailRow icon={<IndianRupee className="h-3.5 w-3.5" />} label="Current CTC" value={selected.currentCtc} />
-            </div>
-
-            <h4 className="font-medium mb-3">Tasks ({selectedTasks.length})</h4>
-            <div className="space-y-2 mb-6">
-              {selectedTasks.map((task) => (
-                <div key={task.id} className="p-3 rounded-xl bg-secondary/30 border border-border/30">
-                  <p className="text-sm font-medium">{task.title}</p>
-                  <p className="text-xs text-muted-foreground">{task.project} · Due {new Date(task.dueDate).toLocaleDateString()}</p>
-                </div>
-              ))}
-            </div>
-
-            <h4 className="font-medium mb-3">Submissions ({selectedReports.length})</h4>
-            <div className="space-y-2">
-              {selectedReports.map((report) => (
-                <div key={report.id} className="p-3 rounded-xl bg-secondary/30 border border-border/30">
-                  <p className="text-sm font-medium">{report.task?.title ?? report.id}</p>
-                  <p className="text-xs text-muted-foreground capitalize">{report.status.replace("_", " ")}</p>
-                </div>
-              ))}
-              {selectedReports.length === 0 && <p className="text-sm text-muted-foreground">No submissions yet</p>}
             </div>
 
             <button

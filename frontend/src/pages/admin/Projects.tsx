@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { PageWrapper } from "@/components/PageWrapper";
 import { motion } from "framer-motion";
-import { Download, FileText, Hash, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { Download, FileText, Hash, Pencil, Plus, Search, X } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
@@ -386,8 +386,9 @@ export default function AdminProjects() {
   const [wizard, setWizard] = useState<NumberWizardState>(DEFAULT_WIZARD);
   const [assigningNumber, setAssigningNumber] = useState(false);
   const [form, setForm] = useState({ name: "", description: "" });
-  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [showGeneratedModal, setShowGeneratedModal] = useState(false);
   const [generatedProjectNumber, setGeneratedProjectNumber] = useState("");
@@ -429,6 +430,7 @@ export default function AdminProjects() {
         id: project.id,
         projectName: project.name,
         description: project.description ?? "",
+        createdAt: project.createdAt,
         projectNumber: project.projectNumber ?? "-",
         projectCodePrefix: project.projectCodePrefix ?? "",
         requisitionForm: requisitionFormsByProjectId.get(project.id) ?? null,
@@ -442,9 +444,17 @@ export default function AdminProjects() {
 
   const filteredRows = useMemo(() => {
     const query = search.trim().toLowerCase();
-    if (!query) return projectRows;
-    return projectRows.filter((row) => row.projectName.toLowerCase().includes(query) || row.projectNumber.toLowerCase().includes(query));
-  }, [projectRows, search]);
+    const from = fromDate ? new Date(`${fromDate}T00:00:00`) : null;
+    const to = toDate ? new Date(`${toDate}T23:59:59`) : null;
+
+    return projectRows.filter((row) => {
+      const createdAt = new Date(row.createdAt);
+      const matchesSearch = !query || row.projectName.toLowerCase().includes(query) || row.projectNumber.toLowerCase().includes(query);
+      const matchesFrom = !from || createdAt >= from;
+      const matchesTo = !to || createdAt <= to;
+      return matchesSearch && matchesFrom && matchesTo;
+    });
+  }, [projectRows, search, fromDate, toDate]);
 
   const selectedProject = useMemo(() => projectRows.find((row) => row.id === selectedProjectId) ?? null, [projectRows, selectedProjectId]);
   const projectsWithoutNumber = useMemo(() => projects.filter((project) => !project.projectNumber), [projects]);
@@ -502,21 +512,6 @@ export default function AdminProjects() {
       toast.success("Project added");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to add project");
-    }
-  };
-
-  const handleDeleteProject = async (id: string, name: string) => {
-    const shouldDelete = window.confirm(`Delete project \"${name}\"?`);
-    if (!shouldDelete) return;
-    try {
-      setDeletingId(id);
-      await api.deleteProject(id);
-      await Promise.all([refetchProjects(), refetchTasks(), refetchRequisitionForms()]);
-      toast.success("Project deleted");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to delete project");
-    } finally {
-      setDeletingId(null);
     }
   };
 
@@ -627,28 +622,54 @@ export default function AdminProjects() {
         </div>
       </div>
 
-      <div className="mb-4 flex items-center gap-2 px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 text-sm max-w-sm">
-        <Search className="h-4 w-4 text-muted-foreground" />
-        <input type="text" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search projects or number..." className="bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground w-full" />
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 text-sm max-w-sm w-full">
+          <Search className="h-4 w-4 text-muted-foreground" />
+          <input type="text" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search projects or number..." className="bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground w-full" />
+        </div>
+        <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 text-sm">
+          <span className="text-muted-foreground">From</span>
+          <input
+            type="date"
+            value={fromDate}
+            onChange={(event) => {
+              const next = event.target.value;
+              setFromDate(next);
+              if (toDate && next && toDate < next) {
+                setToDate(next);
+              }
+            }}
+            className="bg-transparent border-none outline-none text-foreground"
+            title="From date"
+          />
+        </div>
+        <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 text-sm">
+          <span className="text-muted-foreground">To</span>
+          <input
+            type="date"
+            value={toDate}
+            min={fromDate || undefined}
+            onChange={(event) => setToDate(event.target.value)}
+            className="bg-transparent border-none outline-none text-foreground"
+            title="To date"
+          />
+        </div>
       </div>
 
       <div className="glass-panel overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[1120px]">
+          <table className="w-full text-sm min-w-[900px]">
             <thead>
               <tr className="border-b border-border/50 text-muted-foreground">
                 <th className="text-left p-4 font-medium">Project Name</th>
                 <th className="text-left p-4 font-medium">Project Number</th>
                 <th className="text-left p-4 font-medium">Project No. Requisition Form</th>
-                <th className="text-left p-4 font-medium">Total Tasks</th>
-                <th className="text-left p-4 font-medium">Pending</th>
-                <th className="text-left p-4 font-medium">Overdue</th>
               </tr>
             </thead>
             <tbody>
               {filteredRows.map((row, index) => (
                 <motion.tr key={row.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.03 }} onClick={() => setSelectedProjectId(row.id)} className="border-b border-border/30 cursor-pointer hover:bg-secondary/30 transition-colors">
-                  <td className="p-4"><div className="flex items-center justify-between gap-3"><span className="font-medium">{row.projectName}</span><button onClick={(event) => { event.stopPropagation(); void handleDeleteProject(row.id, row.projectName); }} disabled={deletingId === row.id} className="p-1.5 rounded-lg border border-destructive/30 text-destructive hover:bg-destructive/10 disabled:opacity-50" title="Delete project" aria-label="Delete project"><Trash2 className="h-4 w-4" /></button></div></td>
+                  <td className="p-4"><span className="font-medium">{row.projectName}</span></td>
                   <td className="p-4 font-medium">{row.projectNumber}</td>
                   <td className="p-4" onClick={(event) => event.stopPropagation()}>
                     <button
@@ -668,12 +689,9 @@ export default function AdminProjects() {
                       <button onClick={() => openRequisitionWizard(row.id)} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/15 text-primary font-medium hover:bg-primary/20"><FileText className="h-4 w-4" />Generate</button>
                     )}
                   </td>
-                  <td className="p-4 font-medium">{row.totalTasks}</td>
-                  <td className="p-4 font-medium">{row.pendingTasks}</td>
-                  <td className="p-4 font-medium">{row.overdueTasks}</td>
                 </motion.tr>
               ))}
-              {filteredRows.length === 0 && <tr><td colSpan={6} className="p-6 text-muted-foreground">No projects found.</td></tr>}
+              {filteredRows.length === 0 && <tr><td colSpan={3} className="p-6 text-muted-foreground">No projects found.</td></tr>}
             </tbody>
           </table>
         </div>
