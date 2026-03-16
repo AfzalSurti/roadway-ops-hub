@@ -12,6 +12,19 @@ type ApiResponse<T> = {
   };
 };
 
+class RefreshSessionError extends Error {
+  requiresLogout: boolean;
+
+  constructor(message: string, requiresLogout: boolean) {
+    super(message);
+    this.requiresLogout = requiresLogout;
+  }
+}
+
+function shouldLogoutForRefreshError(error: unknown): boolean {
+  return error instanceof RefreshSessionError && error.requiresLogout;
+}
+
 function buildErrorMessage<T>(response: Response, json: ApiResponse<T>): string {
   const fallbackMessage = json.error?.message ?? `Request failed (${response.status})`;
   const details = json.error?.details as
@@ -88,26 +101,40 @@ async function fetchWithApiFallback(path: string, init: RequestInit) {
 async function refreshAccessToken(): Promise<string> {
   const refreshToken = authStorage.getRefreshToken();
   if (!refreshToken) {
-    throw new Error("Session expired. Please login again.");
+    throw new RefreshSessionError("Session expired. Please login again.", true);
   }
 
-  const response = await fetchWithApiFallback("/auth/refresh", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ refreshToken })
-  });
+  let response: Response;
+  try {
+    response = await fetchWithApiFallback("/auth/refresh", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ refreshToken })
+    });
+  } catch {
+    throw new RefreshSessionError("Unable to refresh session right now. Please try again.", false);
+  }
 
   let json: ApiResponse<{ accessToken: string }>;
   try {
     json = (await response.json()) as ApiResponse<{ accessToken: string }>;
   } catch {
-    throw new Error("Session expired. Please login again.");
+    throw new RefreshSessionError("Unable to refresh session right now. Please try again.", false);
   }
 
   if (!response.ok || !json.success || !json.data?.accessToken) {
-    throw new Error(json.error?.message ?? "Session expired. Please login again.");
+    const message = json.error?.message ?? "Unable to refresh session right now. Please try again.";
+    const authFailure =
+      response.status === 401 ||
+      response.status === 403 ||
+      /refresh token is invalid|invalid or expired refresh token|refresh token/i.test(message);
+
+    throw new RefreshSessionError(
+      authFailure ? "Session expired. Please login again." : message,
+      authFailure
+    );
   }
 
   authStorage.setAccessToken(json.data.accessToken);
@@ -125,9 +152,14 @@ export async function bootstrapSession(): Promise<boolean> {
   try {
     await refreshAccessToken();
     return true;
-  } catch {
-    authStorage.clear();
-    return false;
+  } catch (error) {
+    if (shouldLogoutForRefreshError(error)) {
+      authStorage.clear();
+      return false;
+    }
+
+    // Keep session for transient refresh failures (network/cold-start).
+    return true;
   }
 }
 
@@ -170,9 +202,13 @@ async function request<T>(path: string, init: RequestInit = {}, useAuth = true, 
       }
       await refreshPromise;
       return request<T>(path, init, useAuth, false);
-    } catch {
-      authStorage.clear();
-      throw new Error("Invalid or expired access token. Please login again.");
+    } catch (error) {
+      if (shouldLogoutForRefreshError(error)) {
+        authStorage.clear();
+        throw new Error("Invalid or expired access token. Please login again.");
+      }
+
+      throw new Error("Unable to refresh session right now. Please try again.");
     }
   }
 
