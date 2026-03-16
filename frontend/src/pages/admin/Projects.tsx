@@ -682,7 +682,7 @@ export default function AdminProjects() {
                     </button>
                     {!row.projectNumber || row.projectNumber === "-" ? null : row.requisitionForm ? (
                       <div className="flex items-center gap-2">
-                        <button onClick={() => downloadProjectRequisitionPdf(row.requisitionForm, row.projectName)} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-accent/15 text-accent font-medium hover:bg-accent/20"><Download className="h-4 w-4" />Download PDF</button>
+                        <button onClick={() => downloadProjectRequisitionPdf(row.requisitionForm, row.projectName, row.projectNumber)} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-accent/15 text-accent font-medium hover:bg-accent/20"><Download className="h-4 w-4" />Download PDF</button>
                         <button onClick={() => openRequisitionWizard(row.id)} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/15 text-primary font-medium hover:bg-primary/20"><Pencil className="h-4 w-4" />Edit</button>
                       </div>
                     ) : (

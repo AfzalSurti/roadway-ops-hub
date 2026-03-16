@@ -3,6 +3,13 @@ import type { ProjectRequisitionFormItem } from "./domain";
 
 const FIELD_LABEL_RATIO = 0.42;
 
+const COMPANY_NAME_BY_CODE: Record<string, string> = {
+  G: "GEO DESIGNS & RESEARCH PVT. LTD.",
+  S: "SAI GEOTECHNICAL LAB",
+  I: "INERTIA ENGINEERING SOLUTION",
+  H: "SHREE HARI TESTING LAB"
+};
+
 function money(value: string | null | undefined) {
   return value && value.trim() ? value : "";
 }
@@ -18,6 +25,18 @@ function toDisplay(value?: string | number | null) {
   if (value === null || value === undefined) return "";
   const text = String(value).trim();
   return text.length ? text : "";
+}
+
+function resolveCompanyTitle(form: ProjectRequisitionFormItem, projectNumber?: string) {
+  const candidates = [projectNumber, form.approvedProjectNumber, form.newProjectNumber];
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    const code = candidate.trim().charAt(0).toUpperCase();
+    if (COMPANY_NAME_BY_CODE[code]) {
+      return COMPANY_NAME_BY_CODE[code];
+    }
+  }
+  return COMPANY_NAME_BY_CODE.G;
 }
 
 function drawTextInBox(doc: jsPDF, text: string, x: number, y: number, w: number, h: number, opts?: { fontSize?: number; lineHeight?: number; align?: "left" | "center" | "right" }) {
@@ -97,7 +116,7 @@ type LayoutRow =
   | { kind: "pair"; left: FieldLayout; right: FieldLayout }
   | { kind: "full"; field: FieldLayout };
 
-export function downloadProjectRequisitionPdf(form: ProjectRequisitionFormItem, projectName: string) {
+export function downloadProjectRequisitionPdf(form: ProjectRequisitionFormItem, projectName: string, projectNumber?: string) {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
@@ -110,9 +129,11 @@ export function downloadProjectRequisitionPdf(form: ProjectRequisitionFormItem, 
   doc.setLineWidth(0.25);
   doc.rect(x, y, w, h);
 
+  const companyTitle = resolveCompanyTitle(form, projectNumber);
+
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
-  doc.text("GEO DESIGNS & RESEARCH PVT. LTD.", x + w / 2, y + 5.5, { align: "center" });
+  doc.text(companyTitle, x + w / 2, y + 5.5, { align: "center" });
   doc.setFontSize(10.5);
   doc.text("PROJECT NO. REQUISITION FORM", x + w / 2, y + 10.5, { align: "center" });
 
