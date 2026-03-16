@@ -4,6 +4,20 @@ type FinancialBillStatus = "PLANNING" | "PUT_UP" | "RECEIVED";
 
 const db = prisma as any;
 
+const PLAN_INCLUDE = {
+  project: true,
+  items: { orderBy: { itemNumber: "asc" } },
+  raBills: {
+    include: {
+      items: {
+        include: { item: true },
+        orderBy: { createdAt: "asc" }
+      }
+    },
+    orderBy: { billName: "asc" }
+  }
+} as const;
+
 export const financialRepository = {
   findEligibleProjects() {
     return db.project.findMany({
@@ -34,18 +48,7 @@ export const financialRepository = {
   findPlanByProjectId(projectId: string) {
     return db.projectFinancialPlan.findUnique({
       where: { projectId },
-      include: {
-        project: true,
-        items: {
-          orderBy: { itemNumber: "asc" }
-        },
-        bills: {
-          include: {
-            item: true
-          },
-          orderBy: [{ createdAt: "desc" }]
-        }
-      }
+      include: PLAN_INCLUDE
     });
   },
 
@@ -54,7 +57,18 @@ export const financialRepository = {
       where: { id: billId },
       include: {
         item: true,
-        plan: true
+        plan: { include: { project: true } },
+        raBill: true
+      }
+    });
+  },
+
+  findRaBillById(raBillId: string) {
+    return db.projectFinancialRaBill.findUnique({
+      where: { id: raBillId },
+      include: {
+        items: { include: { item: true }, orderBy: { createdAt: "asc" } },
+        plan: { include: { project: { include: { requisitionForm: true } } } }
       }
     });
   },
@@ -133,42 +147,112 @@ export const financialRepository = {
 
       return tx.projectFinancialPlan.findUniqueOrThrow({
         where: { id: plan.id },
-        include: {
-          project: true,
-          items: { orderBy: { itemNumber: "asc" } },
-          bills: { include: { item: true }, orderBy: [{ createdAt: "desc" }] }
-        }
+        include: PLAN_INCLUDE
       });
     });
   },
 
-  createBills(planId: string, bills: Array<{ itemId: string; status: FinancialBillStatus; remark?: string | null; billAmount: number; carryForwardAmount: number }>) {
+  async createRaBill(args: {
+    planId: string;
+    billName: string;
+    billItems: Array<{
+      itemId: string;
+      billPercentage: number;
+      billAmount: number;
+      taxAmount: number;
+      totalAmount: number;
+      carryForwardAmount: number;
+    }>;
+    totalBillAmount: number;
+    totalTaxAmount: number;
+    totalAmount: number;
+  }) {
     return db.$transaction(async (txClient: any) => {
       const tx = txClient as any;
-      for (const bill of bills) {
+
+      const raBill = await tx.projectFinancialRaBill.create({
+        data: {
+          planId: args.planId,
+          billName: args.billName,
+          status: "PLANNING",
+          totalBillAmount: args.totalBillAmount,
+          totalTaxAmount: args.totalTaxAmount,
+          totalAmount: args.totalAmount
+        }
+      });
+
+      for (const item of args.billItems) {
         await tx.projectFinancialBill.create({
           data: {
-            planId,
-            itemId: bill.itemId,
-            billAmount: bill.billAmount,
-            carryForwardAmount: bill.carryForwardAmount,
-            status: bill.status,
-            remark: bill.remark ?? null
+            planId: args.planId,
+            raBillId: raBill.id,
+            itemId: item.itemId,
+            billPercentage: item.billPercentage,
+            billAmount: item.billAmount,
+            taxAmount: item.taxAmount,
+            totalAmount: item.totalAmount,
+            carryForwardAmount: item.carryForwardAmount,
+            status: "PLANNING"
           }
         });
       }
 
       return tx.projectFinancialPlan.findUniqueOrThrow({
-        where: { id: planId },
-        include: {
-          project: true,
-          items: { orderBy: { itemNumber: "asc" } },
-          bills: { include: { item: true }, orderBy: [{ createdAt: "desc" }] }
-        }
+        where: { id: args.planId },
+        include: PLAN_INCLUDE
       });
     });
   },
 
+  async updateRaBill(args: {
+    raBillId: string;
+    status?: FinancialBillStatus;
+    receivedDate?: Date | null;
+    chequeRtgsAmount?: number;
+    itDeductionPct?: number;
+    itDeductionAmount?: number;
+    lCessDeductionPct?: number;
+    lCessDeductionAmount?: number;
+    securityDepositPct?: number;
+    securityDepositAmount?: number;
+    recoverFromRaBillPct?: number;
+    recoverFromRaBillAmount?: number;
+    gstWithheldPct?: number;
+    gstWithheldAmount?: number;
+    withheldPct?: number;
+    withheldAmount?: number;
+    totalReceivedAmount?: number;
+    remark?: string | null;
+  }) {
+    return db.projectFinancialRaBill.update({
+      where: { id: args.raBillId },
+      data: {
+        status: args.status,
+        receivedDate: args.receivedDate,
+        chequeRtgsAmount: args.chequeRtgsAmount,
+        itDeductionPct: args.itDeductionPct,
+        itDeductionAmount: args.itDeductionAmount,
+        lCessDeductionPct: args.lCessDeductionPct,
+        lCessDeductionAmount: args.lCessDeductionAmount,
+        securityDepositPct: args.securityDepositPct,
+        securityDepositAmount: args.securityDepositAmount,
+        recoverFromRaBillPct: args.recoverFromRaBillPct,
+        recoverFromRaBillAmount: args.recoverFromRaBillAmount,
+        gstWithheldPct: args.gstWithheldPct,
+        gstWithheldAmount: args.gstWithheldAmount,
+        withheldPct: args.withheldPct,
+        withheldAmount: args.withheldAmount,
+        totalReceivedAmount: args.totalReceivedAmount,
+        remark: args.remark
+      },
+      include: {
+        items: { include: { item: true }, orderBy: { createdAt: "asc" } },
+        plan: { include: { project: { include: { requisitionForm: true } } } }
+      }
+    });
+  },
+
+  // Legacy kept for backward compat
   async updateBill(args: {
     billId: string;
     status?: FinancialBillStatus;

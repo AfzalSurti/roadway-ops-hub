@@ -74,20 +74,24 @@ export const upsertFinancialPlanSchema = z.object({
   ).min(1, "At least one planning item is required")
 });
 
-export const createFinancialBillsSchema = z.object({
-  bills: z.array(
+export const createRaBillSchema = z.object({
+  items: z.array(
     z.object({
       itemId: z.string().trim().min(1),
-      includePreviousRemaining: z.coerce.boolean().optional().default(false),
-      status: z.enum(["PLANNING", "PUT_UP", "RECEIVED"]).default("PLANNING"),
-      remark: z.string().trim().max(500).optional().nullable()
+      billPercentage: z.coerce.number().min(0).max(100)
     })
   ).min(1, "Select at least one item")
 });
 
-export const updateFinancialBillSchema = z.object({
+export const updateRaBillSchema = z.object({
   status: z.enum(["PLANNING", "PUT_UP", "RECEIVED"]).optional(),
-  receivedAmount: z.coerce.number().min(0).optional(),
-  receivedDate: z.union([z.coerce.date(), z.null()]).optional(),
+  receivedDate: z.string().optional().nullable(),
+  chequeRtgsAmount: z.coerce.number().min(0).optional(),
+  itDeductionPct: z.coerce.number().min(0).max(100).optional(),
+  lCessDeductionPct: z.coerce.number().min(0).max(100).optional(),
+  securityDepositPct: z.coerce.number().min(0).max(100).optional(),
+  recoverFromRaBillPct: z.coerce.number().min(0).max(100).optional(),
+  gstWithheldPct: z.coerce.number().min(0).max(100).optional(),
+  withheldPct: z.coerce.number().min(0).max(100).optional(),
   remark: z.string().trim().max(500).optional().nullable()
-}).refine((payload) => Object.keys(payload).length > 0, "At least one field is required");
+});

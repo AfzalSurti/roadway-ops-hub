@@ -178,8 +178,12 @@ export type FinancialPlanItem = {
 export type FinancialBillItem = {
   id: string;
   planId: string;
+  raBillId: string;
   itemId: string;
+  billPercentage: number;
   billAmount: number;
+  taxAmount: number;
+  totalAmount: number;
   carryForwardAmount: number;
   status: FinancialBillStatus;
   receivedPercentage: number;
@@ -189,6 +193,35 @@ export type FinancialBillItem = {
   createdAt: string;
   updatedAt: string;
   item?: FinancialPlanItem;
+};
+
+export type FinancialRaBill = {
+  id: string;
+  planId: string;
+  billName: string;
+  status: FinancialBillStatus;
+  totalBillAmount: number;
+  totalTaxAmount: number;
+  totalAmount: number;
+  receivedDate?: string | null;
+  chequeRtgsAmount: number;
+  itDeductionPct: number;
+  itDeductionAmount: number;
+  lCessDeductionPct: number;
+  lCessDeductionAmount: number;
+  securityDepositPct: number;
+  securityDepositAmount: number;
+  recoverFromRaBillPct: number;
+  recoverFromRaBillAmount: number;
+  gstWithheldPct: number;
+  gstWithheldAmount: number;
+  withheldPct: number;
+  withheldAmount: number;
+  totalReceivedAmount: number;
+  remark?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  items: FinancialBillItem[];
 };
 
 export type FinancialProjectSummary = {
@@ -216,7 +249,7 @@ export type FinancialPlan = {
   updatedAt: string;
   project?: ProjectItem;
   items: FinancialPlanItem[];
-  bills: FinancialBillItem[];
+  raBills: FinancialRaBill[];
 };
 
 export type FinancialProjectDetail = {

@@ -18,6 +18,17 @@ export const financialController = {
     return sendSuccess(res, plan);
   },
 
+  async createRaBill(req: Request, res: Response) {
+    const plan = await financialService.createRaBill(req.params.projectId, req.body);
+    return sendSuccess(res, plan, 201);
+  },
+
+  async updateRaBill(req: Request, res: Response) {
+    const raBill = await financialService.updateRaBill(req.params.raBillId, req.body);
+    return sendSuccess(res, raBill);
+  },
+
+  // Legacy
   async createBills(req: Request, res: Response) {
     const plan = await financialService.createBills(req.params.projectId, req.body);
     return sendSuccess(res, plan, 201);
@@ -28,3 +39,4 @@ export const financialController = {
     return sendSuccess(res, bill);
   }
 };
+

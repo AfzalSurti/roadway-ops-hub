@@ -1,4 +1,4 @@
-import type { ApiUser, AppNotification, FinancialBillItem, FinancialBillStatus, FinancialPlan, FinancialProjectDetail, FinancialProjectSummary, ProjectItem, ProjectRequisitionFormItem, ReportItem, ReportStatus, ReportTemplate, TaskComment, TaskItem, TaskStatus } from "./domain";
+import type { ApiUser, AppNotification, FinancialBillItem, FinancialBillStatus, FinancialPlan, FinancialProjectDetail, FinancialProjectSummary, FinancialRaBill, ProjectItem, ProjectRequisitionFormItem, ReportItem, ReportStatus, ReportTemplate, TaskComment, TaskItem, TaskStatus } from "./domain";
 
   const API_BASE_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:4000").replace(/\/+$/, "");
 
@@ -545,6 +545,37 @@ export const api = {
   ) {
     return request<FinancialPlan>(`/financials/${projectId}/bills`, {
       method: "POST",
+      body: JSON.stringify(payload)
+    });
+  },
+
+  createRaBill(
+    projectId: string,
+    payload: { items: Array<{ itemId: string; billPercentage: number }> }
+  ) {
+    return request<FinancialPlan>(`/financials/${projectId}/ra-bills`, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+  },
+
+  updateRaBill(
+    raBillId: string,
+    payload: {
+      status?: FinancialBillStatus;
+      receivedDate?: string | null;
+      chequeRtgsAmount?: number;
+      itDeductionPct?: number;
+      lCessDeductionPct?: number;
+      securityDepositPct?: number;
+      recoverFromRaBillPct?: number;
+      gstWithheldPct?: number;
+      withheldPct?: number;
+      remark?: string | null;
+    }
+  ) {
+    return request<FinancialRaBill>(`/financials/ra-bills/${raBillId}`, {
+      method: "PATCH",
       body: JSON.stringify(payload)
     });
   },

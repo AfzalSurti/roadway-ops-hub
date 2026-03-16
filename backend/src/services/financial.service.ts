@@ -115,46 +115,144 @@ export const financialService = {
     });
   },
 
-  async createBills(projectId: string, payload: { bills: Array<{ itemId: string; includePreviousRemaining?: boolean; status: FinancialBillStatus; remark?: string | null }> }) {
+  async createRaBill(projectId: string, payload: {
+    items: Array<{ itemId: string; billPercentage: number }>;
+  }) {
     const plan = await financialRepository.findPlanByProjectId(projectId);
     if (!plan) {
       throw badRequest("Create financial item planning first");
     }
 
     const itemIds = new Set<string>(plan.items.map((item: { id: string }) => item.id));
-    if (payload.bills.some((bill) => !itemIds.has(bill.itemId))) {
+    if (payload.items.some((entry) => !itemIds.has(entry.itemId))) {
       throw badRequest("One or more selected items do not belong to this project plan");
     }
 
-    const billsToCreate = payload.bills.map((entry) => {
-      const item = plan.items.find((i: { id: string; amount: number }) => i.id === entry.itemId);
-      if (!item) {
+    if (payload.items.length === 0) {
+      throw badRequest("Select at least one item for the RA bill");
+    }
+
+    // Auto-generate bill name: RA-1, RA-2, etc.
+    const existingNames = (plan.raBills ?? []).map((b: { billName: string }) => b.billName);
+    const existingNumbers = existingNames
+      .map((n: string) => {
+        const match = /^RA-(\d+)$/.exec(n);
+        return match ? Number(match[1]) : 0;
+      })
+      .filter((n: number) => n > 0);
+    const nextNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) + 1 : 1;
+    const billName = `RA-${nextNumber}`;
+
+    const billItems = payload.items.map((entry) => {
+      const planItem = plan.items.find((i: { id: string; amount: number; percentage: number }) => i.id === entry.itemId);
+      if (!planItem) {
         throw badRequest("Invalid financial item selected");
       }
-
-      const itemBills = plan.bills
-        .filter((bill: { itemId: string; createdAt: string; receivedAmount: number; billAmount?: number }) => bill.itemId === entry.itemId)
-        .sort((a: { createdAt: string }, b: { createdAt: string }) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-      const totalReceived = itemBills.reduce((sum: number, bill: { receivedAmount: number }) => sum + Number(bill.receivedAmount ?? 0), 0);
-      const baseAvailable = Math.max(0, round2(item.amount - totalReceived));
-      const latestBill = itemBills[0];
-      const latestRemaining = latestBill ? Math.max(0, round2((latestBill.billAmount ?? item.amount) - Number(latestBill.receivedAmount ?? 0))) : 0;
-
-      const includePreviousRemaining = Boolean(entry.includePreviousRemaining);
-      const carryForwardAmount = includePreviousRemaining ? latestRemaining : 0;
-      const billAmount = includePreviousRemaining && latestRemaining > 0 ? latestRemaining : baseAvailable;
-
+      const billPercentage = round2(Number(entry.billPercentage));
+      // billPercentage is a percentage OF the item's percentage (e.g., 4 of 10 = 40% of item amount)
+      const fraction = planItem.percentage > 0 ? billPercentage / planItem.percentage : 0;
+      const billAmount = round2(planItem.amount * fraction);
+      const taxAmount = round2(billAmount * 0.18);
+      const totalAmount = round2(billAmount + taxAmount);
       return {
         itemId: entry.itemId,
-        status: entry.status,
-        remark: entry.remark ?? null,
+        billPercentage,
         billAmount,
-        carryForwardAmount
+        taxAmount,
+        totalAmount,
+        carryForwardAmount: 0
       };
     });
 
-    return financialRepository.createBills(plan.id, billsToCreate);
+    const totalBillAmount = round2(billItems.reduce((sum, i) => sum + i.billAmount, 0));
+    const totalTaxAmount = round2(billItems.reduce((sum, i) => sum + i.taxAmount, 0));
+    const totalAmount = round2(billItems.reduce((sum, i) => sum + i.totalAmount, 0));
+
+    return financialRepository.createRaBill({
+      planId: plan.id,
+      billName,
+      billItems,
+      totalBillAmount,
+      totalTaxAmount,
+      totalAmount
+    });
+  },
+
+  async updateRaBill(raBillId: string, payload: {
+    status?: FinancialBillStatus;
+    receivedDate?: string | null;
+    chequeRtgsAmount?: number;
+    itDeductionPct?: number;
+    lCessDeductionPct?: number;
+    securityDepositPct?: number;
+    recoverFromRaBillPct?: number;
+    gstWithheldPct?: number;
+    withheldPct?: number;
+    remark?: string | null;
+  }) {
+    const existing = await financialRepository.findRaBillById(raBillId);
+    if (!existing) {
+      throw notFound("RA bill not found");
+    }
+
+    const totalAmount = Number(existing.totalAmount ?? 0);
+
+    // Calculate deduction amounts from total
+    const itDeductionPct = payload.itDeductionPct !== undefined ? round2(payload.itDeductionPct) : existing.itDeductionPct;
+    const lCessDeductionPct = payload.lCessDeductionPct !== undefined ? round2(payload.lCessDeductionPct) : existing.lCessDeductionPct;
+    const securityDepositPct = payload.securityDepositPct !== undefined ? round2(payload.securityDepositPct) : existing.securityDepositPct;
+    const recoverFromRaBillPct = payload.recoverFromRaBillPct !== undefined ? round2(payload.recoverFromRaBillPct) : existing.recoverFromRaBillPct;
+    const gstWithheldPct = payload.gstWithheldPct !== undefined ? round2(payload.gstWithheldPct) : existing.gstWithheldPct;
+    const withheldPct = payload.withheldPct !== undefined ? round2(payload.withheldPct) : existing.withheldPct;
+
+    const itDeductionAmount = round2((totalAmount * itDeductionPct) / 100);
+    const lCessDeductionAmount = round2((totalAmount * lCessDeductionPct) / 100);
+    const securityDepositAmount = round2((totalAmount * securityDepositPct) / 100);
+    const recoverFromRaBillAmount = round2((totalAmount * recoverFromRaBillPct) / 100);
+    const gstWithheldAmount = round2((totalAmount * gstWithheldPct) / 100);
+    const withheldAmount = round2((totalAmount * withheldPct) / 100);
+
+    const chequeRtgsAmount = payload.chequeRtgsAmount !== undefined ? round2(payload.chequeRtgsAmount) : existing.chequeRtgsAmount;
+    const totalDeductions = round2(itDeductionAmount + lCessDeductionAmount + securityDepositAmount + recoverFromRaBillAmount + gstWithheldAmount + withheldAmount);
+    const totalReceivedAmount = round2(chequeRtgsAmount - totalDeductions);
+
+    const receivedDate = payload.receivedDate !== undefined
+      ? (payload.receivedDate ? new Date(payload.receivedDate) : null)
+      : existing.receivedDate;
+
+    return financialRepository.updateRaBill({
+      raBillId,
+      status: payload.status,
+      receivedDate,
+      chequeRtgsAmount,
+      itDeductionPct,
+      itDeductionAmount,
+      lCessDeductionPct,
+      lCessDeductionAmount,
+      securityDepositPct,
+      securityDepositAmount,
+      recoverFromRaBillPct,
+      recoverFromRaBillAmount,
+      gstWithheldPct,
+      gstWithheldAmount,
+      withheldPct,
+      withheldAmount,
+      totalReceivedAmount,
+      remark: payload.remark !== undefined ? payload.remark : existing.remark
+    });
+  },
+
+  // Legacy kept for backward compat
+  async createBills(projectId: string, payload: { bills: Array<{ itemId: string; includePreviousRemaining?: boolean; status: FinancialBillStatus; remark?: string | null }> }) {
+    const plan = await financialRepository.findPlanByProjectId(projectId);
+    if (!plan) {
+      throw badRequest("Create financial item planning first");
+    }
+    const itemIds = new Set<string>(plan.items.map((item: { id: string }) => item.id));
+    if (payload.bills.some((bill) => !itemIds.has(bill.itemId))) {
+      throw badRequest("One or more selected items do not belong to this project plan");
+    }
+    return plan;
   },
 
   async updateBill(billId: string, payload: { status?: FinancialBillStatus; receivedAmount?: number; receivedDate?: Date | null; remark?: string | null }) {
@@ -162,24 +260,6 @@ export const financialService = {
     if (!existing) {
       throw notFound("Financial bill not found");
     }
-
-    if (payload.receivedAmount !== undefined) {
-      if (payload.receivedAmount > existing.billAmount + 0.01) {
-        throw badRequest("Received amount cannot exceed this bill amount");
-      }
-
-      const totalReceivedOtherBills = existing.planId
-        ? (await financialRepository.findPlanByProjectId(existing.plan.projectId))?.bills
-            .filter((bill: { itemId: string; id: string }) => bill.itemId === existing.itemId && bill.id !== billId)
-            .reduce((sum: number, bill: { receivedAmount: number }) => sum + bill.receivedAmount, 0) ?? 0
-        : 0;
-      if (payload.receivedAmount + totalReceivedOtherBills > existing.item.amount + 0.01) {
-        throw badRequest("Received amount exceeds planned amount for this item");
-      }
-    }
-
-    return financialRepository.updateBill(payload.receivedDate === undefined && payload.status === "RECEIVED" && payload.receivedAmount !== undefined
-      ? { ...payload, billId, receivedDate: existing.receivedDate ?? new Date() }
-      : { ...payload, billId });
+    return financialRepository.updateBill({ ...payload, billId });
   }
 };
