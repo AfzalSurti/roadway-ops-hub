@@ -29,6 +29,22 @@ function getProjectLabel(task: TaskItem): string {
   return task.projectNumber?.trim() || task.projectCode?.trim() || task.project?.trim() || "Unknown";
 }
 
+type EmployeeTaskAction = "SUBMIT" | "COMPLY" | null;
+
+function getActionRequired(task: TaskItem): EmployeeTaskAction {
+  const mapped = getEmployeeTaskStatus(task);
+  if (mapped === "TODO") return "SUBMIT";
+  if (mapped === "IN_PROGRESS") return "COMPLY";
+  return null;
+}
+
+function getRatingDisplay(task: TaskItem): string {
+  if (task.status === "DONE" && task.ratingEnabled && typeof task.rating === "number") {
+    return String(task.rating);
+  }
+  return task.ratingEnabled ? "✓" : "✗";
+}
+
 export default function EmployeeTasks() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -41,7 +57,6 @@ export default function EmployeeTasks() {
   });
   const [toDate, setToDate] = usePersistentState<string>("employee.tasks.toDate", () => new Date().toISOString().slice(0, 10));
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-  const [completionNote, setCompletionNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [acknowledging, setAcknowledging] = useState(false);
 
@@ -116,14 +131,12 @@ export default function EmployeeTasks() {
     [taskComments]
   );
 
-  const handleComplete = async () => {
-    if (!selectedTask) return;
+  const handleComplete = async (task: TaskItem) => {
     try {
       setSubmitting(true);
-      const updated = await api.completeTask(selectedTask.id, completionNote.trim() || undefined);
+      const updated = await api.completeTask(task.id);
       patchTaskInCache(updated);
       await refetchComments();
-      setCompletionNote("");
       toast.success("Task submitted to admin");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to submit task";
@@ -133,11 +146,10 @@ export default function EmployeeTasks() {
     }
   };
 
-  const handleAcceptComment = async () => {
-    if (!selectedTask) return;
+  const handleAcceptComment = async (task: TaskItem) => {
     try {
       setAcknowledging(true);
-      const updated = await api.acknowledgeTaskComment(selectedTask.id);
+      const updated = await api.acknowledgeTaskComment(task.id);
       patchTaskInCache(updated);
       toast.success("Comment accepted and sent back to admin");
     } catch (error) {
@@ -145,6 +157,17 @@ export default function EmployeeTasks() {
       toast.error(message);
     } finally {
       setAcknowledging(false);
+    }
+  };
+
+  const handleActionRequired = async (task: TaskItem) => {
+    const action = getActionRequired(task);
+    if (action === "SUBMIT") {
+      await handleComplete(task);
+      return;
+    }
+    if (action === "COMPLY") {
+      await handleAcceptComment(task);
     }
   };
 
@@ -225,19 +248,25 @@ export default function EmployeeTasks() {
       </div>
 
       <div className="glass-panel overflow-hidden">
-        <table className="w-full text-sm min-w-[860px]">
+        <table className="w-full text-sm min-w-[1300px]">
           <thead>
             <tr className="border-b border-border/50 text-muted-foreground">
               <th className="text-left p-4 font-medium">Project</th>
               <th className="text-left p-4 font-medium">Task</th>
+              <th className="text-left p-4 font-medium">Rating</th>
               <th className="text-left p-4 font-medium">Status</th>
               <th className="text-left p-4 font-medium">Allocated Date</th>
+              <th className="text-left p-4 font-medium">Task Duration</th>
               <th className="text-left p-4 font-medium">Due Date</th>
+              <th className="text-left p-4 font-medium">Action Required</th>
+              <th className="text-left p-4 font-medium">Completed At</th>
             </tr>
           </thead>
           <tbody>
             {sortedTasks.map((task) => {
               const mappedStatus = getEmployeeTaskStatus(task);
+              const actionRequired = getActionRequired(task);
+              const actionBusy = (actionRequired === "SUBMIT" && submitting) || (actionRequired === "COMPLY" && acknowledging);
               return (
                 <tr
                   key={task.id}
@@ -252,19 +281,35 @@ export default function EmployeeTasks() {
                     <p className="font-medium">{task.title}</p>
                     <p className="text-xs text-muted-foreground line-clamp-2">{task.description || "-"}</p>
                   </td>
+                  <td className="p-4 font-semibold">{getRatingDisplay(task)}</td>
                   <td className="p-4">
                     <span className={cn("status-badge", employeeStatusConfig[mappedStatus].color)}>
                       {employeeStatusConfig[mappedStatus].label}
                     </span>
                   </td>
                   <td className="p-4 text-muted-foreground">{new Date(task.allocatedAt ?? task.createdAt).toLocaleDateString()}</td>
+                  <td className="p-4 text-muted-foreground">{task.allottedDays ?? "-"}</td>
                   <td className="p-4 text-muted-foreground">{new Date(task.dueDate).toLocaleDateString()}</td>
+                  <td className="p-4" onClick={(event) => event.stopPropagation()}>
+                    {actionRequired ? (
+                      <button
+                        onClick={() => void handleActionRequired(task)}
+                        disabled={actionBusy}
+                        className="px-3 py-1.5 rounded-lg bg-primary/10 text-primary border border-primary/20 text-xs font-medium hover:bg-primary/20 disabled:opacity-50"
+                      >
+                        {actionBusy ? "Processing..." : actionRequired === "SUBMIT" ? "Submit" : "Comply"}
+                      </button>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
+                  </td>
+                  <td className="p-4 text-muted-foreground">{task.reviewCompletedAt ? new Date(task.reviewCompletedAt).toLocaleDateString() : "-"}</td>
                 </tr>
               );
             })}
             {sortedTasks.length === 0 && (
               <tr>
-                <td colSpan={5} className="p-6 text-muted-foreground">No tasks found for selected filters.</td>
+                <td colSpan={9} className="p-6 text-muted-foreground">No tasks found for selected filters.</td>
               </tr>
             )}
           </tbody>
@@ -298,10 +343,13 @@ export default function EmployeeTasks() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm mb-4">
               <p><span className="text-muted-foreground">Task:</span> {selectedTask.title}</p>
               <p><span className="text-muted-foreground">Project:</span> {getProjectLabel(selectedTask)}</p>
+              <p><span className="text-muted-foreground">Rating:</span> {getRatingDisplay(selectedTask)}</p>
               <p><span className="text-muted-foreground">Allocated:</span> {new Date(selectedTask.allocatedAt ?? selectedTask.createdAt).toLocaleDateString()}</p>
+              <p><span className="text-muted-foreground">Task Duration:</span> {selectedTask.allottedDays ?? "-"} day(s)</p>
               <p><span className="text-muted-foreground">Due:</span> {new Date(selectedTask.dueDate).toLocaleDateString()}</p>
               <p><span className="text-muted-foreground">Status:</span> {employeeStatusConfig[getEmployeeTaskStatus(selectedTask)].label}</p>
-              <p><span className="text-muted-foreground">Rating:</span> {selectedTask.rating ?? "-"}</p>
+              <p><span className="text-muted-foreground">Completed At:</span> {selectedTask.reviewCompletedAt ? new Date(selectedTask.reviewCompletedAt).toLocaleDateString() : "-"}</p>
+              <p className="sm:col-span-2"><span className="text-muted-foreground">Action Required:</span> {getActionRequired(selectedTask) === "SUBMIT" ? "Submit" : getActionRequired(selectedTask) === "COMPLY" ? "Comply" : "-"}</p>
             </div>
 
             <p className="text-sm text-muted-foreground mb-2">Description</p>
@@ -320,32 +368,20 @@ export default function EmployeeTasks() {
               </div>
             </div>
 
-            {selectedTask.status !== "DONE" && (
-              <>
-                <textarea
-                  value={completionNote}
-                  onChange={(event) => setCompletionNote(event.target.value)}
-                  rows={3}
-                  placeholder="Optional note while submitting task"
-                  className="w-full px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none resize-none focus:border-primary/50"
-                />
-                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <button
-                    onClick={() => void handleComplete()}
-                    disabled={submitting}
-                    className="py-2.5 rounded-xl bg-primary/10 text-primary border border-primary/20 text-sm font-medium hover:bg-primary/20 disabled:opacity-50"
-                  >
-                    {submitting ? "Submitting..." : "Done (Send To Admin)"}
-                  </button>
-                  <button
-                    onClick={() => void handleAcceptComment()}
-                    disabled={acknowledging || managerComments.length === 0}
-                    className="py-2.5 rounded-xl bg-secondary/70 border border-border/50 text-sm font-medium hover:bg-secondary disabled:opacity-50"
-                  >
-                    {acknowledging ? "Sending..." : "Accept Comment"}
-                  </button>
-                </div>
-              </>
+            {getActionRequired(selectedTask) && (
+              <div className="mt-3">
+                <button
+                  onClick={() => void handleActionRequired(selectedTask)}
+                  disabled={(getActionRequired(selectedTask) === "SUBMIT" && submitting) || (getActionRequired(selectedTask) === "COMPLY" && acknowledging)}
+                  className="py-2.5 px-4 rounded-xl bg-primary/10 text-primary border border-primary/20 text-sm font-medium hover:bg-primary/20 disabled:opacity-50"
+                >
+                  {(getActionRequired(selectedTask) === "SUBMIT" && submitting) || (getActionRequired(selectedTask) === "COMPLY" && acknowledging)
+                    ? "Processing..."
+                    : getActionRequired(selectedTask) === "SUBMIT"
+                    ? "Submit"
+                    : "Comply"}
+                </button>
+              </div>
             )}
           </div>
         </div>
