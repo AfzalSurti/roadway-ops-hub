@@ -56,20 +56,20 @@ export default function AdminFinancial() {
 
   const { data: eligibleProjects = [], isLoading: loadingProjects } = useQuery({
     queryKey: ["financial-projects"],
-    queryFn: () => api.getFinancialProjects()
+    queryFn: () => api.getFinancialProjects(),
+    staleTime: 5 * 60 * 1000
   });
 
-  useEffect(() => {
-    if (!selectedProjectId && eligibleProjects.length > 0) {
-      setSelectedProjectId(eligibleProjects[0].id);
-    }
-  }, [eligibleProjects, selectedProjectId]);
+  const activeProjectId = selectedProjectId || eligibleProjects[0]?.id || "";
 
   const { data: detail, isLoading: loadingDetail } = useQuery({
-    queryKey: ["financial-project", selectedProjectId],
-    queryFn: () => api.getProjectFinancial(selectedProjectId),
-    enabled: Boolean(selectedProjectId)
+    queryKey: ["financial-project", activeProjectId],
+    queryFn: () => api.getProjectFinancial(activeProjectId),
+    enabled: Boolean(activeProjectId),
+    staleTime: 2 * 60 * 1000
   });
+
+  const raBills = detail?.plan?.raBills ?? [];
 
   useEffect(() => {
     if (!detail) return;
@@ -273,7 +273,7 @@ export default function AdminFinancial() {
       <div className="glass-panel p-4 mb-6">
         <label className="text-sm font-medium mb-2 block">Select Eligible Project</label>
         <select
-          value={selectedProjectId}
+          value={activeProjectId}
           onChange={(e) => setSelectedProjectId(e.target.value)}
           className="w-full max-w-xl px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50"
           title="Select project for financial planning"
@@ -290,7 +290,7 @@ export default function AdminFinancial() {
         </p>
       </div>
 
-      {!selectedProjectId || !detail ? (
+      {!activeProjectId || !detail ? (
         <div className="glass-panel p-8 text-sm text-muted-foreground">
           {loadingDetail ? "Loading financial details..." : "Select a project to continue."}
         </div>
@@ -321,7 +321,7 @@ export default function AdminFinancial() {
                   <Plus className="h-4 w-4" />
                   Create RA Bill
                 </button>
-                {detail.plan?.raBills && detail.plan.raBills.length > 0 && (
+                {raBills.length > 0 && (
                   <button
                     onClick={handleDownloadPdf}
                     className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-accent/10 text-accent border border-accent/20 text-sm font-medium hover:bg-accent/20"
@@ -343,11 +343,11 @@ export default function AdminFinancial() {
               </div>
             </div>
 
-            {!detail.plan || detail.plan.raBills.length === 0 ? (
+            {!detail.plan || raBills.length === 0 ? (
               <p className="text-sm text-muted-foreground">No RA bills created yet. Click "Create RA Bill" to begin.</p>
             ) : (
               <div className="space-y-6">
-                {detail.plan.raBills.map((raBill) => (
+                {raBills.map((raBill) => (
                   <RaBillCard
                     key={raBill.id}
                     raBill={raBill}
