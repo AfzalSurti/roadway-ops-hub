@@ -1,6 +1,8 @@
 import jsPDF from "jspdf";
 import type { ProjectRequisitionFormItem } from "./domain";
 
+const FIELD_LABEL_RATIO = 0.42;
+
 function money(value: string | null | undefined) {
   return value && value.trim() ? value : "";
 }
@@ -19,8 +21,8 @@ function toDisplay(value?: string | number | null) {
 }
 
 function drawTextInBox(doc: jsPDF, text: string, x: number, y: number, w: number, h: number, opts?: { fontSize?: number; lineHeight?: number; align?: "left" | "center" | "right" }) {
-  const fontSize = opts?.fontSize ?? 7.8;
-  const lineHeight = opts?.lineHeight ?? 3.6;
+  const fontSize = opts?.fontSize ?? 9;
+  const lineHeight = opts?.lineHeight ?? 4.2;
   const align = opts?.align ?? "left";
   const usableW = Math.max(1, w - 1.8);
   const usableH = Math.max(1, h - 1.8);
@@ -50,15 +52,15 @@ function drawTextInBox(doc: jsPDF, text: string, x: number, y: number, w: number
 }
 
 function drawField(doc: jsPDF, args: { x: number; y: number; w: number; h: number; label: string; value: string; labelRatio?: number; valueAlign?: "left" | "center" | "right" }) {
-  const { x, y, w, h, label, value, labelRatio = 0.36, valueAlign = "left" } = args;
-  const labelW = Math.max(24, Math.min(w * labelRatio, w - 20));
+  const { x, y, w, h, label, value, valueAlign = "left" } = args;
+  const labelW = Math.max(30, Math.min(w * FIELD_LABEL_RATIO, w - 24));
   const valueW = w - labelW;
   doc.rect(x, y, w, h);
   doc.line(x + labelW, y, x + labelW, y + h);
   doc.setFont("times", "bold");
-  drawTextInBox(doc, label, x, y, labelW, h, { fontSize: 7.2, lineHeight: 3.4 });
+  drawTextInBox(doc, label, x, y, labelW, h, { fontSize: 8.6, lineHeight: 4.1 });
   doc.setFont("times", "normal");
-  drawTextInBox(doc, value, x + labelW, y, valueW, h, { fontSize: 7.6, lineHeight: 3.6, align: valueAlign });
+  drawTextInBox(doc, value, x + labelW, y, valueW, h, { fontSize: 9.2, lineHeight: 4.2, align: valueAlign });
 }
 
 function countLines(doc: jsPDF, text: string, width: number) {
@@ -71,15 +73,15 @@ function measureFieldHeight(
   doc: jsPDF,
   args: { w: number; label: string; value: string; labelRatio?: number; minH?: number }
 ) {
-  const { w, label, value, labelRatio = 0.36, minH = 7 } = args;
-  const labelW = Math.max(24, Math.min(w * labelRatio, w - 20));
+  const { w, label, value, minH = 8 } = args;
+  const labelW = Math.max(30, Math.min(w * FIELD_LABEL_RATIO, w - 24));
   const valueW = w - labelW;
 
   const labelLines = countLines(doc, label, labelW);
   const valueLines = countLines(doc, value, valueW);
 
-  const labelNeeded = labelLines * 3.4 + 2;
-  const valueNeeded = valueLines * 3.6 + 2;
+  const labelNeeded = labelLines * 4.1 + 2;
+  const valueNeeded = valueLines * 4.2 + 2;
   return Math.max(minH, labelNeeded, valueNeeded);
 }
 
@@ -109,9 +111,9 @@ export function downloadProjectRequisitionPdf(form: ProjectRequisitionFormItem, 
   doc.rect(x, y, w, h);
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
+  doc.setFontSize(12);
   doc.text("GEO DESIGNS & RESEARCH PVT. LTD.", x + w / 2, y + 5.5, { align: "center" });
-  doc.setFontSize(8.5);
+  doc.setFontSize(10.5);
   doc.text("PROJECT NO. REQUISITION FORM", x + w / 2, y + 10.5, { align: "center" });
 
   drawField(doc, {
@@ -121,7 +123,6 @@ export function downloadProjectRequisitionPdf(form: ProjectRequisitionFormItem, 
     h: 8,
     label: "Application Date",
     value: fmtDate(form.applicationDate),
-    labelRatio: 0.56,
     valueAlign: "center"
   });
 
@@ -134,87 +135,87 @@ export function downloadProjectRequisitionPdf(form: ProjectRequisitionFormItem, 
   const rows: LayoutRow[] = [
     {
       kind: "pair",
-      left: { label: "Cost Centre / Department", value: toDisplay(form.costCentreDepartment), labelRatio: 0.52, valueAlign: "center" },
-      right: { label: "Name of HOD/DIR", value: toDisplay(form.hodDirectorName), labelRatio: 0.5, valueAlign: "center" }
+      left: { label: "Cost Centre / Department", value: toDisplay(form.costCentreDepartment), valueAlign: "center" },
+      right: { label: "Name of HOD/DIR", value: toDisplay(form.hodDirectorName), valueAlign: "center" }
     },
     {
       kind: "pair",
-      left: { label: "Client Name", value: toDisplay(form.clientName), labelRatio: 0.4 },
-      right: { label: "Billing Name", value: toDisplay(form.billingName), labelRatio: 0.4 }
+      left: { label: "Client Name", value: toDisplay(form.clientName) },
+      right: { label: "Billing Name", value: toDisplay(form.billingName) }
     },
     {
       kind: "pair",
-      left: { label: "Address with Pin Code", value: toDisplay(form.addressWithPincode), labelRatio: 0.4, minH: 10 },
-      right: { label: "Pincode", value: toDisplay(form.pincode), labelRatio: 0.4, valueAlign: "center" }
+      left: { label: "Address with Pin Code", value: toDisplay(form.addressWithPincode), minH: 10 },
+      right: { label: "Pincode", value: toDisplay(form.pincode), valueAlign: "center" }
     },
     {
       kind: "pair",
-      left: { label: "GST Type", value: form.gstType === "REGISTERED" ? "REGISTERED" : "UNREGISTERED", labelRatio: 0.4, valueAlign: "center" },
-      right: { label: "GST Tin Number", value: toDisplay(form.gstNumber), labelRatio: 0.4 }
+      left: { label: "GST Type", value: form.gstType === "REGISTERED" ? "REGISTERED" : "UNREGISTERED", valueAlign: "center" },
+      right: { label: "GST Tin Number", value: toDisplay(form.gstNumber) }
     },
     {
       kind: "pair",
-      left: { label: "Contact No.", value: toDisplay(form.contactNumber), labelRatio: 0.4 },
-      right: { label: "Contact Name", value: toDisplay(form.contactName), labelRatio: 0.4 }
+      left: { label: "Contact No.", value: toDisplay(form.contactNumber) },
+      right: { label: "Contact Name", value: toDisplay(form.contactName) }
     },
     {
       kind: "pair",
-      left: { label: "Department", value: toDisplay(form.department), labelRatio: 0.4 },
-      right: { label: "Designation", value: toDisplay(form.designation), labelRatio: 0.4 }
+      left: { label: "Department", value: toDisplay(form.department) },
+      right: { label: "Designation", value: toDisplay(form.designation) }
     },
     {
       kind: "pair",
-      left: { label: "TAN / PAN No.", value: toDisplay(form.panTanNumber), labelRatio: 0.4 },
-      right: { label: "Email ID", value: toDisplay(form.email), labelRatio: 0.4 }
+      left: { label: "TAN / PAN No.", value: toDisplay(form.panTanNumber) },
+      right: { label: "Email ID", value: toDisplay(form.email) }
     },
     {
       kind: "pair",
-      left: { label: "Work Order / PO / LOI Value", value: money(form.workOrderValue), labelRatio: 0.52 },
-      right: { label: "WO/PO/LOI Date", value: fmtDate(form.workOrderDate), labelRatio: 0.52, valueAlign: "center" }
+      left: { label: "Work Order / PO / LOI Value", value: money(form.workOrderValue) },
+      right: { label: "WO/PO/LOI Date", value: fmtDate(form.workOrderDate), valueAlign: "center" }
     },
     {
       kind: "pair",
-      left: { label: "Amount of W.O./Agreement", value: money(form.amountOfWorkOrder), labelRatio: 0.52 },
-      right: { label: "Agreement Date", value: fmtDate(form.agreementDate), labelRatio: 0.52, valueAlign: "center" }
+      left: { label: "Amount of W.O./Agreement", value: money(form.amountOfWorkOrder) },
+      right: { label: "Agreement Date", value: fmtDate(form.agreementDate), valueAlign: "center" }
     },
     {
       kind: "pair",
-      left: { label: "GST Amount", value: money(form.gstAmount), labelRatio: 0.4 },
-      right: { label: "Project Starting Date", value: fmtDate(form.projectStartingDate), labelRatio: 0.52, valueAlign: "center" }
+      left: { label: "GST Amount", value: money(form.gstAmount) },
+      right: { label: "Project Starting Date", value: fmtDate(form.projectStartingDate), valueAlign: "center" }
     },
     {
       kind: "pair",
-      left: { label: "WO/PO/LOI/LOA No.", value: toDisplay(form.workOrderNumber), labelRatio: 0.52 },
-      right: { label: "Project Duration", value: form.projectDurationDays ? `${form.projectDurationDays} Days` : "", labelRatio: 0.52, valueAlign: "center" }
+      left: { label: "WO/PO/LOI/LOA No.", value: toDisplay(form.workOrderNumber) },
+      right: { label: "Project Duration", value: form.projectDurationDays ? `${form.projectDurationDays} Days` : "", valueAlign: "center" }
     },
     {
       kind: "pair",
-      left: { label: "New Project Number", value: toDisplay(form.newProjectNumber), labelRatio: 0.52 },
-      right: { label: "Project Completion Date", value: fmtDate(form.projectCompletionDate), labelRatio: 0.52, valueAlign: "center" }
+      left: { label: "New Project Number", value: toDisplay(form.newProjectNumber) },
+      right: { label: "Project Completion Date", value: fmtDate(form.projectCompletionDate), valueAlign: "center" }
     },
     {
       kind: "full",
-      field: { label: "Name of Work", value: toDisplay(form.nameOfWork), labelRatio: 0.2, minH: 14 }
+      field: { label: "Name of Work", value: toDisplay(form.nameOfWork), minH: 14 }
     },
     {
       kind: "pair",
-      left: { label: "Location of Work - District", value: toDisplay(form.locationDistrict), labelRatio: 0.52 },
-      right: { label: "State", value: toDisplay(form.state), labelRatio: 0.4 }
+      left: { label: "Location of Work - District", value: toDisplay(form.locationDistrict) },
+      right: { label: "State", value: toDisplay(form.state) }
     },
     {
       kind: "pair",
-      left: { label: "EMD", value: money(form.emdAmount), labelRatio: 0.4 },
-      right: { label: "P.G./SD Amount", value: money(form.pgSdAmount), labelRatio: 0.4 }
+      left: { label: "EMD", value: money(form.emdAmount) },
+      right: { label: "P.G./SD Amount", value: money(form.pgSdAmount) }
     },
     {
       kind: "pair",
-      left: { label: "P.G. Date", value: fmtDate(form.pgDate), labelRatio: 0.4, valueAlign: "center" },
-      right: { label: "P.G. Expiry Date", value: fmtDate(form.pgExpiryDate), labelRatio: 0.45, valueAlign: "center" }
+      left: { label: "P.G. Date", value: fmtDate(form.pgDate), valueAlign: "center" },
+      right: { label: "P.G. Expiry Date", value: fmtDate(form.pgExpiryDate), valueAlign: "center" }
     },
     {
       kind: "pair",
-      left: { label: "Approved Project No.", value: toDisplay(form.approvedProjectNumber), labelRatio: 0.52, valueAlign: "center" },
-      right: { label: "Approved By", value: toDisplay(form.approvedBy), labelRatio: 0.4 }
+      left: { label: "Approved Project No.", value: toDisplay(form.approvedProjectNumber), valueAlign: "center" },
+      right: { label: "Approved By", value: toDisplay(form.approvedBy) }
     }
   ];
 
@@ -293,12 +294,13 @@ export function downloadProjectRequisitionPdf(form: ProjectRequisitionFormItem, 
 
   doc.rect(x, footerY, w, 7);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(7);
+  doc.setFontSize(8.5);
   doc.text("MANAGER ADMINISTRATION", x + 28, footerY + 4.5);
   doc.text("CHECKED BY", x + 32, footerY + 11);
   doc.text("APPROVED BY", x + w - 56, footerY + 11);
 
   doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
   doc.text("Name & Signature:", x + 4, footerY + 18);
   doc.line(x + 34, footerY + 18, x + 72, footerY + 18);
   doc.text("Signature:", x + w - 72, footerY + 18);
