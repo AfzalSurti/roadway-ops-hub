@@ -553,10 +553,46 @@ export const api = {
     projectId: string,
     payload: { items: Array<{ itemId: string; billPercentage: number }> }
   ) {
-    return request<FinancialPlan>(`/financials/${projectId}/ra-bills`, {
-      method: "POST",
-      body: JSON.stringify(payload)
-    });
+    const candidates: Array<{ path: string; body: unknown }> = [
+      {
+        path: `/financials/${projectId}/ra-bills`,
+        body: payload
+      },
+      {
+        // Backward-compatible fallback for older backend versions.
+        path: `/financials/${projectId}/bills`,
+        body: {
+          bills: payload.items.map((item) => ({
+            itemId: item.itemId,
+            includePreviousRemaining: false,
+            status: "PLANNING" as FinancialBillStatus,
+            remark: `RA bill percentage: ${item.billPercentage}`
+          }))
+        }
+      }
+    ];
+
+    const tryNext = async (index: number): Promise<FinancialPlan> => {
+      if (index >= candidates.length) {
+        throw new Error("RA bill API is unavailable on the configured backend.");
+      }
+
+      const candidate = candidates[index];
+      try {
+        return await request<FinancialPlan>(candidate.path, {
+          method: "POST",
+          body: JSON.stringify(candidate.body)
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Request failed";
+        if (/route not found|404|cannot post/i.test(message)) {
+          return tryNext(index + 1);
+        }
+        throw error;
+      }
+    };
+
+    return tryNext(0);
   },
 
   updateRaBill(
@@ -574,10 +610,43 @@ export const api = {
       remark?: string | null;
     }
   ) {
-    return request<FinancialRaBill>(`/financials/ra-bills/${raBillId}`, {
-      method: "PATCH",
-      body: JSON.stringify(payload)
-    });
+    const candidates: Array<{ path: string; body: unknown }> = [
+      {
+        path: `/financials/ra-bills/${raBillId}`,
+        body: payload
+      },
+      {
+        // Backward-compatible fallback for older backend versions.
+        path: `/financials/bills/${raBillId}`,
+        body: {
+          status: payload.status,
+          receivedDate: payload.receivedDate,
+          remark: payload.remark
+        }
+      }
+    ];
+
+    const tryNext = async (index: number): Promise<FinancialRaBill> => {
+      if (index >= candidates.length) {
+        throw new Error("RA bill update API is unavailable on the configured backend.");
+      }
+
+      const candidate = candidates[index];
+      try {
+        return await request<FinancialRaBill>(candidate.path, {
+          method: "PATCH",
+          body: JSON.stringify(candidate.body)
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Request failed";
+        if (/route not found|404|cannot patch/i.test(message)) {
+          return tryNext(index + 1);
+        }
+        throw error;
+      }
+    };
+
+    return tryNext(0);
   },
 
   updateFinancialBill(
