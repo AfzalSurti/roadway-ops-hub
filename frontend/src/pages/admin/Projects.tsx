@@ -7,7 +7,7 @@ import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { downloadProjectRequisitionPdf } from "@/lib/project-requisition-pdf";
 import { downloadProjectReport } from "@/lib/reports-pdf";
-import { statusConfig, type ProjectRequisitionFormItem } from "@/lib/domain";
+import { isTaskOverdue, statusConfig, type ProjectRequisitionFormItem } from "@/lib/domain";
 
 type WizardStep = 1 | 2 | 3 | 4 | 5;
 type RequisitionStep = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
@@ -436,7 +436,7 @@ export default function AdminProjects() {
         requisitionForm: requisitionFormsByProjectId.get(project.id) ?? null,
         totalTasks: projectTasks.length,
         pendingTasks: projectTasks.filter((task) => task.status !== "DONE").length,
-        overdueTasks: projectTasks.filter((task) => task.status !== "DONE" && new Date(task.dueDate) < new Date()).length,
+        overdueTasks: projectTasks.filter((task) => isTaskOverdue(task)).length,
         tasks: projectTasks
       };
     });

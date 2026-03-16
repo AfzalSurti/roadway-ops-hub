@@ -4,6 +4,7 @@ import { ListTodo, AlertTriangle, MessageSquare, CheckCircle2, Clock, RotateCcw 
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { TaskItem } from "@/lib/domain";
+import { isTaskOverdue } from "@/lib/domain";
 
 function getProjectLabel(task: TaskItem): string {
   return task.projectNumber?.trim() || task.projectCode?.trim() || task.project?.trim() || "Unknown";
@@ -14,7 +15,7 @@ function computeStats(tasks: TaskItem[]) {
   return {
     total: tasks.length,
     pending: tasks.filter((t) => t.status === "TODO" && !t.managerReviewComments).length,
-    overdue: tasks.filter((t) => new Date(t.dueDate) < now && t.status !== "DONE").length,
+    overdue: tasks.filter((t) => isTaskOverdue(t)).length,
     adminCommentPending: tasks.filter((t) => t.status === "IN_PROGRESS").length,
     compliancePending: tasks.filter((t) => t.status === "TODO" && !!t.managerReviewComments).length,
     complete: tasks.filter((t) => t.status === "DONE").length,

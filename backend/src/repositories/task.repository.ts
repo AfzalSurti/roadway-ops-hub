@@ -34,6 +34,22 @@ export const taskRepository = {
       orderBy: { createdAt: "desc" }
     });
   },
+  findDueReviewPending(now: Date) {
+    return prisma.task.findMany({
+      where: {
+        status: "IN_PROGRESS",
+        dueDate: {
+          lt: now
+        }
+      },
+      include: {
+        assignedTo: { select: { id: true, email: true, name: true, role: true } },
+        createdBy: { select: { id: true, email: true, name: true, role: true } },
+        reportTemplate: true
+      },
+      orderBy: { dueDate: "asc" }
+    });
+  },
   count(where: Prisma.TaskWhereInput) {
     return prisma.task.count({ where });
   }

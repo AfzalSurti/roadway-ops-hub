@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { X, ListTodo, AlertTriangle, Plus, Phone, GraduationCap, Calendar, Briefcase, IndianRupee } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { toAvatarUrl } from "@/lib/domain";
+import { isTaskOverdue, toAvatarUrl } from "@/lib/domain";
 import { toast } from "sonner";
 
 export default function AdminTeam() {
@@ -33,7 +33,7 @@ export default function AdminTeam() {
           employee,
           active: employeeTasks.filter((task) => task.status !== "DONE").length,
           done: employeeTasks.filter((task) => task.status === "DONE").length,
-          overdue: employeeTasks.filter((task) => new Date(task.dueDate) < new Date() && task.status !== "DONE").length,
+          overdue: employeeTasks.filter((task) => isTaskOverdue(task)).length,
           avgRating:
             employeeTasks.filter((task) => typeof task.rating === "number").length > 0
               ? Number(

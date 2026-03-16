@@ -26,5 +26,27 @@ export const notificationRepository = {
       where: { userId, isRead: false },
       data: { isRead: true }
     });
+  },
+  findRecentByUserEntityAndTitle(args: {
+    userId: string;
+    entityType: string;
+    entityId: string;
+    title: string;
+    since: Date;
+  }) {
+    return prisma.notification.findFirst({
+      where: {
+        userId: args.userId,
+        entityType: args.entityType,
+        entityId: args.entityId,
+        title: args.title,
+        createdAt: {
+          gte: args.since
+        }
+      },
+      orderBy: {
+        createdAt: "desc"
+      }
+    });
   }
 };

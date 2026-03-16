@@ -7,6 +7,7 @@ import { getPagination } from "../utils/pagination.js";
 import { auditService } from "./audit.service.js";
 import { userRepository } from "../repositories/user.repository.js";
 import { notificationService } from "./notification.service.js";
+import { notificationRepository } from "../repositories/notification.repository.js";
 
 function calculateDayDifference(startAt: Date, endAt: Date): number {
   const dayMs = 1000 * 60 * 60 * 24;
@@ -34,6 +35,51 @@ type TaskFilters = {
 };
 
 export const taskService = {
+  async notifyAdminsForDueReviewPendingTasks() {
+    const now = new Date();
+    const overdueUnderReview = await taskRepository.findDueReviewPending(now);
+    if (!overdueUnderReview.length) {
+      return;
+    }
+
+    const admins = await userRepository.findAdmins();
+    if (!admins.length) {
+      return;
+    }
+
+    const dedupeSince = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+    for (const task of overdueUnderReview) {
+      const dueOn = new Date(task.dueDate).toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric"
+      });
+
+      for (const admin of admins) {
+        const existing = await notificationRepository.findRecentByUserEntityAndTitle({
+          userId: admin.id,
+          entityType: "Task",
+          entityId: task.id,
+          title: "Task Review Pending Beyond Due Date",
+          since: dedupeSince
+        });
+
+        if (existing) {
+          continue;
+        }
+
+        await notificationService.notifyUsers({
+          userIds: [admin.id],
+          title: "Task Review Pending Beyond Due Date",
+          message: `${task.assignedTo?.name ?? "Employee"} submitted \"${task.title}\" (${task.project}) but approval is pending and due date ${dueOn} has passed. Please review or revise due date.`,
+          entityType: "Task",
+          entityId: task.id
+        });
+      }
+    }
+  },
+
   async create(payload: Prisma.TaskUncheckedCreateInput, actorId: string) {
     let reportTemplateId = payload.reportTemplateId;
 
@@ -92,6 +138,10 @@ export const taskService = {
       taskRepository.findMany(where, pagination.skip, pagination.limit),
       taskRepository.count(where)
     ]);
+
+    if (user.role === "ADMIN") {
+      await this.notifyAdminsForDueReviewPendingTasks();
+    }
 
     return {
       items,

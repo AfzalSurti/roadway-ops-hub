@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { TaskItem } from "@/lib/domain";
-import { toAvatarUrl } from "@/lib/domain";
+import { isTaskOverdue, toAvatarUrl } from "@/lib/domain";
 import { toast } from "sonner";
 
 type AdminTaskStatus = "TODO" | "UNDER_REVIEW" | "IN_PROGRESS" | "DONE";
@@ -658,7 +658,7 @@ export default function AdminTasks() {
 }
 
 function TaskCard({ task, index, onOpen }: { task: TaskItem; index: number; onOpen: () => void }) {
-  const isOverdue = new Date(task.dueDate) < new Date() && task.status !== "DONE";
+  const isOverdue = isTaskOverdue(task);
 
   return (
     <motion.div

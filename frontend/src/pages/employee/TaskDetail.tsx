@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
-import { statusConfig, toAvatarUrl } from "@/lib/domain";
+import { isTaskOverdue, statusConfig, toAvatarUrl } from "@/lib/domain";
 
 export default function TaskDetail() {
   const { id } = useParams();
@@ -72,7 +72,7 @@ export default function TaskDetail() {
     );
   }
 
-  const isOverdue = new Date(task.dueDate) < new Date() && task.status !== "DONE";
+  const isOverdue = isTaskOverdue(task);
 
   const managerComments = useMemo(
     () => comments.filter((comment) => comment.author?.role === "ADMIN"),

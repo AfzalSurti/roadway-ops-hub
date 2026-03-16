@@ -254,3 +254,6 @@ export const financialBillStatusConfig: Record<FinancialBillStatus, { label: str
 
 export const toAvatarUrl = (name: string) =>
   `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}&backgroundColor=0ea5e9`;
+
+export const isTaskOverdue = (task: Pick<TaskItem, "dueDate" | "status">) =>
+  new Date(task.dueDate) < new Date() && task.status !== "DONE" && task.status !== "IN_PROGRESS";

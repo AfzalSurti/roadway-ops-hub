@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import type { TaskItem } from "@/lib/domain";
+import { isTaskOverdue } from "@/lib/domain";
 
 function getProjectLabel(task: TaskItem): string {
   return task.projectNumber?.trim() || task.projectCode?.trim() || task.project?.trim() || "Unknown";
@@ -16,7 +17,7 @@ function computeStats(tasks: TaskItem[]) {
   return {
     total: tasks.length,
     pending: tasks.filter((task) => task.status === "TODO" && !task.managerReviewComments).length,
-    overdue: tasks.filter((task) => new Date(task.dueDate) < now && task.status !== "DONE").length,
+    overdue: tasks.filter((task) => isTaskOverdue(task)).length,
     adminCommentPending: tasks.filter((task) => task.status === "IN_PROGRESS").length,
     compliancePending: tasks.filter((task) => task.status === "TODO" && !!task.managerReviewComments).length,
     complete: tasks.filter((task) => task.status === "DONE").length,
