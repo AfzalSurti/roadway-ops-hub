@@ -196,6 +196,27 @@ export type FinancialBillItem = {
   item?: FinancialPlanItem;
 };
 
+export type FinancialCarryForwardBillRef = {
+  id: string;
+  billName: string;
+  status: FinancialBillStatus;
+  planningType: "NORMAL" | "EXCESS";
+  totalAmount: number;
+  totalReceivedAmount: number;
+  receivedDate?: string | null;
+};
+
+export type FinancialCarryForward = {
+  id: string;
+  sourceRaBillId: string;
+  targetRaBillId: string;
+  amount: number;
+  createdAt: string;
+  updatedAt: string;
+  sourceRaBill?: FinancialCarryForwardBillRef;
+  targetRaBill?: FinancialCarryForwardBillRef;
+};
+
 export type FinancialRaBill = {
   id: string;
   planId: string;
@@ -224,6 +245,8 @@ export type FinancialRaBill = {
   createdAt: string;
   updatedAt: string;
   items: FinancialBillItem[];
+  outgoingCarryForwards: FinancialCarryForward[];
+  incomingCarryForwards: FinancialCarryForward[];
 };
 
 export type FinancialProjectSummary = {

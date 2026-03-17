@@ -4,16 +4,44 @@ type FinancialBillStatus = "PLANNING" | "PUT_UP" | "RECEIVED";
 
 const db = prisma as any;
 
+const RA_BILL_LINK_SELECT = {
+  id: true,
+  billName: true,
+  status: true,
+  planningType: true,
+  totalAmount: true,
+  totalReceivedAmount: true,
+  receivedDate: true
+} as const;
+
+const RA_BILL_INCLUDE = {
+  items: {
+    include: { item: true },
+    orderBy: { createdAt: "asc" }
+  },
+  outgoingCarryForwards: {
+    include: {
+      targetRaBill: {
+        select: RA_BILL_LINK_SELECT
+      }
+    },
+    orderBy: { createdAt: "asc" }
+  },
+  incomingCarryForwards: {
+    include: {
+      sourceRaBill: {
+        select: RA_BILL_LINK_SELECT
+      }
+    },
+    orderBy: { createdAt: "asc" }
+  }
+} as const;
+
 const PLAN_INCLUDE = {
   project: true,
   items: { orderBy: { itemNumber: "asc" } },
   raBills: {
-    include: {
-      items: {
-        include: { item: true },
-        orderBy: { createdAt: "asc" }
-      }
-    },
+    include: RA_BILL_INCLUDE,
     orderBy: { billName: "asc" }
   }
 } as const;
@@ -67,7 +95,7 @@ export const financialRepository = {
     return db.projectFinancialRaBill.findUnique({
       where: { id: raBillId },
       include: {
-        items: { include: { item: true }, orderBy: { createdAt: "asc" } },
+        ...RA_BILL_INCLUDE,
         plan: { include: { project: { include: { requisitionForm: true } } } }
       }
     });
@@ -170,6 +198,10 @@ export const financialRepository = {
       totalAmount: number;
       carryForwardAmount: number;
     }>;
+    carryForwards: Array<{
+      sourceRaBillId: string;
+      amount: number;
+    }>;
     totalBillAmount: number;
     totalTaxAmount: number;
     totalAmount: number;
@@ -201,6 +233,16 @@ export const financialRepository = {
             totalAmount: item.totalAmount,
             carryForwardAmount: item.carryForwardAmount,
             status: "PLANNING"
+          }
+        });
+      }
+
+      for (const carryForward of args.carryForwards) {
+        await tx.projectFinancialCarryForward.create({
+          data: {
+            sourceRaBillId: carryForward.sourceRaBillId,
+            targetRaBillId: raBill.id,
+            amount: carryForward.amount
           }
         });
       }
@@ -254,7 +296,7 @@ export const financialRepository = {
         remark: args.remark
       },
       include: {
-        items: { include: { item: true }, orderBy: { createdAt: "asc" } },
+        ...RA_BILL_INCLUDE,
         plan: { include: { project: { include: { requisitionForm: true } } } }
       }
     });

@@ -318,38 +318,55 @@ model ProjectFinancialItem {
 }
 
 model ProjectFinancialRaBill {
-  id                      String              @id @default(cuid())
+  id                      String                @id @default(cuid())
   planId                  String
   planningType            FinancialPlanningType @default(NORMAL)
   billName                String
-  status                  FinancialBillStatus @default(PLANNING)
-  totalBillAmount         Float               @default(0)
-  totalTaxAmount          Float               @default(0)
-  totalAmount             Float               @default(0)
+  status                  FinancialBillStatus   @default(PLANNING)
+  totalBillAmount         Float                 @default(0)
+  totalTaxAmount          Float                 @default(0)
+  totalAmount             Float                 @default(0)
   receivedDate            DateTime?
-  chequeRtgsAmount        Float               @default(0)
-  itDeductionPct          Float               @default(0)
-  itDeductionAmount       Float               @default(0)
-  lCessDeductionPct       Float               @default(0)
-  lCessDeductionAmount    Float               @default(0)
-  securityDepositPct      Float               @default(0)
-  securityDepositAmount   Float               @default(0)
-  recoverFromRaBillPct    Float               @default(0)
-  recoverFromRaBillAmount Float               @default(0)
-  gstWithheldPct          Float               @default(0)
-  gstWithheldAmount       Float               @default(0)
-  withheldPct             Float               @default(0)
-  withheldAmount          Float               @default(0)
-  totalReceivedAmount     Float               @default(0)
+  chequeRtgsAmount        Float                 @default(0)
+  itDeductionPct          Float                 @default(0)
+  itDeductionAmount       Float                 @default(0)
+  lCessDeductionPct       Float                 @default(0)
+  lCessDeductionAmount    Float                 @default(0)
+  securityDepositPct      Float                 @default(0)
+  securityDepositAmount   Float                 @default(0)
+  recoverFromRaBillPct    Float                 @default(0)
+  recoverFromRaBillAmount Float                 @default(0)
+  gstWithheldPct          Float                 @default(0)
+  gstWithheldAmount       Float                 @default(0)
+  withheldPct             Float                 @default(0)
+  withheldAmount          Float                 @default(0)
+  totalReceivedAmount     Float                 @default(0)
   remark                  String?
-  createdAt               DateTime            @default(now())
-  updatedAt               DateTime            @updatedAt
-  plan                    ProjectFinancialPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
+  plan                    ProjectFinancialPlan  @relation(fields: [planId], references: [id], onDelete: Cascade)
   items                   ProjectFinancialBill[]
+  outgoingCarryForwards   ProjectFinancialCarryForward[] @relation("ProjectFinancialCarryForwardSource")
+  incomingCarryForwards   ProjectFinancialCarryForward[] @relation("ProjectFinancialCarryForwardTarget")
 
   @@unique([planId, billName])
   @@index([planId, planningType])
   @@index([status])
+}
+
+model ProjectFinancialCarryForward {
+  id             String                 @id @default(cuid())
+  sourceRaBillId String
+  targetRaBillId String
+  amount         Float                  @default(0)
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  sourceRaBill   ProjectFinancialRaBill @relation("ProjectFinancialCarryForwardSource", fields: [sourceRaBillId], references: [id], onDelete: Cascade)
+  targetRaBill   ProjectFinancialRaBill @relation("ProjectFinancialCarryForwardTarget", fields: [targetRaBillId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceRaBillId, targetRaBillId])
+  @@index([sourceRaBillId])
+  @@index([targetRaBillId])
 }
 
 model ProjectFinancialBill {

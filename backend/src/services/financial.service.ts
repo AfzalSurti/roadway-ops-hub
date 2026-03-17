@@ -40,6 +40,24 @@ function round2(value: number) {
   return Number(value.toFixed(2));
 }
 
+type CarryForwardRaBill = {
+  totalAmount: number;
+  totalReceivedAmount: number;
+  outgoingCarryForwards?: Array<{ amount: number }>;
+};
+
+function getRemainingAmount(raBill: CarryForwardRaBill) {
+  return round2(Math.max(Number(raBill.totalAmount ?? 0) - Number(raBill.totalReceivedAmount ?? 0), 0));
+}
+
+function getAllocatedCarryForwardAmount(raBill: CarryForwardRaBill) {
+  return round2((raBill.outgoingCarryForwards ?? []).reduce((sum, entry) => sum + Number(entry.amount ?? 0), 0));
+}
+
+function getAvailableCarryForwardAmount(raBill: CarryForwardRaBill) {
+  return round2(Math.max(getRemainingAmount(raBill) - getAllocatedCarryForwardAmount(raBill), 0));
+}
+
 async function getEligibleProjectOrThrow(projectId: string) {
   const project = await financialRepository.findEligibleProjectById(projectId);
   if (!project || !project.requisitionForm) {
@@ -121,6 +139,7 @@ export const financialService = {
   async createRaBill(projectId: string, payload: {
     planningType?: "NORMAL" | "EXCESS";
     items: Array<{ itemId: string; billPercentage: number }>;
+    carryForwards?: Array<{ sourceRaBillId: string; amount: number }>;
   }) {
     const plan = await financialRepository.findPlanByProjectId(projectId);
     if (!plan) {
@@ -128,6 +147,7 @@ export const financialService = {
     }
 
     const planningType = payload.planningType ?? "NORMAL";
+    const requestedCarryForwards = payload.carryForwards ?? [];
 
     const itemIds = new Set<string>(plan.items.map((item: { id: string }) => item.id));
     if (payload.items.some((entry) => !itemIds.has(entry.itemId))) {
@@ -138,7 +158,6 @@ export const financialService = {
       throw badRequest("Select at least one item for the RA bill");
     }
 
-    // Auto-generate bill name per planning type: RA-1 / EX-1
     const prefix = planningType === "EXCESS" ? "EX" : "RA";
     const existingNames = (plan.raBills ?? [])
       .filter((b: { planningType?: "NORMAL" | "EXCESS" }) => (b.planningType ?? "NORMAL") === planningType)
@@ -187,13 +206,39 @@ export const financialService = {
       }
     }
 
+    const sourceBillsById = new Map(
+      (plan.raBills ?? [])
+        .filter((bill: { id: string; status: FinancialBillStatus; planningType?: "NORMAL" | "EXCESS" }) => bill.status === "RECEIVED" && (bill.planningType ?? "NORMAL") === planningType)
+        .map((bill: { id: string }) => [bill.id, bill] as const)
+    );
+
+    const carryForwardsBySourceId = new Map<string, number>();
+    for (const entry of requestedCarryForwards) {
+      carryForwardsBySourceId.set(
+        entry.sourceRaBillId,
+        round2((carryForwardsBySourceId.get(entry.sourceRaBillId) ?? 0) + Number(entry.amount ?? 0))
+      );
+    }
+
+    for (const [sourceRaBillId, requestedAmount] of carryForwardsBySourceId.entries()) {
+      const sourceBill = sourceBillsById.get(sourceRaBillId) as CarryForwardRaBill & { billName?: string } | undefined;
+      if (!sourceBill) {
+        throw badRequest("Carry forward can be taken only from received bills of the same bill type");
+      }
+      const availableCarryForward = getAvailableCarryForwardAmount(sourceBill);
+      if (requestedAmount > availableCarryForward + 0.0001) {
+        throw badRequest(
+          `${sourceBill.billName ?? "Selected bill"} has only ${availableCarryForward.toFixed(2)} remaining available for carry forward.`
+        );
+      }
+    }
+
     const billItems = payload.items.map((entry) => {
       const planItem = planItemsById.get(entry.itemId);
       if (!planItem) {
         throw badRequest("Invalid financial item selected for this planning type");
       }
       const billPercentage = round2(Number(entry.billPercentage));
-      // billPercentage is a percentage OF the item's percentage (e.g., 4 of 10 = 40% of item amount)
       const fraction = planItem.percentage > 0 ? billPercentage / planItem.percentage : 0;
       const billAmount = round2(planItem.amount * fraction);
       const taxAmount = round2(billAmount * 0.18);
@@ -208,15 +253,17 @@ export const financialService = {
       };
     });
 
-    const totalBillAmount = round2(billItems.reduce((sum, i) => sum + i.billAmount, 0));
-    const totalTaxAmount = round2(billItems.reduce((sum, i) => sum + i.taxAmount, 0));
-    const totalAmount = round2(billItems.reduce((sum, i) => sum + i.totalAmount, 0));
+    const totalBillAmount = round2(billItems.reduce((sum, item) => sum + item.billAmount, 0));
+    const totalTaxAmount = round2(billItems.reduce((sum, item) => sum + item.taxAmount, 0));
+    const totalCarryForwardAmount = round2(Array.from(carryForwardsBySourceId.values()).reduce((sum, amount) => sum + amount, 0));
+    const totalAmount = round2(billItems.reduce((sum, item) => sum + item.totalAmount, 0) + totalCarryForwardAmount);
 
     return financialRepository.createRaBill({
       planId: plan.id,
       billName,
       planningType,
       billItems,
+      carryForwards: Array.from(carryForwardsBySourceId.entries()).map(([sourceRaBillId, amount]) => ({ sourceRaBillId, amount })),
       totalBillAmount,
       totalTaxAmount,
       totalAmount
@@ -259,7 +306,19 @@ export const financialService = {
 
     const chequeRtgsAmount = payload.chequeRtgsAmount !== undefined ? round2(payload.chequeRtgsAmount) : existing.chequeRtgsAmount;
     const totalDeductions = round2(itDeductionAmount + lCessDeductionAmount + securityDepositAmount + recoverFromRaBillAmount + gstWithheldAmount + withheldAmount);
-    const totalReceivedAmount = round2(chequeRtgsAmount - totalDeductions);
+    const totalReceivedAmount = round2(chequeRtgsAmount + totalDeductions);
+
+    if (totalReceivedAmount > totalAmount + 0.0001) {
+      throw badRequest("Received amount plus deductions cannot exceed the total bill amount");
+    }
+
+    const remainingAmount = round2(Math.max(totalAmount - totalReceivedAmount, 0));
+    const allocatedCarryForwardAmount = getAllocatedCarryForwardAmount(existing as CarryForwardRaBill);
+    if (remainingAmount + 0.0001 < allocatedCarryForwardAmount) {
+      throw badRequest(
+        `Remaining amount ${remainingAmount.toFixed(2)} cannot be less than ${allocatedCarryForwardAmount.toFixed(2)} already carried to later bills.`
+      );
+    }
 
     const receivedDate = payload.receivedDate !== undefined
       ? (payload.receivedDate ? new Date(payload.receivedDate) : null)

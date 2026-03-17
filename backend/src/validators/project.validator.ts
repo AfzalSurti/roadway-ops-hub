@@ -82,7 +82,13 @@ export const createRaBillSchema = z.object({
       itemId: z.string().trim().min(1),
       billPercentage: z.coerce.number().min(0).max(100)
     })
-  ).min(1, "Select at least one item")
+  ).min(1, "Select at least one item"),
+  carryForwards: z.array(
+    z.object({
+      sourceRaBillId: z.string().trim().min(1),
+      amount: z.coerce.number().positive()
+    })
+  ).optional().default([])
 });
 
 export const updateRaBillSchema = z.object({

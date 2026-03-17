@@ -30,6 +30,25 @@ function getBillTotalDeductions(raBill: FinancialRaBill) {
   );
 }
 
+function getRaBillMetrics(raBill: FinancialRaBill) {
+  const totalDeductions = getBillTotalDeductions(raBill);
+  const totalReceivedAmount = Number(raBill.totalReceivedAmount || 0);
+  const remainingAmount = round2(Math.max(Number(raBill.totalAmount || 0) - totalReceivedAmount, 0));
+  const receivedPercentage = raBill.totalAmount > 0 ? round2((totalReceivedAmount / raBill.totalAmount) * 100) : 0;
+  const usedInLaterBillsAmount = round2((raBill.outgoingCarryForwards ?? []).reduce((sum, entry) => sum + Number(entry.amount || 0), 0));
+  const includedFromPreviousBillsAmount = round2((raBill.incomingCarryForwards ?? []).reduce((sum, entry) => sum + Number(entry.amount || 0), 0));
+  const availableCarryForwardAmount = round2(Math.max(remainingAmount - usedInLaterBillsAmount, 0));
+  return {
+    totalDeductions,
+    totalReceivedAmount,
+    remainingAmount,
+    receivedPercentage,
+    usedInLaterBillsAmount,
+    includedFromPreviousBillsAmount,
+    availableCarryForwardAmount
+  };
+}
+
 function shortDate(value?: string | null) {
   if (!value) return "-";
   return new Date(value).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
@@ -38,6 +57,12 @@ function shortDate(value?: string | null) {
 type BillItemRow = {
   itemId: string;
   billPercentage: string;
+};
+
+type CarryForwardRow = {
+  sourceRaBillId: string;
+  percentage: string;
+  amount: string;
 };
 
 type DeductionState = {
@@ -59,10 +84,12 @@ export default function AdminFinancial() {
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [showPlanning, setShowPlanning] = useState(false);
   const [showCreateBill, setShowCreateBill] = useState(false);
+  const [showCarryRecord, setShowCarryRecord] = useState(false);
   const [planningType, setPlanningType] = useState<PlanningType>("NORMAL");
   const [billPlanningType, setBillPlanningType] = useState<PlanningType>("NORMAL");
   const [planningRows, setPlanningRows] = useState<Array<{ itemNumber: number; particulars: string; percentage: string }>>([]);
   const [billItemRows, setBillItemRows] = useState<BillItemRow[]>([]);
+  const [carryForwardRows, setCarryForwardRows] = useState<CarryForwardRow[]>([]);
   // Deduction popup state: raBillId | null
   const [deductionPopup, setDeductionPopup] = useState<{ raBillId: string; totalAmount: number } | null>(null);
   const [deductionState, setDeductionState] = useState<DeductionState>({
@@ -202,15 +229,58 @@ export default function AdminFinancial() {
   const billTotals = useMemo(() => {
     const previews = billItemPreviews.filter(Boolean) as NonNullable<typeof billItemPreviews[number]>[];
     return {
-      amount: previews.reduce((s, p) => s + p.amount, 0),
-      tax: previews.reduce((s, p) => s + p.tax, 0),
-      total: previews.reduce((s, p) => s + p.total, 0)
+      amount: previews.reduce((sum, preview) => sum + preview.amount, 0),
+      tax: previews.reduce((sum, preview) => sum + preview.tax, 0),
+      total: previews.reduce((sum, preview) => sum + preview.total, 0)
     };
   }, [billItemPreviews]);
+
+  const carryForwardSourceOptions = useMemo(
+    () => raBills
+      .filter((raBill) => raBill.status === "RECEIVED" && (raBill.planningType ?? "NORMAL") === billPlanningType)
+      .map((raBill) => ({ raBill, ...getRaBillMetrics(raBill) }))
+      .filter((entry) => entry.availableCarryForwardAmount > 0.01),
+    [billPlanningType, raBills]
+  );
+
+  const carryForwardPreviews = useMemo(() => {
+    const selectedCount = new Map<string, number>();
+    return carryForwardRows.map((row) => {
+      const sourceOption = carryForwardSourceOptions.find((entry) => entry.raBill.id === row.sourceRaBillId);
+      const amount = Number(row.amount || 0);
+      const percentage = Number(row.percentage || 0);
+      const nextCount = row.sourceRaBillId ? (selectedCount.get(row.sourceRaBillId) ?? 0) + 1 : 0;
+      if (row.sourceRaBillId) {
+        selectedCount.set(row.sourceRaBillId, nextCount);
+      }
+      const duplicateSelection = Boolean(row.sourceRaBillId) && nextCount > 1;
+      const availableAmount = sourceOption?.availableCarryForwardAmount ?? 0;
+      const exceedsAvailable = amount > availableAmount + 0.0001;
+      return {
+        sourceOption,
+        amount,
+        percentage,
+        availableAmount,
+        duplicateSelection,
+        exceedsAvailable
+      };
+    });
+  }, [carryForwardRows, carryForwardSourceOptions]);
+
+  const totalCarryForwardAmount = useMemo(
+    () => round2(carryForwardPreviews.reduce((sum, preview) => sum + (preview.sourceOption ? preview.amount : 0), 0)),
+    [carryForwardPreviews]
+  );
 
   const hasInvalidBillRows = useMemo(
     () => billItemPreviews.some((preview) => Boolean(preview?.exceedsRemaining)),
     [billItemPreviews]
+  );
+
+  const hasInvalidCarryForwardRows = useMemo(
+    () => carryForwardRows.some((row) => !row.sourceRaBillId || !row.amount || Number(row.amount) <= 0)
+      || carryForwardPreviews.some((preview) => preview.duplicateSelection || preview.exceedsAvailable || !preview.sourceOption),
+    [carryForwardPreviews, carryForwardRows]
   );
 
   const createRaBillMutation = useMutation({
@@ -224,17 +294,28 @@ export default function AdminFinancial() {
           `Item ${invalidPreview.planItem.itemNumber} has only ${formatPercentage(invalidPreview.remainingBeforeRow)} remaining for this bill.`
         );
       }
+      const invalidCarryForwardPreview = carryForwardPreviews.find((preview) => preview.duplicateSelection || preview.exceedsAvailable || !preview.sourceOption);
+      if (invalidCarryForwardPreview?.duplicateSelection) {
+        throw new Error("A previous bill can be selected only once in carry forward.");
+      }
+      if (invalidCarryForwardPreview?.exceedsAvailable) {
+        throw new Error(`Carry forward amount cannot exceed ${money(invalidCarryForwardPreview.availableAmount)}.`);
+      }
       return api.createRaBill(activeProjectId, {
         planningType: billPlanningType,
         items: billItemRows
           .filter((row) => row.itemId && Number(row.billPercentage) > 0)
-          .map((row) => ({ itemId: row.itemId, billPercentage: Number(row.billPercentage) }))
+          .map((row) => ({ itemId: row.itemId, billPercentage: Number(row.billPercentage) })),
+        carryForwards: carryForwardRows
+          .filter((row) => row.sourceRaBillId && Number(row.amount) > 0)
+          .map((row) => ({ sourceRaBillId: row.sourceRaBillId, amount: Number(row.amount) }))
       });
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["financial-project", activeProjectId] });
       setShowCreateBill(false);
       setBillItemRows([]);
+      setCarryForwardRows([]);
       toast.success("RA bill created");
     },
     onError: (error) => {
@@ -260,6 +341,7 @@ export default function AdminFinancial() {
     if (!sourceItems.length) return;
     setBillPlanningType(type);
     setBillItemRows([{ itemId: sourceItems[0].id, billPercentage: "" }]);
+    setCarryForwardRows([]);
     setShowCreateBill(true);
   }
 
@@ -276,6 +358,44 @@ export default function AdminFinancial() {
 
   function removeBillItemRow(index: number) {
     setBillItemRows((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function getCarryForwardAvailableAmount(sourceRaBillId: string) {
+    return carryForwardSourceOptions.find((entry) => entry.raBill.id === sourceRaBillId)?.availableCarryForwardAmount ?? 0;
+  }
+
+  function addCarryForwardRow() {
+    setCarryForwardRows((prev) => [...prev, { sourceRaBillId: "", percentage: "", amount: "" }]);
+  }
+
+  function removeCarryForwardRow(index: number) {
+    setCarryForwardRows((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function updateCarryForwardRow(index: number, patch: Partial<CarryForwardRow>) {
+    setCarryForwardRows((prev) => prev.map((row, rowIndex) => {
+      if (rowIndex !== index) return row;
+      const next = { ...row, ...patch };
+      if (patch.sourceRaBillId !== undefined) {
+        return { sourceRaBillId: patch.sourceRaBillId, percentage: "", amount: "" };
+      }
+      const availableAmount = getCarryForwardAvailableAmount(next.sourceRaBillId);
+      if (patch.amount !== undefined) {
+        const amount = Number(patch.amount || 0);
+        return {
+          ...next,
+          percentage: availableAmount > 0 && Number.isFinite(amount) ? String(round2((amount / availableAmount) * 100)) : ""
+        };
+      }
+      if (patch.percentage !== undefined) {
+        const percentage = Number(patch.percentage || 0);
+        return {
+          ...next,
+          amount: availableAmount > 0 && Number.isFinite(percentage) ? String(round2((availableAmount * percentage) / 100)) : ""
+        };
+      }
+      return next;
+    }));
   }
 
   function openDeductionPopup(raBill: FinancialRaBill) {
@@ -312,9 +432,24 @@ export default function AdminFinancial() {
     const gstwAmt = (total * gstw) / 100;
     const whAmt = (total * wh) / 100;
     const totalDeductions = itAmt + lcessAmt + sdAmt + recoverAmt + gstwAmt + whAmt;
-    const totalReceived = receivedAmount - totalDeductions;
+    const totalReceived = receivedAmount + totalDeductions;
+    const receivedPercentage = total > 0 ? round2((totalReceived / total) * 100) : 0;
+    const remainingAmount = round2(Math.max(total - totalReceived, 0));
 
-    return { itAmt, lcessAmt, sdAmt, recoverAmt, gstwAmt, whAmt, totalDeductions, totalReceived, receivedAmount, totalBillAmount: total };
+    return {
+      itAmt,
+      lcessAmt,
+      sdAmt,
+      recoverAmt,
+      gstwAmt,
+      whAmt,
+      totalDeductions,
+      totalReceived,
+      receivedAmount,
+      receivedPercentage,
+      remainingAmount,
+      totalBillAmount: total
+    };
   }, [deductionPopup, deductionState]);
 
   function submitDeductions() {
@@ -353,6 +488,18 @@ export default function AdminFinancial() {
       raBills: detail.plan.raBills
     });
   }
+
+  const carryForwardMovements = useMemo(
+    () => raBills.flatMap((raBill) =>
+      (raBill.outgoingCarryForwards ?? []).map((entry) => ({
+        sourceBillName: raBill.billName,
+        targetBillName: entry.targetRaBill?.billName ?? "-",
+        amount: entry.amount,
+        planningType: raBill.planningType ?? "NORMAL"
+      }))
+    ),
+    [raBills]
+  );
 
   return (
     <PageWrapper>
@@ -415,13 +562,22 @@ export default function AdminFinancial() {
                     Create RA Bill
                   </button>
                   {raBills.length > 0 && (
-                    <button
-                      onClick={handleDownloadPdf}
-                      className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-accent/10 text-accent border border-accent/20 text-sm font-medium hover:bg-accent/20"
-                    >
-                      <Download className="h-4 w-4" />
-                      Download PDF
-                    </button>
+                    <>
+                      <button
+                        onClick={() => setShowCarryRecord(true)}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-secondary/50 text-foreground border border-border/50 text-sm font-medium hover:bg-secondary/70"
+                      >
+                        <FileText className="h-4 w-4" />
+                        Carry Forward Record
+                      </button>
+                      <button
+                        onClick={handleDownloadPdf}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-accent/10 text-accent border border-accent/20 text-sm font-medium hover:bg-accent/20"
+                      >
+                        <Download className="h-4 w-4" />
+                        Download PDF
+                      </button>
+                    </>
                   )}
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -582,10 +738,10 @@ export default function AdminFinancial() {
             <FinancialModal title={billPlanningType === "EXCESS" ? "Create New Excess Bill" : "Create New RA Bill"} onClose={() => setShowCreateBill(false)}>
               <p className="text-sm text-muted-foreground mb-4">
                 For each item, enter the bill percentage - this is the percentage <em>of that item&apos;s allocated percentage</em>.
-                E.g., if Item 1 has 10% and you enter 4%, the bill takes 4% out of its 10% (i.e., 40% of the item&apos;s amount).
+                E.g., if Item 1 has 10% and you enter 4%, the bill takes 4% out of its 10%.
               </p>
               <p className="text-xs text-muted-foreground mb-3">
-                Used percentages from previous bills are shown per tender item, and each new row can only use what is still remaining.
+                Below the tender items, you can also include remaining amount from earlier received bills of the same type.
               </p>
               <p className="text-xs text-muted-foreground mb-3">
                 Bill Type: <span className="font-medium">{billPlanningType === "EXCESS" ? "Excess" : "Normal"}</span>
@@ -629,9 +785,7 @@ export default function AdminFinancial() {
                           <td className="p-3 text-xs text-muted-foreground max-w-[200px] leading-5">
                             {planItem?.particulars.slice(0, 80)}{planItem && planItem.particulars.length > 80 ? "..." : ""}
                           </td>
-                          <td className="p-3 text-sm font-medium">
-                            {planItem ? formatPercentage(planItem.percentage) : "-"}
-                          </td>
+                          <td className="p-3 text-sm font-medium">{planItem ? formatPercentage(planItem.percentage) : "-"}</td>
                           <td className="p-3 text-xs text-muted-foreground min-w-[180px] leading-5">
                             {preview?.usedInBills.length ? (
                               <div className="space-y-1">
@@ -641,17 +795,16 @@ export default function AdminFinancial() {
                                   </div>
                                 ))}
                               </div>
-                            ) : (
-                              "-"
-                            )}
+                            ) : "-"}
                           </td>
-                          <td className="p-3 text-sm font-medium">
-                            {preview ? formatPercentage(preview.remainingBeforeRow) : "-"}
-                          </td>
+                          <td className="p-3 text-sm font-medium">{preview ? formatPercentage(preview.remainingBeforeRow) : "-"}</td>
                           <td className="p-3 w-36">
                             <div className="flex items-center gap-1">
                               <input
-                                type="number" min="0" max={preview?.remainingBeforeRow ?? planItem?.percentage ?? 100} step="0.01"
+                                type="number"
+                                min="0"
+                                max={preview?.remainingBeforeRow ?? planItem?.percentage ?? 100}
+                                step="0.01"
                                 value={row.billPercentage}
                                 onChange={(e) => setBillItemRows((prev) => prev.map((r, i) => i === index ? { ...r, billPercentage: e.target.value } : r))}
                                 className={`w-24 px-3 py-2 rounded-xl bg-secondary/50 border ${preview?.exceedsRemaining ? "border-destructive text-destructive" : "border-border/50"}`}
@@ -661,11 +814,7 @@ export default function AdminFinancial() {
                               />
                               <span className="text-xs">%</span>
                             </div>
-                            {preview?.exceedsRemaining ? (
-                              <p className="mt-1 text-[11px] text-destructive">
-                                Only {formatPercentage(preview.remainingBeforeRow)} is left.
-                              </p>
-                            ) : null}
+                            {preview?.exceedsRemaining ? <p className="mt-1 text-[11px] text-destructive">Only {formatPercentage(preview.remainingBeforeRow)} is left.</p> : null}
                           </td>
                           <td className="p-3 font-medium text-sm">{preview ? money(preview.amount) : "-"}</td>
                           <td className="p-3 font-medium text-sm">{preview ? money(preview.tax) : "-"}</td>
@@ -686,7 +835,7 @@ export default function AdminFinancial() {
                       );
                     })}
                     <tr className="bg-secondary/20 font-semibold text-sm">
-                      <td className="p-3" colSpan={6}>Bill Total</td>
+                      <td className="p-3" colSpan={6}>Tender Item Total</td>
                       <td className="p-3">{money(billTotals.amount)}</td>
                       <td className="p-3">{money(billTotals.tax)}</td>
                       <td className="p-3">{money(billTotals.total)}</td>
@@ -696,13 +845,132 @@ export default function AdminFinancial() {
                 </table>
               </div>
 
+              <div className="mt-6 rounded-2xl border border-border/40 bg-secondary/10 p-4">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <div>
+                    <h4 className="text-sm font-semibold">Carry Forward From Previous Bills</h4>
+                    <p className="text-xs text-muted-foreground mt-1">Use any remaining amount from earlier received bills. You can enter either percentage of remaining amount or direct amount.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addCarryForwardRow}
+                    disabled={carryForwardSourceOptions.length === 0}
+                    className="px-4 py-2 rounded-xl border border-border/50 text-sm hover:bg-secondary/40 disabled:opacity-50"
+                  >
+                    + Add Previous Bill
+                  </button>
+                </div>
+
+                {carryForwardSourceOptions.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No received bills currently have remaining amount available for carry forward.</p>
+                ) : carryForwardRows.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No previous bill amount added yet.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm min-w-[900px]">
+                      <thead>
+                        <tr className="border-b border-border/40 text-muted-foreground">
+                          <th className="text-left p-3 font-medium">Source Bill</th>
+                          <th className="text-left p-3 font-medium">Total Received</th>
+                          <th className="text-left p-3 font-medium">Remaining Amount</th>
+                          <th className="text-left p-3 font-medium">Available to Take</th>
+                          <th className="text-left p-3 font-medium">Take %</th>
+                          <th className="text-left p-3 font-medium">Take Amount</th>
+                          <th className="p-3"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {carryForwardRows.map((row, index) => {
+                          const preview = carryForwardPreviews[index];
+                          return (
+                            <tr key={index} className="border-b border-border/20 align-top">
+                              <td className="p-3 min-w-[160px]">
+                                <select
+                                  value={row.sourceRaBillId}
+                                  onChange={(e) => updateCarryForwardRow(index, { sourceRaBillId: e.target.value })}
+                                  className="w-full px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 text-xs"
+                                  title={`Previous bill selector for row ${index + 1}`}
+                                  aria-label={`Previous bill selector for row ${index + 1}`}
+                                >
+                                  <option value="">Select bill</option>
+                                  {carryForwardSourceOptions.map((entry) => (
+                                    <option key={entry.raBill.id} value={entry.raBill.id}>{entry.raBill.billName}</option>
+                                  ))}
+                                </select>
+                                {preview?.duplicateSelection ? <p className="mt-1 text-[11px] text-destructive">This source bill is already selected.</p> : null}
+                              </td>
+                              <td className="p-3 text-sm font-medium">{preview?.sourceOption ? money(preview.sourceOption.totalReceivedAmount) : "-"}</td>
+                              <td className="p-3 text-sm font-medium">{preview?.sourceOption ? money(preview.sourceOption.remainingAmount) : "-"}</td>
+                              <td className="p-3 text-sm font-medium">{preview?.sourceOption ? money(preview.availableAmount) : "-"}</td>
+                              <td className="p-3 w-32">
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    step="0.01"
+                                    value={row.percentage}
+                                    onChange={(e) => updateCarryForwardRow(index, { percentage: e.target.value })}
+                                    className="w-24 px-3 py-2 rounded-xl bg-secondary/50 border border-border/50"
+                                    placeholder="e.g. 50"
+                                  />
+                                  <span className="text-xs">%</span>
+                                </div>
+                              </td>
+                              <td className="p-3 w-40">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max={preview?.availableAmount ?? undefined}
+                                  step="0.01"
+                                  value={row.amount}
+                                  onChange={(e) => updateCarryForwardRow(index, { amount: e.target.value })}
+                                  className={`w-full px-3 py-2 rounded-xl bg-secondary/50 border ${preview?.exceedsAvailable ? "border-destructive text-destructive" : "border-border/50"}`}
+                                  placeholder="Amount"
+                                />
+                                {preview?.exceedsAvailable ? <p className="mt-1 text-[11px] text-destructive">Cannot exceed {money(preview.availableAmount)}.</p> : null}
+                              </td>
+                              <td className="p-3">
+                                <button
+                                  type="button"
+                                  onClick={() => removeCarryForwardRow(index)}
+                                  className="p-1.5 rounded-lg hover:bg-destructive/10 text-destructive"
+                                  title="Remove previous bill"
+                                  aria-label="Remove previous bill"
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        <tr className="bg-secondary/20 font-semibold text-sm">
+                          <td className="p-3" colSpan={5}>Carry Forward Total</td>
+                          <td className="p-3">{money(totalCarryForwardAmount)}</td>
+                          <td></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 mt-4 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <DetailTile label="Tender Item Total" value={money(billTotals.total)} />
+                  <DetailTile label="Carry Forward Added" value={money(totalCarryForwardAmount)} />
+                  <DetailTile label="Grand Bill Total" value={money(round2(billTotals.total + totalCarryForwardAmount))} />
+                  <DetailTile label="Bill Type" value={billPlanningType === "EXCESS" ? "Excess" : "Normal"} />
+                </div>
+              </div>
+
               <div className="flex items-center justify-between mt-4">
                 <button type="button" onClick={addBillItemRow} className="px-4 py-2 rounded-xl border border-border/50 text-sm hover:bg-secondary/40">
                   + Add Item
                 </button>
                 <button
                   onClick={() => createRaBillMutation.mutate()}
-                  disabled={createRaBillMutation.isPending || hasInvalidBillRows || billItemRows.some((r) => !r.itemId || !r.billPercentage || Number(r.billPercentage) <= 0)}
+                  disabled={createRaBillMutation.isPending || hasInvalidBillRows || hasInvalidCarryForwardRows || billItemRows.some((row) => !row.itemId || !row.billPercentage || Number(row.billPercentage) <= 0)}
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary/10 text-primary border border-primary/20 text-sm font-medium hover:bg-primary/20 disabled:opacity-50"
                 >
                   <FileText className="h-4 w-4" />
@@ -725,6 +993,7 @@ export default function AdminFinancial() {
                   label="Received Amount"
                   value={deductionState.chequeRtgsAmount}
                   onChange={(v) => setDeductionState((prev) => ({ ...prev, chequeRtgsAmount: v }))}
+                  helperText={`${formatPercentage(deductionAmounts.receivedPercentage)} settled after adding deductions`}
                   isAmount
                 />
                 <DeductionField
@@ -789,7 +1058,6 @@ export default function AdminFinancial() {
                 />
               </div>
 
-              {/* Summary */}
               <div className="rounded-xl border border-border/40 bg-secondary/20 p-4 mb-4 text-sm">
                 <div className="grid grid-cols-2 gap-y-1.5 gap-x-6">
                   <span className="text-muted-foreground">Total Bill Amount</span>
@@ -797,11 +1065,15 @@ export default function AdminFinancial() {
                   <span className="text-muted-foreground">Received Amount</span>
                   <span className="font-medium text-right">{money(deductionAmounts.receivedAmount)}</span>
                   <span className="text-muted-foreground">Total Deductions</span>
-                  <span className="font-medium text-destructive text-right">- {money(deductionAmounts.totalDeductions)}</span>
+                  <span className="font-medium text-right">{money(deductionAmounts.totalDeductions)}</span>
+                  <span className="text-muted-foreground">% Amount Received</span>
+                  <span className="font-medium text-right">{formatPercentage(deductionAmounts.receivedPercentage)}</span>
                   <span className="font-semibold">Total Received Amount</span>
                   <span className={`font-bold text-right ${deductionAmounts.totalReceived >= 0 ? "text-accent" : "text-destructive"}`}>
                     {money(deductionAmounts.totalReceived)}
                   </span>
+                  <span className="font-semibold">Remaining Amount</span>
+                  <span className="font-bold text-right text-warning">{money(deductionAmounts.remainingAmount)}</span>
                 </div>
               </div>
 
@@ -813,6 +1085,84 @@ export default function AdminFinancial() {
                 >
                   {updateRaBillMutation.isPending ? "Saving..." : "Confirm Received"}
                 </button>
+              </div>
+            </FinancialModal>
+          )}
+
+          {showCarryRecord && (
+            <FinancialModal title="Carry Forward Record" onClose={() => setShowCarryRecord(false)}>
+              <div className="space-y-6">
+                <div className="rounded-xl border border-border/40 bg-secondary/10 p-4 text-sm text-muted-foreground">
+                  Track bill received amount, deductions, remaining amount, and how remaining value moves into later bills.
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm min-w-[1100px]">
+                    <thead>
+                      <tr className="border-b border-border/40 text-muted-foreground">
+                        <th className="text-left p-3 font-medium">Bill</th>
+                        <th className="text-left p-3 font-medium">Type</th>
+                        <th className="text-left p-3 font-medium">Total Bill</th>
+                        <th className="text-left p-3 font-medium">Received Amount</th>
+                        <th className="text-left p-3 font-medium">Deductions</th>
+                        <th className="text-left p-3 font-medium">Total Received</th>
+                        <th className="text-left p-3 font-medium">Received %</th>
+                        <th className="text-left p-3 font-medium">Remaining</th>
+                        <th className="text-left p-3 font-medium">Used in Later Bills</th>
+                        <th className="text-left p-3 font-medium">Still Available</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {raBills.map((raBill) => {
+                        const metrics = getRaBillMetrics(raBill);
+                        return (
+                          <tr key={raBill.id} className="border-b border-border/20">
+                            <td className="p-3 font-medium">{raBill.billName}</td>
+                            <td className="p-3">{(raBill.planningType ?? "NORMAL") === "EXCESS" ? "Excess" : "Normal"}</td>
+                            <td className="p-3">{money(raBill.totalAmount)}</td>
+                            <td className="p-3">{money(raBill.chequeRtgsAmount)}</td>
+                            <td className="p-3">{money(metrics.totalDeductions)}</td>
+                            <td className="p-3">{money(metrics.totalReceivedAmount)}</td>
+                            <td className="p-3">{formatPercentage(metrics.receivedPercentage)}</td>
+                            <td className="p-3">{money(metrics.remainingAmount)}</td>
+                            <td className="p-3">{money(metrics.usedInLaterBillsAmount)}</td>
+                            <td className="p-3">{money(metrics.availableCarryForwardAmount)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div>
+                  <h4 className="text-sm font-semibold mb-3">Carry Forward Movement</h4>
+                  {carryForwardMovements.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No carry forward movement recorded yet.</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm min-w-[720px]">
+                        <thead>
+                          <tr className="border-b border-border/40 text-muted-foreground">
+                            <th className="text-left p-3 font-medium">From Bill</th>
+                            <th className="text-left p-3 font-medium">To Bill</th>
+                            <th className="text-left p-3 font-medium">Type</th>
+                            <th className="text-left p-3 font-medium">Amount Taken</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {carryForwardMovements.map((movement, index) => (
+                            <tr key={`${movement.sourceBillName}-${movement.targetBillName}-${index}`} className="border-b border-border/20">
+                              <td className="p-3 font-medium">{movement.sourceBillName}</td>
+                              <td className="p-3 font-medium">{movement.targetBillName}</td>
+                              <td className="p-3">{movement.planningType === "EXCESS" ? "Excess" : "Normal"}</td>
+                              <td className="p-3">{money(movement.amount)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
               </div>
             </FinancialModal>
           )}
@@ -829,6 +1179,7 @@ function RaBillCard({ raBill, onStatusChange, onReceivedClick, isPending }: {
   isPending: boolean;
 }) {
   const statusCfg = financialBillStatusConfig[raBill.status];
+  const metrics = getRaBillMetrics(raBill);
 
   return (
     <div className="rounded-xl border border-border/40 overflow-hidden">
@@ -925,11 +1276,46 @@ function RaBillCard({ raBill, onStatusChange, onReceivedClick, isPending }: {
           <ReceiptTile label="Recover From RA Bill" value={`${raBill.recoverFromRaBillPct.toFixed(2)}% -> ${new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(raBill.recoverFromRaBillAmount)}`} />
           <ReceiptTile label="2% GST Withheld" value={`${raBill.gstWithheldPct.toFixed(2)}% -> ${new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(raBill.gstWithheldAmount)}`} />
           <ReceiptTile label="Withheld" value={`${raBill.withheldPct.toFixed(2)}% -> ${new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(raBill.withheldAmount)}`} />
-          <ReceiptTile label="Total Deductions" value={new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(getBillTotalDeductions(raBill))} />
+          <ReceiptTile label="Total Deductions" value={new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(metrics.totalDeductions)} />
           <ReceiptTile label="Total Received" value={new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(raBill.totalReceivedAmount)} accent />
+          <ReceiptTile label="Received %" value={formatPercentage(metrics.receivedPercentage)} />
+          <ReceiptTile label="Remaining Amount" value={new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(metrics.remainingAmount)} />
           {raBill.remark ? <ReceiptTile label="Remark" value={raBill.remark} /> : null}
         </div>
       )}
+
+      {raBill.incomingCarryForwards.length > 0 || raBill.outgoingCarryForwards.length > 0 ? (
+        <div className="px-4 py-3 border-t border-border/20 bg-secondary/10 grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground mb-2">Included From Previous Bills</p>
+            {raBill.incomingCarryForwards.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No previous bill amount included.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {raBill.incomingCarryForwards.map((entry) => (
+                  <div key={entry.id} className="text-sm">
+                    <span className="font-medium">{entry.sourceRaBill?.billName ?? "Previous bill"}</span>: {money(entry.amount)}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground mb-2">Used In Later Bills</p>
+            {raBill.outgoingCarryForwards.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No remaining amount used in later bills yet.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {raBill.outgoingCarryForwards.map((entry) => (
+                  <div key={entry.id} className="text-sm">
+                    <span className="font-medium">{entry.targetRaBill?.billName ?? "Next bill"}</span>: {money(entry.amount)}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -943,11 +1329,12 @@ function ReceiptTile({ label, value, accent }: { label: string; value: string; a
   );
 }
 
-function DeductionField({ label, value, onChange, computedAmount, isAmount }: {
+function DeductionField({ label, value, onChange, computedAmount, helperText, isAmount }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   computedAmount?: number;
+  helperText?: string;
   isAmount?: boolean;
 }) {
   return (
@@ -971,6 +1358,7 @@ function DeductionField({ label, value, onChange, computedAmount, isAmount }: {
       {computedAmount !== undefined && (
         <p className="text-xs text-muted-foreground mt-1">= {new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(computedAmount)}</p>
       )}
+      {helperText ? <p className="text-xs text-muted-foreground mt-1">{helperText}</p> : null}
     </div>
   );
 }

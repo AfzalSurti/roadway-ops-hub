@@ -551,14 +551,21 @@ export const api = {
 
   createRaBill(
     projectId: string,
-    payload: { planningType?: "NORMAL" | "EXCESS"; items: Array<{ itemId: string; billPercentage: number }> }
+    payload: {
+      planningType?: "NORMAL" | "EXCESS";
+      items: Array<{ itemId: string; billPercentage: number }>;
+      carryForwards?: Array<{ sourceRaBillId: string; amount: number }>;
+    }
   ) {
     const candidates: Array<{ path: string; body: unknown }> = [
       {
         path: `/financials/${projectId}/ra-bills`,
         body: payload
-      },
-      {
+      }
+    ];
+
+    if (!payload.carryForwards || payload.carryForwards.length === 0) {
+      candidates.push({
         // Backward-compatible fallback for older backend versions.
         path: `/financials/${projectId}/bills`,
         body: {
@@ -569,8 +576,8 @@ export const api = {
             remark: `RA bill percentage: ${item.billPercentage}`
           }))
         }
-      }
-    ];
+      });
+    }
 
     const tryNext = async (index: number): Promise<FinancialPlan> => {
       if (index >= candidates.length) {
