@@ -65,6 +65,13 @@ type CarryForwardRow = {
   amount: string;
 };
 
+type PlanningRow = {
+  itemNumber: number;
+  particulars: string;
+  percentage: string;
+  amount: string;
+};
+
 type DeductionState = {
   chequeRtgsAmount: string;
   itDeductionPct: string;
@@ -87,7 +94,8 @@ export default function AdminFinancial() {
   const [showCarryRecord, setShowCarryRecord] = useState(false);
   const [planningType, setPlanningType] = useState<PlanningType>("NORMAL");
   const [billPlanningType, setBillPlanningType] = useState<PlanningType>("NORMAL");
-  const [planningRows, setPlanningRows] = useState<Array<{ itemNumber: number; particulars: string; percentage: string }>>([]);
+  const [planningRows, setPlanningRows] = useState<PlanningRow[]>([]);
+  const [excessBaseAmount, setExcessBaseAmount] = useState("");
   const [billItemRows, setBillItemRows] = useState<BillItemRow[]>([]);
   const [carryForwardRows, setCarryForwardRows] = useState<CarryForwardRow[]>([]);
   // Deduction popup state: raBillId | null
@@ -133,11 +141,17 @@ export default function AdminFinancial() {
     if (!detail) return;
     const sourceItems = itemsByType[planningType];
     const source = sourceItems.length
-      ? sourceItems.map((item) => ({ itemNumber: item.itemNumber, particulars: item.particulars, percentage: String(item.percentage) }))
+      ? sourceItems.map((item) => ({ itemNumber: item.itemNumber, particulars: item.particulars, percentage: String(item.percentage), amount: String(item.amount) }))
       : planningType === "NORMAL"
-        ? detail.itemTemplates.map((item) => ({ itemNumber: item.itemNumber, particulars: item.particulars, percentage: "0" }))
-        : [{ itemNumber: 1, particulars: "", percentage: "0" }];
+        ? detail.itemTemplates.map((item) => ({ itemNumber: item.itemNumber, particulars: item.particulars, percentage: "0", amount: "0" }))
+        : [{ itemNumber: 1, particulars: "", percentage: "0", amount: "0" }];
     setPlanningRows(source);
+    if (planningType === "EXCESS") {
+      const existingExcessAmount = round2(sourceItems.reduce((sum, item) => sum + Number(item.amount || 0), 0));
+      setExcessBaseAmount(existingExcessAmount > 0 ? String(existingExcessAmount) : "");
+    } else {
+      setExcessBaseAmount("");
+    }
   }, [detail?.plan?.updatedAt, detail?.project?.id, planningType, itemsByType]);
 
   const totalPercentage = useMemo(
@@ -145,16 +159,31 @@ export default function AdminFinancial() {
     [planningRows]
   );
 
+  const totalPlanningAmount = useMemo(
+    () => round2(planningRows.reduce((sum, item) => sum + Number(item.amount || 0), 0)),
+    [planningRows]
+  );
+
+  const excessTaxAmount = useMemo(
+    () => round2(Number(excessBaseAmount || 0) * 0.18),
+    [excessBaseAmount]
+  );
+
+  const totalExcessAmount = useMemo(
+    () => round2(Number(excessBaseAmount || 0) + excessTaxAmount),
+    [excessBaseAmount, excessTaxAmount]
+  );
+
   const addPlanningRow = () => {
     const nextNumber = planningRows.length > 0 ? Math.max(...planningRows.map((row) => row.itemNumber)) + 1 : 1;
-    setPlanningRows((prev) => [...prev, { itemNumber: nextNumber, particulars: "", percentage: "0" }]);
+    setPlanningRows((prev) => [...prev, { itemNumber: nextNumber, particulars: "", percentage: "0", amount: "0" }]);
   };
 
   const removePlanningRow = (index: number) => {
     setPlanningRows((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const updatePlanningRow = (index: number, patch: Partial<{ itemNumber: number; particulars: string; percentage: string }>) => {
+  const updatePlanningRow = (index: number, patch: Partial<PlanningRow>) => {
     setPlanningRows((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   };
 
@@ -163,12 +192,23 @@ export default function AdminFinancial() {
       if (!activeProjectId) {
         throw new Error("Please select a project before saving planning.");
       }
+      if (planningType === "EXCESS") {
+        const base = Number(excessBaseAmount || 0);
+        if (base <= 0) {
+          throw new Error("Please enter Excess Amount before saving Excess Planning.");
+        }
+        if (totalPlanningAmount > base + 0.0001) {
+          throw new Error("Total item amount cannot be greater than Excess Amount.");
+        }
+      }
       return api.upsertFinancialPlan(activeProjectId, {
         planningType,
         items: planningRows.map((item) => ({
           itemNumber: Number(item.itemNumber),
           particulars: item.particulars.trim(),
-          percentage: Number(item.percentage || 0)
+          percentage: planningType === "EXCESS"
+            ? (Number(excessBaseAmount || 0) > 0 ? round2((Number(item.amount || 0) / Number(excessBaseAmount || 0)) * 100) : 0)
+            : Number(item.percentage || 0)
         }))
       });
     },
@@ -635,18 +675,43 @@ export default function AdminFinancial() {
           {/* Tender Item Modal */}
           {showPlanning && (
             <FinancialModal title={planningType === "EXCESS" ? "Excess Planning" : "Tender Item"} onClose={() => setShowPlanning(false)}>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4 text-sm">
-                <DetailTile label="Contract Value" value={money(detail.project.contractValue)} />
-                <DetailTile label="Tax" value={money(detail.project.taxAmount)} />
-                <DetailTile label="Total Amount" value={money(detail.project.totalAmount)} />
-              </div>
+              {planningType === "EXCESS" ? (
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-4 text-sm">
+                  <div className="rounded-xl border border-border/40 bg-secondary/20 p-3">
+                    <p className="text-xs text-muted-foreground mb-1">Excess Amount</p>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={excessBaseAmount}
+                      onChange={(e) => setExcessBaseAmount(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 text-sm"
+                      placeholder="Enter excess amount"
+                      title="Excess amount"
+                      aria-label="Excess amount"
+                    />
+                  </div>
+                  <DetailTile label="Tax (18%)" value={money(excessTaxAmount)} />
+                  <DetailTile label="Total Excess Amount" value={money(totalExcessAmount)} />
+                  <DetailTile
+                    label="Item Amount Total"
+                    value={money(totalPlanningAmount)}
+                  />
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4 text-sm">
+                  <DetailTile label="Contract Value" value={money(detail.project.contractValue)} />
+                  <DetailTile label="Tax" value={money(detail.project.taxAmount)} />
+                  <DetailTile label="Total Amount" value={money(detail.project.totalAmount)} />
+                </div>
+              )}
               <div className="overflow-x-auto">
                 <table className="w-full text-sm min-w-[820px]">
                   <thead>
                     <tr className="border-b border-border/40 text-muted-foreground">
                       <th className="text-left p-3 font-medium">Sr. No.</th>
                       <th className="text-left p-3 font-medium">Particulars</th>
-                      <th className="text-left p-3 font-medium">Percentage</th>
+                      <th className="text-left p-3 font-medium">{planningType === "EXCESS" ? "Amount" : "Percentage"}</th>
                       <th className="text-left p-3 font-medium">Amount</th>
                       <th className="text-left p-3 font-medium">Tax (18%)</th>
                       <th className="text-left p-3 font-medium">Total</th>
@@ -655,7 +720,9 @@ export default function AdminFinancial() {
                   <tbody>
                     {planningRows.map((item, index) => {
                       const percentage = Number(item.percentage || 0);
-                      const amount = (detail.project.contractValue * percentage) / 100;
+                      const amount = planningType === "EXCESS"
+                        ? Number(item.amount || 0)
+                        : (detail.project.contractValue * percentage) / 100;
                       const tax = amount * 0.18;
                       const total = amount + tax;
                       return (
@@ -682,15 +749,35 @@ export default function AdminFinancial() {
                           </td>
                           <td className="p-3 w-36">
                             <div className="flex items-center gap-2">
-                              <input
-                                type="number" min="0" max="100" step="0.01"
-                                value={item.percentage}
-                                onChange={(e) => updatePlanningRow(index, { percentage: e.target.value })}
-                                className="w-24 px-3 py-2 rounded-xl bg-secondary/50 border border-border/50"
-                                title={`Percentage for item ${item.itemNumber}`}
-                                aria-label={`Percentage for item ${item.itemNumber}`}
-                              />
-                              <span>%</span>
+                              {planningType === "EXCESS" ? (
+                                <input
+                                  type="number" min="0" step="0.01"
+                                  value={item.amount}
+                                  onChange={(e) => {
+                                    const nextAmount = e.target.value;
+                                    const base = Number(excessBaseAmount || 0);
+                                    updatePlanningRow(index, {
+                                      amount: nextAmount,
+                                      percentage: base > 0 ? String(round2((Number(nextAmount || 0) / base) * 100)) : "0"
+                                    });
+                                  }}
+                                  className="w-28 px-3 py-2 rounded-xl bg-secondary/50 border border-border/50"
+                                  title={`Amount for item ${item.itemNumber}`}
+                                  aria-label={`Amount for item ${item.itemNumber}`}
+                                />
+                              ) : (
+                                <>
+                                  <input
+                                    type="number" min="0" max="100" step="0.01"
+                                    value={item.percentage}
+                                    onChange={(e) => updatePlanningRow(index, { percentage: e.target.value })}
+                                    className="w-24 px-3 py-2 rounded-xl bg-secondary/50 border border-border/50"
+                                    title={`Percentage for item ${item.itemNumber}`}
+                                    aria-label={`Percentage for item ${item.itemNumber}`}
+                                  />
+                                  <span>%</span>
+                                </>
+                              )}
                             </div>
                             <button
                               type="button"
@@ -709,10 +796,21 @@ export default function AdminFinancial() {
                     })}
                     <tr className="bg-secondary/20 font-medium">
                       <td className="p-3" colSpan={2}>Total</td>
-                      <td className={`p-3 ${Math.abs(totalPercentage - 100) > 0.01 ? "text-destructive" : "text-accent"}`}>{totalPercentage.toFixed(2)}%</td>
-                      <td className="p-3">{money(detail.project.contractValue)}</td>
-                      <td className="p-3">{money(detail.project.taxAmount)}</td>
-                      <td className="p-3">{money(detail.project.totalAmount)}</td>
+                      {planningType === "EXCESS" ? (
+                        <>
+                          <td className="p-3 text-muted-foreground">-</td>
+                          <td className={`p-3 ${totalPlanningAmount > Number(excessBaseAmount || 0) + 0.0001 ? "text-destructive" : "text-accent"}`}>{money(totalPlanningAmount)}</td>
+                          <td className="p-3">{money(totalPlanningAmount * 0.18)}</td>
+                          <td className="p-3">{money(totalPlanningAmount * 1.18)}</td>
+                        </>
+                      ) : (
+                        <>
+                          <td className={`p-3 ${Math.abs(totalPercentage - 100) > 0.01 ? "text-destructive" : "text-accent"}`}>{totalPercentage.toFixed(2)}%</td>
+                          <td className="p-3">{money(detail.project.contractValue)}</td>
+                          <td className="p-3">{money(detail.project.taxAmount)}</td>
+                          <td className="p-3">{money(detail.project.totalAmount)}</td>
+                        </>
+                      )}
                     </tr>
                   </tbody>
                 </table>
@@ -723,7 +821,12 @@ export default function AdminFinancial() {
                 </button>
                 <button
                   onClick={() => savePlanMutation.mutate()}
-                  disabled={savePlanMutation.isPending || planningRows.some((row) => !row.particulars.trim() || row.itemNumber < 1)}
+                  disabled={
+                    savePlanMutation.isPending
+                    || planningRows.some((row) => !row.particulars.trim() || row.itemNumber < 1)
+                    || (planningType === "EXCESS" && Number(excessBaseAmount || 0) <= 0)
+                    || (planningType === "EXCESS" && totalPlanningAmount > Number(excessBaseAmount || 0) + 0.0001)
+                  }
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary/10 text-primary border border-primary/20 text-sm font-medium hover:bg-primary/20 disabled:opacity-50"
                 >
                   <Save className="h-4 w-4" />

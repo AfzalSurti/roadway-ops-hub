@@ -158,7 +158,7 @@ export const financialService = {
       throw badRequest("Select at least one item for the RA bill");
     }
 
-    const prefix = planningType === "EXCESS" ? "EX" : "RA";
+    const prefix = planningType === "EXCESS" ? "XS" : "RA";
     const existingNames = (plan.raBills ?? [])
       .filter((b: { planningType?: "NORMAL" | "EXCESS" }) => (b.planningType ?? "NORMAL") === planningType)
       .map((b: { billName: string }) => b.billName);
