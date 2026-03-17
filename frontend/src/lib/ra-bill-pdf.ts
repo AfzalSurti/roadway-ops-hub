@@ -86,6 +86,7 @@ export function downloadRaBillPdf(params: {
   projectName: string;
   contractNumber?: string;
   raBills: FinancialRaBill[];
+  fileName?: string;
 }) {
   const { plan, projectNumber, projectName, contractNumber, raBills } = params;
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
@@ -290,5 +291,6 @@ export function downloadRaBillPdf(params: {
   }
 
   const safeProjectNumber = projectNumber.replace(/[^a-zA-Z0-9_-]/g, "_");
-  doc.save(`RA-Bill-Log_${safeProjectNumber}.pdf`);
+  const safeFileName = (params.fileName ?? `RA-Bill-Log_${safeProjectNumber}`).replace(/[^a-zA-Z0-9_-]/g, "_");
+  doc.save(`${safeFileName}.pdf`);
 }

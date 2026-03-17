@@ -529,6 +529,17 @@ export default function AdminFinancial() {
     });
   }
 
+  function handleDownloadSingleBillPdf(raBill: FinancialRaBill) {
+    if (!detail?.plan) return;
+    downloadRaBillPdf({
+      plan: detail.plan,
+      projectNumber: detail.project.projectNumber,
+      projectName: detail.project.name,
+      raBills: [raBill],
+      fileName: `${raBill.billName}_${detail.project.projectNumber}`
+    });
+  }
+
   const carryForwardMovements = useMemo(
     () => raBills.flatMap((raBill) =>
       (raBill.outgoingCarryForwards ?? []).map((entry) => ({
@@ -659,6 +670,7 @@ export default function AdminFinancial() {
                   bills={raBills.filter((bill) => (bill.planningType ?? "NORMAL") === "NORMAL")}
                   onStatusChange={handleStatusChange}
                   onReceivedClick={openDeductionPopup}
+                  onDownloadPdf={handleDownloadSingleBillPdf}
                   isPending={updateRaBillMutation.isPending}
                 />
                 <BillGroupSection
@@ -666,6 +678,7 @@ export default function AdminFinancial() {
                   bills={raBills.filter((bill) => (bill.planningType ?? "NORMAL") === "EXCESS")}
                   onStatusChange={handleStatusChange}
                   onReceivedClick={openDeductionPopup}
+                  onDownloadPdf={handleDownloadSingleBillPdf}
                   isPending={updateRaBillMutation.isPending}
                 />
               </div>
@@ -1275,10 +1288,11 @@ export default function AdminFinancial() {
   );
 }
 
-function RaBillCard({ raBill, onStatusChange, onReceivedClick, isPending }: {
+function RaBillCard({ raBill, onStatusChange, onReceivedClick, onDownloadPdf, isPending }: {
   raBill: FinancialRaBill;
   onStatusChange: (status: FinancialBillStatus) => void;
   onReceivedClick: () => void;
+  onDownloadPdf: () => void;
   isPending: boolean;
 }) {
   const statusCfg = financialBillStatusConfig[raBill.status];
@@ -1296,6 +1310,14 @@ function RaBillCard({ raBill, onStatusChange, onReceivedClick, isPending }: {
           <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusCfg.color}`}>{statusCfg.label}</span>
         </div>
         <div className="flex items-center gap-2">
+          {raBill.status === "RECEIVED" && (
+            <button
+              onClick={onDownloadPdf}
+              className="px-3 py-1.5 rounded-lg bg-accent/10 text-accent border border-accent/20 text-xs font-medium hover:bg-accent/20"
+            >
+              Download Bill PDF
+            </button>
+          )}
           {raBill.status !== "RECEIVED" && (
             <>
               {raBill.status === "PLANNING" && (
@@ -1496,12 +1518,14 @@ function BillGroupSection({
   bills,
   onStatusChange,
   onReceivedClick,
+  onDownloadPdf,
   isPending
 }: {
   title: string;
   bills: FinancialRaBill[];
   onStatusChange: (raBill: FinancialRaBill, status: FinancialBillStatus) => void;
   onReceivedClick: (raBill: FinancialRaBill) => void;
+  onDownloadPdf: (raBill: FinancialRaBill) => void;
   isPending: boolean;
 }) {
   if (bills.length === 0) {
@@ -1527,6 +1551,7 @@ function BillGroupSection({
           raBill={raBill}
           onStatusChange={(newStatus) => onStatusChange(raBill, newStatus)}
           onReceivedClick={() => onReceivedClick(raBill)}
+          onDownloadPdf={() => onDownloadPdf(raBill)}
           isPending={isPending}
         />
       ))}
