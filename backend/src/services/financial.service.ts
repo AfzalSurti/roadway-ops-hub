@@ -152,8 +152,43 @@ export const financialService = {
     const nextNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) + 1 : 1;
     const billName = `${prefix}-${nextNumber}`;
 
+    const planItemsById = new Map<string, { id: string; itemNumber: number; amount: number; percentage: number }>(
+      plan.items
+        .filter((item: { planningType?: "NORMAL" | "EXCESS" }) => (item.planningType ?? "NORMAL") === planningType)
+        .map((item: { id: string; itemNumber: number; amount: number; percentage: number }) => [item.id, item] as const)
+    );
+
+    const previouslyUsedByItemId = new Map<string, number>();
+    for (const raBill of (plan.raBills ?? []).filter((bill: { planningType?: "NORMAL" | "EXCESS" }) => (bill.planningType ?? "NORMAL") === planningType)) {
+      for (const billItem of raBill.items ?? []) {
+        previouslyUsedByItemId.set(
+          billItem.itemId,
+          round2((previouslyUsedByItemId.get(billItem.itemId) ?? 0) + Number(billItem.billPercentage ?? 0))
+        );
+      }
+    }
+
+    const requestedByItemId = new Map<string, number>();
+    for (const entry of payload.items) {
+      requestedByItemId.set(entry.itemId, round2((requestedByItemId.get(entry.itemId) ?? 0) + Number(entry.billPercentage ?? 0)));
+    }
+
+    for (const [itemId, requestedPercentage] of requestedByItemId.entries()) {
+      const planItem = planItemsById.get(itemId);
+      if (!planItem) {
+        throw badRequest("Invalid financial item selected for this planning type");
+      }
+      const previouslyUsed = previouslyUsedByItemId.get(itemId) ?? 0;
+      const remainingPercentage = round2(Math.max(planItem.percentage - previouslyUsed, 0));
+      if (requestedPercentage > remainingPercentage + 0.0001) {
+        throw badRequest(
+          `Item ${planItem.itemNumber} has only ${remainingPercentage.toFixed(2)}% remaining. Previously billed ${previouslyUsed.toFixed(2)}% out of ${planItem.percentage.toFixed(2)}%.`
+        );
+      }
+    }
+
     const billItems = payload.items.map((entry) => {
-      const planItem = plan.items.find((i: { id: string; amount: number; percentage: number; planningType?: "NORMAL" | "EXCESS" }) => i.id === entry.itemId && (i.planningType ?? "NORMAL") === planningType);
+      const planItem = planItemsById.get(entry.itemId);
       if (!planItem) {
         throw badRequest("Invalid financial item selected for this planning type");
       }

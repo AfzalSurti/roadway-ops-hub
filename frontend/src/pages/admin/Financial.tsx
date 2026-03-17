@@ -11,6 +11,14 @@ function money(value: number) {
   return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(value || 0);
 }
 
+function round2(value: number) {
+  return Number(value.toFixed(2));
+}
+
+function formatPercentage(value: number) {
+  return `${round2(value).toFixed(2)}%`;
+}
+
 function shortDate(value?: string | null) {
   if (!value) return "-";
   return new Date(value).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
@@ -139,17 +147,46 @@ export default function AdminFinancial() {
   // Compute bill amounts for create-bill modal preview
   const billItemPreviews = useMemo(() => {
     if (!detail?.plan) return [];
+    const previousUsageByItemId = new Map<string, { usedPercentage: number; bills: Array<{ billName: string; billPercentage: number }> }>();
+
+    for (const raBill of raBills) {
+      if ((raBill.planningType ?? "NORMAL") !== billPlanningType) continue;
+      for (const billItem of raBill.items) {
+        const current = previousUsageByItemId.get(billItem.itemId) ?? { usedPercentage: 0, bills: [] };
+        current.usedPercentage = round2(current.usedPercentage + billItem.billPercentage);
+        current.bills.push({ billName: raBill.billName, billPercentage: billItem.billPercentage });
+        previousUsageByItemId.set(billItem.itemId, current);
+      }
+    }
+
+    const draftedUsageByItemId = new Map<string, number>();
+
     return billItemRows.map((row) => {
-      const planItem = detail.plan!.items.find((i) => i.id === row.itemId);
+      const planItem = detail.plan!.items.find((i) => i.id === row.itemId && (i.planningType ?? "NORMAL") === billPlanningType);
       if (!planItem) return null;
+      const previousUsage = previousUsageByItemId.get(row.itemId);
+      const previousUsed = previousUsage?.usedPercentage ?? 0;
+      const draftedUsedBeforeRow = draftedUsageByItemId.get(row.itemId) ?? 0;
+      const remainingBeforeRow = round2(Math.max(planItem.percentage - previousUsed - draftedUsedBeforeRow, 0));
       const billPct = Number(row.billPercentage || 0);
       const fraction = planItem.percentage > 0 ? billPct / planItem.percentage : 0;
       const amount = planItem.amount * fraction;
       const tax = amount * 0.18;
       const total = amount + tax;
-      return { planItem, billPct, amount, tax, total };
+      draftedUsageByItemId.set(row.itemId, round2(draftedUsedBeforeRow + billPct));
+      return {
+        planItem,
+        billPct,
+        amount,
+        tax,
+        total,
+        previousUsed,
+        usedInBills: previousUsage?.bills ?? [],
+        remainingBeforeRow,
+        exceedsRemaining: billPct > remainingBeforeRow + 0.0001
+      };
     });
-  }, [billItemRows, detail?.plan]);
+  }, [billItemRows, billPlanningType, detail?.plan, raBills]);
 
   const billTotals = useMemo(() => {
     const previews = billItemPreviews.filter(Boolean) as NonNullable<typeof billItemPreviews[number]>[];
@@ -160,10 +197,21 @@ export default function AdminFinancial() {
     };
   }, [billItemPreviews]);
 
+  const hasInvalidBillRows = useMemo(
+    () => billItemPreviews.some((preview) => Boolean(preview?.exceedsRemaining)),
+    [billItemPreviews]
+  );
+
   const createRaBillMutation = useMutation({
     mutationFn: () => {
       if (!activeProjectId) {
         throw new Error("Please select a project before creating RA bill.");
+      }
+      const invalidPreview = billItemPreviews.find((preview) => preview?.exceedsRemaining);
+      if (invalidPreview) {
+        throw new Error(
+          `Item ${invalidPreview.planItem.itemNumber} has only ${formatPercentage(invalidPreview.remainingBeforeRow)} remaining for this bill.`
+        );
       }
       return api.createRaBill(activeProjectId, {
         planningType: billPlanningType,
@@ -526,16 +574,21 @@ export default function AdminFinancial() {
                 E.g., if Item 1 has 10% and you enter 4%, the bill takes 4% out of its 10% (i.e., 40% of the item&apos;s amount).
               </p>
               <p className="text-xs text-muted-foreground mb-3">
+                Used percentages from previous bills are shown per tender item, and each new row can only use what is still remaining.
+              </p>
+              <p className="text-xs text-muted-foreground mb-3">
                 Bill Type: <span className="font-medium">{billPlanningType === "EXCESS" ? "Excess" : "Normal"}</span>
               </p>
 
               <div className="overflow-x-auto">
-                <table className="w-full text-sm min-w-[700px]">
+                <table className="w-full text-sm min-w-[1080px]">
                   <thead>
                     <tr className="border-b border-border/40 text-muted-foreground">
                       <th className="text-left p-3 font-medium">Item</th>
                       <th className="text-left p-3 font-medium">Particulars</th>
                       <th className="text-left p-3 font-medium">Item %</th>
+                      <th className="text-left p-3 font-medium">Used in Bills</th>
+                      <th className="text-left p-3 font-medium">Remaining %</th>
                       <th className="text-left p-3 font-medium">Bill % (of item %)</th>
                       <th className="text-left p-3 font-medium">Amount</th>
                       <th className="text-left p-3 font-medium">Tax (18%)</th>
@@ -566,21 +619,42 @@ export default function AdminFinancial() {
                             {planItem?.particulars.slice(0, 80)}{planItem && planItem.particulars.length > 80 ? "..." : ""}
                           </td>
                           <td className="p-3 text-sm font-medium">
-                            {planItem ? `${planItem.percentage.toFixed(2)}%` : "-"}
+                            {planItem ? formatPercentage(planItem.percentage) : "-"}
+                          </td>
+                          <td className="p-3 text-xs text-muted-foreground min-w-[180px] leading-5">
+                            {preview?.usedInBills.length ? (
+                              <div className="space-y-1">
+                                {preview.usedInBills.map((usage) => (
+                                  <div key={`${usage.billName}-${usage.billPercentage}`}>
+                                    <span className="font-medium text-foreground">{usage.billName}</span>: {formatPercentage(usage.billPercentage)}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              "-"
+                            )}
+                          </td>
+                          <td className="p-3 text-sm font-medium">
+                            {preview ? formatPercentage(preview.remainingBeforeRow) : "-"}
                           </td>
                           <td className="p-3 w-36">
                             <div className="flex items-center gap-1">
                               <input
-                                type="number" min="0" max={planItem?.percentage ?? 100} step="0.01"
+                                type="number" min="0" max={preview?.remainingBeforeRow ?? planItem?.percentage ?? 100} step="0.01"
                                 value={row.billPercentage}
                                 onChange={(e) => setBillItemRows((prev) => prev.map((r, i) => i === index ? { ...r, billPercentage: e.target.value } : r))}
-                                className="w-24 px-3 py-2 rounded-xl bg-secondary/50 border border-border/50"
+                                className={`w-24 px-3 py-2 rounded-xl bg-secondary/50 border ${preview?.exceedsRemaining ? "border-destructive text-destructive" : "border-border/50"}`}
                                 title={`Bill percentage for row ${index + 1}`}
                                 aria-label={`Bill percentage for row ${index + 1}`}
                                 placeholder="e.g. 4"
                               />
                               <span className="text-xs">%</span>
                             </div>
+                            {preview?.exceedsRemaining ? (
+                              <p className="mt-1 text-[11px] text-destructive">
+                                Only {formatPercentage(preview.remainingBeforeRow)} is left.
+                              </p>
+                            ) : null}
                           </td>
                           <td className="p-3 font-medium text-sm">{preview ? money(preview.amount) : "-"}</td>
                           <td className="p-3 font-medium text-sm">{preview ? money(preview.tax) : "-"}</td>
@@ -601,7 +675,7 @@ export default function AdminFinancial() {
                       );
                     })}
                     <tr className="bg-secondary/20 font-semibold text-sm">
-                      <td className="p-3" colSpan={4}>Bill Total</td>
+                      <td className="p-3" colSpan={6}>Bill Total</td>
                       <td className="p-3">{money(billTotals.amount)}</td>
                       <td className="p-3">{money(billTotals.tax)}</td>
                       <td className="p-3">{money(billTotals.total)}</td>
@@ -617,7 +691,7 @@ export default function AdminFinancial() {
                 </button>
                 <button
                   onClick={() => createRaBillMutation.mutate()}
-                  disabled={createRaBillMutation.isPending || billItemRows.some((r) => !r.itemId || !r.billPercentage || Number(r.billPercentage) <= 0)}
+                  disabled={createRaBillMutation.isPending || hasInvalidBillRows || billItemRows.some((r) => !r.itemId || !r.billPercentage || Number(r.billPercentage) <= 0)}
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary/10 text-primary border border-primary/20 text-sm font-medium hover:bg-primary/20 disabled:opacity-50"
                 >
                   <FileText className="h-4 w-4" />
