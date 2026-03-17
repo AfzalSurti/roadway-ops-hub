@@ -129,7 +129,7 @@ export default function AdminFinancial() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["financial-project", activeProjectId] });
       setShowPlanning(false);
-      toast.success("Financial item planning saved");
+      toast.success("Financial tender item saved");
     },
     onError: (error) => {
       toast.error(error instanceof Error ? error.message : "Failed to save financial planning");
@@ -345,7 +345,7 @@ export default function AdminFinancial() {
                     className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary/10 text-primary border border-primary/20 text-sm font-medium hover:bg-primary/20"
                   >
                     <Save className="h-4 w-4" />
-                    Item Planning
+                    Tender Item
                   </button>
                   <button
                     onClick={() => openCreateBill("NORMAL")}
@@ -417,9 +417,9 @@ export default function AdminFinancial() {
             )}
           </div>
 
-          {/* Item Planning Modal */}
+          {/* Tender Item Modal */}
           {showPlanning && (
-            <FinancialModal title={planningType === "EXCESS" ? "Excess Planning" : "Item Planning"} onClose={() => setShowPlanning(false)}>
+            <FinancialModal title={planningType === "EXCESS" ? "Excess Planning" : "Tender Item"} onClose={() => setShowPlanning(false)}>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4 text-sm">
                 <DetailTile label="Contract Value" value={money(detail.project.contractValue)} />
                 <DetailTile label="Tax" value={money(detail.project.taxAmount)} />
