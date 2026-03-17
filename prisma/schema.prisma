@@ -40,6 +40,11 @@ enum FinancialBillStatus {
   RECEIVED
 }
 
+enum FinancialPlanningType {
+  NORMAL
+  EXCESS
+}
+
 enum AuditAction {
   TASK_CREATED
   TASK_UPDATED
@@ -299,6 +304,7 @@ model ProjectFinancialItem {
   id          String                 @id @default(cuid())
   planId      String
   itemNumber  Int
+  planningType FinancialPlanningType @default(NORMAL)
   particulars String
   percentage  Float
   amount      Float
@@ -307,13 +313,14 @@ model ProjectFinancialItem {
   plan        ProjectFinancialPlan   @relation(fields: [planId], references: [id], onDelete: Cascade)
   bills       ProjectFinancialBill[]
 
-  @@unique([planId, itemNumber])
-  @@index([planId])
+  @@unique([planId, itemNumber, planningType])
+  @@index([planId, planningType])
 }
 
 model ProjectFinancialRaBill {
   id                      String              @id @default(cuid())
   planId                  String
+  planningType            FinancialPlanningType @default(NORMAL)
   billName                String
   status                  FinancialBillStatus @default(PLANNING)
   totalBillAmount         Float               @default(0)
@@ -341,7 +348,7 @@ model ProjectFinancialRaBill {
   items                   ProjectFinancialBill[]
 
   @@unique([planId, billName])
-  @@index([planId])
+  @@index([planId, planningType])
   @@index([status])
 }
 

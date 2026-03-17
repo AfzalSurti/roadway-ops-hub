@@ -65,6 +65,7 @@ export const assignProjectNumberSchema = previewProjectNumberSchema.extend({
 });
 
 export const upsertFinancialPlanSchema = z.object({
+  planningType: z.enum(["NORMAL", "EXCESS"]).optional(),
   items: z.array(
     z.object({
       itemNumber: z.coerce.number().int().min(1).max(999),
@@ -75,6 +76,7 @@ export const upsertFinancialPlanSchema = z.object({
 });
 
 export const createRaBillSchema = z.object({
+  planningType: z.enum(["NORMAL", "EXCESS"]).optional(),
   items: z.array(
     z.object({
       itemId: z.string().trim().min(1),

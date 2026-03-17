@@ -87,11 +87,13 @@ export const financialService = {
     };
   },
 
-  async upsertPlan(projectId: string, payload: { items: Array<{ itemNumber: number; particulars: string; percentage: number }> }) {
+  async upsertPlan(projectId: string, payload: { planningType?: "NORMAL" | "EXCESS"; items: Array<{ itemNumber: number; particulars: string; percentage: number }> }) {
     const project = await getEligibleProjectOrThrow(projectId);
     const contractValue = round2(parseMoney(project.requisitionForm!.amountOfWorkOrder || project.requisitionForm!.workOrderValue));
     const taxAmount = round2(contractValue * 0.18);
     const totalAmount = round2(contractValue + taxAmount);
+
+    const planningType = payload.planningType ?? "NORMAL";
 
     const byItemNumber = [...payload.items].sort((a, b) => a.itemNumber - b.itemNumber);
     const unique = new Set(byItemNumber.map((item) => item.itemNumber));
@@ -103,7 +105,8 @@ export const financialService = {
       itemNumber: item.itemNumber,
       particulars: item.particulars,
       percentage: round2(Number(item.percentage)),
-      amount: round2((contractValue * Number(item.percentage)) / 100)
+      amount: round2((contractValue * Number(item.percentage)) / 100),
+      planningType
     }));
 
     return financialRepository.upsertPlan({
@@ -116,12 +119,15 @@ export const financialService = {
   },
 
   async createRaBill(projectId: string, payload: {
+    planningType?: "NORMAL" | "EXCESS";
     items: Array<{ itemId: string; billPercentage: number }>;
   }) {
     const plan = await financialRepository.findPlanByProjectId(projectId);
     if (!plan) {
       throw badRequest("Create financial item planning first");
     }
+
+    const planningType = payload.planningType ?? "NORMAL";
 
     const itemIds = new Set<string>(plan.items.map((item: { id: string }) => item.id));
     if (payload.items.some((entry) => !itemIds.has(entry.itemId))) {
@@ -132,21 +138,24 @@ export const financialService = {
       throw badRequest("Select at least one item for the RA bill");
     }
 
-    // Auto-generate bill name: RA-1, RA-2, etc.
-    const existingNames = (plan.raBills ?? []).map((b: { billName: string }) => b.billName);
+    // Auto-generate bill name per planning type: RA-1 / EX-1
+    const prefix = planningType === "EXCESS" ? "EX" : "RA";
+    const existingNames = (plan.raBills ?? [])
+      .filter((b: { planningType?: "NORMAL" | "EXCESS" }) => (b.planningType ?? "NORMAL") === planningType)
+      .map((b: { billName: string }) => b.billName);
     const existingNumbers = existingNames
       .map((n: string) => {
-        const match = /^RA-(\d+)$/.exec(n);
+        const match = new RegExp(`^${prefix}-(\\d+)$`).exec(n);
         return match ? Number(match[1]) : 0;
       })
       .filter((n: number) => n > 0);
     const nextNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) + 1 : 1;
-    const billName = `RA-${nextNumber}`;
+    const billName = `${prefix}-${nextNumber}`;
 
     const billItems = payload.items.map((entry) => {
-      const planItem = plan.items.find((i: { id: string; amount: number; percentage: number }) => i.id === entry.itemId);
+      const planItem = plan.items.find((i: { id: string; amount: number; percentage: number; planningType?: "NORMAL" | "EXCESS" }) => i.id === entry.itemId && (i.planningType ?? "NORMAL") === planningType);
       if (!planItem) {
-        throw badRequest("Invalid financial item selected");
+        throw badRequest("Invalid financial item selected for this planning type");
       }
       const billPercentage = round2(Number(entry.billPercentage));
       // billPercentage is a percentage OF the item's percentage (e.g., 4 of 10 = 40% of item amount)
@@ -171,6 +180,7 @@ export const financialService = {
     return financialRepository.createRaBill({
       planId: plan.id,
       billName,
+      planningType,
       billItems,
       totalBillAmount,
       totalTaxAmount,

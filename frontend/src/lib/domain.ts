@@ -168,6 +168,7 @@ export type FinancialPlanItem = {
   id: string;
   planId: string;
   itemNumber: number;
+  planningType: "NORMAL" | "EXCESS";
   particulars: string;
   percentage: number;
   amount: number;
@@ -198,6 +199,7 @@ export type FinancialBillItem = {
 export type FinancialRaBill = {
   id: string;
   planId: string;
+  planningType: "NORMAL" | "EXCESS";
   billName: string;
   status: FinancialBillStatus;
   totalBillAmount: number;

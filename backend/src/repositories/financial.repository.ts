@@ -78,7 +78,7 @@ export const financialRepository = {
     contractValue: number;
     taxAmount: number;
     totalAmount: number;
-    items: Array<{ itemNumber: number; particulars: string; percentage: number; amount: number }>;
+    items: Array<{ itemNumber: number; particulars: string; percentage: number; amount: number; planningType: "NORMAL" | "EXCESS" }>;
   }) {
     return db.$transaction(async (txClient: any) => {
       const tx = txClient as any;
@@ -100,19 +100,22 @@ export const financialRepository = {
       for (const item of args.items) {
         await tx.projectFinancialItem.upsert({
           where: {
-            planId_itemNumber: {
+            planId_itemNumber_planningType: {
               planId: plan.id,
-              itemNumber: item.itemNumber
+              itemNumber: item.itemNumber,
+              planningType: item.planningType
             }
           },
           update: {
             particulars: item.particulars,
             percentage: item.percentage,
-            amount: item.amount
+            amount: item.amount,
+            planningType: item.planningType
           },
           create: {
             planId: plan.id,
             itemNumber: item.itemNumber,
+            planningType: item.planningType,
             particulars: item.particulars,
             percentage: item.percentage,
             amount: item.amount
@@ -120,9 +123,12 @@ export const financialRepository = {
         });
       }
 
+      const currentPlanningType = args.items[0]?.planningType ?? "NORMAL";
+
       await tx.projectFinancialItem.deleteMany({
         where: {
           planId: plan.id,
+          planningType: currentPlanningType,
           itemNumber: {
             notIn: args.items.map((item) => item.itemNumber)
           }
@@ -155,6 +161,7 @@ export const financialRepository = {
   async createRaBill(args: {
     planId: string;
     billName: string;
+    planningType: "NORMAL" | "EXCESS";
     billItems: Array<{
       itemId: string;
       billPercentage: number;
@@ -174,6 +181,7 @@ export const financialRepository = {
         data: {
           planId: args.planId,
           billName: args.billName,
+          planningType: args.planningType,
           status: "PLANNING",
           totalBillAmount: args.totalBillAmount,
           totalTaxAmount: args.totalTaxAmount,

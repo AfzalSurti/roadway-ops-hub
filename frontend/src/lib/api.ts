@@ -531,7 +531,7 @@ export const api = {
 
   upsertFinancialPlan(
     projectId: string,
-    payload: { items: Array<{ itemNumber: number; particulars: string; percentage: number }> }
+    payload: { planningType?: "NORMAL" | "EXCESS"; items: Array<{ itemNumber: number; particulars: string; percentage: number }> }
   ) {
     return request<FinancialPlan>(`/financials/${projectId}/plan`, {
       method: "POST",
@@ -551,7 +551,7 @@ export const api = {
 
   createRaBill(
     projectId: string,
-    payload: { items: Array<{ itemId: string; billPercentage: number }> }
+    payload: { planningType?: "NORMAL" | "EXCESS"; items: Array<{ itemId: string; billPercentage: number }> }
   ) {
     const candidates: Array<{ path: string; body: unknown }> = [
       {

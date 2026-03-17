@@ -33,11 +33,15 @@ type DeductionState = {
   remark: string;
 };
 
+type PlanningType = "NORMAL" | "EXCESS";
+
 export default function AdminFinancial() {
   const queryClient = useQueryClient();
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [showPlanning, setShowPlanning] = useState(false);
   const [showCreateBill, setShowCreateBill] = useState(false);
+  const [planningType, setPlanningType] = useState<PlanningType>("NORMAL");
+  const [billPlanningType, setBillPlanningType] = useState<PlanningType>("NORMAL");
   const [planningRows, setPlanningRows] = useState<Array<{ itemNumber: number; particulars: string; percentage: string }>>([]);
   const [billItemRows, setBillItemRows] = useState<BillItemRow[]>([]);
   // Deduction popup state: raBillId | null
@@ -71,13 +75,24 @@ export default function AdminFinancial() {
 
   const raBills = detail?.plan?.raBills ?? [];
 
+  const itemsByType = useMemo(() => {
+    const items = detail?.plan?.items ?? [];
+    return {
+      NORMAL: items.filter((item) => (item.planningType ?? "NORMAL") === "NORMAL"),
+      EXCESS: items.filter((item) => (item.planningType ?? "NORMAL") === "EXCESS")
+    } as const;
+  }, [detail?.plan?.items]);
+
   useEffect(() => {
     if (!detail) return;
-    const source = detail.plan?.items.length
-      ? detail.plan.items.map((item) => ({ itemNumber: item.itemNumber, particulars: item.particulars, percentage: String(item.percentage) }))
-      : detail.itemTemplates.map((item) => ({ itemNumber: item.itemNumber, particulars: item.particulars, percentage: "0" }));
+    const sourceItems = itemsByType[planningType];
+    const source = sourceItems.length
+      ? sourceItems.map((item) => ({ itemNumber: item.itemNumber, particulars: item.particulars, percentage: String(item.percentage) }))
+      : planningType === "NORMAL"
+        ? detail.itemTemplates.map((item) => ({ itemNumber: item.itemNumber, particulars: item.particulars, percentage: "0" }))
+        : [{ itemNumber: 1, particulars: "", percentage: "0" }];
     setPlanningRows(source);
-  }, [detail?.plan?.updatedAt, detail?.project?.id]);
+  }, [detail?.plan?.updatedAt, detail?.project?.id, planningType, itemsByType]);
 
   const totalPercentage = useMemo(
     () => planningRows.reduce((sum, item) => sum + Number(item.percentage || 0), 0),
@@ -103,6 +118,7 @@ export default function AdminFinancial() {
         throw new Error("Please select a project before saving planning.");
       }
       return api.upsertFinancialPlan(activeProjectId, {
+        planningType,
         items: planningRows.map((item) => ({
           itemNumber: Number(item.itemNumber),
           particulars: item.particulars.trim(),
@@ -150,6 +166,7 @@ export default function AdminFinancial() {
         throw new Error("Please select a project before creating RA bill.");
       }
       return api.createRaBill(activeProjectId, {
+        planningType: billPlanningType,
         items: billItemRows
           .filter((row) => row.itemId && Number(row.billPercentage) > 0)
           .map((row) => ({ itemId: row.itemId, billPercentage: Number(row.billPercentage) }))
@@ -179,15 +196,23 @@ export default function AdminFinancial() {
     }
   });
 
-  function openCreateBill() {
-    if (!detail?.plan?.items.length) return;
-    setBillItemRows([{ itemId: detail.plan.items[0].id, billPercentage: "" }]);
+  function openCreateBill(type: PlanningType) {
+    const sourceItems = itemsByType[type];
+    if (!sourceItems.length) return;
+    setBillPlanningType(type);
+    setBillItemRows([{ itemId: sourceItems[0].id, billPercentage: "" }]);
     setShowCreateBill(true);
   }
 
+  function openPlanning(type: PlanningType) {
+    setPlanningType(type);
+    setShowPlanning(true);
+  }
+
   function addBillItemRow() {
-    if (!detail?.plan?.items.length) return;
-    setBillItemRows((prev) => [...prev, { itemId: detail!.plan!.items[0].id, billPercentage: "" }]);
+    const sourceItems = itemsByType[billPlanningType];
+    if (!sourceItems.length) return;
+    setBillItemRows((prev) => [...prev, { itemId: sourceItems[0].id, billPercentage: "" }]);
   }
 
   function removeBillItemRow(index: number) {
@@ -315,19 +340,34 @@ export default function AdminFinancial() {
               </div>
               <div className="flex flex-wrap gap-2">
                 <button
-                  onClick={() => setShowPlanning(true)}
+                  onClick={() => openPlanning("NORMAL")}
                   className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary/10 text-primary border border-primary/20 text-sm font-medium hover:bg-primary/20"
                 >
                   <Save className="h-4 w-4" />
                   Item Planning
                 </button>
                 <button
-                  onClick={openCreateBill}
-                  disabled={!detail.plan}
+                  onClick={() => openCreateBill("NORMAL")}
+                  disabled={!detail.plan || itemsByType.NORMAL.length === 0}
                   className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary/10 text-primary border border-primary/20 text-sm font-medium hover:bg-primary/20 disabled:opacity-50"
                 >
                   <Plus className="h-4 w-4" />
                   Create RA Bill
+                </button>
+                <button
+                  onClick={() => openPlanning("EXCESS")}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-warning/10 text-warning border border-warning/20 text-sm font-medium hover:bg-warning/20"
+                >
+                  <Save className="h-4 w-4" />
+                  Excess Planning
+                </button>
+                <button
+                  onClick={() => openCreateBill("EXCESS")}
+                  disabled={!detail.plan || itemsByType.EXCESS.length === 0}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-warning/10 text-warning border border-warning/20 text-sm font-medium hover:bg-warning/20 disabled:opacity-50"
+                >
+                  <Plus className="h-4 w-4" />
+                  Create Excess Bill
                 </button>
                 {raBills.length > 0 && (
                   <button
@@ -355,22 +395,27 @@ export default function AdminFinancial() {
               <p className="text-sm text-muted-foreground">No RA bills created yet. Click "Create RA Bill" to begin.</p>
             ) : (
               <div className="space-y-6">
-                {raBills.map((raBill) => (
-                  <RaBillCard
-                    key={raBill.id}
-                    raBill={raBill}
-                    onStatusChange={(newStatus) => handleStatusChange(raBill, newStatus)}
-                    onReceivedClick={() => openDeductionPopup(raBill)}
-                    isPending={updateRaBillMutation.isPending}
-                  />
-                ))}
+                <BillGroupSection
+                  title="Normal Bills"
+                  bills={raBills.filter((bill) => (bill.planningType ?? "NORMAL") === "NORMAL")}
+                  onStatusChange={handleStatusChange}
+                  onReceivedClick={openDeductionPopup}
+                  isPending={updateRaBillMutation.isPending}
+                />
+                <BillGroupSection
+                  title="Excess Bills"
+                  bills={raBills.filter((bill) => (bill.planningType ?? "NORMAL") === "EXCESS")}
+                  onStatusChange={handleStatusChange}
+                  onReceivedClick={openDeductionPopup}
+                  isPending={updateRaBillMutation.isPending}
+                />
               </div>
             )}
           </div>
 
           {/* Item Planning Modal */}
           {showPlanning && (
-            <FinancialModal title="Item Planning" onClose={() => setShowPlanning(false)}>
+            <FinancialModal title={planningType === "EXCESS" ? "Excess Planning" : "Item Planning"} onClose={() => setShowPlanning(false)}>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4 text-sm">
                 <DetailTile label="Contract Value" value={money(detail.project.contractValue)} />
                 <DetailTile label="Tax" value={money(detail.project.taxAmount)} />
@@ -471,10 +516,13 @@ export default function AdminFinancial() {
 
           {/* Create RA Bill Modal */}
           {showCreateBill && detail.plan && (
-            <FinancialModal title="Create New RA Bill" onClose={() => setShowCreateBill(false)}>
+            <FinancialModal title={billPlanningType === "EXCESS" ? "Create New Excess Bill" : "Create New RA Bill"} onClose={() => setShowCreateBill(false)}>
               <p className="text-sm text-muted-foreground mb-4">
                 For each item, enter the bill percentage â€” this is the percentage <em>of that item&apos;s allocated percentage</em>.
                 E.g., if Item 1 has 10% and you enter 4%, the bill takes 4% out of its 10% (i.e., 40% of the item&apos;s amount).
+              </p>
+              <p className="text-xs text-muted-foreground mb-3">
+                Bill Type: <span className="font-medium">{billPlanningType === "EXCESS" ? "Excess" : "Normal"}</span>
               </p>
 
               <div className="overflow-x-auto">
@@ -505,7 +553,7 @@ export default function AdminFinancial() {
                               title={`Item selector for row ${index + 1}`}
                               aria-label={`Item selector for row ${index + 1}`}
                             >
-                              {detail.plan!.items.map((item) => (
+                              {itemsByType[billPlanningType].map((item) => (
                                 <option key={item.id} value={item.id}>Item {item.itemNumber}</option>
                               ))}
                             </select>
@@ -569,7 +617,7 @@ export default function AdminFinancial() {
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary/10 text-primary border border-primary/20 text-sm font-medium hover:bg-primary/20 disabled:opacity-50"
                 >
                   <FileText className="h-4 w-4" />
-                  {createRaBillMutation.isPending ? "Creating..." : "Create RA Bill"}
+                  {createRaBillMutation.isPending ? "Creating..." : billPlanningType === "EXCESS" ? "Create Excess Bill" : "Create RA Bill"}
                 </button>
               </div>
             </FinancialModal>
@@ -697,6 +745,9 @@ function RaBillCard({ raBill, onStatusChange, onReceivedClick, isPending }: {
       <div className="flex items-center justify-between px-4 py-3 bg-secondary/30 border-b border-border/30">
         <div className="flex items-center gap-3">
           <span className="text-base font-bold text-primary">{raBill.billName}</span>
+          <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${(raBill.planningType ?? "NORMAL") === "EXCESS" ? "text-warning bg-warning/10" : "text-primary bg-primary/10"}`}>
+            {(raBill.planningType ?? "NORMAL") === "EXCESS" ? "Excess" : "Normal"}
+          </span>
           <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusCfg.color}`}>{statusCfg.label}</span>
         </div>
         <div className="flex items-center gap-2">
@@ -844,6 +895,49 @@ function FinancialModal({ title, onClose, children }: { title: string; onClose: 
         </div>
         {children}
       </div>
+    </div>
+  );
+}
+
+function BillGroupSection({
+  title,
+  bills,
+  onStatusChange,
+  onReceivedClick,
+  isPending
+}: {
+  title: string;
+  bills: FinancialRaBill[];
+  onStatusChange: (raBill: FinancialRaBill, status: FinancialBillStatus) => void;
+  onReceivedClick: (raBill: FinancialRaBill) => void;
+  isPending: boolean;
+}) {
+  if (bills.length === 0) {
+    return (
+      <div className="rounded-xl border border-border/40 bg-secondary/10 p-4">
+        <p className="text-sm font-medium">{title}</p>
+        <p className="text-xs text-muted-foreground mt-1">No bills in this category yet.</p>
+      </div>
+    );
+  }
+
+  const total = bills.reduce((sum, bill) => sum + bill.totalAmount, 0);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between rounded-xl border border-border/40 bg-secondary/10 px-4 py-2.5">
+        <p className="text-sm font-semibold">{title}</p>
+        <p className="text-xs text-muted-foreground">{bills.length} bills • {money(total)}</p>
+      </div>
+      {bills.map((raBill) => (
+        <RaBillCard
+          key={raBill.id}
+          raBill={raBill}
+          onStatusChange={(newStatus) => onStatusChange(raBill, newStatus)}
+          onReceivedClick={() => onReceivedClick(raBill)}
+          isPending={isPending}
+        />
+      ))}
     </div>
   );
 }
