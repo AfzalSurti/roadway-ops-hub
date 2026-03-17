@@ -254,6 +254,15 @@ export type FinancialProjectSummary = {
   name: string;
   projectNumber: string;
   requisitionFormId: string;
+  workOrderNumber?: string;
+  workOrderDate?: string | null;
+  billingName?: string;
+  designation?: string;
+  department?: string;
+  addressWithPincode?: string;
+  nameOfWork?: string;
+  panTanNumber?: string;
+  gstNumber?: string;
   contractValue: number;
   taxAmount: number;
   totalAmount: number;

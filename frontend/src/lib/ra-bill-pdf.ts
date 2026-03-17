@@ -14,6 +14,24 @@ function shortDate(value?: string | Date | null) {
   return new Date(value).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+function amountInWords(value: number) {
+  const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+  const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+  const toWords = (n: number): string => {
+    if (n === 0) return "Zero";
+    if (n < 20) return ones[n];
+    if (n < 100) return `${tens[Math.floor(n / 10)]}${n % 10 ? ` ${ones[n % 10]}` : ""}`;
+    if (n < 1000) return `${ones[Math.floor(n / 100)]} Hundred${n % 100 ? ` ${toWords(n % 100)}` : ""}`;
+    if (n < 100000) return `${toWords(Math.floor(n / 1000))} Thousand${n % 1000 ? ` ${toWords(n % 1000)}` : ""}`;
+    if (n < 10000000) return `${toWords(Math.floor(n / 100000))} Lakh${n % 100000 ? ` ${toWords(n % 100000)}` : ""}`;
+    return `${toWords(Math.floor(n / 10000000))} Crore${n % 10000000 ? ` ${toWords(n % 10000000)}` : ""}`;
+  };
+
+  const rounded = Math.round(value || 0);
+  if (rounded <= 0) return "Zero Rupees Only";
+  return `${toWords(rounded)} Rupees Only`;
+}
+
 const PAGE_W = 210;
 const PAGE_H = 297;
 const MARGIN_X = 14;
@@ -293,4 +311,135 @@ export function downloadRaBillPdf(params: {
   const safeProjectNumber = projectNumber.replace(/[^a-zA-Z0-9_-]/g, "_");
   const safeFileName = (params.fileName ?? `RA-Bill-Log_${safeProjectNumber}`).replace(/[^a-zA-Z0-9_-]/g, "_");
   doc.save(`${safeFileName}.pdf`);
+}
+
+export function downloadProperBillPdf(params: {
+  projectNumber: string;
+  projectName: string;
+  raBill: FinancialRaBill;
+  workOrderNumber?: string;
+  workOrderDate?: string | null;
+  billingName?: string;
+  designation?: string;
+  department?: string;
+  addressWithPincode?: string;
+  nameOfWork?: string;
+  panTanNumber?: string;
+  gstNumber?: string;
+}) {
+  const { projectNumber, projectName, raBill } = params;
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+
+  // Keep clear space for pre-printed paper header/footer.
+  const LEFT = 16;
+  const RIGHT = 194;
+  const TOP = 52;
+  const BOTTOM = 265;
+  const W = RIGHT - LEFT;
+  let y = TOP;
+
+  doc.setFont("times", "bold");
+  doc.setFontSize(12.5);
+  doc.text("PROFORMA INVOICE", (LEFT + RIGHT) / 2, y, { align: "center" });
+  y += 8;
+
+  doc.setFontSize(10);
+  doc.text(`P.I. No.     : ${projectNumber}/${raBill.billName}`, LEFT, y);
+  doc.text(`P.I. Type   : ${raBill.billName}`, LEFT, y + 6);
+  doc.text(`Date         : ${shortDate(raBill.createdAt)}`, LEFT, y + 12);
+  doc.text(`WO No.      : ${params.workOrderNumber ?? "-"}${params.workOrderDate ? `, Dt. ${shortDate(params.workOrderDate)}` : ""}`, LEFT, y + 18);
+  doc.text(projectName, RIGHT, y, { align: "right" });
+  doc.text(`Project No. : ${projectNumber}`, RIGHT, y + 6, { align: "right" });
+  y += 28;
+
+  doc.setFont("times", "bold");
+  doc.text("To,", LEFT, y);
+  y += 5;
+  doc.setFont("times", "normal");
+  doc.text(params.designation ?? "Deputy Executive Engineer", LEFT, y);
+  y += 5;
+  if (params.department) {
+    doc.text(params.department, LEFT, y);
+    y += 5;
+  }
+  if (params.billingName) {
+    doc.text(params.billingName, LEFT, y);
+    y += 5;
+  }
+  if (params.addressWithPincode) {
+    const addr = doc.splitTextToSize(params.addressWithPincode, W - 4) as string[];
+    doc.text(addr, LEFT, y);
+    y += addr.length * 4.6;
+  }
+  y += 3;
+
+  doc.setFont("times", "bold");
+  doc.text("Project Name :", LEFT, y);
+  doc.setFont("times", "normal");
+  const workName = params.nameOfWork ?? projectName;
+  const workLines = doc.splitTextToSize(workName, W - 30) as string[];
+  doc.text(workLines, LEFT + 30, y);
+  y += Math.max(8, workLines.length * 4.8);
+
+  y += 3;
+  const col = [18, 108, 14, 32];
+  const rowH = 7;
+  const x0 = LEFT;
+  doc.setLineWidth(0.3);
+  doc.setFont("times", "bold");
+  doc.rect(x0, y, col[0], rowH);
+  doc.rect(x0 + col[0], y, col[1], rowH);
+  doc.rect(x0 + col[0] + col[1], y, col[2], rowH);
+  doc.rect(x0 + col[0] + col[1] + col[2], y, col[3], rowH);
+  doc.text("Item No.", x0 + 2, y + 4.8);
+  doc.text("Description", x0 + col[0] + col[1] / 2, y + 4.8, { align: "center" });
+  doc.text("Rs", x0 + col[0] + col[1] + 3, y + 4.8);
+  doc.text("Amount", x0 + col[0] + col[1] + col[2] + col[3] / 2, y + 4.8, { align: "center" });
+  y += rowH;
+
+  const rows = raBill.items.map((item) => ({
+    itemNo: String(item.item?.itemNumber ?? "-"),
+    desc: item.item?.particulars ?? "-",
+    amount: item.totalAmount
+  }));
+
+  doc.setFont("times", "normal");
+  rows.forEach((row) => {
+    const lineCount = (doc.splitTextToSize(row.desc, col[1] - 3) as string[]).slice(0, 3);
+    const h = Math.max(8, lineCount.length * 4.6 + 2.5);
+    if (y + h > BOTTOM - 26) return;
+    doc.rect(x0, y, col[0], h);
+    doc.rect(x0 + col[0], y, col[1], h);
+    doc.rect(x0 + col[0] + col[1], y, col[2], h);
+    doc.rect(x0 + col[0] + col[1] + col[2], y, col[3], h);
+    doc.text(row.itemNo, x0 + col[0] / 2, y + 5, { align: "center" });
+    doc.text(lineCount, x0 + col[0] + 1.5, y + 4.8);
+    doc.text("Rs", x0 + col[0] + col[1] + 3, y + 5);
+    doc.text(formatAmount(row.amount), x0 + col[0] + col[1] + col[2] + col[3] - 1.5, y + 5, { align: "right" });
+    y += h;
+  });
+
+  doc.setFont("times", "bold");
+  doc.rect(x0, y, col[0] + col[1] + col[2], rowH);
+  doc.rect(x0 + col[0] + col[1] + col[2], y, col[3], rowH);
+  doc.text("Total Amount", x0 + col[0] + col[1] + col[2] - 2, y + 4.8, { align: "right" });
+  doc.text(formatAmount(raBill.totalAmount), x0 + col[0] + col[1] + col[2] + col[3] - 1.5, y + 4.8, { align: "right" });
+  y += rowH;
+
+  doc.setFont("times", "bold");
+  doc.rect(x0, y, W, rowH);
+  doc.text(`(In words): ${amountInWords(raBill.totalAmount)}`, x0 + 1.5, y + 4.8);
+  y += rowH;
+
+  doc.rect(x0, y, W / 2, rowH);
+  doc.rect(x0 + W / 2, y, W / 2, rowH);
+  doc.text(`PAN No: ${params.panTanNumber ?? "-"}`, x0 + 1.5, y + 4.8);
+  doc.text(`GST No: ${params.gstNumber ?? "-"}`, x0 + W - 1.5, y + 4.8, { align: "right" });
+
+  doc.setFont("times", "bold");
+  doc.text("Geo Designs & Research Pvt. Ltd.", LEFT, BOTTOM - 11);
+  doc.text("[Authorized Signatory]", LEFT, BOTTOM - 2.5);
+
+  const safe = `${raBill.billName}_${projectNumber}_proper`.replace(/[^a-zA-Z0-9_-]/g, "_");
+  doc.save(`${safe}.pdf`);
 }

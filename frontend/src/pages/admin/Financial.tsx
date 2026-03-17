@@ -3,7 +3,7 @@ import { PageWrapper } from "@/components/PageWrapper";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { financialBillStatusConfig, type FinancialBillStatus, type FinancialRaBill } from "@/lib/domain";
-import { downloadRaBillPdf } from "@/lib/ra-bill-pdf";
+import { downloadProperBillPdf, downloadRaBillPdf } from "@/lib/ra-bill-pdf";
 import { toast } from "sonner";
 import { Download, FileText, Plus, Save, X } from "lucide-react";
 import * as XLSX from "xlsx";
@@ -541,6 +541,24 @@ export default function AdminFinancial() {
     });
   }
 
+  function handleDownloadSingleProperBillPdf(raBill: FinancialRaBill) {
+    if (!detail?.project) return;
+    downloadProperBillPdf({
+      projectNumber: detail.project.projectNumber,
+      projectName: detail.project.name,
+      raBill,
+      workOrderNumber: detail.project.workOrderNumber,
+      workOrderDate: detail.project.workOrderDate,
+      billingName: detail.project.billingName,
+      designation: detail.project.designation,
+      department: detail.project.department,
+      addressWithPincode: detail.project.addressWithPincode,
+      nameOfWork: detail.project.nameOfWork,
+      panTanNumber: detail.project.panTanNumber,
+      gstNumber: detail.project.gstNumber
+    });
+  }
+
   async function handleDownloadAllProjectsBillStatus() {
     try {
       const summary = await api.getAllProjectsBillStatus();
@@ -752,7 +770,8 @@ export default function AdminFinancial() {
                   bills={raBills.filter((bill) => (bill.planningType ?? "NORMAL") === "NORMAL")}
                   onStatusChange={handleStatusChange}
                   onReceivedClick={openDeductionPopup}
-                  onDownloadPdf={handleDownloadSingleBillPdf}
+                  onDownloadLogPdf={handleDownloadSingleBillPdf}
+                  onDownloadProperPdf={handleDownloadSingleProperBillPdf}
                   isPending={updateRaBillMutation.isPending}
                 />
                 <BillGroupSection
@@ -760,7 +779,8 @@ export default function AdminFinancial() {
                   bills={raBills.filter((bill) => (bill.planningType ?? "NORMAL") === "EXCESS")}
                   onStatusChange={handleStatusChange}
                   onReceivedClick={openDeductionPopup}
-                  onDownloadPdf={handleDownloadSingleBillPdf}
+                  onDownloadLogPdf={handleDownloadSingleBillPdf}
+                  onDownloadProperPdf={handleDownloadSingleProperBillPdf}
                   isPending={updateRaBillMutation.isPending}
                 />
               </div>
@@ -1370,11 +1390,12 @@ export default function AdminFinancial() {
   );
 }
 
-function RaBillCard({ raBill, onStatusChange, onReceivedClick, onDownloadPdf, isPending }: {
+function RaBillCard({ raBill, onStatusChange, onReceivedClick, onDownloadLogPdf, onDownloadProperPdf, isPending }: {
   raBill: FinancialRaBill;
   onStatusChange: (status: FinancialBillStatus) => void;
   onReceivedClick: () => void;
-  onDownloadPdf: () => void;
+  onDownloadLogPdf: () => void;
+  onDownloadProperPdf: () => void;
   isPending: boolean;
 }) {
   const statusCfg = financialBillStatusConfig[raBill.status];
@@ -1393,12 +1414,20 @@ function RaBillCard({ raBill, onStatusChange, onReceivedClick, onDownloadPdf, is
         </div>
         <div className="flex items-center gap-2">
           {raBill.status === "RECEIVED" && (
-            <button
-              onClick={onDownloadPdf}
-              className="px-3 py-1.5 rounded-lg bg-accent/10 text-accent border border-accent/20 text-xs font-medium hover:bg-accent/20"
-            >
-              Download Bill PDF
-            </button>
+            <>
+              <button
+                onClick={onDownloadLogPdf}
+                className="px-3 py-1.5 rounded-lg bg-accent/10 text-accent border border-accent/20 text-xs font-medium hover:bg-accent/20"
+              >
+                Log Details PDF
+              </button>
+              <button
+                onClick={onDownloadProperPdf}
+                className="px-3 py-1.5 rounded-lg bg-primary/10 text-primary border border-primary/20 text-xs font-medium hover:bg-primary/20"
+              >
+                Proper Bill PDF
+              </button>
+            </>
           )}
           {raBill.status !== "RECEIVED" && (
             <>
@@ -1600,14 +1629,16 @@ function BillGroupSection({
   bills,
   onStatusChange,
   onReceivedClick,
-  onDownloadPdf,
+  onDownloadLogPdf,
+  onDownloadProperPdf,
   isPending
 }: {
   title: string;
   bills: FinancialRaBill[];
   onStatusChange: (raBill: FinancialRaBill, status: FinancialBillStatus) => void;
   onReceivedClick: (raBill: FinancialRaBill) => void;
-  onDownloadPdf: (raBill: FinancialRaBill) => void;
+  onDownloadLogPdf: (raBill: FinancialRaBill) => void;
+  onDownloadProperPdf: (raBill: FinancialRaBill) => void;
   isPending: boolean;
 }) {
   if (bills.length === 0) {
@@ -1633,7 +1664,8 @@ function BillGroupSection({
           raBill={raBill}
           onStatusChange={(newStatus) => onStatusChange(raBill, newStatus)}
           onReceivedClick={() => onReceivedClick(raBill)}
-          onDownloadPdf={() => onDownloadPdf(raBill)}
+          onDownloadLogPdf={() => onDownloadLogPdf(raBill)}
+          onDownloadProperPdf={() => onDownloadProperPdf(raBill)}
           isPending={isPending}
         />
       ))}
