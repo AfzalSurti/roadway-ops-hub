@@ -19,6 +19,17 @@ function formatPercentage(value: number) {
   return `${round2(value).toFixed(2)}%`;
 }
 
+function getBillTotalDeductions(raBill: FinancialRaBill) {
+  return round2(
+    Number(raBill.itDeductionAmount || 0) +
+    Number(raBill.lCessDeductionAmount || 0) +
+    Number(raBill.securityDepositAmount || 0) +
+    Number(raBill.recoverFromRaBillAmount || 0) +
+    Number(raBill.gstWithheldAmount || 0) +
+    Number(raBill.withheldAmount || 0)
+  );
+}
+
 function shortDate(value?: string | null) {
   if (!value) return "-";
   return new Date(value).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
@@ -286,7 +297,7 @@ export default function AdminFinancial() {
   const deductionAmounts = useMemo(() => {
     if (!deductionPopup) return null;
     const total = deductionPopup.totalAmount;
-    const cheque = Number(deductionState.chequeRtgsAmount || 0);
+    const receivedAmount = Number(deductionState.chequeRtgsAmount || 0);
     const it = Number(deductionState.itDeductionPct || 0);
     const lcess = Number(deductionState.lCessDeductionPct || 0);
     const sd = Number(deductionState.securityDepositPct || 0);
@@ -301,9 +312,9 @@ export default function AdminFinancial() {
     const gstwAmt = (total * gstw) / 100;
     const whAmt = (total * wh) / 100;
     const totalDeductions = itAmt + lcessAmt + sdAmt + recoverAmt + gstwAmt + whAmt;
-    const totalReceived = cheque - totalDeductions;
+    const totalReceived = receivedAmount - totalDeductions;
 
-    return { itAmt, lcessAmt, sdAmt, recoverAmt, gstwAmt, whAmt, totalDeductions, totalReceived };
+    return { itAmt, lcessAmt, sdAmt, recoverAmt, gstwAmt, whAmt, totalDeductions, totalReceived, receivedAmount, totalBillAmount: total };
   }, [deductionPopup, deductionState]);
 
   function submitDeductions() {
@@ -706,12 +717,12 @@ export default function AdminFinancial() {
             <FinancialModal title="Mark as Received - Enter Deductions" onClose={() => setDeductionPopup(null)}>
               <div className="mb-4 p-3 rounded-xl bg-primary/5 border border-primary/20">
                 <p className="text-sm font-medium">Total Bill Amount: <span className="text-primary">{money(deductionPopup.totalAmount)}</span></p>
-                <p className="text-xs text-muted-foreground mt-1">Deduction amounts are calculated as a percentage of the total bill amount.</p>
+                <p className="text-xs text-muted-foreground mt-1">All 6 deductions below are calculated as a percentage of the total bill amount shown above, not from the received amount.</p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
                 <DeductionField
-                  label="Cheque / RTGS Amount"
+                  label="Received Amount"
                   value={deductionState.chequeRtgsAmount}
                   onChange={(v) => setDeductionState((prev) => ({ ...prev, chequeRtgsAmount: v }))}
                   isAmount
@@ -781,8 +792,10 @@ export default function AdminFinancial() {
               {/* Summary */}
               <div className="rounded-xl border border-border/40 bg-secondary/20 p-4 mb-4 text-sm">
                 <div className="grid grid-cols-2 gap-y-1.5 gap-x-6">
-                  <span className="text-muted-foreground">Cheque / RTGS Amount</span>
-                  <span className="font-medium text-right">{money(Number(deductionState.chequeRtgsAmount || 0))}</span>
+                  <span className="text-muted-foreground">Total Bill Amount</span>
+                  <span className="font-medium text-right">{money(deductionAmounts.totalBillAmount)}</span>
+                  <span className="text-muted-foreground">Received Amount</span>
+                  <span className="font-medium text-right">{money(deductionAmounts.receivedAmount)}</span>
                   <span className="text-muted-foreground">Total Deductions</span>
                   <span className="font-medium text-destructive text-right">- {money(deductionAmounts.totalDeductions)}</span>
                   <span className="font-semibold">Total Received Amount</span>
@@ -888,6 +901,14 @@ function RaBillCard({ raBill, onStatusChange, onReceivedClick, isPending }: {
               <td className="px-4 py-2 text-right">{new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(raBill.totalTaxAmount)}</td>
               <td className="px-4 py-2 text-right text-primary">{new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(raBill.totalAmount)}</td>
             </tr>
+            {raBill.status === "RECEIVED" && (
+              <tr className="bg-accent/5 font-medium text-xs">
+                <td className="px-4 py-2" colSpan={3}>Payment Summary</td>
+                <td className="px-4 py-2 text-right text-destructive">-{new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(getBillTotalDeductions(raBill))}</td>
+                <td className="px-4 py-2 text-right">{new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(raBill.chequeRtgsAmount)}</td>
+                <td className="px-4 py-2 text-right text-accent">{new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(raBill.totalReceivedAmount)}</td>
+              </tr>
+            )}
           </tfoot>
         </table>
       </div>
@@ -895,14 +916,16 @@ function RaBillCard({ raBill, onStatusChange, onReceivedClick, isPending }: {
       {/* Received details (shown only when RECEIVED) */}
       {raBill.status === "RECEIVED" && (
         <div className="px-4 py-3 bg-accent/5 border-t border-accent/20 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+          <ReceiptTile label="Total Bill Amount" value={new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(raBill.totalAmount)} />
           <ReceiptTile label="Received Date" value={shortDate(raBill.receivedDate)} />
-          <ReceiptTile label="Cheque/RTGS" value={new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(raBill.chequeRtgsAmount)} />
+          <ReceiptTile label="Received Amount" value={new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(raBill.chequeRtgsAmount)} />
           <ReceiptTile label="10% IT" value={`${raBill.itDeductionPct.toFixed(2)}% -> ${new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(raBill.itDeductionAmount)}`} />
           <ReceiptTile label="1% L.Cess" value={`${raBill.lCessDeductionPct.toFixed(2)}% -> ${new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(raBill.lCessDeductionAmount)}`} />
           <ReceiptTile label="Security Deposit" value={`${raBill.securityDepositPct.toFixed(2)}% -> ${new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(raBill.securityDepositAmount)}`} />
           <ReceiptTile label="Recover From RA Bill" value={`${raBill.recoverFromRaBillPct.toFixed(2)}% -> ${new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(raBill.recoverFromRaBillAmount)}`} />
           <ReceiptTile label="2% GST Withheld" value={`${raBill.gstWithheldPct.toFixed(2)}% -> ${new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(raBill.gstWithheldAmount)}`} />
           <ReceiptTile label="Withheld" value={`${raBill.withheldPct.toFixed(2)}% -> ${new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(raBill.withheldAmount)}`} />
+          <ReceiptTile label="Total Deductions" value={new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(getBillTotalDeductions(raBill))} />
           <ReceiptTile label="Total Received" value={new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(raBill.totalReceivedAmount)} accent />
           {raBill.remark ? <ReceiptTile label="Remark" value={raBill.remark} /> : null}
         </div>
