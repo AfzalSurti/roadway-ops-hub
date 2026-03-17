@@ -1406,21 +1406,19 @@ function RaBillCard({ raBill, onStatusChange, onReceivedClick, onDownloadLogPdf,
           <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusCfg.color}`}>{statusCfg.label}</span>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={onDownloadProperPdf}
+            className="px-3 py-1.5 rounded-lg bg-primary/10 text-primary border border-primary/20 text-xs font-medium hover:bg-primary/20"
+          >
+            Proper Bill PDF
+          </button>
           {raBill.status === "RECEIVED" && (
-            <>
-              <button
-                onClick={onDownloadLogPdf}
-                className="px-3 py-1.5 rounded-lg bg-accent/10 text-accent border border-accent/20 text-xs font-medium hover:bg-accent/20"
-              >
-                Log Details PDF
-              </button>
-              <button
-                onClick={onDownloadProperPdf}
-                className="px-3 py-1.5 rounded-lg bg-primary/10 text-primary border border-primary/20 text-xs font-medium hover:bg-primary/20"
-              >
-                Proper Bill PDF
-              </button>
-            </>
+            <button
+              onClick={onDownloadLogPdf}
+              className="px-3 py-1.5 rounded-lg bg-accent/10 text-accent border border-accent/20 text-xs font-medium hover:bg-accent/20"
+            >
+              Log Details PDF
+            </button>
           )}
           {raBill.status !== "RECEIVED" && (
             <>
