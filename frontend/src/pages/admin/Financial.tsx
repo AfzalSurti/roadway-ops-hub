@@ -98,16 +98,20 @@ export default function AdminFinancial() {
   };
 
   const savePlanMutation = useMutation({
-    mutationFn: () =>
-      api.upsertFinancialPlan(selectedProjectId, {
+    mutationFn: () => {
+      if (!activeProjectId) {
+        throw new Error("Please select a project before saving planning.");
+      }
+      return api.upsertFinancialPlan(activeProjectId, {
         items: planningRows.map((item) => ({
           itemNumber: Number(item.itemNumber),
           particulars: item.particulars.trim(),
           percentage: Number(item.percentage || 0)
         }))
-      }),
+      });
+    },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["financial-project", selectedProjectId] });
+      await queryClient.invalidateQueries({ queryKey: ["financial-project", activeProjectId] });
       setShowPlanning(false);
       toast.success("Financial item planning saved");
     },
@@ -141,14 +145,18 @@ export default function AdminFinancial() {
   }, [billItemPreviews]);
 
   const createRaBillMutation = useMutation({
-    mutationFn: () =>
-      api.createRaBill(selectedProjectId, {
+    mutationFn: () => {
+      if (!activeProjectId) {
+        throw new Error("Please select a project before creating RA bill.");
+      }
+      return api.createRaBill(activeProjectId, {
         items: billItemRows
           .filter((row) => row.itemId && Number(row.billPercentage) > 0)
           .map((row) => ({ itemId: row.itemId, billPercentage: Number(row.billPercentage) }))
-      }),
+      });
+    },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["financial-project", selectedProjectId] });
+      await queryClient.invalidateQueries({ queryKey: ["financial-project", activeProjectId] });
       setShowCreateBill(false);
       setBillItemRows([]);
       toast.success("RA bill created");
@@ -162,7 +170,7 @@ export default function AdminFinancial() {
     mutationFn: (args: { raBillId: string; payload: Parameters<typeof api.updateRaBill>[1] }) =>
       api.updateRaBill(args.raBillId, args.payload),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["financial-project", selectedProjectId] });
+      await queryClient.invalidateQueries({ queryKey: ["financial-project", activeProjectId] });
       setDeductionPopup(null);
       toast.success("RA bill updated");
     },
