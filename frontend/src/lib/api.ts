@@ -1,4 +1,4 @@
-import type { ApiUser, AppNotification, FinancialBillItem, FinancialBillStatus, FinancialPlan, FinancialProjectDetail, FinancialProjectSummary, FinancialRaBill, ProjectItem, ProjectRequisitionFormItem, ReportItem, ReportStatus, ReportTemplate, TaskComment, TaskItem, TaskStatus } from "./domain";
+import type { ApiUser, AppNotification, FinancialAllProjectsBillStatusSummary, FinancialBillItem, FinancialBillStatus, FinancialPlan, FinancialProjectDetail, FinancialProjectSummary, FinancialRaBill, ProjectItem, ProjectRequisitionFormItem, ReportItem, ReportStatus, ReportTemplate, TaskComment, TaskItem, TaskStatus } from "./domain";
 
   const API_BASE_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:4000").replace(/\/+$/, "");
 
@@ -523,6 +523,10 @@ export const api = {
 
   getFinancialProjects() {
     return request<FinancialProjectSummary[]>("/financials/projects");
+  },
+
+  getAllProjectsBillStatus() {
+    return request<FinancialAllProjectsBillStatusSummary>("/financials/bill-status/projects");
   },
 
   getProjectFinancial(projectId: string) {

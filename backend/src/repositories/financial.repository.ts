@@ -60,6 +60,27 @@ export const financialRepository = {
     });
   },
 
+  findAllEligibleProjectsWithFinancial() {
+    return db.project.findMany({
+      where: {
+        projectNumber: { not: null },
+        requisitionForm: { isNot: null }
+      },
+      include: {
+        requisitionForm: true,
+        financialPlan: {
+          include: {
+            items: true,
+            raBills: {
+              orderBy: { createdAt: "asc" }
+            }
+          }
+        }
+      },
+      orderBy: { name: "asc" }
+    });
+  },
+
   findEligibleProjectById(projectId: string) {
     return db.project.findFirst({
       where: {

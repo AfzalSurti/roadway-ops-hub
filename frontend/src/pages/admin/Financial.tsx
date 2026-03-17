@@ -6,6 +6,7 @@ import { financialBillStatusConfig, type FinancialBillStatus, type FinancialRaBi
 import { downloadRaBillPdf } from "@/lib/ra-bill-pdf";
 import { toast } from "sonner";
 import { Download, FileText, Plus, Save, X } from "lucide-react";
+import * as XLSX from "xlsx";
 
 function money(value: number) {
   return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(value || 0);
@@ -540,6 +541,80 @@ export default function AdminFinancial() {
     });
   }
 
+  async function handleDownloadAllProjectsBillStatus() {
+    try {
+      const summary = await api.getAllProjectsBillStatus();
+      if (!summary.rows.length) {
+        toast.error("No financial bill status data available for export.");
+        return;
+      }
+
+      const rows: Array<Record<string, string | number>> = summary.rows.map((row, index) => ({
+        "S.No": index + 1,
+        "Folder No": row.folderNo || "",
+        "DPR Project": row.dprProject,
+        "Project No.": row.projectNo,
+        "WO Amount (Excl. GST)": row.workOrderAmountExclGst,
+        "Received Amount (Excl. GST)": row.receivedAmountExclGst,
+        "Financial Progress %": row.financialProgressPct,
+        "RA Bill Raised/Claim": row.raBillRaisedClaim,
+        Planning: row.planningAmount,
+        "Total Excess (Excl. GST)": row.totalExcessExclGst,
+        "Excess Received": row.excessReceived,
+        "Excess Bill Raised/Claim": row.excessBillRaisedClaim,
+        Remark: row.remark || ""
+      }));
+
+      const totals = summary.rows.reduce((acc, row) => ({
+        workOrderAmountExclGst: acc.workOrderAmountExclGst + row.workOrderAmountExclGst,
+        receivedAmountExclGst: acc.receivedAmountExclGst + row.receivedAmountExclGst,
+        raBillRaisedClaim: acc.raBillRaisedClaim + row.raBillRaisedClaim,
+        planningAmount: acc.planningAmount + row.planningAmount,
+        totalExcessExclGst: acc.totalExcessExclGst + row.totalExcessExclGst,
+        excessReceived: acc.excessReceived + row.excessReceived,
+        excessBillRaisedClaim: acc.excessBillRaisedClaim + row.excessBillRaisedClaim
+      }), {
+        workOrderAmountExclGst: 0,
+        receivedAmountExclGst: 0,
+        raBillRaisedClaim: 0,
+        planningAmount: 0,
+        totalExcessExclGst: 0,
+        excessReceived: 0,
+        excessBillRaisedClaim: 0
+      });
+
+      rows.push({
+        "S.No": "",
+        "Folder No": "",
+        "DPR Project": "Total",
+        "Project No.": "",
+        "WO Amount (Excl. GST)": round2(totals.workOrderAmountExclGst),
+        "Received Amount (Excl. GST)": round2(totals.receivedAmountExclGst),
+        "Financial Progress %": round2(totals.workOrderAmountExclGst > 0 ? (totals.receivedAmountExclGst / totals.workOrderAmountExclGst) * 100 : 0),
+        "RA Bill Raised/Claim": round2(totals.raBillRaisedClaim),
+        Planning: round2(totals.planningAmount),
+        "Total Excess (Excl. GST)": round2(totals.totalExcessExclGst),
+        "Excess Received": round2(totals.excessReceived),
+        "Excess Bill Raised/Claim": round2(totals.excessBillRaisedClaim),
+        Remark: ""
+      });
+
+      const worksheet = XLSX.utils.json_to_sheet(rows);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Bill Status");
+      const datePart = summary.generatedAt.slice(0, 10);
+      XLSX.writeFile(workbook, `all-project-bill-status-${datePart}.xlsx`);
+
+      if (summary.missingColumns.length > 0) {
+        toast.success(`Downloaded bill status. Missing columns in current data: ${summary.missingColumns.join(", ")}.`);
+      } else {
+        toast.success("Downloaded all-project bill status.");
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to download all-project bill status");
+    }
+  }
+
   const carryForwardMovements = useMemo(
     () => raBills.flatMap((raBill) =>
       (raBill.outgoingCarryForwards ?? []).map((entry) => ({
@@ -597,6 +672,13 @@ export default function AdminFinancial() {
               </div>
               <div className="flex flex-col gap-2 lg:items-end">
                 <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={handleDownloadAllProjectsBillStatus}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-secondary/50 text-foreground border border-border/50 text-sm font-medium hover:bg-secondary/70"
+                  >
+                    <Download className="h-4 w-4" />
+                    Download All Project Status
+                  </button>
                   <button
                     onClick={() => openPlanning("NORMAL")}
                     className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary/10 text-primary border border-primary/20 text-sm font-medium hover:bg-primary/20"

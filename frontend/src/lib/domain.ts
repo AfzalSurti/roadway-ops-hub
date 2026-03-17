@@ -283,6 +283,28 @@ export type FinancialProjectDetail = {
   plan: FinancialPlan | null;
 };
 
+export type FinancialProjectBillStatusRow = {
+  projectId: string;
+  folderNo: string;
+  dprProject: string;
+  projectNo: string;
+  workOrderAmountExclGst: number;
+  receivedAmountExclGst: number;
+  financialProgressPct: number;
+  raBillRaisedClaim: number;
+  planningAmount: number;
+  totalExcessExclGst: number;
+  excessReceived: number;
+  excessBillRaisedClaim: number;
+  remark: string;
+};
+
+export type FinancialAllProjectsBillStatusSummary = {
+  generatedAt: string;
+  rows: FinancialProjectBillStatusRow[];
+  missingColumns: string[];
+};
+
 export const statusConfig: Record<TaskStatus, { label: string; color: string }> = {
   TODO: { label: "To Do", color: "text-muted-foreground bg-muted" },
   IN_PROGRESS: { label: "In Progress", color: "text-primary bg-primary/10" },

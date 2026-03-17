@@ -67,6 +67,85 @@ async function getEligibleProjectOrThrow(projectId: string) {
 }
 
 export const financialService = {
+  async getAllProjectsBillStatus() {
+    const projects = await financialRepository.findAllEligibleProjectsWithFinancial();
+
+    const rows = projects.map((project: {
+      id: string;
+      name: string;
+      projectNumber: string;
+      requisitionForm: {
+        nameOfWork?: string | null;
+        amountOfWorkOrder?: string | null;
+        workOrderValue?: string | null;
+      } | null;
+      financialPlan?: {
+        items?: Array<{ amount: number; planningType?: "NORMAL" | "EXCESS" }>;
+        raBills?: Array<{
+          status: FinancialBillStatus;
+          planningType?: "NORMAL" | "EXCESS";
+          totalBillAmount: number;
+          chequeRtgsAmount: number;
+          remark?: string | null;
+          createdAt?: Date;
+        }>;
+      } | null;
+    }) => {
+      const requisition = project.requisitionForm;
+      const plan = project.financialPlan;
+      const allBills = plan?.raBills ?? [];
+      const normalBills = allBills.filter((bill) => (bill.planningType ?? "NORMAL") === "NORMAL");
+      const excessBills = allBills.filter((bill) => (bill.planningType ?? "NORMAL") === "EXCESS");
+
+      const workOrderAmountExclGst = round2(parseMoney(requisition?.amountOfWorkOrder || requisition?.workOrderValue));
+      const receivedAmountExclGst = round2(
+        normalBills
+          .filter((bill) => bill.status === "RECEIVED")
+          .reduce((sum, bill) => sum + Number(bill.chequeRtgsAmount || 0), 0)
+      );
+      const financialProgressPct = workOrderAmountExclGst > 0 ? round2((receivedAmountExclGst / workOrderAmountExclGst) * 100) : 0;
+      const raBillRaisedClaim = round2(normalBills.reduce((sum, bill) => sum + Number(bill.totalBillAmount || 0), 0));
+      const planningAmount = round2(Math.max(workOrderAmountExclGst - raBillRaisedClaim, 0));
+
+      const excessItems = (plan?.items ?? []).filter((item) => (item.planningType ?? "NORMAL") === "EXCESS");
+      const totalExcessExclGst = round2(excessItems.reduce((sum, item) => sum + Number(item.amount || 0), 0));
+      const excessReceived = round2(
+        excessBills
+          .filter((bill) => bill.status === "RECEIVED")
+          .reduce((sum, bill) => sum + Number(bill.chequeRtgsAmount || 0), 0)
+      );
+      const excessBillRaisedClaim = round2(excessBills.reduce((sum, bill) => sum + Number(bill.totalBillAmount || 0), 0));
+
+      const latestRemark = [...allBills]
+        .reverse()
+        .find((bill) => (bill.remark ?? "").trim().length > 0)?.remark ?? "";
+
+      return {
+        projectId: project.id,
+        folderNo: "",
+        dprProject: (requisition?.nameOfWork ?? project.name ?? "").trim(),
+        projectNo: project.projectNumber,
+        workOrderAmountExclGst,
+        receivedAmountExclGst,
+        financialProgressPct,
+        raBillRaisedClaim,
+        planningAmount,
+        totalExcessExclGst,
+        excessReceived,
+        excessBillRaisedClaim,
+        remark: latestRemark
+      };
+    });
+
+    return {
+      generatedAt: new Date().toISOString(),
+      rows,
+      missingColumns: [
+        "folderNo"
+      ]
+    };
+  },
+
   async listEligibleProjects() {
     const projects = await financialRepository.findEligibleProjects();
     return projects.map((project: { id: string; name: string; projectNumber: string; requisitionForm: { id: string; amountOfWorkOrder: string; workOrderValue: string; gstAmount: string } }) => ({

@@ -9,6 +9,7 @@ import { createRaBillSchema, updateRaBillSchema, upsertFinancialPlanSchema } fro
 export const financialRouter = Router();
 
 financialRouter.use(requireAuth, requireRole("ADMIN"));
+financialRouter.get("/bill-status/projects", asyncHandler(financialController.getAllProjectsBillStatus));
 financialRouter.get("/projects", asyncHandler(financialController.listEligibleProjects));
 financialRouter.get("/:projectId", asyncHandler(financialController.getProjectFinancial));
 financialRouter.post("/:projectId/plan", validate(upsertFinancialPlanSchema), asyncHandler(financialController.upsertPlan));

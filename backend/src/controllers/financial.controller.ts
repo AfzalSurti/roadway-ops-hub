@@ -3,6 +3,11 @@ import { financialService } from "../services/financial.service.js";
 import { sendSuccess } from "../utils/response.js";
 
 export const financialController = {
+  async getAllProjectsBillStatus(_req: Request, res: Response) {
+    const summary = await financialService.getAllProjectsBillStatus();
+    return sendSuccess(res, summary);
+  },
+
   async listEligibleProjects(_req: Request, res: Response) {
     const projects = await financialService.listEligibleProjects();
     return sendSuccess(res, projects);
