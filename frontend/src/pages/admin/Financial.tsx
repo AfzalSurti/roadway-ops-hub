@@ -522,7 +522,7 @@ export default function AdminFinancial() {
           {showCreateBill && detail.plan && (
             <FinancialModal title={billPlanningType === "EXCESS" ? "Create New Excess Bill" : "Create New RA Bill"} onClose={() => setShowCreateBill(false)}>
               <p className="text-sm text-muted-foreground mb-4">
-                For each item, enter the bill percentage â€” this is the percentage <em>of that item&apos;s allocated percentage</em>.
+                For each item, enter the bill percentage - this is the percentage <em>of that item&apos;s allocated percentage</em>.
                 E.g., if Item 1 has 10% and you enter 4%, the bill takes 4% out of its 10% (i.e., 40% of the item&apos;s amount).
               </p>
               <p className="text-xs text-muted-foreground mb-3">
@@ -563,7 +563,7 @@ export default function AdminFinancial() {
                             </select>
                           </td>
                           <td className="p-3 text-xs text-muted-foreground max-w-[200px] leading-5">
-                            {planItem?.particulars.slice(0, 80)}{planItem && planItem.particulars.length > 80 ? "â€¦" : ""}
+                            {planItem?.particulars.slice(0, 80)}{planItem && planItem.particulars.length > 80 ? "..." : ""}
                           </td>
                           <td className="p-3 text-sm font-medium">
                             {planItem ? `${planItem.percentage.toFixed(2)}%` : "-"}
@@ -629,7 +629,7 @@ export default function AdminFinancial() {
 
           {/* Deduction Popup */}
           {deductionPopup && deductionAmounts && (
-            <FinancialModal title="Mark as Received â€” Enter Deductions" onClose={() => setDeductionPopup(null)}>
+            <FinancialModal title="Mark as Received - Enter Deductions" onClose={() => setDeductionPopup(null)}>
               <div className="mb-4 p-3 rounded-xl bg-primary/5 border border-primary/20">
                 <p className="text-sm font-medium">Total Bill Amount: <span className="text-primary">{money(deductionPopup.totalAmount)}</span></p>
                 <p className="text-xs text-muted-foreground mt-1">Deduction amounts are calculated as a percentage of the total bill amount.</p>
@@ -710,7 +710,7 @@ export default function AdminFinancial() {
                   <span className="text-muted-foreground">Cheque / RTGS Amount</span>
                   <span className="font-medium text-right">{money(Number(deductionState.chequeRtgsAmount || 0))}</span>
                   <span className="text-muted-foreground">Total Deductions</span>
-                  <span className="font-medium text-destructive text-right">âˆ’ {money(deductionAmounts.totalDeductions)}</span>
+                  <span className="font-medium text-destructive text-right">- {money(deductionAmounts.totalDeductions)}</span>
                   <span className="font-semibold">Total Received Amount</span>
                   <span className={`font-bold text-right ${deductionAmounts.totalReceived >= 0 ? "text-accent" : "text-destructive"}`}>
                     {money(deductionAmounts.totalReceived)}
@@ -796,7 +796,7 @@ function RaBillCard({ raBill, onStatusChange, onReceivedClick, isPending }: {
               <tr key={billItem.id} className="border-b border-border/20">
                 <td className="px-4 py-2 font-medium text-xs">Item {billItem.item?.itemNumber}</td>
                 <td className="px-4 py-2 text-xs text-muted-foreground max-w-[300px] leading-5">
-                  {billItem.item?.particulars.slice(0, 100)}{(billItem.item?.particulars.length ?? 0) > 100 ? "â€¦" : ""}
+                  {billItem.item?.particulars.slice(0, 100)}{(billItem.item?.particulars.length ?? 0) > 100 ? "..." : ""}
                 </td>
                 <td className="px-4 py-2 text-right text-xs">
                   {billItem.billPercentage.toFixed(2)}% of {billItem.item?.percentage.toFixed(2)}%
@@ -823,12 +823,12 @@ function RaBillCard({ raBill, onStatusChange, onReceivedClick, isPending }: {
         <div className="px-4 py-3 bg-accent/5 border-t border-accent/20 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
           <ReceiptTile label="Received Date" value={shortDate(raBill.receivedDate)} />
           <ReceiptTile label="Cheque/RTGS" value={new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(raBill.chequeRtgsAmount)} />
-          <ReceiptTile label="10% IT" value={`${raBill.itDeductionPct.toFixed(2)}% â†’ ${new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(raBill.itDeductionAmount)}`} />
-          <ReceiptTile label="1% L.Cess" value={`${raBill.lCessDeductionPct.toFixed(2)}% â†’ ${new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(raBill.lCessDeductionAmount)}`} />
-          <ReceiptTile label="Security Deposit" value={`${raBill.securityDepositPct.toFixed(2)}% â†’ ${new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(raBill.securityDepositAmount)}`} />
-          <ReceiptTile label="Recover From RA Bill" value={`${raBill.recoverFromRaBillPct.toFixed(2)}% â†’ ${new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(raBill.recoverFromRaBillAmount)}`} />
-          <ReceiptTile label="2% GST Withheld" value={`${raBill.gstWithheldPct.toFixed(2)}% â†’ ${new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(raBill.gstWithheldAmount)}`} />
-          <ReceiptTile label="Withheld" value={`${raBill.withheldPct.toFixed(2)}% â†’ ${new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(raBill.withheldAmount)}`} />
+          <ReceiptTile label="10% IT" value={`${raBill.itDeductionPct.toFixed(2)}% -> ${new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(raBill.itDeductionAmount)}`} />
+          <ReceiptTile label="1% L.Cess" value={`${raBill.lCessDeductionPct.toFixed(2)}% -> ${new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(raBill.lCessDeductionAmount)}`} />
+          <ReceiptTile label="Security Deposit" value={`${raBill.securityDepositPct.toFixed(2)}% -> ${new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(raBill.securityDepositAmount)}`} />
+          <ReceiptTile label="Recover From RA Bill" value={`${raBill.recoverFromRaBillPct.toFixed(2)}% -> ${new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(raBill.recoverFromRaBillAmount)}`} />
+          <ReceiptTile label="2% GST Withheld" value={`${raBill.gstWithheldPct.toFixed(2)}% -> ${new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(raBill.gstWithheldAmount)}`} />
+          <ReceiptTile label="Withheld" value={`${raBill.withheldPct.toFixed(2)}% -> ${new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(raBill.withheldAmount)}`} />
           <ReceiptTile label="Total Received" value={new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(raBill.totalReceivedAmount)} accent />
           {raBill.remark ? <ReceiptTile label="Remark" value={raBill.remark} /> : null}
         </div>

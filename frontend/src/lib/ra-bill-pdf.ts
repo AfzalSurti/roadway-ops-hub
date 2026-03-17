@@ -1,8 +1,12 @@
 import jsPDF from "jspdf";
 import type { FinancialPlan, FinancialRaBill } from "./domain";
 
+function formatAmount(value: number) {
+  return new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value || 0);
+}
+
 function money(value: number) {
-  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(value || 0);
+  return `Rs. ${formatAmount(value)}`;
 }
 
 function shortDate(value?: string | Date | null) {
@@ -27,7 +31,7 @@ function drawCell(doc: jsPDF, x: number, y: number, w: number, h: number, text: 
   padding?: number;
 }) {
   const align = opts?.align ?? "left";
-  const fs = opts?.fontSize ?? 9;
+  let fs = opts?.fontSize ?? 9;
   const pad = opts?.padding ?? 2;
 
   if (opts?.fill) {
@@ -42,16 +46,31 @@ function drawCell(doc: jsPDF, x: number, y: number, w: number, h: number, text: 
   doc.setFontSize(fs);
   doc.setTextColor(25, 25, 25);
 
-  const lines = doc.splitTextToSize(text || "-", Math.max(10, w - pad * 2)) as string[];
-  const lineH = fs * 0.45;
-  const textY = y + h / 2 + lineH * 0.35;
+  const content = (text || "-").replace(/[₹]/g, "Rs. ").replace(/[–—−]/g, "-");
+  const usableW = Math.max(10, w - pad * 2);
+
+  while (fs > 6.4 && doc.getTextWidth(content) > usableW && !content.includes(" ")) {
+    fs -= 0.2;
+    doc.setFontSize(fs);
+  }
+
+  let lines = doc.splitTextToSize(content, usableW) as string[];
+  const lineH = fs * 0.42;
+  const maxLines = Math.max(1, Math.floor((h - 2) / lineH));
+  if (lines.length > maxLines) {
+    lines = lines.slice(0, maxLines);
+    const last = lines.length - 1;
+    lines[last] = `${lines[last].slice(0, Math.max(0, lines[last].length - 3))}...`;
+  }
+  const textBlockH = lines.length * lineH;
+  const textY = y + (h - textBlockH) / 2 + lineH * 0.82;
 
   if (align === "right") {
-    doc.text(lines[0], x + w - pad, textY, { align: "right" });
+    doc.text(lines, x + w - pad, textY, { align: "right" });
   } else if (align === "center") {
-    doc.text(lines[0], x + w / 2, textY, { align: "center" });
+    doc.text(lines, x + w / 2, textY, { align: "center" });
   } else {
-    doc.text(lines[0], x + pad, textY);
+    doc.text(lines, x + pad, textY);
   }
 }
 
@@ -136,7 +155,7 @@ export function downloadRaBillPdf(params: {
     y += leftRows.length * rowH + 5;
 
     // Item table
-    const widths = [8, 14, 56, 18, 18, 22, 22, 24];
+    const widths = [8, 12, 40, 16, 16, 28, 28, 34];
     const headers = ["S.No", "Item", "Particulars", "Item %", "Bill %", "Amount", "Tax", "Total"];
     let x = MARGIN_X;
     for (let i = 0; i < headers.length; i++) {
@@ -154,7 +173,7 @@ export function downloadRaBillPdf(params: {
       y = ensureSpace(doc, y, 14);
       const particulars = item.item?.particulars ?? "-";
       const lines = doc.splitTextToSize(particulars, widths[2] - 3.5) as string[];
-      const capped = lines.slice(0, 3).join(" ");
+      const capped = lines.slice(0, 2).join(" ");
 
       const row = [
         String(i + 1),
@@ -170,7 +189,7 @@ export function downloadRaBillPdf(params: {
       let cx = MARGIN_X;
       for (let c = 0; c < widths.length; c++) {
         drawCell(doc, cx, y, widths[c], 10, row[c], {
-          fontSize: 8.2,
+          fontSize: c >= 5 ? 7.3 : 8.1,
           align: c >= 5 ? "right" : c === 0 ? "center" : "left"
         });
         cx += widths[c];
@@ -214,7 +233,7 @@ export function downloadRaBillPdf(params: {
       ["Withheld", `${raBill.withheldPct.toFixed(2)}%`, money(raBill.withheldAmount)]
     ];
     const dx = MARGIN_X;
-    const dw = [88, 26, 40];
+    const dw = [82, 22, 46];
     for (let i = 0; i < 3; i++) {
       drawCell(doc, dx + dw.slice(0, i).reduce((a, b) => a + b, 0), y, dw[i], 7, dHeaders[i], {
         fill: HEADER_BG,
@@ -226,9 +245,9 @@ export function downloadRaBillPdf(params: {
     y += 7;
 
     dRows.forEach((row) => {
-      drawCell(doc, dx, y, dw[0], 7, row[0], { fontSize: 8.5 });
-      drawCell(doc, dx + dw[0], y, dw[1], 7, row[1], { fontSize: 8.5, align: "center" });
-      drawCell(doc, dx + dw[0] + dw[1], y, dw[2], 7, row[2], { fontSize: 8.5, align: "right" });
+      drawCell(doc, dx, y, dw[0], 7, row[0], { fontSize: 8.3 });
+      drawCell(doc, dx + dw[0], y, dw[1], 7, row[1], { fontSize: 8.3, align: "center" });
+      drawCell(doc, dx + dw[0] + dw[1], y, dw[2], 7, row[2], { fontSize: 7.4, align: "right" });
       y += 7;
     });
 
@@ -236,8 +255,8 @@ export function downloadRaBillPdf(params: {
     drawCell(doc, dx + dw[0] + dw[1] + dw[2] + 28, y - 49, 24, 7, "Received", { fill: HEADER_BG, bold: true, fontSize: 8.4, align: "center" });
     drawCell(doc, dx + dw[0] + dw[1] + dw[2] + 52, y - 49, 24, 7, "Remark", { fill: HEADER_BG, bold: true, fontSize: 8.4, align: "center" });
 
-    drawCell(doc, dx + dw[0] + dw[1] + dw[2] + 4, y - 42, 24, 42, money(raBill.chequeRtgsAmount), { fontSize: 8.2, align: "right" });
-    drawCell(doc, dx + dw[0] + dw[1] + dw[2] + 28, y - 42, 24, 42, money(raBill.totalReceivedAmount), { fontSize: 8.2, align: "right" });
+    drawCell(doc, dx + dw[0] + dw[1] + dw[2] + 4, y - 42, 24, 42, money(raBill.chequeRtgsAmount), { fontSize: 7.1, align: "right" });
+    drawCell(doc, dx + dw[0] + dw[1] + dw[2] + 28, y - 42, 24, 42, money(raBill.totalReceivedAmount), { fontSize: 7.1, align: "right" });
     drawCell(doc, dx + dw[0] + dw[1] + dw[2] + 52, y - 42, 24, 42, raBill.remark ?? "-", { fontSize: 8.2 });
 
     y += 6;
