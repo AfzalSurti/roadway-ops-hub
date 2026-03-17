@@ -442,12 +442,12 @@ export default function AdminFinancial() {
   function openDeductionPopup(raBill: FinancialRaBill) {
     setDeductionState({
       chequeRtgsAmount: raBill.chequeRtgsAmount > 0 ? String(raBill.chequeRtgsAmount) : "",
-      itDeductionPct: raBill.itDeductionPct > 0 ? String(raBill.itDeductionPct) : "",
-      lCessDeductionPct: raBill.lCessDeductionPct > 0 ? String(raBill.lCessDeductionPct) : "",
-      securityDepositPct: raBill.securityDepositPct > 0 ? String(raBill.securityDepositPct) : "",
-      recoverFromRaBillPct: raBill.recoverFromRaBillPct > 0 ? String(raBill.recoverFromRaBillPct) : "",
-      gstWithheldPct: raBill.gstWithheldPct > 0 ? String(raBill.gstWithheldPct) : "",
-      withheldPct: raBill.withheldPct > 0 ? String(raBill.withheldPct) : "",
+      itDeductionPct: raBill.itDeductionAmount > 0 ? String(raBill.itDeductionAmount) : "",
+      lCessDeductionPct: raBill.lCessDeductionAmount > 0 ? String(raBill.lCessDeductionAmount) : "",
+      securityDepositPct: raBill.securityDepositAmount > 0 ? String(raBill.securityDepositAmount) : "",
+      recoverFromRaBillPct: raBill.recoverFromRaBillAmount > 0 ? String(raBill.recoverFromRaBillAmount) : "",
+      gstWithheldPct: raBill.gstWithheldAmount > 0 ? String(raBill.gstWithheldAmount) : "",
+      withheldPct: raBill.withheldAmount > 0 ? String(raBill.withheldAmount) : "",
       receivedDate: raBill.receivedDate ? raBill.receivedDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
       remark: raBill.remark ?? ""
     });
@@ -459,19 +459,12 @@ export default function AdminFinancial() {
     if (!deductionPopup) return null;
     const total = deductionPopup.totalAmount;
     const receivedAmount = Number(deductionState.chequeRtgsAmount || 0);
-    const it = Number(deductionState.itDeductionPct || 0);
-    const lcess = Number(deductionState.lCessDeductionPct || 0);
-    const sd = Number(deductionState.securityDepositPct || 0);
-    const recover = Number(deductionState.recoverFromRaBillPct || 0);
-    const gstw = Number(deductionState.gstWithheldPct || 0);
-    const wh = Number(deductionState.withheldPct || 0);
-
-    const itAmt = (total * it) / 100;
-    const lcessAmt = (total * lcess) / 100;
-    const sdAmt = (total * sd) / 100;
-    const recoverAmt = (total * recover) / 100;
-    const gstwAmt = (total * gstw) / 100;
-    const whAmt = (total * wh) / 100;
+    const itAmt = Number(deductionState.itDeductionPct || 0);
+    const lcessAmt = Number(deductionState.lCessDeductionPct || 0);
+    const sdAmt = Number(deductionState.securityDepositPct || 0);
+    const recoverAmt = Number(deductionState.recoverFromRaBillPct || 0);
+    const gstwAmt = Number(deductionState.gstWithheldPct || 0);
+    const whAmt = Number(deductionState.withheldPct || 0);
     const totalDeductions = itAmt + lcessAmt + sdAmt + recoverAmt + gstwAmt + whAmt;
     const totalReceived = receivedAmount + totalDeductions;
     const receivedPercentage = total > 0 ? round2((totalReceived / total) * 100) : 0;
@@ -495,18 +488,26 @@ export default function AdminFinancial() {
 
   function submitDeductions() {
     if (!deductionPopup) return;
+    const total = Number(deductionPopup.totalAmount || 0);
+    const itAmt = Number(deductionState.itDeductionPct || 0);
+    const lcessAmt = Number(deductionState.lCessDeductionPct || 0);
+    const sdAmt = Number(deductionState.securityDepositPct || 0);
+    const recoverAmt = Number(deductionState.recoverFromRaBillPct || 0);
+    const gstwAmt = Number(deductionState.gstWithheldPct || 0);
+    const whAmt = Number(deductionState.withheldPct || 0);
+
     updateRaBillMutation.mutate({
       raBillId: deductionPopup.raBillId,
       payload: {
         status: "RECEIVED",
         receivedDate: deductionState.receivedDate || null,
         chequeRtgsAmount: Number(deductionState.chequeRtgsAmount || 0),
-        itDeductionPct: Number(deductionState.itDeductionPct || 0),
-        lCessDeductionPct: Number(deductionState.lCessDeductionPct || 0),
-        securityDepositPct: Number(deductionState.securityDepositPct || 0),
-        recoverFromRaBillPct: Number(deductionState.recoverFromRaBillPct || 0),
-        gstWithheldPct: Number(deductionState.gstWithheldPct || 0),
-        withheldPct: Number(deductionState.withheldPct || 0),
+        itDeductionPct: total > 0 ? round2((itAmt / total) * 100) : 0,
+        lCessDeductionPct: total > 0 ? round2((lcessAmt / total) * 100) : 0,
+        securityDepositPct: total > 0 ? round2((sdAmt / total) * 100) : 0,
+        recoverFromRaBillPct: total > 0 ? round2((recoverAmt / total) * 100) : 0,
+        gstWithheldPct: total > 0 ? round2((gstwAmt / total) * 100) : 0,
+        withheldPct: total > 0 ? round2((whAmt / total) * 100) : 0,
         remark: deductionState.remark || null
       }
     });
@@ -1203,7 +1204,7 @@ export default function AdminFinancial() {
             <FinancialModal title="Mark as Received - Enter Deductions" onClose={() => setDeductionPopup(null)}>
               <div className="mb-4 p-3 rounded-xl bg-primary/5 border border-primary/20">
                 <p className="text-sm font-medium">Total Bill Amount: <span className="text-primary">{money(deductionPopup.totalAmount)}</span></p>
-                <p className="text-xs text-muted-foreground mt-1">All 6 deductions below are calculated as a percentage of the total bill amount shown above, not from the received amount.</p>
+                <p className="text-xs text-muted-foreground mt-1">Enter all deduction values as manual amounts.</p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
@@ -1215,40 +1216,40 @@ export default function AdminFinancial() {
                   isAmount
                 />
                 <DeductionField
-                  label="10% IT"
+                  label="IT Deduction"
                   value={deductionState.itDeductionPct}
                   onChange={(v) => setDeductionState((prev) => ({ ...prev, itDeductionPct: v }))}
-                  computedAmount={deductionAmounts.itAmt}
+                  isAmount
                 />
                 <DeductionField
-                  label="1% L.Cess"
+                  label="L.Cess Deduction"
                   value={deductionState.lCessDeductionPct}
                   onChange={(v) => setDeductionState((prev) => ({ ...prev, lCessDeductionPct: v }))}
-                  computedAmount={deductionAmounts.lcessAmt}
+                  isAmount
                 />
                 <DeductionField
                   label="Security Deposit"
                   value={deductionState.securityDepositPct}
                   onChange={(v) => setDeductionState((prev) => ({ ...prev, securityDepositPct: v }))}
-                  computedAmount={deductionAmounts.sdAmt}
+                  isAmount
                 />
                 <DeductionField
                   label="Recover From RA Bill"
                   value={deductionState.recoverFromRaBillPct}
                   onChange={(v) => setDeductionState((prev) => ({ ...prev, recoverFromRaBillPct: v }))}
-                  computedAmount={deductionAmounts.recoverAmt}
+                  isAmount
                 />
                 <DeductionField
-                  label="2% GST Withheld"
+                  label="GST Withheld"
                   value={deductionState.gstWithheldPct}
                   onChange={(v) => setDeductionState((prev) => ({ ...prev, gstWithheldPct: v }))}
-                  computedAmount={deductionAmounts.gstwAmt}
+                  isAmount
                 />
                 <DeductionField
                   label="Withheld Amount"
                   value={deductionState.withheldPct}
                   onChange={(v) => setDeductionState((prev) => ({ ...prev, withheldPct: v }))}
-                  computedAmount={deductionAmounts.whAmt}
+                  isAmount
                 />
                 <div>
                   <label className="text-xs text-muted-foreground mb-1 block">Received Date</label>
