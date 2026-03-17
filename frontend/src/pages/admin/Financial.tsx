@@ -681,14 +681,14 @@ export default function AdminFinancial() {
         <>
           {/* Project summary */}
           <div className="glass-panel p-5 mb-6">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 flex-1">
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
                 <DetailTile label="Project" value={`${detail.project.projectNumber} - ${detail.project.name}`} />
                 <DetailTile label="Contract Value" value={money(detail.project.contractValue)} />
                 <DetailTile label="Tax (18%)" value={money(detail.project.taxAmount)} />
                 <DetailTile label="Total Amount" value={money(detail.project.totalAmount)} />
               </div>
-              <div className="flex flex-col gap-2 lg:items-end">
+              <div className="flex flex-col gap-2">
                 <div className="flex flex-wrap gap-2">
                   <button
                     onClick={handleDownloadAllProjectsBillStatus}
