@@ -315,7 +315,7 @@ export default function AdminFinancial() {
           {loadingProjects ? <option>Loading projects...</option> : null}
           {!loadingProjects && eligibleProjects.length === 0 ? <option value="">No eligible projects</option> : null}
           {!loadingProjects && eligibleProjects.map((project) => (
-            <option key={project.id} value={project.id}>{project.projectNumber} Â· {project.name}</option>
+            <option key={project.id} value={project.id}>{project.projectNumber} - {project.name}</option>
           ))}
         </select>
         <p className="text-xs text-muted-foreground mt-2">
@@ -333,51 +333,55 @@ export default function AdminFinancial() {
           <div className="glass-panel p-5 mb-6">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 flex-1">
-                <DetailTile label="Project" value={`${detail.project.projectNumber} Â· ${detail.project.name}`} />
+                <DetailTile label="Project" value={`${detail.project.projectNumber} - ${detail.project.name}`} />
                 <DetailTile label="Contract Value" value={money(detail.project.contractValue)} />
                 <DetailTile label="Tax (18%)" value={money(detail.project.taxAmount)} />
                 <DetailTile label="Total Amount" value={money(detail.project.totalAmount)} />
               </div>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => openPlanning("NORMAL")}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary/10 text-primary border border-primary/20 text-sm font-medium hover:bg-primary/20"
-                >
-                  <Save className="h-4 w-4" />
-                  Item Planning
-                </button>
-                <button
-                  onClick={() => openCreateBill("NORMAL")}
-                  disabled={!detail.plan || itemsByType.NORMAL.length === 0}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary/10 text-primary border border-primary/20 text-sm font-medium hover:bg-primary/20 disabled:opacity-50"
-                >
-                  <Plus className="h-4 w-4" />
-                  Create RA Bill
-                </button>
-                <button
-                  onClick={() => openPlanning("EXCESS")}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-warning/10 text-warning border border-warning/20 text-sm font-medium hover:bg-warning/20"
-                >
-                  <Save className="h-4 w-4" />
-                  Excess Planning
-                </button>
-                <button
-                  onClick={() => openCreateBill("EXCESS")}
-                  disabled={!detail.plan || itemsByType.EXCESS.length === 0}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-warning/10 text-warning border border-warning/20 text-sm font-medium hover:bg-warning/20 disabled:opacity-50"
-                >
-                  <Plus className="h-4 w-4" />
-                  Create Excess Bill
-                </button>
-                {raBills.length > 0 && (
+              <div className="flex flex-col gap-2 lg:items-end">
+                <div className="flex flex-wrap gap-2">
                   <button
-                    onClick={handleDownloadPdf}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-accent/10 text-accent border border-accent/20 text-sm font-medium hover:bg-accent/20"
+                    onClick={() => openPlanning("NORMAL")}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary/10 text-primary border border-primary/20 text-sm font-medium hover:bg-primary/20"
                   >
-                    <Download className="h-4 w-4" />
-                    Download PDF
+                    <Save className="h-4 w-4" />
+                    Item Planning
                   </button>
-                )}
+                  <button
+                    onClick={() => openCreateBill("NORMAL")}
+                    disabled={!detail.plan || itemsByType.NORMAL.length === 0}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary/10 text-primary border border-primary/20 text-sm font-medium hover:bg-primary/20 disabled:opacity-50"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Create RA Bill
+                  </button>
+                  {raBills.length > 0 && (
+                    <button
+                      onClick={handleDownloadPdf}
+                      className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-accent/10 text-accent border border-accent/20 text-sm font-medium hover:bg-accent/20"
+                    >
+                      <Download className="h-4 w-4" />
+                      Download PDF
+                    </button>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => openPlanning("EXCESS")}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-warning/10 text-warning border border-warning/20 text-sm font-medium hover:bg-warning/20"
+                  >
+                    <Save className="h-4 w-4" />
+                    Excess Planning
+                  </button>
+                  <button
+                    onClick={() => openCreateBill("EXCESS")}
+                    disabled={!detail.plan || itemsByType.EXCESS.length === 0}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-warning/10 text-warning border border-warning/20 text-sm font-medium hover:bg-warning/20 disabled:opacity-50"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Create Excess Bill
+                  </button>
+                </div>
               </div>
             </div>
           </div>
