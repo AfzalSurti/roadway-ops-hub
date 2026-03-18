@@ -287,6 +287,20 @@ export const financialService = {
       }
       const previouslyUsed = previouslyUsedByItemId.get(itemId) ?? 0;
       const remainingPercentage = round2(Math.max(planItem.percentage - previouslyUsed, 0));
+      if (planningType === "EXCESS") {
+        const requestedAmount = planItem.percentage > 0
+          ? round2((planItem.amount * requestedPercentage) / planItem.percentage)
+          : 0;
+        const previouslyUsedAmount = planItem.percentage > 0
+          ? round2((planItem.amount * previouslyUsed) / planItem.percentage)
+          : 0;
+        const remainingAmount = round2(Math.max(planItem.amount - previouslyUsedAmount, 0));
+        if (requestedAmount > remainingAmount + 0.0001) {
+          throw badRequest(
+            `Item ${planItem.itemNumber} has only ${remainingAmount.toFixed(2)} amount remaining. Previously billed ${previouslyUsedAmount.toFixed(2)} out of ${planItem.amount.toFixed(2)}.`
+          );
+        }
+      }
       if (requestedPercentage > remainingPercentage + 0.0001) {
         throw badRequest(
           `Item ${planItem.itemNumber} has only ${remainingPercentage.toFixed(2)}% remaining. Previously billed ${previouslyUsed.toFixed(2)}% out of ${planItem.percentage.toFixed(2)}%.`

@@ -58,6 +58,7 @@ function shortDate(value?: string | null) {
 type BillItemRow = {
   itemId: string;
   billPercentage: string;
+  billAmount: string;
 };
 
 type CarryForwardRow = {
@@ -100,7 +101,7 @@ export default function AdminFinancial() {
   const [billItemRows, setBillItemRows] = useState<BillItemRow[]>([]);
   const [carryForwardRows, setCarryForwardRows] = useState<CarryForwardRow[]>([]);
   // Deduction popup state: raBillId | null
-  const [deductionPopup, setDeductionPopup] = useState<{ raBillId: string; totalAmount: number } | null>(null);
+  const [deductionPopup, setDeductionPopup] = useState<{ raBillId: string; totalAmount: number; planningType: PlanningType } | null>(null);
   const [deductionState, setDeductionState] = useState<DeductionState>({
     chequeRtgsAmount: "",
     itDeductionPct: "",
@@ -226,33 +227,53 @@ export default function AdminFinancial() {
   // Compute bill amounts for create-bill modal preview
   const billItemPreviews = useMemo(() => {
     if (!detail?.plan) return [];
-    const previousUsageByItemId = new Map<string, { usedPercentage: number; bills: Array<{ billName: string; billPercentage: number }> }>();
+    const previousUsageByItemId = new Map<string, { usedPercentage: number; usedAmount: number; bills: Array<{ billName: string; billPercentage: number; billAmount: number }> }>();
 
     for (const raBill of raBills) {
       if ((raBill.planningType ?? "NORMAL") !== billPlanningType) continue;
       for (const billItem of raBill.items) {
-        const current = previousUsageByItemId.get(billItem.itemId) ?? { usedPercentage: 0, bills: [] };
+        const current = previousUsageByItemId.get(billItem.itemId) ?? { usedPercentage: 0, usedAmount: 0, bills: [] };
         current.usedPercentage = round2(current.usedPercentage + billItem.billPercentage);
-        current.bills.push({ billName: raBill.billName, billPercentage: billItem.billPercentage });
+        current.usedAmount = round2(current.usedAmount + Number(billItem.billAmount || 0));
+        current.bills.push({ billName: raBill.billName, billPercentage: billItem.billPercentage, billAmount: Number(billItem.billAmount || 0) });
         previousUsageByItemId.set(billItem.itemId, current);
       }
     }
 
     const draftedUsageByItemId = new Map<string, number>();
 
-    return billItemRows.map((row) => {
+    return billItemRows.map((row, index) => {
       const planItem = detail.plan!.items.find((i) => i.id === row.itemId && (i.planningType ?? "NORMAL") === billPlanningType);
       if (!planItem) return null;
       const previousUsage = previousUsageByItemId.get(row.itemId);
       const previousUsed = previousUsage?.usedPercentage ?? 0;
+      const previousUsedAmount = previousUsage?.usedAmount ?? 0;
       const draftedUsedBeforeRow = draftedUsageByItemId.get(row.itemId) ?? 0;
-      const remainingBeforeRow = round2(Math.max(planItem.percentage - previousUsed - draftedUsedBeforeRow, 0));
-      const billPct = Number(row.billPercentage || 0);
-      const fraction = planItem.percentage > 0 ? billPct / planItem.percentage : 0;
-      const amount = planItem.amount * fraction;
+      const draftedUsedBeforeRowAmount = round2(
+        billPlanningType === "EXCESS"
+          ? billItemRows
+              .slice(0, index)
+              .filter((draftRow) => draftRow.itemId === row.itemId)
+              .reduce((sum, draftRow) => sum + Number(draftRow.billAmount || 0), 0)
+          : 0
+      );
+      const remainingBeforeRow = round2(
+        billPlanningType === "EXCESS"
+          ? Math.max(planItem.amount - previousUsedAmount - draftedUsedBeforeRowAmount, 0)
+          : Math.max(planItem.percentage - previousUsed - draftedUsedBeforeRow, 0)
+      );
+      const billPct = billPlanningType === "EXCESS"
+        ? (planItem.amount > 0 ? round2((Number(row.billAmount || 0) / planItem.amount) * planItem.percentage) : 0)
+        : Number(row.billPercentage || 0);
+      const amount = billPlanningType === "EXCESS"
+        ? Number(row.billAmount || 0)
+        : (planItem.percentage > 0 ? (planItem.amount * billPct) / planItem.percentage : 0);
       const tax = amount * 0.18;
       const total = amount + tax;
       draftedUsageByItemId.set(row.itemId, round2(draftedUsedBeforeRow + billPct));
+      const exceedsRemaining = billPlanningType === "EXCESS"
+        ? amount > remainingBeforeRow + 0.0001
+        : billPct > remainingBeforeRow + 0.0001;
       return {
         planItem,
         billPct,
@@ -260,9 +281,10 @@ export default function AdminFinancial() {
         tax,
         total,
         previousUsed,
+        previousUsedAmount,
         usedInBills: previousUsage?.bills ?? [],
         remainingBeforeRow,
-        exceedsRemaining: billPct > remainingBeforeRow + 0.0001
+        exceedsRemaining
       };
     });
   }, [billItemRows, billPlanningType, detail?.plan, raBills]);
@@ -332,7 +354,9 @@ export default function AdminFinancial() {
       const invalidPreview = billItemPreviews.find((preview) => preview?.exceedsRemaining);
       if (invalidPreview) {
         throw new Error(
-          `Item ${invalidPreview.planItem.itemNumber} has only ${formatPercentage(invalidPreview.remainingBeforeRow)} remaining for this bill.`
+          billPlanningType === "EXCESS"
+            ? `Item ${invalidPreview.planItem.itemNumber} has only ${money(invalidPreview.remainingBeforeRow)} remaining for this bill.`
+            : `Item ${invalidPreview.planItem.itemNumber} has only ${formatPercentage(invalidPreview.remainingBeforeRow)} remaining for this bill.`
         );
       }
       const invalidCarryForwardPreview = carryForwardPreviews.find((preview) => preview.duplicateSelection || preview.exceedsAvailable || !preview.sourceOption);
@@ -345,8 +369,14 @@ export default function AdminFinancial() {
       return api.createRaBill(activeProjectId, {
         planningType: billPlanningType,
         items: billItemRows
-          .filter((row) => row.itemId && Number(row.billPercentage) > 0)
-          .map((row) => ({ itemId: row.itemId, billPercentage: Number(row.billPercentage) })),
+          .filter((row) => row.itemId && Number(billPlanningType === "EXCESS" ? row.billAmount : row.billPercentage) > 0)
+          .map((row) => {
+            const planItem = itemsByType[billPlanningType].find((item) => item.id === row.itemId);
+            const billPercentage = billPlanningType === "EXCESS"
+              ? (planItem && planItem.amount > 0 ? round2((Number(row.billAmount || 0) / planItem.amount) * planItem.percentage) : 0)
+              : Number(row.billPercentage);
+            return { itemId: row.itemId, billPercentage };
+          }),
         carryForwards: carryForwardRows
           .filter((row) => row.sourceRaBillId && Number(row.amount) > 0)
           .map((row) => ({ sourceRaBillId: row.sourceRaBillId, amount: Number(row.amount) }))
@@ -381,7 +411,7 @@ export default function AdminFinancial() {
     const sourceItems = itemsByType[type];
     if (!sourceItems.length) return;
     setBillPlanningType(type);
-    setBillItemRows([{ itemId: sourceItems[0].id, billPercentage: "" }]);
+    setBillItemRows([{ itemId: sourceItems[0].id, billPercentage: "", billAmount: "" }]);
     setCarryForwardRows([]);
     setShowCreateBill(true);
   }
@@ -394,7 +424,7 @@ export default function AdminFinancial() {
   function addBillItemRow() {
     const sourceItems = itemsByType[billPlanningType];
     if (!sourceItems.length) return;
-    setBillItemRows((prev) => [...prev, { itemId: sourceItems[0].id, billPercentage: "" }]);
+    setBillItemRows((prev) => [...prev, { itemId: sourceItems[0].id, billPercentage: "", billAmount: "" }]);
   }
 
   function removeBillItemRow(index: number) {
@@ -451,12 +481,17 @@ export default function AdminFinancial() {
       receivedDate: raBill.receivedDate ? raBill.receivedDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
       remark: raBill.remark ?? ""
     });
-    setDeductionPopup({ raBillId: raBill.id, totalAmount: raBill.totalAmount });
+    setDeductionPopup({
+      raBillId: raBill.id,
+      totalAmount: raBill.totalAmount,
+      planningType: (raBill.planningType ?? "NORMAL") as PlanningType
+    });
   }
 
   // Compute deduction amounts in real time for the popup
   const deductionAmounts = useMemo(() => {
     if (!deductionPopup) return null;
+    const isExcessBill = deductionPopup.planningType === "EXCESS";
     const total = deductionPopup.totalAmount;
     const receivedAmount = Number(deductionState.chequeRtgsAmount || 0);
     const it = Number(deductionState.itDeductionPct || 0);
@@ -466,12 +501,12 @@ export default function AdminFinancial() {
     const gstw = Number(deductionState.gstWithheldPct || 0);
     const wh = Number(deductionState.withheldPct || 0);
 
-    const itAmt = (total * it) / 100;
-    const lcessAmt = (total * lcess) / 100;
-    const sdAmt = (total * sd) / 100;
-    const recoverAmt = (total * recover) / 100;
-    const gstwAmt = (total * gstw) / 100;
-    const whAmt = (total * wh) / 100;
+    const itAmt = isExcessBill ? 0 : (total * it) / 100;
+    const lcessAmt = isExcessBill ? 0 : (total * lcess) / 100;
+    const sdAmt = isExcessBill ? 0 : (total * sd) / 100;
+    const recoverAmt = isExcessBill ? 0 : (total * recover) / 100;
+    const gstwAmt = isExcessBill ? 0 : (total * gstw) / 100;
+    const whAmt = isExcessBill ? 0 : (total * wh) / 100;
     const totalDeductions = itAmt + lcessAmt + sdAmt + recoverAmt + gstwAmt + whAmt;
     const totalReceived = receivedAmount + totalDeductions;
     const receivedPercentage = total > 0 ? round2((totalReceived / total) * 100) : 0;
@@ -495,18 +530,19 @@ export default function AdminFinancial() {
 
   function submitDeductions() {
     if (!deductionPopup) return;
+    const isExcessBill = deductionPopup.planningType === "EXCESS";
     updateRaBillMutation.mutate({
       raBillId: deductionPopup.raBillId,
       payload: {
         status: "RECEIVED",
         receivedDate: deductionState.receivedDate || null,
         chequeRtgsAmount: Number(deductionState.chequeRtgsAmount || 0),
-        itDeductionPct: Number(deductionState.itDeductionPct || 0),
-        lCessDeductionPct: Number(deductionState.lCessDeductionPct || 0),
-        securityDepositPct: Number(deductionState.securityDepositPct || 0),
-        recoverFromRaBillPct: Number(deductionState.recoverFromRaBillPct || 0),
-        gstWithheldPct: Number(deductionState.gstWithheldPct || 0),
-        withheldPct: Number(deductionState.withheldPct || 0),
+        itDeductionPct: isExcessBill ? 0 : Number(deductionState.itDeductionPct || 0),
+        lCessDeductionPct: isExcessBill ? 0 : Number(deductionState.lCessDeductionPct || 0),
+        securityDepositPct: isExcessBill ? 0 : Number(deductionState.securityDepositPct || 0),
+        recoverFromRaBillPct: isExcessBill ? 0 : Number(deductionState.recoverFromRaBillPct || 0),
+        gstWithheldPct: isExcessBill ? 0 : Number(deductionState.gstWithheldPct || 0),
+        withheldPct: isExcessBill ? 0 : Number(deductionState.withheldPct || 0),
         remark: deductionState.remark || null
       }
     });
@@ -954,10 +990,16 @@ export default function AdminFinancial() {
           {/* Create RA Bill Modal */}
           {showCreateBill && detail.plan && (
             <FinancialModal title={billPlanningType === "EXCESS" ? "Create New Excess Bill" : "Create New RA Bill"} onClose={() => setShowCreateBill(false)}>
-              <p className="text-sm text-muted-foreground mb-4">
-                For each item, enter the bill percentage - this is the percentage <em>of that item&apos;s allocated percentage</em>.
-                E.g., if Item 1 has 10% and you enter 4%, the bill takes 4% out of its 10%.
-              </p>
+              {billPlanningType === "EXCESS" ? (
+                <p className="text-sm text-muted-foreground mb-4">
+                  For each excess-planned item, enter the bill amount to take in this bill. Entered amount cannot exceed that item&apos;s remaining planned amount.
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground mb-4">
+                  For each item, enter the bill percentage - this is the percentage <em>of that item&apos;s allocated percentage</em>.
+                  E.g., if Item 1 has 10% and you enter 4%, the bill takes 4% out of its 10%.
+                </p>
+              )}
               <p className="text-xs text-muted-foreground mb-3">
                 Below the tender items, you can also include remaining amount from earlier received bills of the same type.
               </p>
@@ -971,10 +1013,10 @@ export default function AdminFinancial() {
                     <tr className="border-b border-border/40 text-muted-foreground">
                       <th className="text-left p-3 font-medium">Item</th>
                       <th className="text-left p-3 font-medium">Particulars</th>
-                      <th className="text-left p-3 font-medium">Item %</th>
+                      <th className="text-left p-3 font-medium">{billPlanningType === "EXCESS" ? "Planned Amount" : "Item %"}</th>
                       <th className="text-left p-3 font-medium">Used in Bills</th>
-                      <th className="text-left p-3 font-medium">Remaining %</th>
-                      <th className="text-left p-3 font-medium">Bill % (of item %)</th>
+                      <th className="text-left p-3 font-medium">{billPlanningType === "EXCESS" ? "Remaining Amount" : "Remaining %"}</th>
+                      <th className="text-left p-3 font-medium">{billPlanningType === "EXCESS" ? "Bill Amount" : "Bill % (of item %)"}</th>
                       <th className="text-left p-3 font-medium">Amount</th>
                       <th className="text-left p-3 font-medium">Tax (18%)</th>
                       <th className="text-left p-3 font-medium">Total</th>
@@ -990,7 +1032,7 @@ export default function AdminFinancial() {
                           <td className="p-3 w-32">
                             <select
                               value={row.itemId}
-                              onChange={(e) => setBillItemRows((prev) => prev.map((r, i) => i === index ? { ...r, itemId: e.target.value } : r))}
+                              onChange={(e) => setBillItemRows((prev) => prev.map((r, i) => i === index ? { ...r, itemId: e.target.value, billPercentage: "", billAmount: "" } : r))}
                               className="w-full px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 text-xs"
                               title={`Item selector for row ${index + 1}`}
                               aria-label={`Item selector for row ${index + 1}`}
@@ -1003,36 +1045,36 @@ export default function AdminFinancial() {
                           <td className="p-3 text-xs text-muted-foreground max-w-[200px] leading-5">
                             {planItem?.particulars.slice(0, 80)}{planItem && planItem.particulars.length > 80 ? "..." : ""}
                           </td>
-                          <td className="p-3 text-sm font-medium">{planItem ? formatPercentage(planItem.percentage) : "-"}</td>
+                          <td className="p-3 text-sm font-medium">{planItem ? (billPlanningType === "EXCESS" ? money(planItem.amount) : formatPercentage(planItem.percentage)) : "-"}</td>
                           <td className="p-3 text-xs text-muted-foreground min-w-[180px] leading-5">
                             {preview?.usedInBills.length ? (
                               <div className="space-y-1">
                                 {preview.usedInBills.map((usage) => (
-                                  <div key={`${usage.billName}-${usage.billPercentage}`}>
-                                    <span className="font-medium text-foreground">{usage.billName}</span>: {formatPercentage(usage.billPercentage)}
+                                  <div key={`${usage.billName}-${usage.billPercentage}-${usage.billAmount}`}>
+                                    <span className="font-medium text-foreground">{usage.billName}</span>: {billPlanningType === "EXCESS" ? money(usage.billAmount) : formatPercentage(usage.billPercentage)}
                                   </div>
                                 ))}
                               </div>
                             ) : "-"}
                           </td>
-                          <td className="p-3 text-sm font-medium">{preview ? formatPercentage(preview.remainingBeforeRow) : "-"}</td>
+                          <td className="p-3 text-sm font-medium">{preview ? (billPlanningType === "EXCESS" ? money(preview.remainingBeforeRow) : formatPercentage(preview.remainingBeforeRow)) : "-"}</td>
                           <td className="p-3 w-36">
                             <div className="flex items-center gap-1">
                               <input
                                 type="number"
                                 min="0"
-                                max={preview?.remainingBeforeRow ?? planItem?.percentage ?? 100}
+                                max={preview?.remainingBeforeRow ?? (billPlanningType === "EXCESS" ? planItem?.amount : planItem?.percentage) ?? 100}
                                 step="0.01"
-                                value={row.billPercentage}
-                                onChange={(e) => setBillItemRows((prev) => prev.map((r, i) => i === index ? { ...r, billPercentage: e.target.value } : r))}
+                                value={billPlanningType === "EXCESS" ? row.billAmount : row.billPercentage}
+                                onChange={(e) => setBillItemRows((prev) => prev.map((r, i) => i === index ? (billPlanningType === "EXCESS" ? { ...r, billAmount: e.target.value } : { ...r, billPercentage: e.target.value }) : r))}
                                 className={`w-24 px-3 py-2 rounded-xl bg-secondary/50 border ${preview?.exceedsRemaining ? "border-destructive text-destructive" : "border-border/50"}`}
-                                title={`Bill percentage for row ${index + 1}`}
-                                aria-label={`Bill percentage for row ${index + 1}`}
-                                placeholder="e.g. 4"
+                                title={`Bill value for row ${index + 1}`}
+                                aria-label={`Bill value for row ${index + 1}`}
+                                placeholder={billPlanningType === "EXCESS" ? "Amount" : "e.g. 4"}
                               />
-                              <span className="text-xs">%</span>
+                              {billPlanningType !== "EXCESS" ? <span className="text-xs">%</span> : null}
                             </div>
-                            {preview?.exceedsRemaining ? <p className="mt-1 text-[11px] text-destructive">Only {formatPercentage(preview.remainingBeforeRow)} is left.</p> : null}
+                            {preview?.exceedsRemaining ? <p className="mt-1 text-[11px] text-destructive">Only {billPlanningType === "EXCESS" ? money(preview.remainingBeforeRow) : formatPercentage(preview.remainingBeforeRow)} is left.</p> : null}
                           </td>
                           <td className="p-3 font-medium text-sm">{preview ? money(preview.amount) : "-"}</td>
                           <td className="p-3 font-medium text-sm">{preview ? money(preview.tax) : "-"}</td>
@@ -1188,7 +1230,7 @@ export default function AdminFinancial() {
                 </button>
                 <button
                   onClick={() => createRaBillMutation.mutate()}
-                  disabled={createRaBillMutation.isPending || hasInvalidBillRows || hasInvalidCarryForwardRows || billItemRows.some((row) => !row.itemId || !row.billPercentage || Number(row.billPercentage) <= 0)}
+                  disabled={createRaBillMutation.isPending || hasInvalidBillRows || hasInvalidCarryForwardRows || billItemRows.some((row) => !row.itemId || Number(billPlanningType === "EXCESS" ? row.billAmount : row.billPercentage) <= 0)}
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary/10 text-primary border border-primary/20 text-sm font-medium hover:bg-primary/20 disabled:opacity-50"
                 >
                   <FileText className="h-4 w-4" />
@@ -1200,9 +1242,12 @@ export default function AdminFinancial() {
 
           {/* Deduction Popup */}
           {deductionPopup && deductionAmounts && (
-            <FinancialModal title="Mark as Received - Enter Deductions" onClose={() => setDeductionPopup(null)}>
+            <FinancialModal title={deductionPopup.planningType === "EXCESS" ? "Mark Excess Bill as Received" : "Mark as Received - Enter Deductions"} onClose={() => setDeductionPopup(null)}>
               <div className="mb-4 p-3 rounded-xl bg-primary/5 border border-primary/20">
                 <p className="text-sm font-medium">Total Bill Amount: <span className="text-primary">{money(deductionPopup.totalAmount)}</span></p>
+                {deductionPopup.planningType === "EXCESS" ? (
+                  <p className="text-xs text-muted-foreground mt-1">Enter only received amount. Remaining amount can be used in the next excess bill through carry forward.</p>
+                ) : null}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
@@ -1210,39 +1255,43 @@ export default function AdminFinancial() {
                   label="Received Amount"
                   value={deductionState.chequeRtgsAmount}
                   onChange={(v) => setDeductionState((prev) => ({ ...prev, chequeRtgsAmount: v }))}
-                  helperText={`${formatPercentage(deductionAmounts.receivedPercentage)} settled after adding deductions`}
+                  helperText={deductionPopup.planningType === "EXCESS" ? `${formatPercentage(deductionAmounts.receivedPercentage)} settled` : `${formatPercentage(deductionAmounts.receivedPercentage)} settled after adding deductions`}
                   isAmount
                 />
-                <DeductionField
-                  label="10% IT"
-                  value={deductionState.itDeductionPct}
-                  onChange={(v) => setDeductionState((prev) => ({ ...prev, itDeductionPct: v }))}
-                />
-                <DeductionField
-                  label="1% L.Cess"
-                  value={deductionState.lCessDeductionPct}
-                  onChange={(v) => setDeductionState((prev) => ({ ...prev, lCessDeductionPct: v }))}
-                />
-                <DeductionField
-                  label="Security Deposit %"
-                  value={deductionState.securityDepositPct}
-                  onChange={(v) => setDeductionState((prev) => ({ ...prev, securityDepositPct: v }))}
-                />
-                <DeductionField
-                  label="Recover from RA Bill %"
-                  value={deductionState.recoverFromRaBillPct}
-                  onChange={(v) => setDeductionState((prev) => ({ ...prev, recoverFromRaBillPct: v }))}
-                />
-                <DeductionField
-                  label="GST Withheld %"
-                  value={deductionState.gstWithheldPct}
-                  onChange={(v) => setDeductionState((prev) => ({ ...prev, gstWithheldPct: v }))}
-                />
-                <DeductionField
-                  label="Withheld %"
-                  value={deductionState.withheldPct}
-                  onChange={(v) => setDeductionState((prev) => ({ ...prev, withheldPct: v }))}
-                />
+                {deductionPopup.planningType !== "EXCESS" ? (
+                  <>
+                    <DeductionField
+                      label="10% IT"
+                      value={deductionState.itDeductionPct}
+                      onChange={(v) => setDeductionState((prev) => ({ ...prev, itDeductionPct: v }))}
+                    />
+                    <DeductionField
+                      label="1% L.Cess"
+                      value={deductionState.lCessDeductionPct}
+                      onChange={(v) => setDeductionState((prev) => ({ ...prev, lCessDeductionPct: v }))}
+                    />
+                    <DeductionField
+                      label="Security Deposit %"
+                      value={deductionState.securityDepositPct}
+                      onChange={(v) => setDeductionState((prev) => ({ ...prev, securityDepositPct: v }))}
+                    />
+                    <DeductionField
+                      label="Recover from RA Bill %"
+                      value={deductionState.recoverFromRaBillPct}
+                      onChange={(v) => setDeductionState((prev) => ({ ...prev, recoverFromRaBillPct: v }))}
+                    />
+                    <DeductionField
+                      label="GST Withheld %"
+                      value={deductionState.gstWithheldPct}
+                      onChange={(v) => setDeductionState((prev) => ({ ...prev, gstWithheldPct: v }))}
+                    />
+                    <DeductionField
+                      label="Withheld %"
+                      value={deductionState.withheldPct}
+                      onChange={(v) => setDeductionState((prev) => ({ ...prev, withheldPct: v }))}
+                    />
+                  </>
+                ) : null}
                 <div>
                   <label className="text-xs text-muted-foreground mb-1 block">Received Date</label>
                   <input
