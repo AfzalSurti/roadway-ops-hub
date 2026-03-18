@@ -1,16 +1,37 @@
 import { useEffect, useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { PageWrapper } from "@/components/PageWrapper";
 import { motion } from "framer-motion";
-import { Download, FileText, Hash, Pencil, Plus, Search, X } from "lucide-react";
+import { BarChart3, Download, FileText, Hash, Pencil, Plus, Search, X } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { downloadProjectRequisitionPdf } from "@/lib/project-requisition-pdf";
 import { downloadProjectReport } from "@/lib/reports-pdf";
 import { isTaskOverdue, statusConfig, type ProjectRequisitionFormItem } from "@/lib/domain";
+import { PROJECT_PLAN_TEMPLATE } from "@/lib/project-plan-template";
 
 type WizardStep = 1 | 2 | 3 | 4 | 5;
 type RequisitionStep = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+
+type ProjectPlanEntry = {
+  id: string;
+  activityCode: string;
+  activityName: string;
+  subActivityCode: string;
+  subActivityName: string;
+  startDate: string;
+  days: string;
+  endDate: string;
+};
+
+type ProjectPlanStoreItem = {
+  generatedAt: string;
+  entries: ProjectPlanEntry[];
+};
+
+type ProjectPlansStore = Record<string, ProjectPlanStoreItem>;
+
+const PROJECT_PLAN_STORAGE_KEY = "roadway.ops.projectPlans.v1";
 
 type NumberWizardState = {
   projectId: string;
@@ -192,6 +213,45 @@ function addDays(dateText: string, daysText: string) {
   const date = new Date(`${dateText}T00:00:00`);
   date.setDate(date.getDate() + days);
   return date.toISOString().slice(0, 10);
+}
+
+function calculatePlanEndDate(startDate: string, daysText: string) {
+  if (!startDate || !daysText) return "";
+  const days = Number(daysText);
+  if (!Number.isFinite(days) || days <= 0) return "";
+  const endDate = new Date(`${startDate}T00:00:00`);
+  endDate.setDate(endDate.getDate() + days - 1);
+  return endDate.toISOString().slice(0, 10);
+}
+
+function createDefaultProjectPlanEntries() {
+  const rows: ProjectPlanEntry[] = [];
+  PROJECT_PLAN_TEMPLATE.forEach((activity) => {
+    activity.subActivities.forEach((subActivity, index) => {
+      rows.push({
+        id: `${activity.code}-${index + 1}`,
+        activityCode: activity.code,
+        activityName: activity.name,
+        subActivityCode: `${activity.code}.${index + 1}`,
+        subActivityName: subActivity,
+        startDate: "",
+        days: "",
+        endDate: ""
+      });
+    });
+  });
+  return rows;
+}
+
+function parseProjectPlansStore(raw: string | null): ProjectPlansStore {
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw) as ProjectPlansStore;
+    if (!parsed || typeof parsed !== "object") return {};
+    return parsed;
+  } catch {
+    return {};
+  }
 }
 
 function toPayload(draft: RequisitionFormDraft) {
@@ -397,6 +457,22 @@ export default function AdminProjects() {
   const [requisitionProjectId, setRequisitionProjectId] = useState<string | null>(null);
   const [requisitionDraft, setRequisitionDraft] = useState<RequisitionFormDraft>(DEFAULT_REQUISITION_DRAFT);
   const [savingRequisition, setSavingRequisition] = useState(false);
+  const [projectPlans, setProjectPlans] = useState<ProjectPlansStore>({});
+  const [planEditorProjectId, setPlanEditorProjectId] = useState<string | null>(null);
+  const [planEditorEntries, setPlanEditorEntries] = useState<ProjectPlanEntry[]>([]);
+  const [planChartProjectId, setPlanChartProjectId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setProjectPlans(parseProjectPlansStore(window.localStorage.getItem(PROJECT_PLAN_STORAGE_KEY)));
+  }, []);
+
+  const persistProjectPlans = (next: ProjectPlansStore) => {
+    setProjectPlans(next);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(PROJECT_PLAN_STORAGE_KEY, JSON.stringify(next));
+    }
+  };
 
   const { data: tasksData, refetch: refetchTasks } = useQuery({
     queryKey: ["tasks", "projects-summary"],
@@ -437,10 +513,11 @@ export default function AdminProjects() {
         totalTasks: projectTasks.length,
         pendingTasks: projectTasks.filter((task) => task.status !== "DONE").length,
         overdueTasks: projectTasks.filter((task) => isTaskOverdue(task)).length,
+        projectPlan: projectPlans[project.id] ?? null,
         tasks: projectTasks
       };
     });
-  }, [projects, tasks, requisitionFormsByProjectId]);
+  }, [projects, tasks, requisitionFormsByProjectId, projectPlans]);
 
   const filteredRows = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -460,6 +537,8 @@ export default function AdminProjects() {
   const projectsWithoutNumber = useMemo(() => projects.filter((project) => !project.projectNumber), [projects]);
   const wizardProject = useMemo(() => projects.find((project) => project.id === wizard.projectId) ?? null, [projects, wizard.projectId]);
   const requisitionProject = useMemo(() => projectRows.find((row) => row.id === requisitionProjectId) ?? null, [projectRows, requisitionProjectId]);
+  const planEditorProject = useMemo(() => projectRows.find((row) => row.id === planEditorProjectId) ?? null, [projectRows, planEditorProjectId]);
+  const planChartProject = useMemo(() => projectRows.find((row) => row.id === planChartProjectId) ?? null, [projectRows, planChartProjectId]);
 
   const subTechnicalOptions = useMemo(() => {
     if (!wizard.technicalUnitCode) return [];
@@ -609,6 +688,81 @@ export default function AdminProjects() {
     }
   };
 
+  const openProjectPlanEditor = (projectId: string) => {
+    const existing = projectPlans[projectId];
+    setPlanEditorProjectId(projectId);
+    setPlanEditorEntries(existing?.entries?.length ? existing.entries : createDefaultProjectPlanEntries());
+  };
+
+  const updatePlanEditorEntry = (entryId: string, patch: Partial<ProjectPlanEntry>) => {
+    setPlanEditorEntries((prev) => prev.map((entry) => {
+      if (entry.id !== entryId) return entry;
+      const next = { ...entry, ...patch };
+      if (patch.startDate !== undefined || patch.days !== undefined) {
+        next.endDate = calculatePlanEndDate(next.startDate, next.days);
+      }
+      return next;
+    }));
+  };
+
+  const saveProjectPlan = () => {
+    if (!planEditorProjectId) return;
+    const validEntries = planEditorEntries.filter((entry) => entry.startDate && Number(entry.days) > 0);
+    if (!validEntries.length) {
+      toast.error("Please fill at least one sub activity with start date and days.");
+      return;
+    }
+
+    const next: ProjectPlansStore = {
+      ...projectPlans,
+      [planEditorProjectId]: {
+        generatedAt: new Date().toISOString(),
+        entries: planEditorEntries
+      }
+    };
+    persistProjectPlans(next);
+    setPlanEditorProjectId(null);
+    setPlanEditorEntries([]);
+    toast.success("Project plan saved.");
+  };
+
+  const planChartRows = useMemo(() => {
+    const entries = planChartProject?.projectPlan?.entries ?? [];
+    const valid = entries
+      .filter((entry) => entry.startDate && entry.endDate && Number(entry.days) > 0)
+      .map((entry) => {
+        const start = new Date(`${entry.startDate}T00:00:00`);
+        const end = new Date(`${entry.endDate}T00:00:00`);
+        return {
+          ...entry,
+          start,
+          end,
+          daysCount: Number(entry.days)
+        };
+      })
+      .sort((a, b) => a.start.getTime() - b.start.getTime());
+
+    if (!valid.length) {
+      return { rows: [] as Array<typeof valid[number] & { leftPct: number; widthPct: number }>, totalDays: 0 };
+    }
+
+    const minTime = Math.min(...valid.map((entry) => entry.start.getTime()));
+    const maxTime = Math.max(...valid.map((entry) => entry.end.getTime()));
+    const totalDays = Math.max(Math.floor((maxTime - minTime) / 86400000) + 1, 1);
+
+    const rows = valid.map((entry) => {
+      const startOffset = Math.floor((entry.start.getTime() - minTime) / 86400000);
+      const spanDays = Math.max(Math.floor((entry.end.getTime() - entry.start.getTime()) / 86400000) + 1, 1);
+      return {
+        ...entry,
+        leftPct: (startOffset / totalDays) * 100,
+        widthPct: Math.max((spanDays / totalDays) * 100, 1.2)
+      };
+    });
+
+    return { rows, totalDays };
+  }, [planChartProject]);
+
   return (
     <PageWrapper>
       <div className="page-header flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -663,6 +817,7 @@ export default function AdminProjects() {
               <tr className="border-b border-border/50 text-muted-foreground">
                 <th className="text-left p-4 font-medium">Project Name</th>
                 <th className="text-left p-4 font-medium">Project Number</th>
+                <th className="text-left p-4 font-medium">Project Plan</th>
                 <th className="text-left p-4 font-medium">Task Report</th>
                 <th className="text-left p-4 font-medium">Project No. Requisition Form</th>
               </tr>
@@ -672,6 +827,36 @@ export default function AdminProjects() {
                 <motion.tr key={row.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.03 }} onClick={() => setSelectedProjectId(row.id)} className="border-b border-border/30 cursor-pointer hover:bg-secondary/30 transition-colors">
                   <td className="p-4"><span className="font-medium">{row.projectName}</span></td>
                   <td className="p-4 font-medium">{row.projectNumber}</td>
+                  <td className="p-4" onClick={(event) => event.stopPropagation()}>
+                    {!row.projectNumber || row.projectNumber === "-" ? (
+                      <p className="text-xs text-muted-foreground">Add project number first</p>
+                    ) : row.projectPlan ? (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                          onClick={() => openProjectPlanEditor(row.id)}
+                          className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/15 text-primary font-medium hover:bg-primary/20"
+                        >
+                          <Pencil className="h-4 w-4" />
+                          Edit Plan
+                        </button>
+                        <button
+                          onClick={() => setPlanChartProjectId(row.id)}
+                          className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-accent/15 text-accent font-medium hover:bg-accent/20"
+                        >
+                          <BarChart3 className="h-4 w-4" />
+                          Bar Chart
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => openProjectPlanEditor(row.id)}
+                        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/15 text-primary font-medium hover:bg-primary/20"
+                      >
+                        <FileText className="h-4 w-4" />
+                        Generate Plan
+                      </button>
+                    )}
+                  </td>
                   <td className="p-4" onClick={(event) => event.stopPropagation()}>
                     <button
                       onClick={(event) => { event.stopPropagation(); downloadProjectReport({ tasks: row.tasks, projectName: row.projectName }); }}
@@ -694,7 +879,7 @@ export default function AdminProjects() {
                   </td>
                 </motion.tr>
               ))}
-              {filteredRows.length === 0 && <tr><td colSpan={4} className="p-6 text-muted-foreground">No projects found.</td></tr>}
+              {filteredRows.length === 0 && <tr><td colSpan={5} className="p-6 text-muted-foreground">No projects found.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -805,6 +990,157 @@ export default function AdminProjects() {
               <button onClick={() => setShowRequisitionWizard(false)} className="px-4 py-2 rounded-lg border border-border/50 text-sm">Cancel</button>
               <button onClick={() => void saveRequisitionForm()} disabled={savingRequisition} className="px-4 py-2 rounded-lg bg-gradient-to-r from-primary to-accent text-primary-foreground text-sm font-medium disabled:opacity-60">{savingRequisition ? "Saving..." : "Generate"}</button>
             </div>
+          </motion.div>
+        </div>
+      )}
+
+      {planEditorProject && (
+        <div className="fixed inset-0 z-[85] flex items-center justify-center bg-background/85 backdrop-blur-sm">
+          <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} className="glass-panel-strong p-6 w-full max-w-6xl mx-4 max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <div>
+                <h3 className="text-lg font-semibold">Project Plan</h3>
+                <p className="text-xs text-muted-foreground mt-1">Project: {planEditorProject.projectName}</p>
+              </div>
+              <button onClick={() => setPlanEditorProjectId(null)} className="px-3 py-1.5 rounded-lg border border-destructive/30 text-destructive hover:bg-destructive/10 text-xs">Close</button>
+            </div>
+
+            <div className="overflow-x-auto rounded-xl border border-border/40">
+              <table className="w-full text-sm min-w-[980px]">
+                <thead>
+                  <tr className="border-b border-border/40 bg-secondary/20">
+                    <th className="text-left p-3 font-medium">Activity</th>
+                    <th className="text-left p-3 font-medium">Sub Activity</th>
+                    <th className="text-left p-3 font-medium">Start Date</th>
+                    <th className="text-left p-3 font-medium">Days</th>
+                    <th className="text-left p-3 font-medium">End Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {planEditorEntries.map((entry, index) => {
+                    const isFirstInActivity = planEditorEntries.findIndex((item) => item.activityCode === entry.activityCode) === index;
+                    const activityRowCount = isFirstInActivity
+                      ? planEditorEntries.filter((item) => item.activityCode === entry.activityCode).length
+                      : 0;
+
+                    return (
+                      <tr key={entry.id} className="border-b border-border/20 align-top">
+                        {isFirstInActivity ? (
+                          <td rowSpan={activityRowCount} className="p-3 bg-secondary/10 min-w-[210px]">
+                            <p className="text-xs text-muted-foreground">{entry.activityCode}</p>
+                            <p className="font-medium mt-0.5">{entry.activityName}</p>
+                          </td>
+                        ) : null}
+                        <td className="p-3 min-w-[320px]">
+                          <p className="text-xs text-muted-foreground">{entry.subActivityCode}</p>
+                          <p className="text-sm mt-0.5">{entry.subActivityName}</p>
+                        </td>
+                        <td className="p-3 min-w-[170px]">
+                          <input
+                            type="date"
+                            value={entry.startDate}
+                            onChange={(event) => updatePlanEditorEntry(entry.id, { startDate: event.target.value })}
+                            className="w-full px-3 py-2 rounded-lg bg-secondary/50 border border-border/50"
+                            title={`Start date for ${entry.subActivityName}`}
+                            aria-label={`Start date for ${entry.subActivityName}`}
+                          />
+                        </td>
+                        <td className="p-3 min-w-[120px]">
+                          <input
+                            type="number"
+                            min="1"
+                            step="1"
+                            value={entry.days}
+                            onChange={(event) => updatePlanEditorEntry(entry.id, { days: event.target.value.replace(/\D/g, "") })}
+                            className="w-full px-3 py-2 rounded-lg bg-secondary/50 border border-border/50"
+                            placeholder="Days"
+                            title={`Days for ${entry.subActivityName}`}
+                            aria-label={`Days for ${entry.subActivityName}`}
+                          />
+                        </td>
+                        <td className="p-3 min-w-[170px]">
+                          <input
+                            type="date"
+                            value={entry.endDate}
+                            readOnly
+                            className="w-full px-3 py-2 rounded-lg bg-secondary/30 border border-border/40 text-muted-foreground"
+                            title={`Auto end date for ${entry.subActivityName}`}
+                            aria-label={`Auto end date for ${entry.subActivityName}`}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 mt-5">
+              <button onClick={() => setPlanEditorProjectId(null)} className="px-4 py-2 rounded-lg border border-border/50 text-sm">Cancel</button>
+              <button onClick={saveProjectPlan} className="px-4 py-2 rounded-lg bg-gradient-to-r from-primary to-accent text-primary-foreground text-sm font-medium">
+                {planEditorProject.projectPlan ? "Save Plan" : "Generate Plan"}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {planChartProject && (
+        <div className="fixed inset-0 z-[86] flex items-center justify-center bg-background/85 backdrop-blur-sm">
+          <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} className="glass-panel-strong p-6 w-full max-w-6xl mx-4 max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <div>
+                <h3 className="text-lg font-semibold">Project Plan Bar Chart</h3>
+                <p className="text-xs text-muted-foreground mt-1">Project: {planChartProject.projectName}</p>
+              </div>
+              <button onClick={() => setPlanChartProjectId(null)} className="px-3 py-1.5 rounded-lg border border-destructive/30 text-destructive hover:bg-destructive/10 text-xs">Close</button>
+            </div>
+
+            {planChartRows.rows.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No scheduled activities found. Please edit plan and fill start date plus days.</p>
+            ) : (
+              <div className="rounded-xl border border-border/40 p-4 bg-secondary/10">
+                <div className="mb-3 flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Y Axis: Activities</span>
+                  <span>X Axis: Days (0 - {planChartRows.totalDays})</span>
+                </div>
+
+                <div className="space-y-2">
+                  {planChartRows.rows.map((entry) => (
+                    <div key={entry.id} className="grid grid-cols-[320px_1fr] items-center gap-3">
+                      <div className="text-xs leading-4">
+                        <p className="font-medium text-foreground">{entry.subActivityCode} {entry.subActivityName}</p>
+                        <p className="text-muted-foreground mt-0.5">{entry.startDate} to {entry.endDate} ({entry.days} days)</p>
+                      </div>
+                      <svg viewBox="0 0 1000 32" preserveAspectRatio="none" className="h-8 w-full rounded-lg bg-secondary/50 border border-border/40 overflow-hidden" role="img" aria-label={`${entry.subActivityName}: ${entry.days} days`}>
+                        <rect
+                          x={(entry.leftPct / 100) * 1000}
+                          y={2}
+                          width={Math.max((entry.widthPct / 100) * 1000, 12)}
+                          height={28}
+                          rx={6}
+                          className="fill-primary"
+                          opacity={0.9}
+                        />
+                      </svg>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-4 border-t border-border/30 pt-3">
+                  <svg viewBox="0 0 1000 28" preserveAspectRatio="none" className="h-7 w-full">
+                    {[0, 0.25, 0.5, 0.75, 1].map((point) => (
+                      <g key={point}>
+                        <line x1={point * 1000} y1={0} x2={point * 1000} y2={10} stroke="currentColor" className="text-border" strokeWidth="1" />
+                        <text x={point * 1000} y={24} textAnchor="middle" className="fill-muted-foreground text-[11px]">
+                          {Math.round(planChartRows.totalDays * point)}d
+                        </text>
+                      </g>
+                    ))}
+                  </svg>
+                </div>
+              </div>
+            )}
           </motion.div>
         </div>
       )}
