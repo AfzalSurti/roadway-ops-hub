@@ -2,7 +2,7 @@ import { Bell, Search, X } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { AppNotification, TaskItem } from "@/lib/domain";
 import { toast } from "sonner";
 
@@ -85,6 +85,21 @@ export function TopBar() {
     selectedTask?.status === "IN_PROGRESS" &&
     selectedNotification?.entityType === "Task";
 
+  useEffect(() => {
+    if (!selectedNotification) {
+      return;
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setSelectedNotification(null);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [selectedNotification]);
+
   return (
     <header className="h-16 border-b border-border bg-background/80 backdrop-blur-xl sticky top-0 z-30 flex items-center justify-between px-6">
       {/* Search */}
@@ -141,7 +156,7 @@ export function TopBar() {
             onClick={() => setSelectedNotification(null)}
           >
             <div
-              className="w-full max-w-2xl rounded-2xl border border-border/50 bg-background shadow-xl p-5"
+              className="w-full max-w-2xl rounded-2xl border border-border/50 bg-background shadow-xl p-5 max-h-[85vh] overflow-y-auto"
               onClick={(event) => event.stopPropagation()}
             >
               <div className="flex items-start justify-between gap-3 mb-4">
@@ -205,6 +220,15 @@ export function TopBar() {
                   </div>
                 </div>
               )}
+
+              <div className="mt-4 flex justify-end">
+                <button
+                  onClick={() => setSelectedNotification(null)}
+                  className="px-3 py-2 rounded-lg border border-border/50 text-sm hover:bg-secondary/40"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         )}
