@@ -3,7 +3,7 @@ import { PageWrapper } from "@/components/PageWrapper";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
-import { User, Phone, GraduationCap, Calendar, Briefcase, IndianRupee, Pencil, Check, X } from "lucide-react";
+import { User, Phone, GraduationCap, Calendar, Briefcase, Pencil, Check, X } from "lucide-react";
 
 function computeExperienceFromDate(dateValue?: string | null) {
   if (!dateValue) return null;
@@ -43,8 +43,7 @@ export default function EmployeeProfile() {
     contactNumber: "",
     education: "",
     yearOfPassing: "",
-    dateOfJoining: "",
-    currentCtc: ""
+    dateOfJoining: ""
   });
 
   const { data: profile, isLoading } = useQuery({
@@ -72,8 +71,7 @@ export default function EmployeeProfile() {
       contactNumber: profile?.contactNumber ?? "",
       education: profile?.education ?? "",
       yearOfPassing: profile?.yearOfPassing ?? "",
-      dateOfJoining: profile?.dateOfJoining ? profile.dateOfJoining.slice(0, 10) : "",
-      currentCtc: profile?.currentCtc ?? ""
+      dateOfJoining: profile?.dateOfJoining ? profile.dateOfJoining.slice(0, 10) : ""
     });
     setEditing(true);
   };
@@ -87,8 +85,7 @@ export default function EmployeeProfile() {
       yearOfPassing: form.yearOfPassing || null,
       dateOfJoining: form.dateOfJoining
         ? new Date(form.dateOfJoining).toISOString()
-        : null,
-      currentCtc: form.currentCtc.trim() || null
+        : null
     });
   };
 
@@ -212,13 +209,6 @@ export default function EmployeeProfile() {
                 />
                 <ProfileRow icon={<Briefcase className="h-4 w-4" />} label="Total Experience" value={totalExperienceValue ?? "Not available yet"} readOnly />
                 <ProfileRow icon={<Briefcase className="h-4 w-4" />} label="Experience in Organization" value={orgExperienceValue ?? "Not available yet"} readOnly />
-                <EditRow
-                  icon={<IndianRupee className="h-4 w-4" />}
-                  label="Current CTC"
-                  value={form.currentCtc}
-                  onChange={(v) => setForm((p) => ({ ...p, currentCtc: v }))}
-                  placeholder="e.g. 6,00,000 per annum"
-                />
               </>
             ) : (
               <>
@@ -232,7 +222,6 @@ export default function EmployeeProfile() {
                 />
                 <ProfileRow icon={<Briefcase className="h-4 w-4" />} label="Total Experience" value={profile?.totalExperience ?? null} />
                 <ProfileRow icon={<Briefcase className="h-4 w-4" />} label="Experience in Organization" value={profile?.experienceInOrg ?? null} />
-                <ProfileRow icon={<IndianRupee className="h-4 w-4" />} label="Current CTC" value={profile?.currentCtc ?? null} />
               </>
             )}
           </div>

@@ -695,7 +695,6 @@ export const api = {
     yearOfPassing?: string | null;
     dateOfJoining?: string | null;
     experienceInOrg?: string | null;
-    currentCtc?: string | null;
   }) {
     return request<ApiUser>("/users/me", {
       method: "PATCH",

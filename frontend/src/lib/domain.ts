@@ -23,7 +23,6 @@ export type ApiUser = {
   totalExperience?: string | null;
   dateOfJoining?: string | null;
   experienceInOrg?: string | null;
-  currentCtc?: string | null;
 };
 
 export type ProjectItem = {

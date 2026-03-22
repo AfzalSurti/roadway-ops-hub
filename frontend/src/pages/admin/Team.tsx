@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import type React from "react";
 import { PageWrapper } from "@/components/PageWrapper";
 import { motion } from "framer-motion";
-import { X, ListTodo, AlertTriangle, Plus, Phone, GraduationCap, Calendar, Briefcase, IndianRupee } from "lucide-react";
+import { X, ListTodo, AlertTriangle, Plus, Phone, GraduationCap, Calendar, Briefcase } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { isTaskOverdue, toAvatarUrl } from "@/lib/domain";
@@ -200,7 +200,6 @@ export default function AdminTeam() {
                 value={selected.dateOfJoining ? new Date(selected.dateOfJoining).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : null}
               />
               <ProfileDetailRow icon={<Briefcase className="h-3.5 w-3.5" />} label="Experience in Organization" value={selected.experienceInOrg} />
-              <ProfileDetailRow icon={<IndianRupee className="h-3.5 w-3.5" />} label="Current CTC" value={selected.currentCtc} />
             </div>
 
             <button
