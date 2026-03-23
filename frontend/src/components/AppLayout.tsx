@@ -1,6 +1,7 @@
 import { Outlet, useNavigate } from "react-router-dom";
 import { AppSidebar } from "@/components/AppSidebar";
 import { TopBar } from "@/components/TopBar";
+import { ChatAssistant } from "@/components/ChatAssistant";
 import { useAuth } from "@/lib/auth";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
@@ -56,6 +57,7 @@ export function AppLayout() {
           <Outlet />
         </main>
       </div>
+      <ChatAssistant />
     </div>
   );
 }

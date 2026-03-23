@@ -163,6 +163,23 @@ export type AppNotification = {
   createdAt: string;
 };
 
+export type AssistantConversationMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+export type AssistantChatResponse = {
+  status: "completed" | "needs_input" | "failed";
+  action: string;
+  reply: string;
+  missingFields?: string[];
+  result?: unknown;
+  generatedCredentials?: {
+    email: string;
+    password: string;
+  };
+};
+
 export type FinancialPlanItem = {
   id: string;
   planId: string;

@@ -22,7 +22,9 @@ const envSchema = z.object({
     .optional(),
   RESEND_API_KEY: z.string().min(1).optional(),
   EMAIL_FROM: z.string().trim().min(3).optional(),
-  APP_URL: z.string().url().optional()
+  APP_URL: z.string().url().optional(),
+  GROQ_API: z.string().min(1).optional(),
+  GROQ_MODEL: z.string().default("llama-3.3-70b-versatile")
 });
 
 export const env = envSchema.parse(process.env);
