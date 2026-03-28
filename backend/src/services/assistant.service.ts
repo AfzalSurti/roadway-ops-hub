@@ -2,6 +2,8 @@ import { randomBytes } from "node:crypto";
 import { env } from "../config/env.js";
 import { logger } from "../config/logger.js";
 import { projectService } from "./project.service.js";
+import { reportRepository } from "../repositories/report.repository.js";
+import { taskRepository } from "../repositories/task.repository.js";
 import { taskService } from "./task.service.js";
 import { userService } from "./user.service.js";
 import { userRepository } from "../repositories/user.repository.js";
@@ -19,6 +21,10 @@ type AssistantAction =
   | "CREATE_EMPLOYEE"
   | "LIST_PROJECTS"
   | "LIST_TASKS"
+  | "EMPLOYEE_PERFORMANCE"
+  | "PENDING_TASKS_MONTH"
+  | "SHOW_PENDING_TASK_DETAILS"
+  | "DOWNLOAD_EMPLOYEE_REPORT"
   | "HELP"
   | "UNKNOWN";
 
@@ -38,7 +44,7 @@ type AssistantResult = {
 };
 
 const ACTION_HELP_TEXT =
-  "I can help with: create project, create task, add team member, list projects, and list tasks. Example: 'Create task Soil testing for project NH848, assign to user@x.com, start today, 3 days'.";
+  "I can help with: create project, create task, add team member, list projects, list tasks, show employee performance, show pending tasks this month, and download an employee report.";
 
 function normalizeText(input: unknown): string {
   return typeof input === "string" ? input.trim() : "";
@@ -97,9 +103,43 @@ function parseDateInput(input: unknown): Date | null {
   return parsed;
 }
 
-function fallbackPlanner(message: string): PlannerResult {
+function fallbackPlanner(message: string, conversation: ChatMessage[]): PlannerResult {
   const lower = message.toLowerCase();
   const emailMatch = message.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi)?.[0] ?? "";
+  const yesLike = /^(yes|haan|ha|show|show me|more|details|yes show)$/i.test(message.trim());
+  const lastAssistantMessage = [...conversation].reverse().find((item) => item.role === "assistant")?.content.toLowerCase() ?? "";
+
+  if (yesLike && lastAssistantMessage.includes("do you want to see more details")) {
+    return { action: "SHOW_PENDING_TASK_DETAILS" };
+  }
+
+  if (/download.+report|export.+report/.test(lower) && /employee|member/.test(lower)) {
+    const format = /excel|xlsx/.test(lower) ? "excel" : /csv/.test(lower) ? "csv" : "pdf";
+    const nameMatch = message.match(/(?:employee|member)\s+([a-z][a-z .'-]{1,60})/i);
+    return {
+      action: "DOWNLOAD_EMPLOYEE_REPORT",
+      arguments: {
+        employeeName: normalizeText(nameMatch?.[1]),
+        employeeEmail: emailMatch,
+        format
+      }
+    };
+  }
+
+  if (/(performance|report card|summary)/.test(lower) && /employee|member/.test(lower)) {
+    const nameMatch = message.match(/(?:employee|member)\s+([a-z][a-z .'-]{1,60})/i);
+    return {
+      action: "EMPLOYEE_PERFORMANCE",
+      arguments: {
+        employeeName: normalizeText(nameMatch?.[1]),
+        employeeEmail: emailMatch
+      }
+    };
+  }
+
+  if (/pending\s+task/.test(lower) && /(this month|current month|this month\?)/.test(lower)) {
+    return { action: "PENDING_TASKS_MONTH" };
+  }
 
   if (/create\s+project|add\s+project/.test(lower)) {
     const nameMatch = message.match(/(?:project\s+name\s*[:=-]?|create\s+project\s+)(.+)$/i);
@@ -160,12 +200,16 @@ async function planWithGroq(message: string, conversation: ChatMessage[]): Promi
   const systemPrompt = [
     "You are an assistant that converts chat into a strict JSON command.",
     "Return JSON only.",
-    "Actions: CREATE_PROJECT, CREATE_TASK, CREATE_EMPLOYEE, LIST_PROJECTS, LIST_TASKS, HELP, UNKNOWN.",
+    "Actions: CREATE_PROJECT, CREATE_TASK, CREATE_EMPLOYEE, LIST_PROJECTS, LIST_TASKS, EMPLOYEE_PERFORMANCE, PENDING_TASKS_MONTH, SHOW_PENDING_TASK_DETAILS, DOWNLOAD_EMPLOYEE_REPORT, HELP, UNKNOWN.",
     "For CREATE_PROJECT arguments: name, description.",
     "For CREATE_TASK arguments: title, description, project, assignedToEmail, assignedToName, allocatedAt, allottedDays.",
     "For CREATE_EMPLOYEE arguments: name, email, password, passwordMode (AUTO|MANUAL).",
     "For LIST_PROJECTS arguments: limit.",
     "For LIST_TASKS arguments: status, assignedToEmail, limit.",
+    "For EMPLOYEE_PERFORMANCE arguments: employeeName, employeeEmail.",
+    "For PENDING_TASKS_MONTH arguments: no fields needed.",
+    "For SHOW_PENDING_TASK_DETAILS arguments: no fields needed.",
+    "For DOWNLOAD_EMPLOYEE_REPORT arguments: employeeName, employeeEmail, format (pdf|excel|csv).",
     "If user omitted details, keep fields empty or null; do not invent emails.",
     "JSON shape: {\"action\":\"...\",\"arguments\":{},\"summary\":\"...\"}"
   ].join("\n");
@@ -249,13 +293,168 @@ function requireAdmin(userRole: string): string | null {
   return userRole === "ADMIN" ? null : "This action requires an admin account.";
 }
 
+function getCurrentMonthRange() {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  return { start, end };
+}
+
+async function resolveEmployee(args: Record<string, unknown>) {
+  const email = normalizeText(args.employeeEmail ?? args.assignedToEmail ?? args.email).toLowerCase();
+  if (email) {
+    const byEmail = await userRepository.findByEmail(email);
+    if (byEmail?.role === "EMPLOYEE") {
+      return byEmail;
+    }
+  }
+
+  const name = normalizeText(args.employeeName ?? args.assignedToName ?? args.name);
+  if (!name) {
+    return null;
+  }
+
+  const employees = await userRepository.findEmployees();
+  const lowered = name.toLowerCase();
+  const exact = employees.find((employee) => employee.name.toLowerCase() === lowered);
+  if (exact) {
+    return exact;
+  }
+
+  const matches = employees.filter((employee) => employee.name.toLowerCase().includes(lowered));
+  if (matches.length === 1) {
+    return matches[0];
+  }
+
+  return null;
+}
+
+async function getEmployeePerformanceReply(args: Record<string, unknown>) {
+  const employee = await resolveEmployee(args);
+  if (!employee) {
+    return {
+      status: "needs_input" as const,
+      action: "EMPLOYEE_PERFORMANCE" as const,
+      missingFields: ["employee name or employee email"],
+      reply: "Please provide the employee name or email so I can analyze performance."
+    };
+  }
+
+  const [tasks, reports] = await Promise.all([
+    taskRepository.findMany({ assignedToId: employee.id }, 0, 500),
+    reportRepository.findMany({ submittedById: employee.id }, 0, 500)
+  ]);
+
+  const completed = tasks.filter((task) => task.status === "DONE").length;
+  const pending = tasks.filter((task) => task.status === "TODO").length;
+  const underReview = tasks.filter((task) => task.status === "IN_PROGRESS").length;
+  const blocked = tasks.filter((task) => task.status === "BLOCKED").length;
+  const adminComments = reports.filter((report) => Boolean(report.adminFeedback?.trim())).length;
+  const ratedTasks = tasks.filter((task) => typeof task.rating === "number");
+  const averageRating = ratedTasks.length
+    ? (ratedTasks.reduce((sum, task) => sum + Number(task.rating ?? 0), 0) / ratedTasks.length).toFixed(2)
+    : "-";
+  const latestReport = reports[0];
+
+  return {
+    status: "completed" as const,
+    action: "EMPLOYEE_PERFORMANCE" as const,
+    result: {
+      employeeId: employee.id,
+      employeeName: employee.name,
+      totalTasks: tasks.length,
+      completed,
+      pending,
+      underReview,
+      blocked,
+      submittedReports: reports.length,
+      adminComments,
+      averageRating
+    },
+    reply: [
+      `Employee Performance: ${employee.name}`,
+      `Email: ${employee.email}`,
+      `Total tasks assigned: ${tasks.length}`,
+      `Completed tasks: ${completed}`,
+      `Pending tasks: ${pending}`,
+      `Under review: ${underReview}`,
+      `Blocked tasks: ${blocked}`,
+      `Reports submitted: ${reports.length}`,
+      `Admin comments on reports: ${adminComments}`,
+      `Average rating: ${averageRating}`,
+      `Latest report submitted: ${latestReport ? formatDate(new Date(latestReport.createdAt)) : "No reports submitted yet"}`
+    ].join("\n")
+  };
+}
+
+async function getPendingTasksThisMonthReply(includeDetails: boolean) {
+  const { start, end } = getCurrentMonthRange();
+  const tasks = await taskRepository.findMany(
+    {
+      status: { in: ["TODO", "BLOCKED"] },
+      allocatedAt: {
+        gte: start,
+        lte: end
+      }
+    },
+    0,
+    500
+  );
+
+  const monthLabel = start.toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+  const grouped = new Map<string, { employeeName: string; count: number; tasks: string[] }>();
+
+  for (const task of tasks) {
+    const key = task.assignedToId;
+    const current = grouped.get(key) ?? {
+      employeeName: task.assignedTo?.name ?? "Unknown Employee",
+      count: 0,
+      tasks: []
+    };
+    current.count += 1;
+    if (current.tasks.length < 5) {
+      current.tasks.push(task.title);
+    }
+    grouped.set(key, current);
+  }
+
+  if (!includeDetails) {
+    return {
+      status: "completed" as const,
+      action: "PENDING_TASKS_MONTH" as const,
+      result: { totalPendingTasks: tasks.length, month: monthLabel },
+      reply: `There are ${tasks.length} pending tasks in ${monthLabel}. Do you want to see more details?`
+    };
+  }
+
+  if (!tasks.length) {
+    return {
+      status: "completed" as const,
+      action: "SHOW_PENDING_TASK_DETAILS" as const,
+      result: { totalPendingTasks: 0, month: monthLabel },
+      reply: `There are no pending tasks in ${monthLabel}.`
+    };
+  }
+
+  const lines = Array.from(grouped.values())
+    .sort((left, right) => right.count - left.count || left.employeeName.localeCompare(right.employeeName))
+    .map((entry, index) => `${index + 1}. ${entry.employeeName}: ${entry.count} pending task(s) | ${entry.tasks.join(", ")}`);
+
+  return {
+    status: "completed" as const,
+    action: "SHOW_PENDING_TASK_DETAILS" as const,
+    result: { totalPendingTasks: tasks.length, month: monthLabel, grouped: lines },
+    reply: `Pending task details for ${monthLabel}:\n${lines.join("\n")}`
+  };
+}
+
 export const assistantService = {
   async chat(input: {
     user: { id: string; role: string };
     message: string;
     conversation: ChatMessage[];
   }): Promise<AssistantResult> {
-    const planned = (await planWithGroq(input.message, input.conversation)) ?? fallbackPlanner(input.message);
+    const planned = (await planWithGroq(input.message, input.conversation)) ?? fallbackPlanner(input.message, input.conversation);
     const args = planned.arguments ?? {};
 
     switch (planned.action) {
@@ -437,6 +636,66 @@ export const assistantService = {
           action: planned.action,
           result: list.items,
           reply: `Here are ${list.items.length} tasks:\n${lines.join("\n")}`
+        };
+      }
+
+      case "EMPLOYEE_PERFORMANCE": {
+        const roleError = requireAdmin(input.user.role);
+        if (roleError) {
+          return { status: "failed", action: planned.action, reply: roleError };
+        }
+
+        return getEmployeePerformanceReply(args);
+      }
+
+      case "PENDING_TASKS_MONTH": {
+        const roleError = requireAdmin(input.user.role);
+        if (roleError) {
+          return { status: "failed", action: planned.action, reply: roleError };
+        }
+
+        return getPendingTasksThisMonthReply(false);
+      }
+
+      case "SHOW_PENDING_TASK_DETAILS": {
+        const roleError = requireAdmin(input.user.role);
+        if (roleError) {
+          return { status: "failed", action: planned.action, reply: roleError };
+        }
+
+        return getPendingTasksThisMonthReply(true);
+      }
+
+      case "DOWNLOAD_EMPLOYEE_REPORT": {
+        const roleError = requireAdmin(input.user.role);
+        if (roleError) {
+          return { status: "failed", action: planned.action, reply: roleError };
+        }
+
+        const employee = await resolveEmployee(args);
+        if (!employee) {
+          return {
+            status: "needs_input",
+            action: planned.action,
+            missingFields: ["employee name or employee email"],
+            reply: "Please provide the employee name or email so I can prepare the report download."
+          };
+        }
+
+        const { start, end } = getCurrentMonthRange();
+        const format = normalizeText(args.format).toLowerCase();
+
+        return {
+          status: "completed",
+          action: planned.action,
+          result: {
+            employeeId: employee.id,
+            employeeName: employee.name,
+            fromDate: start.toISOString().slice(0, 10),
+            toDate: end.toISOString().slice(0, 10),
+            format: format === "excel" || format === "csv" ? format : "pdf"
+          },
+          reply: `Preparing ${employee.name}'s report download for ${start.toLocaleDateString("en-IN", { month: "long", year: "numeric" })}.`
         };
       }
 

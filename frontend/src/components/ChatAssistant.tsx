@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { MessageCircle, Send, X } from "lucide-react";
 import { api } from "@/lib/api";
 import type { AssistantConversationMessage } from "@/lib/domain";
+import { downloadEmployeeAssistantReport } from "@/lib/assistant-report-export";
 import { toast } from "sonner";
 
 type UiMessage = {
@@ -11,7 +12,7 @@ type UiMessage = {
 };
 
 const STARTER_TEXT =
-  "Hi, I can help you create projects, create tasks, add team members, and list data. Tell me what to do in one line.";
+  "Hi, I can help you create projects, create tasks, add team members, check employee performance, review pending tasks, and download employee reports.";
 
 export function ChatAssistant() {
   const [open, setOpen] = useState(false);
@@ -51,6 +52,36 @@ export function ChatAssistant() {
         message: value,
         conversation: [...conversation, { role: "user", content: value }].slice(-20)
       });
+
+      if (
+        response.action === "DOWNLOAD_EMPLOYEE_REPORT" &&
+        response.result &&
+        typeof response.result === "object" &&
+        "employeeId" in response.result
+      ) {
+        const result = response.result as {
+          employeeId: string;
+          fromDate?: string;
+          toDate?: string;
+          format?: "pdf" | "excel" | "csv";
+        };
+
+        const [users, tasksData, reportsData] = await Promise.all([
+          api.getUsers(),
+          api.getTasks({ limit: 500 }),
+          api.getReports({ limit: 500 })
+        ]);
+
+        downloadEmployeeAssistantReport({
+          employeeId: result.employeeId,
+          fromDate: result.fromDate ?? new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10),
+          toDate: result.toDate ?? new Date().toISOString().slice(0, 10),
+          format: result.format ?? "pdf",
+          users,
+          tasks: tasksData.items,
+          reports: reportsData.items
+        });
+      }
 
       const assistantText = response.generatedCredentials
         ? `${response.reply}\n\nCredentials:\nEmail: ${response.generatedCredentials.email}\nPassword: ${response.generatedCredentials.password}`
