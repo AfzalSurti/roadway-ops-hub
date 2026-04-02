@@ -22,25 +22,58 @@ const transporter =
       })
     : null;
 
-function buildWelcomeHtml(payload: { employeeName: string; employeeEmail: string; password: string }, appUrl: string) {
-  return `
-      <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #0f172a;">
-        <h2 style="margin-bottom: 12px;">Welcome to RoadwayOps Hub</h2>
-        <p>Hi ${payload.employeeName},</p>
-        <p>Your employee account has been created successfully.</p>
-        <p><strong>Website:</strong> <a href="${appUrl}">${appUrl}</a></p>
-        <p><strong>Login Credentials</strong></p>
-        <ul>
-          <li><strong>Email:</strong> ${payload.employeeEmail}</li>
-          <li><strong>Password:</strong> ${payload.password}</li>
-        </ul>
-        <p>Please sign in and change your password after first login.</p>
-        <p style="margin-top: 20px;">- RoadwayOps Hub</p>
-      </div>
-    `;
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
-async function sendViaResend(args: { to: string; subject: string; html: string }) {
+function buildWelcomeHtml(payload: { employeeName: string; employeeEmail: string; password: string }, appUrl: string) {
+  const employeeName = escapeHtml(payload.employeeName);
+  const employeeEmail = escapeHtml(payload.employeeEmail);
+  const password = escapeHtml(payload.password);
+  const safeAppUrl = escapeHtml(appUrl);
+
+  return `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #0f172a; max-width: 640px; margin: 0 auto;">
+      <h2 style="margin-bottom: 12px;">Hello ${employeeName},</h2>
+      <p>You are invited to Sankalp website.</p>
+      <p>
+        Website link:
+        <a href="${safeAppUrl}" style="color: #2563eb; text-decoration: none;">${safeAppUrl}</a>
+      </p>
+      <div style="margin: 20px 0; padding: 16px; border: 1px solid #cbd5e1; border-radius: 12px; background: #f8fafc;">
+        <p style="margin: 0 0 10px;"><strong>Your credentials</strong></p>
+        <p style="margin: 0 0 6px;"><strong>Email:</strong> ${employeeEmail}</p>
+        <p style="margin: 0;"><strong>Password:</strong> ${password}</p>
+      </div>
+      <p>Please use these credentials to sign in.</p>
+      <p style="margin-top: 20px;">RoadwayOps Hub Team</p>
+    </div>
+  `;
+}
+
+function buildWelcomeText(payload: { employeeName: string; employeeEmail: string; password: string }, appUrl: string) {
+  return [
+    `Hello ${payload.employeeName},`,
+    "",
+    "You are invited to Sankalp website.",
+    `Website link: ${appUrl}`,
+    "",
+    "Your credentials:",
+    `Email: ${payload.employeeEmail}`,
+    `Password: ${payload.password}`,
+    "",
+    "Please use these credentials to sign in.",
+    "",
+    "RoadwayOps Hub Team"
+  ].join("\n");
+}
+
+async function sendViaResend(args: { to: string; subject: string; html: string; text: string }) {
   if (!resend) {
     return false;
   }
@@ -51,7 +84,8 @@ async function sendViaResend(args: { to: string; subject: string; html: string }
     from,
     to: [args.to],
     subject: args.subject,
-    html: args.html
+    html: args.html,
+    text: args.text
   });
 
   if (result.error) {
@@ -69,12 +103,13 @@ export const emailService = {
   async sendEmployeeWelcomeEmail(payload: { to: string; employeeName: string; employeeEmail: string; password: string }) {
     const appUrl = env.APP_URL ?? "https://roadway-ops-hub.vercel.app";
 
-    const subject = "Your RoadwayOps Hub Employee Account";
+    const subject = "Invitation to Sankalp Website";
     const html = buildWelcomeHtml(payload, appUrl);
+    const text = buildWelcomeText(payload, appUrl);
 
     if (env.RESEND_API_KEY) {
       try {
-        await sendViaResend({ to: payload.to, subject, html });
+        await sendViaResend({ to: payload.to, subject, html, text });
         return true;
       } catch (error) {
         logger.warn({ err: error, to: payload.to }, "Resend email send failed; falling back to SMTP");
@@ -90,7 +125,8 @@ export const emailService = {
       from: env.EMAIL_FROM ?? `RoadwayOps Hub <${env.GMAIL}>`,
       to: payload.to,
       subject,
-      html
+      html,
+      text
     });
 
     return true;
@@ -99,9 +135,10 @@ export const emailService = {
   async sendSimpleWelcomeEmail(to: string) {
     const html = "<p>Your account is created successfully.</p>";
     const subject = "Welcome Employee";
+    const text = "Your account is created successfully.";
 
     if (resend) {
-      await sendViaResend({ to, subject, html });
+      await sendViaResend({ to, subject, html, text });
       return true;
     }
 
@@ -114,7 +151,8 @@ export const emailService = {
       from: env.EMAIL_FROM ?? `RoadwayOps Hub <${env.GMAIL}>`,
       to,
       subject,
-      html
+      html,
+      text
     });
 
     return true;

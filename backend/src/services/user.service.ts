@@ -43,28 +43,39 @@ export const userService = {
     });
   },
   async createEmployee(payload: { name: string; email: string; password: string }) {
-    const existing = await userRepository.findByEmail(payload.email);
+    const normalizedEmail = payload.email.trim().toLowerCase();
+    const normalizedName = payload.name.trim();
+
+    const existing = await userRepository.findByEmail(normalizedEmail);
     if (existing) {
       throw conflict("User with this email already exists");
     }
 
     const user = await userRepository.create({
-      name: payload.name,
-      email: payload.email,
+      name: normalizedName,
+      email: normalizedEmail,
       role: "EMPLOYEE",
       passwordHash: await hashPassword(payload.password)
     });
 
-    void emailService
-      .sendEmployeeWelcomeEmail({
-        to: payload.email,
-        employeeName: payload.name,
-        employeeEmail: payload.email,
+    try {
+      await emailService.sendEmployeeWelcomeEmail({
+        to: normalizedEmail,
+        employeeName: normalizedName,
+        employeeEmail: normalizedEmail,
         password: payload.password
-      })
-      .catch((error) => {
-        logger.warn({ err: error, email: payload.email }, "Failed to send employee welcome email");
       });
+    } catch (error) {
+      logger.error({ err: error, email: normalizedEmail, userId: user.id }, "Failed to send employee welcome email");
+
+      try {
+        await userRepository.deleteById(user.id);
+      } catch (deleteError) {
+        logger.error({ err: deleteError, userId: user.id }, "Failed to rollback employee creation after email send failure");
+      }
+
+      throw badRequest("Employee was not created because the invite email could not be sent");
+    }
 
     return user;
   },
