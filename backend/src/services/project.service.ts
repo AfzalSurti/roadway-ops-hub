@@ -170,15 +170,24 @@ export const projectService = {
       projectNumberAssignedAt: new Date()
     });
   },
-  async create(payload: { name: string; description?: string }) {
+  async create(payload: { name: string; description?: string; projectNumber?: string }) {
     const existing = await projectRepository.findByName(payload.name);
     if (existing) {
       throw conflict("Project with this name already exists");
     }
 
+    if (payload.projectNumber) {
+      const projects = await projectRepository.findMany();
+      const numberExists = projects.some((project) => project.projectNumber === payload.projectNumber);
+      if (numberExists) {
+        throw conflict("Project number already exists");
+      }
+    }
+
     return projectRepository.create({
       name: payload.name,
-      description: payload.description
+      description: payload.description,
+      projectNumber: payload.projectNumber
     });
   },
   async update(

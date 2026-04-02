@@ -445,11 +445,14 @@ export default function AdminProjects() {
   const [wizardStep, setWizardStep] = useState<WizardStep>(1);
   const [wizard, setWizard] = useState<NumberWizardState>(DEFAULT_WIZARD);
   const [assigningNumber, setAssigningNumber] = useState(false);
-  const [form, setForm] = useState({ name: "", description: "" });
+  const [form, setForm] = useState({ name: "", description: "", projectNumber: "" });
   const [search, setSearch] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [isEditingSelectedProject, setIsEditingSelectedProject] = useState(false);
+  const [savingSelectedProject, setSavingSelectedProject] = useState(false);
+  const [selectedProjectForm, setSelectedProjectForm] = useState({ name: "", description: "", projectNumber: "" });
   const [showGeneratedModal, setShowGeneratedModal] = useState(false);
   const [generatedProjectNumber, setGeneratedProjectNumber] = useState("");
   const [generatedProjectName, setGeneratedProjectName] = useState("");
@@ -534,11 +537,18 @@ export default function AdminProjects() {
   }, [projectRows, search, fromDate, toDate]);
 
   const selectedProject = useMemo(() => projectRows.find((row) => row.id === selectedProjectId) ?? null, [projectRows, selectedProjectId]);
+  const selectedProjectRecord = useMemo(() => projects.find((project) => project.id === selectedProjectId) ?? null, [projects, selectedProjectId]);
   const projectsWithoutNumber = useMemo(() => projects.filter((project) => !project.projectNumber), [projects]);
   const wizardProject = useMemo(() => projects.find((project) => project.id === wizard.projectId) ?? null, [projects, wizard.projectId]);
   const requisitionProject = useMemo(() => projectRows.find((row) => row.id === requisitionProjectId) ?? null, [projectRows, requisitionProjectId]);
   const planEditorProject = useMemo(() => projectRows.find((row) => row.id === planEditorProjectId) ?? null, [projectRows, planEditorProjectId]);
   const planChartProject = useMemo(() => projectRows.find((row) => row.id === planChartProjectId) ?? null, [projectRows, planChartProjectId]);
+  const selectedProjectFormDirty = useMemo(() => {
+    if (!selectedProjectRecord) return false;
+    return selectedProjectForm.name.trim() !== selectedProjectRecord.name
+      || selectedProjectForm.description.trim() !== (selectedProjectRecord.description ?? "")
+      || selectedProjectForm.projectNumber.trim() !== (selectedProjectRecord.projectNumber ?? "");
+  }, [selectedProjectForm, selectedProjectRecord]);
 
   const subTechnicalOptions = useMemo(() => {
     if (!wizard.technicalUnitCode) return [];
@@ -564,6 +574,21 @@ export default function AdminProjects() {
     }
   }, [requisitionDraft.projectStartingDate, requisitionDraft.projectDurationDays, requisitionDraft.projectCompletionDate]);
 
+  useEffect(() => {
+    if (!selectedProjectRecord) {
+      setIsEditingSelectedProject(false);
+      setSelectedProjectForm({ name: "", description: "", projectNumber: "" });
+      return;
+    }
+
+    setIsEditingSelectedProject(false);
+    setSelectedProjectForm({
+      name: selectedProjectRecord.name,
+      description: selectedProjectRecord.description ?? "",
+      projectNumber: selectedProjectRecord.projectNumber ?? ""
+    });
+  }, [selectedProjectRecord]);
+
   const resetWizard = () => {
     setWizard(DEFAULT_WIZARD);
     setWizardStep(1);
@@ -584,13 +609,52 @@ export default function AdminProjects() {
   const handleCreateProject = async () => {
     if (!form.name.trim()) return toast.error("Project name is required");
     try {
-      await api.createProject({ name: form.name.trim(), description: form.description.trim() || undefined });
+      await api.createProject({
+        name: form.name.trim(),
+        description: form.description.trim() || undefined,
+        projectNumber: form.projectNumber.trim() || undefined
+      });
       await Promise.all([refetchProjects(), refetchTasks()]);
-      setForm({ name: "", description: "" });
+      setForm({ name: "", description: "", projectNumber: "" });
       setShowCreate(false);
       toast.success("Project added");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to add project");
+    }
+  };
+
+  const handleSaveSelectedProject = async () => {
+    if (!selectedProjectRecord) return;
+
+    const nextName = selectedProjectForm.name.trim();
+    const nextDescription = selectedProjectForm.description.trim();
+    const nextProjectNumber = selectedProjectForm.projectNumber.trim();
+
+    if (!nextName) {
+      toast.error("Project name is required");
+      return;
+    }
+
+    const payload: Record<string, string> = {};
+    if (nextName !== selectedProjectRecord.name) payload.name = nextName;
+    if (nextDescription !== (selectedProjectRecord.description ?? "")) payload.description = nextDescription;
+    if (nextProjectNumber && nextProjectNumber !== (selectedProjectRecord.projectNumber ?? "")) payload.projectNumber = nextProjectNumber;
+
+    if (Object.keys(payload).length === 0) {
+      setIsEditingSelectedProject(false);
+      return;
+    }
+
+    try {
+      setSavingSelectedProject(true);
+      await api.updateProject(selectedProjectRecord.id, payload);
+      await Promise.all([refetchProjects(), refetchTasks(), queryClient.invalidateQueries({ queryKey: ["projects"] })]);
+      setIsEditingSelectedProject(false);
+      toast.success("Project updated");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update project");
+    } finally {
+      setSavingSelectedProject(false);
     }
   };
 
@@ -888,12 +952,91 @@ export default function AdminProjects() {
       {selectedProject && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm" onClick={() => setSelectedProjectId(null)}>
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} onClick={(event) => event.stopPropagation()} className="glass-panel-strong p-6 w-full max-w-3xl mx-4 max-h-[85vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4"><h3 className="text-lg font-semibold">Project Details</h3><button onClick={() => setSelectedProjectId(null)} className="p-1 rounded-lg hover:bg-secondary/50" title="Close" aria-label="Close"><X className="h-4 w-4" /></button></div>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Project Details</h3>
+              <div className="flex items-center gap-2">
+                {isEditingSelectedProject ? (
+                  <>
+                    {selectedProjectFormDirty ? (
+                      <button
+                        onClick={() => void handleSaveSelectedProject()}
+                        disabled={savingSelectedProject}
+                        className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-primary to-accent text-primary-foreground text-sm font-medium disabled:opacity-60"
+                      >
+                        {savingSelectedProject ? "Saving..." : "Save"}
+                      </button>
+                    ) : null}
+                    <button
+                      onClick={() => {
+                        setIsEditingSelectedProject(false);
+                        setSelectedProjectForm({
+                          name: selectedProjectRecord?.name ?? "",
+                          description: selectedProjectRecord?.description ?? "",
+                          projectNumber: selectedProjectRecord?.projectNumber ?? ""
+                        });
+                      }}
+                      className="px-3 py-1.5 rounded-lg border border-border/50 text-sm"
+                    >
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => setIsEditingSelectedProject(true)}
+                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-primary/40 text-primary text-sm font-medium hover:bg-primary/10 transition-colors"
+                  >
+                    <Pencil className="h-4 w-4" />
+                    Edit
+                  </button>
+                )}
+                <button onClick={() => setSelectedProjectId(null)} className="p-1 rounded-lg hover:bg-secondary/50" title="Close" aria-label="Close"><X className="h-4 w-4" /></button>
+              </div>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm mb-5">
-              <div className="sm:col-span-2"><p className="text-xs text-muted-foreground">Project Name</p><p className="font-medium mt-1">{selectedProject.projectName}</p></div>
-              <div><p className="text-xs text-muted-foreground">Project Number</p><p className="font-medium mt-1">{selectedProject.projectNumber}</p></div>
+              <div className="sm:col-span-2">
+                <p className="text-xs text-muted-foreground">Project Name</p>
+                {isEditingSelectedProject ? (
+                  <input
+                    value={selectedProjectForm.name}
+                    onChange={(event) => setSelectedProjectForm((prev) => ({ ...prev, name: event.target.value }))}
+                    className="w-full mt-1 px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
+                    placeholder="Project name"
+                    title="Project name"
+                  />
+                ) : (
+                  <p className="font-medium mt-1">{selectedProject.projectName}</p>
+                )}
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Project Number</p>
+                {isEditingSelectedProject ? (
+                  <input
+                    value={selectedProjectForm.projectNumber}
+                    onChange={(event) => setSelectedProjectForm((prev) => ({ ...prev, projectNumber: event.target.value.toUpperCase() }))}
+                    className="w-full mt-1 px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50"
+                    placeholder="Project number (optional)"
+                    title="Project number"
+                  />
+                ) : (
+                  <p className="font-medium mt-1">{selectedProject.projectNumber}</p>
+                )}
+              </div>
               <div><p className="text-xs text-muted-foreground">Project Code Prefix</p><p className="font-medium mt-1">{selectedProject.projectCodePrefix || "-"}</p></div>
-              <div className="sm:col-span-2"><p className="text-xs text-muted-foreground">Description</p><p className="mt-1 text-sm">{selectedProject.description.trim() || "No description added."}</p></div>
+              <div className="sm:col-span-2">
+                <p className="text-xs text-muted-foreground">Description</p>
+                {isEditingSelectedProject ? (
+                  <textarea
+                    value={selectedProjectForm.description}
+                    onChange={(event) => setSelectedProjectForm((prev) => ({ ...prev, description: event.target.value }))}
+                    rows={3}
+                    className="w-full mt-1 px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none resize-none focus:border-primary/50"
+                    placeholder="Project description"
+                    title="Project description"
+                  />
+                ) : (
+                  <p className="mt-1 text-sm">{selectedProject.description.trim() || "No description added."}</p>
+                )}
+              </div>
               <div><p className="text-xs text-muted-foreground">Total Tasks</p><p className="font-medium mt-1">{selectedProject.totalTasks}</p></div>
               <div><p className="text-xs text-muted-foreground">Pending</p><p className="font-medium mt-1">{selectedProject.pendingTasks}</p></div>
               <div><p className="text-xs text-muted-foreground">Overdue</p><p className="font-medium mt-1">{selectedProject.overdueTasks}</p></div>
@@ -928,6 +1071,7 @@ export default function AdminProjects() {
             <div className="flex items-center justify-between mb-4"><h3 className="font-semibold">Add Project</h3><button onClick={() => setShowCreate(false)} className="p-1 rounded-lg hover:bg-secondary/50" title="Close" aria-label="Close"><X className="h-4 w-4" /></button></div>
             <div className="space-y-3">
               <input value={form.name} onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))} className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50" placeholder="Project name" title="Project name" />
+              <input value={form.projectNumber} onChange={(event) => setForm((prev) => ({ ...prev, projectNumber: event.target.value.toUpperCase() }))} className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none focus:border-primary/50" placeholder="Project number (optional)" title="Project number" />
               <textarea value={form.description} onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))} rows={3} className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50 text-foreground outline-none resize-none focus:border-primary/50" placeholder="Project description (optional)" title="Project description" />
               <button onClick={() => void handleCreateProject()} className="w-full py-2.5 rounded-xl bg-gradient-to-r from-primary to-accent text-primary-foreground font-medium hover:opacity-90 transition-opacity">Create Project</button>
             </div>

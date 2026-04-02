@@ -14,6 +14,7 @@
     "start:render": "prisma db push --accept-data-loss && node backend/dist/scripts/bootstrap-admin-env.js && node backend/dist/server.js",
     "prisma:migrate": "prisma migrate dev",
     "bootstrap:admin": "tsx backend/src/scripts/bootstrap-admin.ts",
+    "db:wipe:keep-admin": "tsx backend/src/scripts/wipe-db-keep-admin.ts",
     "lint": "eslint .",
     "preview": "vite preview --config frontend/vite.config.ts",
     "test": "vitest run --config frontend/vitest.config.ts",

@@ -459,7 +459,7 @@ export const api = {
     return request<Array<{ id: string; label: string; description: string; reference?: string }>>("/tasks/dpr-activities");
   },
 
-  createProject(payload: { name: string; description?: string }) {
+  createProject(payload: { name: string; description?: string; projectNumber?: string }) {
     return request<ProjectItem>("/projects", {
       method: "POST",
       body: JSON.stringify(payload)

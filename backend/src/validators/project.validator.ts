@@ -2,7 +2,8 @@ import { z } from "zod";
 
 export const createProjectSchema = z.object({
   name: z.string().min(2, "Project name must be at least 2 characters"),
-  description: z.string().optional()
+  description: z.string().optional(),
+  projectNumber: z.string().trim().min(1).optional()
 });
 
 export const updateProjectSchema = z
