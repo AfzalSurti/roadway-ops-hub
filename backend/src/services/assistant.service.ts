@@ -3,165 +3,236 @@ import { env } from "../config/env.js";
 import { logger } from "../config/logger.js";
 import { projectService } from "./project.service.js";
 import { reportRepository } from "../repositories/report.repository.js";
-import { taskRepository } from "../repositories/task.repository.js";
-import { taskService } from "./task.service.js";
-import { userService } from "./user.service.js";
-import { userRepository } from "../repositories/user.repository.js";
 import { commentService } from "./comment.service.js";
+import { taskService } from "./task.service.js";
+import { taskRepository } from "../repositories/task.repository.js";
+import { userRepository } from "../repositories/user.repository.js";
+import { userService } from "./user.service.js";
+import { templateService } from "./template.service.js";
+import { notificationService } from "./notification.service.js";
+    switch (action) {
+      case "ADD_COMMENT": {
+        const taskRef = normalizeText((args as any).taskId ?? (args as any).task ?? (args as any).taskTitle ?? (args as any).taskSearch);
+        const commentBody = normalizeText((args as any).comment ?? (args as any).body ?? "");
 
-type ChatRole = "user" | "assistant";
+        const missingFields: string[] = [];
+        if (!taskRef) missingFields.push("task id or exact task title");
+        if (!commentBody) missingFields.push("comment text");
 
-type ChatMessage = {
-  role: ChatRole;
-  content: string;
-};
-
-type AssistantDraft = {
-  action: AssistantAction;
-  arguments?: Record<string, unknown>;
-  missingFields?: string[];
-};
-
-type AssistantAction =
-  | "CREATE_PROJECT"
-  | "CREATE_TASK"
-  | "CREATE_EMPLOYEE"
-  | "ADD_COMMENT"
-  | "LIST_PROJECTS"
-  | "LIST_TASKS"
-  | "EMPLOYEE_PERFORMANCE"
-  | "PENDING_TASKS_MONTH"
-  | "SHOW_PENDING_TASK_DETAILS"
-  | "DOWNLOAD_EMPLOYEE_REPORT"
-  | "HELP"
-  | "UNKNOWN";
-
-type PlannerResult = {
-  action: AssistantAction;
-  arguments?: Record<string, unknown>;
-  summary?: string;
-};
-
-type AssistantResult = {
-  status: "completed" | "needs_input" | "failed";
-  action: AssistantAction;
-  reply: string;
-  missingFields?: string[];
-  result?: unknown;
-  generatedCredentials?: { email: string; password: string };
-  draft?: AssistantDraft;
-};
-
-const ACTION_HELP_TEXT =
-  "I can help with: create project, create task, add team member, list projects, list tasks, show employee performance, show pending tasks this month, and download an employee report.";
-
-function normalizeText(input: unknown): string {
-  return typeof input === "string" ? input.trim() : "";
-}
-
-function toNumber(input: unknown): number | null {
-  if (typeof input === "number" && Number.isFinite(input)) {
-    return input;
-  }
-  if (typeof input === "string") {
-    const parsed = Number(input);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-  return null;
-}
-
-function formatDate(value: Date): string {
-  return value.toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric"
-  });
-}
-
-function extractJson(text: string): PlannerResult | null {
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  if (start === -1 || end === -1 || end <= start) {
-    return null;
-  }
-
-  const raw = text.slice(start, end + 1);
-  try {
-    const parsed = JSON.parse(raw) as PlannerResult;
-    if (!parsed || typeof parsed !== "object") {
-      return null;
-    }
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-function parseDateInput(input: unknown): Date | null {
-  const text = normalizeText(input).toLowerCase();
-  if (!text) return null;
-  if (text === "today") return new Date();
-  if (text === "tomorrow") {
-    const next = new Date();
-    next.setDate(next.getDate() + 1);
-    return next;
-  }
-
-  const parsed = new Date(text);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return parsed;
-}
-
-function isCommandLike(message: string): boolean {
-  return /\b(create|add|list|show|download|export|employee|project|task|report|member|name|email|password|details|status|assign|review)\b/i.test(message);
-}
-
-function extractEmail(message: string): string {
-  return message.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi)?.[0]?.toLowerCase() ?? "";
-}
-
-function extractFollowUpArguments(
-  action: AssistantAction,
-  message: string,
-  missingFields: string[] = []
-): Record<string, unknown> {
-  const lower = message.toLowerCase();
-  const simpleValue = normalizeText(message);
-  const email = extractEmail(message);
-  const textFields = missingFields.map((field) => field.toLowerCase());
-
-  const prefersField = (...needles: string[]) => textFields.some((field) => needles.some((needle) => field.includes(needle)));
-
-  switch (action) {
-    case "ADD_COMMENT": {
-      const taskIdMatch = message.match(/task\s+#?([A-Za-z0-9-]+)/i);
-      const commentMatch = message.match(/comment\s*[:=-]?\s*(.+)$/i);
-      const args: Record<string, unknown> = {};
-
-      if (taskIdMatch && normalizeText(taskIdMatch[1])) {
-        args.taskId = normalizeText(taskIdMatch[1]);
-      } else if (!isCommandLike(simpleValue) && simpleValue && simpleValue.length < 60 && !commentMatch) {
-        // short free-text could be a task id or title
-        args.taskId = simpleValue;
-      }
-
-      if (commentMatch && normalizeText(commentMatch[1])) {
-        args.comment = normalizeText(commentMatch[1]);
-      } else if (!isCommandLike(simpleValue) && simpleValue && simpleValue.length > 1) {
-        // assume longer free-text is the comment body
-        if (simpleValue.length > 40 || /\s/.test(simpleValue)) {
-          args.comment = simpleValue;
+        if (missingFields.length) {
+          return {
+            status: "needs_input",
+            action,
+            missingFields,
+            reply: `Please provide: ${missingFields.join(", ")}.`,
+            draft: { action, arguments: args, missingFields }
+          };
         }
+
+        const resolved = await resolveTaskByReference(taskRef, input.user);
+        if (!resolved.task) {
+          if (resolved.matches.length > 1) {
+            const lines = resolved.matches.map((item, index) => `${index + 1}. ${item.title} (${item.id})`).slice(0, 5);
+            return {
+              status: "needs_input",
+              action,
+              missingFields: ["task id or exact task title"],
+              reply: `I found multiple tasks matching "${taskRef}". Please provide the exact task id:\n${lines.join("\n")}`,
+              draft: { action, arguments: args, missingFields: ["task id or exact task title"] }
+            };
+          }
+
+          return {
+            status: "needs_input",
+            action,
+            missingFields: ["task id or exact task title"],
+            reply: "I couldn't find a matching task. Please provide the exact task id or full task title.",
+            draft: { action, arguments: args, missingFields: ["task id or exact task title"] }
+          };
+        }
+
+        const created = await commentService.create(resolved.task.id, commentBody, { id: input.user.id, role: input.user.role as any });
+        return {
+          status: "completed",
+          action,
+          result: created,
+          reply: `Comment added to task: ${resolved.task.title}.`
+        };
       }
+      case "LIST_COMMENTS": {
+        const taskRef = normalizeText((args as any).taskId ?? (args as any).task ?? (args as any).taskTitle ?? (args as any).taskSearch);
 
-      return args;
-    }
-    case "CREATE_PROJECT": {
-      const nameMatch = message.match(/(?:project\s+name\s*[:=-]?\s*|name\s*[:=-]?\s*|project\s+)(.+)$/i);
-      const descriptionMatch = message.match(/description\s*[:=-]?\s*(.+)$/i);
-      const args: Record<string, unknown> = {};
+        if (!taskRef) {
+          return {
+            status: "needs_input",
+            action,
+            missingFields: ["task id or exact task title"],
+            reply: "Please provide the task id or exact task title so I can list its comments.",
+            draft: { action, arguments: args, missingFields: ["task id or exact task title"] }
+          };
+        }
 
-      if (prefersField("name") && normalizeText(nameMatch?.[1])) {
+        const resolved = await resolveTaskByReference(taskRef, input.user);
+        if (!resolved.task) {
+          if (resolved.matches.length > 1) {
+            const lines = resolved.matches.map((item, index) => `${index + 1}. ${item.title} (${item.id})`).slice(0, 5);
+            return {
+              status: "needs_input",
+              action,
+              missingFields: ["task id or exact task title"],
+              reply: `I found multiple tasks matching "${taskRef}". Please provide the exact task id:\n${lines.join("\n")}`,
+              draft: { action, arguments: args, missingFields: ["task id or exact task title"] }
+            };
+          }
+
+          return {
+            status: "needs_input",
+            action,
+            missingFields: ["task id or exact task title"],
+            reply: "I couldn't find a matching task. Please provide the exact task id or full task title.",
+            draft: { action, arguments: args, missingFields: ["task id or exact task title"] }
+          };
+        }
+
+        const comments = await commentService.list(resolved.task.id, { id: input.user.id, role: input.user.role as any });
+        if (!comments.length) {
+          return { status: "completed", action, result: [], reply: `No comments found for task ${resolved.task.title}.` };
+        }
+
+        const lines = comments.map((comment, index) => `${index + 1}. ${comment.body} (${formatDate(new Date(comment.createdAt))})`);
+        return {
+          status: "completed",
+          action,
+          result: comments,
+          reply: `Comments for ${resolved.task.title}:\n${lines.join("\n")}`
+        };
+      }
+      case "LIST_NOTIFICATIONS": {
+        const limit = Math.min(20, Math.max(1, toNumber((args as any).limit) ?? 10));
+        const notifications = await notificationService.listForUser(input.user.id, limit);
+        if (!notifications.length) {
+          return { status: "completed", action, result: [], reply: "You have no notifications." };
+        }
+
+        return {
+          status: "completed",
+          action,
+          result: notifications,
+          reply: [`Here are your latest ${notifications.length} notifications:`, ...notifications.map((notification, index) => `${index + 1}. ${formatNotificationLine(notification)}`)].join("\n")
+        };
+      }
+      case "MARK_NOTIFICATION_READ": {
+        const notificationId = normalizeText((args as any).notificationId ?? (args as any).id);
+        if (!notificationId) {
+          return {
+            status: "needs_input",
+            action,
+            missingFields: ["notification id"],
+            reply: "Please provide the notification id to mark it as read.",
+            draft: { action, arguments: args, missingFields: ["notification id"] }
+          };
+        }
+
+        const result = await notificationService.markRead(notificationId, input.user.id);
+        return {
+          status: "completed",
+          action,
+          result,
+          reply: result.updated ? "Notification marked as read." : "No matching notification was found."
+        };
+      }
+      case "MARK_ALL_NOTIFICATIONS_READ": {
+        const result = await notificationService.markAllRead(input.user.id);
+        return {
+          status: "completed",
+          action,
+          result,
+          reply: result.updated ? `Marked ${result.updated} notification(s) as read.` : "You had no unread notifications."
+        };
+      }
+      case "LIST_TEMPLATES": {
+        const templates = await templateService.list();
+        if (!templates.length) {
+          return { status: "completed", action, result: [], reply: "No templates found." };
+        }
+
+        const lines = templates.map((template, index) => `${index + 1}. ${template.name}${template.description ? ` - ${template.description}` : ""}`);
+        return {
+          status: "completed",
+          action,
+          result: templates,
+          reply: `Here are the available templates:\n${lines.join("\n")}`
+        };
+      }
+      case "CREATE_TEMPLATE": {
+        const name = normalizeText((args as any).name);
+        const description = normalizeText((args as any).description) || undefined;
+        const fields = Array.isArray((args as any).fields) ? (args as any).fields : [];
+
+        if (!name) {
+          return {
+            status: "needs_input",
+            action,
+            missingFields: ["template name"],
+            reply: "Please provide the template name to create it.",
+            draft: { action, arguments: args, missingFields: ["template name"] }
+          };
+        }
+
+        const existing = await templateService.list();
+        const duplicate = existing.find((template) => template.name.toLowerCase() === name.toLowerCase());
+        if (duplicate) {
+          return { status: "failed", action, reply: `A template named "${name}" already exists.` };
+        }
+
+        const result = await templateService.create({ name, description, fields }, input.user.id);
+        return { status: "completed", action, result, reply: `Template created: ${result.name}.` };
+      }
+      case "UPDATE_TEMPLATE": {
+        const templateRef = normalizeText((args as any).templateRef ?? (args as any).id ?? (args as any).name);
+        const name = normalizeText((args as any).name);
+        const description = normalizeText((args as any).description) || undefined;
+        const fields = Array.isArray((args as any).fields) ? (args as any).fields : undefined;
+
+        if (!templateRef) {
+          return {
+            status: "needs_input",
+            action,
+            missingFields: ["template id or name"],
+            reply: "Please provide the template id or exact name to update it.",
+            draft: { action, arguments: args, missingFields: ["template id or name"] }
+          };
+        }
+
+        const template = await resolveTemplateByReference(templateRef);
+        if (!template) {
+          return { status: "failed", action, reply: `No template found for "${templateRef}".` };
+        }
+
+        const result = await templateService.update(template.id, { name: name || undefined, description, fields }, input.user.id);
+        return { status: "completed", action, result, reply: `Template updated: ${result.name}.` };
+      }
+      case "DELETE_TEMPLATE": {
+        const templateRef = normalizeText((args as any).templateRef ?? (args as any).id ?? (args as any).name);
+
+        if (!templateRef) {
+          return {
+            status: "needs_input",
+            action,
+            missingFields: ["template id or name"],
+            reply: "Please provide the template id or exact name to delete it.",
+            draft: { action, arguments: args, missingFields: ["template id or name"] }
+          };
+        }
+
+        const template = await resolveTemplateByReference(templateRef);
+        if (!template) {
+          return { status: "failed", action, reply: `No template found for "${templateRef}".` };
+        }
+
+        await templateService.remove(template.id);
+        return { status: "completed", action, reply: `Template deleted: ${template.name}.` };
+      }
         args.name = normalizeText(nameMatch?.[1]);
       } else if (prefersField("name") && simpleValue && !isCommandLike(simpleValue)) {
         args.name = simpleValue;
@@ -277,6 +348,43 @@ function extractFollowUpArguments(
   }
 }
 
+async function resolveTaskByReference(reference: string, user: { id: string; role: string }) {
+  const trimmed = normalizeText(reference);
+  if (!trimmed) {
+    return { task: null as { id: string; title: string } | null, matches: [] as Array<{ id: string; title: string }> };
+  }
+
+  try {
+    const task = await taskService.getById(trimmed);
+    return { task: task as { id: string; title: string }, matches: [] as Array<{ id: string; title: string }> };
+  } catch {
+    const list = await taskService.list({ id: user.id, role: user.role as "ADMIN" | "EMPLOYEE" }, { search: trimmed, limit: 10 });
+    const matches = list.items.map((item) => ({ id: item.id, title: item.title }));
+    if (matches.length === 1) {
+      return { task: matches[0], matches };
+    }
+    return { task: null, matches };
+  }
+}
+
+async function resolveTemplateByReference(reference: string) {
+  const trimmed = normalizeText(reference);
+  if (!trimmed) {
+    return null;
+  }
+
+  try {
+    return await templateService.getById(trimmed);
+  } catch {
+    const templates = await templateService.list();
+    return templates.find((template) => template.name.toLowerCase() === trimmed.toLowerCase()) ?? null;
+  }
+}
+
+function formatNotificationLine(notification: { id: string; title: string; message: string; isRead: boolean; createdAt: Date | string }) {
+  return `${notification.id} | ${notification.isRead ? "read" : "unread"} | ${notification.title} | ${notification.message} | ${new Date(notification.createdAt).toLocaleString("en-IN")}`;
+}
+
 function mergeDraftArguments(
   action: AssistantAction,
   baseArguments: Record<string, unknown>,
@@ -340,6 +448,56 @@ function fallbackPlanner(message: string, conversation: ChatMessage[]): PlannerR
     return { action: "PENDING_TASKS_MONTH" };
   }
 
+  if (/(comment|reply|add comment|post comment|show comments|list comments)/.test(lower) && /task/.test(lower)) {
+    const taskIdMatch = message.match(/task\s+#?([A-Za-z0-9-]+)/i);
+    const commentMatch = message.match(/comment\s*[:=-]?\s*(.+)$/i);
+    const isList = /show comments|list comments|view comments/.test(lower);
+    return {
+      action: isList ? "LIST_COMMENTS" : "ADD_COMMENT",
+      arguments: {
+        taskId: normalizeText(taskIdMatch?.[1]),
+        comment: isList ? undefined : normalizeText(commentMatch?.[1])
+      }
+    };
+  }
+
+  if (/notification|notifications/.test(lower) && /(list|show|view|mark|read)/.test(lower)) {
+    const notificationIdMatch = message.match(/notification\s+#?([A-Za-z0-9-]+)/i);
+    if (/mark\s+all|read\s+all/.test(lower)) {
+      return { action: "MARK_ALL_NOTIFICATIONS_READ" };
+    }
+    if (/mark|read/.test(lower) && notificationIdMatch) {
+      return { action: "MARK_NOTIFICATION_READ", arguments: { notificationId: normalizeText(notificationIdMatch[1]) } };
+    }
+    return { action: "LIST_NOTIFICATIONS", arguments: { limit: 10 } };
+  }
+
+  if (/template|report\s+template/.test(lower) && /(list|show|create|add|update|edit|delete|remove)/.test(lower)) {
+    const nameMatch = message.match(/(?:template\s+name\s*[:=-]?|template\s+)(.+)$/i);
+    const templateIdMatch = message.match(/template\s+#?([A-Za-z0-9-]+)/i);
+    if (/list|show/.test(lower) && !/create|add|update|edit|delete|remove/.test(lower)) {
+      return { action: "LIST_TEMPLATES" };
+    }
+    if (/create|add/.test(lower)) {
+      return {
+        action: "CREATE_TEMPLATE",
+        arguments: { name: normalizeText(nameMatch?.[1]) }
+      };
+    }
+    if (/update|edit/.test(lower)) {
+      return {
+        action: "UPDATE_TEMPLATE",
+        arguments: { templateRef: normalizeText(templateIdMatch?.[1] ?? nameMatch?.[1]) }
+      };
+    }
+    if (/delete|remove/.test(lower)) {
+      return {
+        action: "DELETE_TEMPLATE",
+        arguments: { templateRef: normalizeText(templateIdMatch?.[1] ?? nameMatch?.[1]) }
+      };
+    }
+  }
+
   if (/create\s+project|add\s+project/.test(lower)) {
     const nameMatch = message.match(/(?:project\s+name\s*[:=-]?|create\s+project\s+)(.+)$/i);
     return {
@@ -399,13 +557,21 @@ async function planWithGroq(message: string, conversation: ChatMessage[]): Promi
   const systemPrompt = [
     "You are an assistant that converts chat into a strict JSON command.",
     "Return JSON only.",
-    "Actions: CREATE_PROJECT, CREATE_TASK, CREATE_EMPLOYEE, ADD_COMMENT, LIST_PROJECTS, LIST_TASKS, EMPLOYEE_PERFORMANCE, PENDING_TASKS_MONTH, SHOW_PENDING_TASK_DETAILS, DOWNLOAD_EMPLOYEE_REPORT, HELP, UNKNOWN.",
+    "Actions: CREATE_PROJECT, CREATE_TASK, CREATE_EMPLOYEE, ADD_COMMENT, LIST_COMMENTS, LIST_PROJECTS, LIST_TASKS, LIST_NOTIFICATIONS, MARK_NOTIFICATION_READ, MARK_ALL_NOTIFICATIONS_READ, LIST_TEMPLATES, CREATE_TEMPLATE, UPDATE_TEMPLATE, DELETE_TEMPLATE, EMPLOYEE_PERFORMANCE, PENDING_TASKS_MONTH, SHOW_PENDING_TASK_DETAILS, DOWNLOAD_EMPLOYEE_REPORT, HELP, UNKNOWN.",
     "For CREATE_PROJECT arguments: name, description.",
     "For CREATE_TASK arguments: title, description, project, assignedToEmail, assignedToName, allocatedAt, allottedDays.",
     "For CREATE_EMPLOYEE arguments: name, email, password, passwordMode (AUTO|MANUAL).",
     "For ADD_COMMENT arguments: taskId, comment",
+    "For LIST_COMMENTS arguments: taskId.",
     "For LIST_PROJECTS arguments: limit.",
     "For LIST_TASKS arguments: status, assignedToEmail, limit.",
+    "For LIST_NOTIFICATIONS arguments: limit.",
+    "For MARK_NOTIFICATION_READ arguments: notificationId.",
+    "For MARK_ALL_NOTIFICATIONS_READ arguments: no fields needed.",
+    "For LIST_TEMPLATES arguments: no fields needed.",
+    "For CREATE_TEMPLATE arguments: name, description, fields.",
+    "For UPDATE_TEMPLATE arguments: templateRef, name, description, fields.",
+    "For DELETE_TEMPLATE arguments: templateRef.",
     "For EMPLOYEE_PERFORMANCE arguments: employeeName, employeeEmail.",
     "For PENDING_TASKS_MONTH arguments: no fields needed.",
     "For SHOW_PENDING_TASK_DETAILS arguments: no fields needed.",
@@ -686,51 +852,209 @@ export const assistantService = {
           };
         }
 
-        try {
-          // try resolve as id first
-          let resolvedTaskId: string | null = null;
-          try {
-            const t = await taskService.getById(taskRef);
-            resolvedTaskId = t.id;
-          } catch {
-            // not an id or not found, try search by title
+        const resolved = await resolveTaskByReference(taskRef, input.user);
+        if (!resolved.task) {
+          if (resolved.matches.length > 1) {
+            const lines = resolved.matches.map((item, index) => `${index + 1}. ${item.title} (${item.id})`).slice(0, 5);
+            return {
+              status: "needs_input",
+              action,
+              missingFields: ["task id or exact task title"],
+              reply: `I found multiple tasks matching "${taskRef}". Please provide the exact task id:\n${lines.join("\n")}`,
+              draft: { action, arguments: args, missingFields: ["task id or exact task title"] }
+            };
           }
 
-          if (!resolvedTaskId) {
-            const list = await taskService.list({ id: input.user.id, role: input.user.role as any }, { search: taskRef, limit: 10 });
-            if (list.items.length === 1) {
-              resolvedTaskId = list.items[0].id;
-            } else if (!list.items.length) {
-              return {
-                status: "needs_input",
-                action,
-                missingFields: ["task id or exact task title"],
-                reply: "I couldn't find a matching task. Please provide the exact task id or full task title.",
-                draft: { action, arguments: args, missingFields: ["task id or exact task title"] }
-              };
-            } else {
-              const lines = list.items.map((t, i) => `${i + 1}. ${t.title} (${t.id})`).slice(0, 5);
-              return {
-                status: "needs_input",
-                action,
-                missingFields: ["task id or exact task title"],
-                reply: `I found multiple tasks matching "${taskRef}". Please provide the task id exactly from the list:\n${lines.join("\n")}`,
-                draft: { action, arguments: args, missingFields: ["task id or exact task title"] }
-              };
-            }
-          }
-
-          const created = await commentService.create(resolvedTaskId, commentBody, { id: input.user.id, role: input.user.role as any });
           return {
-            status: "completed",
+            status: "needs_input",
             action,
-            result: created,
-            reply: `Comment added to task: ${created.taskId}`
+            missingFields: ["task id or exact task title"],
+            reply: "I couldn't find a matching task. Please provide the exact task id or full task title.",
+            draft: { action, arguments: args, missingFields: ["task id or exact task title"] }
           };
-        } catch (err: any) {
-          logger.warn({ err }, "Failed to add comment via assistant");
-          return { status: "failed", action, reply: err?.message ?? "Failed to add comment" };
         }
+
+        const created = await commentService.create(resolved.task.id, commentBody, { id: input.user.id, role: input.user.role as any });
+        return {
+          status: "completed",
+          action,
+          result: created,
+          reply: `Comment added to task: ${resolved.task.title}.`
+        };
+      }
+      case "LIST_COMMENTS": {
+        const taskRef = normalizeText((args as any).taskId ?? (args as any).task ?? (args as any).taskTitle ?? (args as any).taskSearch);
+
+        if (!taskRef) {
+          return {
+            status: "needs_input",
+            action,
+            missingFields: ["task id or exact task title"],
+            reply: "Please provide the task id or exact task title so I can list its comments.",
+            draft: { action, arguments: args, missingFields: ["task id or exact task title"] }
+          };
+        }
+
+        const resolved = await resolveTaskByReference(taskRef, input.user);
+        if (!resolved.task) {
+          if (resolved.matches.length > 1) {
+            const lines = resolved.matches.map((item, index) => `${index + 1}. ${item.title} (${item.id})`).slice(0, 5);
+            return {
+              status: "needs_input",
+              action,
+              missingFields: ["task id or exact task title"],
+              reply: `I found multiple tasks matching "${taskRef}". Please provide the exact task id:\n${lines.join("\n")}`,
+              draft: { action, arguments: args, missingFields: ["task id or exact task title"] }
+            };
+          }
+
+          return {
+            status: "needs_input",
+            action,
+            missingFields: ["task id or exact task title"],
+            reply: "I couldn't find a matching task. Please provide the exact task id or full task title.",
+            draft: { action, arguments: args, missingFields: ["task id or exact task title"] }
+          };
+        }
+
+        const comments = await commentService.list(resolved.task.id, { id: input.user.id, role: input.user.role as any });
+        if (!comments.length) {
+          return { status: "completed", action, result: [], reply: `No comments found for task ${resolved.task.title}.` };
+        }
+
+        const lines = comments.map((comment, index) => `${index + 1}. ${comment.body} (${formatDate(new Date(comment.createdAt))})`);
+        return {
+          status: "completed",
+          action,
+          result: comments,
+          reply: `Comments for ${resolved.task.title}:\n${lines.join("\n")}`
+        };
+      }
+      case "LIST_NOTIFICATIONS": {
+        const limit = Math.min(20, Math.max(1, toNumber((args as any).limit) ?? 10));
+        const notifications = await notificationService.listForUser(input.user.id, limit);
+        if (!notifications.length) {
+          return { status: "completed", action, result: [], reply: "You have no notifications." };
+        }
+
+        return {
+          status: "completed",
+          action,
+          result: notifications,
+          reply: [`Here are your latest ${notifications.length} notifications:`, ...notifications.map((notification, index) => `${index + 1}. ${formatNotificationLine(notification)}`)].join("\n")
+        };
+      }
+      case "MARK_NOTIFICATION_READ": {
+        const notificationId = normalizeText((args as any).notificationId ?? (args as any).id);
+        if (!notificationId) {
+          return {
+            status: "needs_input",
+            action,
+            missingFields: ["notification id"],
+            reply: "Please provide the notification id to mark it as read.",
+            draft: { action, arguments: args, missingFields: ["notification id"] }
+          };
+        }
+
+        const result = await notificationService.markRead(notificationId, input.user.id);
+        return {
+          status: "completed",
+          action,
+          result,
+          reply: result.updated ? "Notification marked as read." : "No matching notification was found."
+        };
+      }
+      case "MARK_ALL_NOTIFICATIONS_READ": {
+        const result = await notificationService.markAllRead(input.user.id);
+        return {
+          status: "completed",
+          action,
+          result,
+          reply: result.updated ? `Marked ${result.updated} notification(s) as read.` : "You had no unread notifications."
+        };
+      }
+      case "LIST_TEMPLATES": {
+        const templates = await templateService.list();
+        if (!templates.length) {
+          return { status: "completed", action, result: [], reply: "No templates found." };
+        }
+
+        const lines = templates.map((template, index) => `${index + 1}. ${template.name}${template.description ? ` - ${template.description}` : ""}`);
+        return {
+          status: "completed",
+          action,
+          result: templates,
+          reply: `Here are the available templates:\n${lines.join("\n")}`
+        };
+      }
+      case "CREATE_TEMPLATE": {
+        const name = normalizeText((args as any).name);
+        const description = normalizeText((args as any).description) || undefined;
+        const fields = Array.isArray((args as any).fields) ? (args as any).fields : [];
+
+        if (!name) {
+          return {
+            status: "needs_input",
+            action,
+            missingFields: ["template name"],
+            reply: "Please provide the template name to create it.",
+            draft: { action, arguments: args, missingFields: ["template name"] }
+          };
+        }
+
+        const existing = await templateService.list();
+        const duplicate = existing.find((template) => template.name.toLowerCase() === name.toLowerCase());
+        if (duplicate) {
+          return { status: "failed", action, reply: `A template named "${name}" already exists.` };
+        }
+
+        const result = await templateService.create({ name, description, fields }, input.user.id);
+        return { status: "completed", action, result, reply: `Template created: ${result.name}.` };
+      }
+      case "UPDATE_TEMPLATE": {
+        const templateRef = normalizeText((args as any).templateRef ?? (args as any).id ?? (args as any).name);
+        const name = normalizeText((args as any).name);
+        const description = normalizeText((args as any).description) || undefined;
+        const fields = Array.isArray((args as any).fields) ? (args as any).fields : undefined;
+
+        if (!templateRef) {
+          return {
+            status: "needs_input",
+            action,
+            missingFields: ["template id or name"],
+            reply: "Please provide the template id or exact name to update it.",
+            draft: { action, arguments: args, missingFields: ["template id or name"] }
+          };
+        }
+
+        const template = await resolveTemplateByReference(templateRef);
+        if (!template) {
+          return { status: "failed", action, reply: `No template found for "${templateRef}".` };
+        }
+
+        const result = await templateService.update(template.id, { name: name || undefined, description, fields }, input.user.id);
+        return { status: "completed", action, result, reply: `Template updated: ${result.name}.` };
+      }
+      case "DELETE_TEMPLATE": {
+        const templateRef = normalizeText((args as any).templateRef ?? (args as any).id ?? (args as any).name);
+
+        if (!templateRef) {
+          return {
+            status: "needs_input",
+            action,
+            missingFields: ["template id or name"],
+            reply: "Please provide the template id or exact name to delete it.",
+            draft: { action, arguments: args, missingFields: ["template id or name"] }
+          };
+        }
+
+        const template = await resolveTemplateByReference(templateRef);
+        if (!template) {
+          return { status: "failed", action, reply: `No template found for "${templateRef}".` };
+        }
+
+        await templateService.remove(template.id);
+        return { status: "completed", action, reply: `Template deleted: ${template.name}.` };
       }
       case "CREATE_PROJECT": {
         const roleError = requireAdmin(input.user.role);
