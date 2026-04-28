@@ -37,6 +37,7 @@ type AssistantAction =
   | "PENDING_TASKS_MONTH"
   | "SHOW_PENDING_TASK_DETAILS"
   | "DOWNLOAD_EMPLOYEE_REPORT"
+  | "GENERAL_QUERY"
   | "HELP"
   | "UNKNOWN";
 
@@ -376,6 +377,16 @@ function fallbackPlanner(message: string, conversation: ChatMessage[]): PlannerR
     return { action: "LIST_TASKS", arguments: { limit: 10 } };
   }
 
+  // Check if message looks like a general question or inquiry
+  if (/\?$/.test(message.trim()) || /^(what|how|why|when|where|who|tell|explain|describe)\s+/i.test(message)) {
+    return { action: "GENERAL_QUERY", arguments: { query: message } };
+  }
+
+  // Any other input that isn't a command goes to GENERAL_QUERY for conversational response
+  if (message.length > 3 && !isCommandLike(message)) {
+    return { action: "GENERAL_QUERY", arguments: { query: message } };
+  }
+
   return { action: "HELP" };
 }
 
@@ -387,7 +398,7 @@ async function planWithGroq(message: string, conversation: ChatMessage[]): Promi
   const systemPrompt = [
     "You are an assistant that converts chat into a strict JSON command.",
     "Return JSON only.",
-    "Actions: CREATE_PROJECT, CREATE_TASK, CREATE_EMPLOYEE, ADD_COMMENT, LIST_PROJECTS, LIST_TASKS, EMPLOYEE_PERFORMANCE, PENDING_TASKS_MONTH, SHOW_PENDING_TASK_DETAILS, DOWNLOAD_EMPLOYEE_REPORT, HELP, UNKNOWN.",
+    "Actions: CREATE_PROJECT, CREATE_TASK, CREATE_EMPLOYEE, ADD_COMMENT, LIST_PROJECTS, LIST_TASKS, EMPLOYEE_PERFORMANCE, PENDING_TASKS_MONTH, SHOW_PENDING_TASK_DETAILS, DOWNLOAD_EMPLOYEE_REPORT, GENERAL_QUERY, HELP, UNKNOWN.",
     "For CREATE_PROJECT arguments: name, description.",
     "For CREATE_TASK arguments: title, description, project, assignedToEmail, assignedToName, allocatedAt, allottedDays.",
     "For CREATE_EMPLOYEE arguments: name, email, password, passwordMode (AUTO|MANUAL).",
@@ -398,6 +409,8 @@ async function planWithGroq(message: string, conversation: ChatMessage[]): Promi
     "For PENDING_TASKS_MONTH arguments: no fields needed.",
     "For SHOW_PENDING_TASK_DETAILS arguments: no fields needed.",
     "For DOWNLOAD_EMPLOYEE_REPORT arguments: employeeName, employeeEmail, format (pdf|excel|csv).",
+    "For GENERAL_QUERY arguments: query (the user's question or statement).",
+    "Use GENERAL_QUERY for: questions about features, explanations, how-tos, general inquiries not fitting structured actions.",
     "If user omitted details, keep fields empty or null; do not invent emails.",
     "JSON shape: {\"action\":\"...\",\"arguments\":{},\"summary\":\"...\"}"
   ].join("\n");
@@ -962,6 +975,63 @@ export const assistantService = {
             format: format === "excel" || format === "csv" ? format : "pdf"
           },
           reply: `Preparing ${employee.name}'s report download for ${start.toLocaleDateString("en-IN", { month: "long", year: "numeric" })}.`
+        };
+      }
+
+      case "GENERAL_QUERY": {
+        const query = normalizeText((args as any).query ?? input.message);
+        if (!query) {
+          return { status: "completed", action, reply: "I'm ready to help. What would you like to know?" };
+        }
+
+        // Try to generate a conversational response using Groq
+        try {
+          const messages = [
+            ...input.conversation.slice(-6).map((item) => ({ role: item.role, content: item.content })),
+            { role: "user", content: query }
+          ];
+
+          const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${env.GROQ_API}`
+            },
+            body: JSON.stringify({
+              model: env.GROQ_MODEL,
+              temperature: 0.7,
+              messages: [
+                {
+                  role: "system",
+                  content:
+                    "You are a helpful assistant for a project and task management system. Provide clear, concise, friendly answers about features, how to use the system, and general inquiries. Keep responses concise and actionable."
+                },
+                ...messages
+              ]
+            })
+          });
+
+          if (!response.ok) {
+            logger.warn({ status: response.status }, "Groq general query request failed");
+          } else {
+            const payload = (await response.json()) as {
+              choices?: Array<{ message?: { content?: string } }>;
+            };
+
+            const content = payload.choices?.[0]?.message?.content;
+            if (content) {
+              return { status: "completed", action, reply: content };
+            }
+          }
+        } catch (error) {
+          logger.warn({ err: error }, "Groq general query unavailable");
+        }
+
+        // Fallback: provide a friendly response with guidance
+        return {
+          status: "completed",
+          action,
+          reply: `That's a great question! I can help with: creating projects, tasks, and team members; listing and searching projects and tasks; checking employee performance; reviewing pending tasks; and downloading reports. If you need specific help with any of these, just ask!`
         };
       }
 

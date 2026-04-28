@@ -19,6 +19,7 @@ const assistantActionSchema = z.enum([
   "LIST_NOTIFICATIONS",
   "MARK_NOTIFICATION_READ",
   "MARK_ALL_NOTIFICATIONS_READ",
+  "GENERAL_QUERY",
   "HELP",
   "UNKNOWN"
 ]);
