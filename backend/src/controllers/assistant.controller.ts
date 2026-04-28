@@ -7,7 +7,8 @@ export const assistantController = {
     const result = await assistantService.chat({
       user: req.user!,
       message: req.body.message,
-      conversation: req.body.conversation ?? []
+      conversation: req.body.conversation ?? [],
+      draft: req.body.draft
     });
 
     return sendSuccess(res, result);

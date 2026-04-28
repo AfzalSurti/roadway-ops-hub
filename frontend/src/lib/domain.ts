@@ -168,6 +168,12 @@ export type AssistantConversationMessage = {
   content: string;
 };
 
+export type AssistantDraft = {
+  action: string;
+  arguments?: Record<string, unknown>;
+  missingFields?: string[];
+};
+
 export type AssistantChatResponse = {
   status: "completed" | "needs_input" | "failed";
   action: string;
@@ -178,6 +184,7 @@ export type AssistantChatResponse = {
     email: string;
     password: string;
   };
+  draft?: AssistantDraft;
 };
 
 export type FinancialPlanItem = {

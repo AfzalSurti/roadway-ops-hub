@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { MessageCircle, Send, X } from "lucide-react";
 import { api } from "@/lib/api";
-import type { AssistantConversationMessage } from "@/lib/domain";
+import type { AssistantConversationMessage, AssistantDraft } from "@/lib/domain";
 import { downloadEmployeeAssistantReport } from "@/lib/assistant-report-export";
 import { toast } from "sonner";
 
@@ -18,6 +18,7 @@ export function ChatAssistant() {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [pendingDraft, setPendingDraft] = useState<AssistantDraft | null>(null);
   const [messages, setMessages] = useState<UiMessage[]>([
     {
       id: "assistant-start",
@@ -50,7 +51,8 @@ export function ChatAssistant() {
     try {
       const response = await api.chatAssistant({
         message: value,
-        conversation: [...conversation, { role: "user", content: value }].slice(-20)
+        conversation: [...conversation, { role: "user", content: value }].slice(-20),
+        draft: pendingDraft ?? undefined
       });
 
       if (
@@ -86,6 +88,12 @@ export function ChatAssistant() {
       const assistantText = response.generatedCredentials
         ? `${response.reply}\n\nCredentials:\nEmail: ${response.generatedCredentials.email}\nPassword: ${response.generatedCredentials.password}`
         : response.reply;
+
+      if (response.status === "needs_input") {
+        setPendingDraft(response.draft ?? { action: response.action, arguments: {}, missingFields: response.missingFields ?? [] });
+      } else {
+        setPendingDraft(null);
+      }
 
       setMessages((prev) => [
         ...prev,

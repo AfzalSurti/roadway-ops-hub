@@ -15,6 +15,12 @@ type ChatMessage = {
   content: string;
 };
 
+type AssistantDraft = {
+  action: AssistantAction;
+  arguments?: Record<string, unknown>;
+  missingFields?: string[];
+};
+
 type AssistantAction =
   | "CREATE_PROJECT"
   | "CREATE_TASK"
@@ -41,6 +47,7 @@ type AssistantResult = {
   missingFields?: string[];
   result?: unknown;
   generatedCredentials?: { email: string; password: string };
+  draft?: AssistantDraft;
 };
 
 const ACTION_HELP_TEXT =
@@ -101,6 +108,160 @@ function parseDateInput(input: unknown): Date | null {
   const parsed = new Date(text);
   if (Number.isNaN(parsed.getTime())) return null;
   return parsed;
+}
+
+function isCommandLike(message: string): boolean {
+  return /\b(create|add|list|show|download|export|employee|project|task|report|member|name|email|password|details|status|assign|review)\b/i.test(message);
+}
+
+function extractEmail(message: string): string {
+  return message.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi)?.[0]?.toLowerCase() ?? "";
+}
+
+function extractFollowUpArguments(
+  action: AssistantAction,
+  message: string,
+  missingFields: string[] = []
+): Record<string, unknown> {
+  const lower = message.toLowerCase();
+  const simpleValue = normalizeText(message);
+  const email = extractEmail(message);
+  const textFields = missingFields.map((field) => field.toLowerCase());
+
+  const prefersField = (...needles: string[]) => textFields.some((field) => needles.some((needle) => field.includes(needle)));
+
+  switch (action) {
+    case "CREATE_PROJECT": {
+      const nameMatch = message.match(/(?:project\s+name\s*[:=-]?\s*|name\s*[:=-]?\s*|project\s+)(.+)$/i);
+      const descriptionMatch = message.match(/description\s*[:=-]?\s*(.+)$/i);
+      const args: Record<string, unknown> = {};
+
+      if (prefersField("name") && normalizeText(nameMatch?.[1])) {
+        args.name = normalizeText(nameMatch?.[1]);
+      } else if (prefersField("name") && simpleValue && !isCommandLike(simpleValue)) {
+        args.name = simpleValue;
+      }
+
+      if (prefersField("description") && normalizeText(descriptionMatch?.[1])) {
+        args.description = normalizeText(descriptionMatch?.[1]);
+      }
+
+      return args;
+    }
+
+    case "CREATE_EMPLOYEE": {
+      const nameMatch = message.match(/(?:employee\s+name\s*[:=-]?\s*|name\s*[:=-]?\s*|member\s+)([a-z][a-z .'-]{1,80})/i);
+      const wantsAuto = /auto|generate|random|temporary|temp/i.test(lower);
+      const args: Record<string, unknown> = {};
+
+      if (prefersField("name") && normalizeText(nameMatch?.[1])) {
+        args.name = normalizeText(nameMatch?.[1]);
+      } else if (prefersField("name") && simpleValue && !isCommandLike(simpleValue) && !email) {
+        args.name = simpleValue;
+      }
+
+      if (prefersField("email") && email) {
+        args.email = email;
+      }
+
+      if (wantsAuto) {
+        args.passwordMode = "AUTO";
+      }
+
+      return args;
+    }
+
+    case "CREATE_TASK": {
+      const titleMatch = message.match(/(?:task\s+name\s*[:=-]?\s*|title\s*[:=-]?\s*|task\s+)(.+?)(?:\s+for\s+project|\s+assign\s+to|\s+allotted|\s+start|\s+for\s+\d+\s+days|$)/i);
+      const projectMatch = message.match(/for\s+project\s+(.+?)(?:\s+assign\s+to|\s+start|\s+for\s+\d+\s+days|$)/i);
+      const assignedNameMatch = message.match(/(?:assign\s+to\s+name\s*[:=-]?\s*|assign\s+to\s+)([a-z][a-z .'-]{1,80})/i);
+      const daysMatch = message.match(/(\d+)\s+days?/i);
+      const dateMatch = message.match(/(?:start\s+date\s*[:=-]?\s*|on\s+)(.+)$/i);
+      const args: Record<string, unknown> = {};
+
+      if (prefersField("title", "task") && normalizeText(titleMatch?.[1])) {
+        args.title = normalizeText(titleMatch?.[1]);
+      } else if (prefersField("title", "task") && simpleValue && !isCommandLike(simpleValue)) {
+        args.title = simpleValue;
+      }
+
+      if (prefersField("project") && normalizeText(projectMatch?.[1])) {
+        args.project = normalizeText(projectMatch?.[1]);
+      } else if (prefersField("project") && simpleValue && !isCommandLike(simpleValue) && !args.title) {
+        args.project = simpleValue;
+      }
+
+      if (prefersField("assigned", "employee", "assignee") && email) {
+        args.assignedToEmail = email;
+      }
+
+      if (prefersField("assigned", "employee", "assignee") && normalizeText(assignedNameMatch?.[1])) {
+        args.assignedToName = normalizeText(assignedNameMatch?.[1]);
+      } else if (prefersField("assigned", "employee", "assignee") && simpleValue && !isCommandLike(simpleValue) && !email) {
+        args.assignedToName = simpleValue;
+      }
+
+      if (prefersField("day", "days", "duration") && daysMatch?.[1]) {
+        args.allottedDays = Number(daysMatch[1]);
+      } else if (prefersField("day", "days", "duration") && /^[0-9]+$/.test(simpleValue)) {
+        args.allottedDays = Number(simpleValue);
+      }
+
+      if (prefersField("start", "date", "allocated") && normalizeText(dateMatch?.[1])) {
+        args.allocatedAt = normalizeText(dateMatch?.[1]);
+      } else {
+        const parsedDate = parseDateInput(simpleValue);
+        if (prefersField("start", "date", "allocated") && parsedDate) {
+          args.allocatedAt = simpleValue;
+        }
+      }
+
+      return args;
+    }
+
+    case "EMPLOYEE_PERFORMANCE":
+    case "DOWNLOAD_EMPLOYEE_REPORT": {
+      const nameMatch = message.match(/(?:employee|member)\s+([a-z][a-z .'-]{1,80})/i);
+      const args: Record<string, unknown> = {};
+
+      if (prefersField("name") && normalizeText(nameMatch?.[1])) {
+        args.employeeName = normalizeText(nameMatch?.[1]);
+      } else if (prefersField("name") && simpleValue && !isCommandLike(simpleValue) && !email) {
+        args.employeeName = simpleValue;
+      }
+
+      if (prefersField("email") && email) {
+        args.employeeEmail = email;
+      }
+
+      if (action === "DOWNLOAD_EMPLOYEE_REPORT") {
+        if (/excel|xlsx/.test(lower)) {
+          args.format = "excel";
+        } else if (/csv/.test(lower)) {
+          args.format = "csv";
+        } else if (/pdf/.test(lower)) {
+          args.format = "pdf";
+        }
+      }
+
+      return args;
+    }
+
+    default:
+      return {};
+  }
+}
+
+function mergeDraftArguments(
+  action: AssistantAction,
+  baseArguments: Record<string, unknown>,
+  message: string,
+  missingFields: string[] = []
+) {
+  return {
+    ...baseArguments,
+    ...extractFollowUpArguments(action, message, missingFields)
+  };
 }
 
 function fallbackPlanner(message: string, conversation: ChatMessage[]): PlannerResult {
@@ -453,11 +614,21 @@ export const assistantService = {
     user: { id: string; role: string };
     message: string;
     conversation: ChatMessage[];
+    draft?: AssistantDraft;
   }): Promise<AssistantResult> {
     const planned = (await planWithGroq(input.message, input.conversation)) ?? fallbackPlanner(input.message, input.conversation);
-    const args = planned.arguments ?? {};
+    const useDraft = Boolean(input.draft && (planned.action === "HELP" || planned.action === "UNKNOWN" || planned.action === input.draft.action));
+    const args = useDraft
+      ? mergeDraftArguments(
+          input.draft!.action,
+          input.draft?.arguments ?? {},
+          input.message,
+          input.draft?.missingFields ?? []
+        )
+      : planned.arguments ?? {};
+    const action = useDraft ? input.draft!.action : planned.action;
 
-    switch (planned.action) {
+    switch (action) {
       case "CREATE_PROJECT": {
         const roleError = requireAdmin(input.user.role);
         if (roleError) {
@@ -468,9 +639,10 @@ export const assistantService = {
         if (!name) {
           return {
             status: "needs_input",
-            action: planned.action,
+            action,
             missingFields: ["project name"],
-            reply: "Please provide the project name to create the project."
+            reply: "Please provide the project name to create the project.",
+            draft: { action, arguments: args, missingFields: ["project name"] }
           };
         }
 
@@ -478,7 +650,7 @@ export const assistantService = {
         const result = await projectService.create({ name, description });
         return {
           status: "completed",
-          action: planned.action,
+          action,
           result,
           reply: `Project created successfully: ${result.name}.`
         };
@@ -509,9 +681,10 @@ export const assistantService = {
         if (missingFields.length) {
           return {
             status: "needs_input",
-            action: planned.action,
+            action,
             missingFields,
-            reply: `Please provide: ${missingFields.join(", ")}.`
+            reply: `Please provide: ${missingFields.join(", ")}.`,
+            draft: { action, arguments: args, missingFields }
           };
         }
 
@@ -537,7 +710,7 @@ export const assistantService = {
 
         return {
           status: "completed",
-          action: planned.action,
+          action,
           result,
           reply: `Task created: ${result.title}, due on ${formatDate(dueDate)}.`
         };
@@ -566,9 +739,10 @@ export const assistantService = {
         if (missingFields.length) {
           return {
             status: "needs_input",
-            action: planned.action,
+            action,
             missingFields,
-            reply: `Please provide: ${missingFields.join(", ")}.`
+            reply: `Please provide: ${missingFields.join(", ")}.`,
+            draft: { action, arguments: args, missingFields }
           };
         }
 
@@ -577,7 +751,7 @@ export const assistantService = {
 
         return {
           status: "completed",
-          action: planned.action,
+          action,
           result,
           generatedCredentials: { email, password },
           reply: `Team member created successfully. Email: ${email}. Password: ${password}`
@@ -589,12 +763,12 @@ export const assistantService = {
         const projects = await projectService.list();
         const sliced = projects.slice(0, limit);
         if (!sliced.length) {
-          return { status: "completed", action: planned.action, result: [], reply: "No projects found." };
+          return { status: "completed", action, result: [], reply: "No projects found." };
         }
         const lines = sliced.map((project, index) => `${index + 1}. ${project.name}${project.projectNumber ? ` (${project.projectNumber})` : ""}`);
         return {
           status: "completed",
-          action: planned.action,
+          action,
           result: sliced,
           reply: `Here are the top ${sliced.length} projects:\n${lines.join("\n")}`
         };
@@ -627,13 +801,13 @@ export const assistantService = {
         );
 
         if (!list.items.length) {
-          return { status: "completed", action: planned.action, result: list.items, reply: "No tasks found for this filter." };
+          return { status: "completed", action, result: list.items, reply: "No tasks found for this filter." };
         }
 
         const lines = list.items.map((task, index) => `${index + 1}. ${task.title} | ${task.project} | ${task.status}`);
         return {
           status: "completed",
-          action: planned.action,
+          action,
           result: list.items,
           reply: `Here are ${list.items.length} tasks:\n${lines.join("\n")}`
         };
@@ -676,9 +850,10 @@ export const assistantService = {
         if (!employee) {
           return {
             status: "needs_input",
-            action: planned.action,
+            action,
             missingFields: ["employee name or employee email"],
-            reply: "Please provide the employee name or email so I can prepare the report download."
+            reply: "Please provide the employee name or email so I can prepare the report download.",
+            draft: { action, arguments: args, missingFields: ["employee name or employee email"] }
           };
         }
 
@@ -687,7 +862,7 @@ export const assistantService = {
 
         return {
           status: "completed",
-          action: planned.action,
+          action,
           result: {
             employeeId: employee.id,
             employeeName: employee.name,
@@ -702,11 +877,7 @@ export const assistantService = {
       case "HELP":
       case "UNKNOWN":
       default:
-        return {
-          status: "completed",
-          action: planned.action,
-          reply: ACTION_HELP_TEXT
-        };
+        return { status: "completed", action, reply: ACTION_HELP_TEXT };
     }
   }
 };

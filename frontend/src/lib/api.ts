@@ -1,4 +1,4 @@
-import type { ApiUser, AppNotification, AssistantChatResponse, AssistantConversationMessage, FinancialAllProjectsBillStatusSummary, FinancialBillItem, FinancialBillStatus, FinancialPlan, FinancialProjectDetail, FinancialProjectSummary, FinancialRaBill, ProjectItem, ProjectRequisitionFormItem, ReportItem, ReportStatus, ReportTemplate, TaskComment, TaskItem, TaskStatus } from "./domain";
+import type { ApiUser, AppNotification, AssistantChatResponse, AssistantConversationMessage, AssistantDraft, FinancialAllProjectsBillStatusSummary, FinancialBillItem, FinancialBillStatus, FinancialPlan, FinancialProjectDetail, FinancialProjectSummary, FinancialRaBill, ProjectItem, ProjectRequisitionFormItem, ReportItem, ReportStatus, ReportTemplate, TaskComment, TaskItem, TaskStatus } from "./domain";
 
   const API_BASE_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:4000").replace(/\/+$/, "");
 
@@ -725,7 +725,7 @@ export const api = {
     });
   },
 
-  chatAssistant(payload: { message: string; conversation?: AssistantConversationMessage[] }) {
+  chatAssistant(payload: { message: string; conversation?: AssistantConversationMessage[]; draft?: AssistantDraft }) {
     return request<AssistantChatResponse>("/assistant/chat", {
       method: "POST",
       body: JSON.stringify(payload)
