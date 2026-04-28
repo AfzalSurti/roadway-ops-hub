@@ -7,6 +7,7 @@ import { taskRepository } from "../repositories/task.repository.js";
 import { taskService } from "./task.service.js";
 import { userService } from "./user.service.js";
 import { userRepository } from "../repositories/user.repository.js";
+import { commentService } from "./comment.service.js";
 
 type ChatRole = "user" | "assistant";
 
@@ -25,6 +26,7 @@ type AssistantAction =
   | "CREATE_PROJECT"
   | "CREATE_TASK"
   | "CREATE_EMPLOYEE"
+  | "ADD_COMMENT"
   | "LIST_PROJECTS"
   | "LIST_TASKS"
   | "EMPLOYEE_PERFORMANCE"
@@ -131,6 +133,29 @@ function extractFollowUpArguments(
   const prefersField = (...needles: string[]) => textFields.some((field) => needles.some((needle) => field.includes(needle)));
 
   switch (action) {
+    case "ADD_COMMENT": {
+      const taskIdMatch = message.match(/task\s+#?([A-Za-z0-9-]+)/i);
+      const commentMatch = message.match(/comment\s*[:=-]?\s*(.+)$/i);
+      const args: Record<string, unknown> = {};
+
+      if (taskIdMatch && normalizeText(taskIdMatch[1])) {
+        args.taskId = normalizeText(taskIdMatch[1]);
+      } else if (!isCommandLike(simpleValue) && simpleValue && simpleValue.length < 60 && !commentMatch) {
+        // short free-text could be a task id or title
+        args.taskId = simpleValue;
+      }
+
+      if (commentMatch && normalizeText(commentMatch[1])) {
+        args.comment = normalizeText(commentMatch[1]);
+      } else if (!isCommandLike(simpleValue) && simpleValue && simpleValue.length > 1) {
+        // assume longer free-text is the comment body
+        if (simpleValue.length > 40 || /\s/.test(simpleValue)) {
+          args.comment = simpleValue;
+        }
+      }
+
+      return args;
+    }
     case "CREATE_PROJECT": {
       const nameMatch = message.match(/(?:project\s+name\s*[:=-]?\s*|name\s*[:=-]?\s*|project\s+)(.+)$/i);
       const descriptionMatch = message.match(/description\s*[:=-]?\s*(.+)$/i);
@@ -287,6 +312,19 @@ function fallbackPlanner(message: string, conversation: ChatMessage[]): PlannerR
     };
   }
 
+  if (/(comment|reply|add comment|post comment|leave comment)/.test(lower) && /task/.test(lower)) {
+    const taskIdMatch = message.match(/task\s+#?([A-Za-z0-9-]+)/i);
+    const commentMatch = message.match(/comment\s*[:=-]?\s*(.+)$/i);
+    const titleMatch = message.match(/task\s+(?:"|')?([a-z0-9][a-z0-9 .'-]{1,120})/i);
+    return {
+      action: "ADD_COMMENT",
+      arguments: {
+        taskId: normalizeText(taskIdMatch?.[1] ?? titleMatch?.[1]),
+        comment: normalizeText(commentMatch?.[1]) || undefined
+      }
+    };
+  }
+
   if (/(performance|report card|summary)/.test(lower) && /employee|member/.test(lower)) {
     const nameMatch = message.match(/(?:employee|member)\s+([a-z][a-z .'-]{1,60})/i);
     return {
@@ -361,10 +399,11 @@ async function planWithGroq(message: string, conversation: ChatMessage[]): Promi
   const systemPrompt = [
     "You are an assistant that converts chat into a strict JSON command.",
     "Return JSON only.",
-    "Actions: CREATE_PROJECT, CREATE_TASK, CREATE_EMPLOYEE, LIST_PROJECTS, LIST_TASKS, EMPLOYEE_PERFORMANCE, PENDING_TASKS_MONTH, SHOW_PENDING_TASK_DETAILS, DOWNLOAD_EMPLOYEE_REPORT, HELP, UNKNOWN.",
+    "Actions: CREATE_PROJECT, CREATE_TASK, CREATE_EMPLOYEE, ADD_COMMENT, LIST_PROJECTS, LIST_TASKS, EMPLOYEE_PERFORMANCE, PENDING_TASKS_MONTH, SHOW_PENDING_TASK_DETAILS, DOWNLOAD_EMPLOYEE_REPORT, HELP, UNKNOWN.",
     "For CREATE_PROJECT arguments: name, description.",
     "For CREATE_TASK arguments: title, description, project, assignedToEmail, assignedToName, allocatedAt, allottedDays.",
     "For CREATE_EMPLOYEE arguments: name, email, password, passwordMode (AUTO|MANUAL).",
+    "For ADD_COMMENT arguments: taskId, comment",
     "For LIST_PROJECTS arguments: limit.",
     "For LIST_TASKS arguments: status, assignedToEmail, limit.",
     "For EMPLOYEE_PERFORMANCE arguments: employeeName, employeeEmail.",
@@ -629,6 +668,70 @@ export const assistantService = {
     const action = useDraft ? input.draft!.action : planned.action;
 
     switch (action) {
+      case "ADD_COMMENT": {
+        const taskRef = normalizeText((args as any).taskId ?? (args as any).task ?? (args as any).taskTitle ?? (args as any).taskSearch);
+        const commentBody = normalizeText((args as any).comment ?? (args as any).body ?? "");
+
+        const missingFields: string[] = [];
+        if (!taskRef) missingFields.push("task id or exact task title");
+        if (!commentBody) missingFields.push("comment text");
+
+        if (missingFields.length) {
+          return {
+            status: "needs_input",
+            action,
+            missingFields,
+            reply: `Please provide: ${missingFields.join(", ")}.`,
+            draft: { action, arguments: args, missingFields }
+          };
+        }
+
+        try {
+          // try resolve as id first
+          let resolvedTaskId: string | null = null;
+          try {
+            const t = await taskService.getById(taskRef);
+            resolvedTaskId = t.id;
+          } catch {
+            // not an id or not found, try search by title
+          }
+
+          if (!resolvedTaskId) {
+            const list = await taskService.list({ id: input.user.id, role: input.user.role as any }, { search: taskRef, limit: 10 });
+            if (list.items.length === 1) {
+              resolvedTaskId = list.items[0].id;
+            } else if (!list.items.length) {
+              return {
+                status: "needs_input",
+                action,
+                missingFields: ["task id or exact task title"],
+                reply: "I couldn't find a matching task. Please provide the exact task id or full task title.",
+                draft: { action, arguments: args, missingFields: ["task id or exact task title"] }
+              };
+            } else {
+              const lines = list.items.map((t, i) => `${i + 1}. ${t.title} (${t.id})`).slice(0, 5);
+              return {
+                status: "needs_input",
+                action,
+                missingFields: ["task id or exact task title"],
+                reply: `I found multiple tasks matching "${taskRef}". Please provide the task id exactly from the list:\n${lines.join("\n")}`,
+                draft: { action, arguments: args, missingFields: ["task id or exact task title"] }
+              };
+            }
+          }
+
+          const created = await commentService.create(resolvedTaskId, commentBody, { id: input.user.id, role: input.user.role as any });
+          return {
+            status: "completed",
+            action,
+            result: created,
+            reply: `Comment added to task: ${created.taskId}`
+          };
+        } catch (err: any) {
+          logger.warn({ err }, "Failed to add comment via assistant");
+          return { status: "failed", action, reply: err?.message ?? "Failed to add comment" };
+        }
+      }
       case "CREATE_PROJECT": {
         const roleError = requireAdmin(input.user.role);
         if (roleError) {

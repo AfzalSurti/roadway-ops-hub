@@ -10,6 +10,7 @@ const assistantActionSchema = z.enum([
   "PENDING_TASKS_MONTH",
   "SHOW_PENDING_TASK_DETAILS",
   "DOWNLOAD_EMPLOYEE_REPORT",
+  "ADD_COMMENT",
   "HELP",
   "UNKNOWN"
 ]);
