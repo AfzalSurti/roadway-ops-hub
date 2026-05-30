@@ -65,7 +65,7 @@ export default function AdminTeam() {
 
     try {
       setIsCreating(true);
-      await api.createEmployee({
+      const result = await api.createEmployee({
         name: form.name.trim(),
         email: form.email.trim(),
         password: passwordToUse
@@ -75,7 +75,7 @@ export default function AdminTeam() {
       setForm({ name: "", email: "", password: "" });
       setGeneratedPassword("");
       setPasswordMode("manual");
-      toast.success("Employee created successfully");
+      toast.success(result.message);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to create employee";
       toast.error(message);

@@ -1,4 +1,4 @@
-import type { ApiUser, AppNotification, AssistantChatResponse, AssistantConversationMessage, AssistantDraft, FinancialAllProjectsBillStatusSummary, FinancialBillItem, FinancialBillStatus, FinancialPlan, FinancialProjectDetail, FinancialProjectSummary, FinancialRaBill, ProjectItem, ProjectRequisitionFormItem, ReportItem, ReportStatus, ReportTemplate, TaskComment, TaskItem, TaskStatus } from "./domain";
+import type { ApiUser, AppNotification, AssistantChatResponse, AssistantConversationMessage, AssistantDraft, CreateEmployeeResponse, FinancialAllProjectsBillStatusSummary, FinancialBillItem, FinancialBillStatus, FinancialPlan, FinancialProjectDetail, FinancialProjectSummary, FinancialRaBill, ProjectItem, ProjectRequisitionFormItem, ReportItem, ReportStatus, ReportTemplate, TaskComment, TaskItem, TaskStatus } from "./domain";
 
   const API_BASE_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:4000").replace(/\/+$/, "");
 
@@ -671,7 +671,7 @@ export const api = {
   },
 
   createEmployee(payload: { name: string; email: string; password: string }) {
-    return request<ApiUser>("/users", {
+    return request<CreateEmployeeResponse>("/users", {
       method: "POST",
       body: JSON.stringify(payload)
     });

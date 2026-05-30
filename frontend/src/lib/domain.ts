@@ -25,6 +25,12 @@ export type ApiUser = {
   experienceInOrg?: string | null;
 };
 
+export type CreateEmployeeResponse = {
+  user: ApiUser;
+  emailSent: boolean;
+  message: string;
+};
+
 export type ProjectItem = {
   id: string;
   name: string;

@@ -856,9 +856,9 @@ export const assistantService = {
         return {
           status: "completed",
           action,
-          result,
+          result: result.user,
           generatedCredentials: { email, password },
-          reply: `Team member created successfully. Email: ${email}. Password: ${password}`
+          reply: result.emailSent ? `Team member created successfully. Email sent to ${email}. Password: ${password}` : `Team member created successfully, but email was not sent. ${result.message}`
         };
       }
 

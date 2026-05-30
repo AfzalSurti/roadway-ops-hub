@@ -60,8 +60,8 @@ export const userController = {
     return sendSuccess(res, serializeUser(user));
   },
   async createEmployee(req: Request, res: Response) {
-    const user = await userService.createEmployee(req.body);
-    return sendSuccess(res, serializeUser(user), 201);
+    const result = await userService.createEmployee(req.body);
+    return sendSuccess(res, { user: serializeUser(result.user), emailSent: result.emailSent, message: result.message }, 201);
   },
   async listEmployees(_req: Request, res: Response) {
     const users = await userService.listEmployees();

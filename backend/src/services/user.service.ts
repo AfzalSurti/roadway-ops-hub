@@ -5,6 +5,12 @@ import { hashPassword } from "../utils/password.js";
 import { emailService } from "./email.service.js";
 import { logger } from "../config/logger.js";
 
+type EmployeeCreateResult = {
+  user: Awaited<ReturnType<typeof userRepository.create>>;
+  emailSent: boolean;
+  message: string;
+};
+
 export const userService = {
   listEmployees() {
     return userRepository.findEmployees();
@@ -42,7 +48,7 @@ export const userService = {
       currentCtc: payload.currentCtc
     });
   },
-  async createEmployee(payload: { name: string; email: string; password: string }) {
+  async createEmployee(payload: { name: string; email: string; password: string }): Promise<EmployeeCreateResult> {
     const normalizedEmail = payload.email.trim().toLowerCase();
     const normalizedName = payload.name.trim();
 
@@ -59,25 +65,28 @@ export const userService = {
     });
 
     try {
-      await emailService.sendEmployeeWelcomeEmail({
+      const emailSent = await emailService.sendEmployeeWelcomeEmail({
         to: normalizedEmail,
         employeeName: normalizedName,
         employeeEmail: normalizedEmail,
         password: payload.password
       });
+
+      return {
+        user,
+        emailSent,
+        message: emailSent ? `Email sent to ${normalizedEmail}` : "Employee created successfully, but email was not sent."
+      };
     } catch (error) {
       logger.error({ err: error, email: normalizedEmail, userId: user.id }, "Failed to send employee welcome email");
 
-      try {
-        await userRepository.deleteById(user.id);
-      } catch (deleteError) {
-        logger.error({ err: deleteError, userId: user.id }, "Failed to rollback employee creation after email send failure");
-      }
-
-      throw badRequest("Employee was not created because the invite email could not be sent");
+      const reason = error instanceof Error && error.message ? error.message : "unknown email error";
+      return {
+        user,
+        emailSent: false,
+        message: `Employee created successfully, but email was not sent because ${reason}.`
+      };
     }
-
-    return user;
   },
   async deleteEmployee(id: string) {
     const employee = await userRepository.findById(id);
