@@ -79,6 +79,13 @@ export type AssetItem = {
   purchaseAmount: number;
   gst: number;
   totalAmountWithGst: number;
+  usefulLifeYears: number;
+  scrapRate: number;
+  scrapValue: number;
+  depreciationPerYear: number;
+  yearsElapsed: number;
+  currentValue: number;
+  depreciationAsOfYear: number;
   projectNumber?: string | null;
   assignedUser?: string | null;
   status: AssetStatus;

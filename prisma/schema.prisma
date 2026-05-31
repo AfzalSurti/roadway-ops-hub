@@ -144,6 +144,10 @@ model Asset {
   purchaseAmount     Float           @default(0)
   gst                Float           @default(0)
   totalAmountWithGst Float           @default(0)
+  usefulLifeYears    Int             @default(10)
+  scrapRate          Float           @default(0.05)
+  scrapValue         Float           @default(0)
+  depreciationPerYear Float          @default(0)
   projectNumber      String?
   assignedUser       String?
   status             AssetStatus     @default(IN_USE)

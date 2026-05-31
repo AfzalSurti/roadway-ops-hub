@@ -43,6 +43,5 @@ export const addMovementSchema = z.object({
 export const addMaintenanceSchema = z.object({
   dateOfMaintenance: z.coerce.date(),
   repairCostInclGst: z.coerce.number().min(0).default(0),
-  depreciationTillDate: z.coerce.number().min(0).default(0),
   sellAmount: z.coerce.number().min(0).default(0)
 });

@@ -1,5 +1,6 @@
 import type { AssetStatus, Prisma } from "@prisma/client";
 import { assetRepository } from "../repositories/asset.repository.js";
+import { calculateAssetDepreciation } from "../utils/depreciation.js";
 import { badRequest, notFound } from "../utils/errors.js";
 import { getPagination } from "../utils/pagination.js";
 
@@ -88,6 +89,13 @@ function calculateTotalAmountWithGst(purchaseAmount: number, gst: number): numbe
   return Number((purchaseAmount + gst).toFixed(2));
 }
 
+function enrichAsset<T extends { assetClass: string; purchaseAmount: number; dateOfPurchase?: Date | null }>(asset: T) {
+  return {
+    ...asset,
+    ...calculateAssetDepreciation(asset, new Date())
+  };
+}
+
 function getAssetPrefix(assetClass: string): string {
   const prefix = ASSET_ID_PREFIXES[assetClass];
   if (!prefix) {
@@ -111,7 +119,7 @@ export const assetService = {
     ]);
 
     return {
-      items,
+      items: items.map((item) => enrichAsset(item)),
       pagination: {
         page: pagination.page,
         limit: pagination.limit,
@@ -126,7 +134,7 @@ export const assetService = {
     if (!asset) {
       throw notFound("Asset not found");
     }
-    return asset;
+    return enrichAsset(asset);
   },
 
   async create(payload: {
@@ -146,8 +154,16 @@ export const assetService = {
     const assetId = await generateAssetId(payload.assetClass);
     const purchaseAmount = payload.purchaseAmount ?? 0;
     const gst = payload.gst ?? 0;
+    const depreciation = calculateAssetDepreciation(
+      {
+        assetClass: payload.assetClass,
+        purchaseAmount,
+        dateOfPurchase: payload.dateOfPurchase ?? null
+      },
+      payload.dateOfPurchase ?? new Date()
+    );
 
-    return assetRepository.create({
+    const created = await assetRepository.create({
       assetId,
       itAssetId: payload.itAssetId ?? null,
       assetClass: payload.assetClass,
@@ -157,12 +173,18 @@ export const assetService = {
       purchaseAmount,
       gst,
       totalAmountWithGst: calculateTotalAmountWithGst(purchaseAmount, gst),
+      usefulLifeYears: depreciation.usefulLifeYears,
+      scrapRate: depreciation.scrapRate,
+      scrapValue: depreciation.scrapValue,
+      depreciationPerYear: depreciation.depreciationPerYear,
       projectNumber: payload.projectNumber ?? null,
       assignedUser: payload.assignedUser ?? null,
       status: payload.status ?? "IN_USE",
       remarks: payload.remarks ?? null,
       forMonth: payload.forMonth ?? null
     });
+
+    return enrichAsset(created);
   },
 
   async update(
@@ -185,13 +207,27 @@ export const assetService = {
     const existing = await this.getById(id);
     const nextPurchaseAmount = payload.purchaseAmount ?? existing.purchaseAmount;
     const nextGst = payload.gst ?? existing.gst;
+    const nextAssetClass = payload.assetClass ?? existing.assetClass;
+    const depreciation = calculateAssetDepreciation(
+      {
+        assetClass: nextAssetClass,
+        purchaseAmount: nextPurchaseAmount,
+        dateOfPurchase: payload.dateOfPurchase ?? existing.dateOfPurchase ?? null
+      },
+      payload.dateOfPurchase ?? existing.dateOfPurchase ?? new Date()
+    );
 
     const data: Prisma.AssetUncheckedUpdateInput = {
       ...payload,
-      totalAmountWithGst: calculateTotalAmountWithGst(nextPurchaseAmount, nextGst)
+      totalAmountWithGst: calculateTotalAmountWithGst(nextPurchaseAmount, nextGst),
+      usefulLifeYears: depreciation.usefulLifeYears,
+      scrapRate: depreciation.scrapRate,
+      scrapValue: depreciation.scrapValue,
+      depreciationPerYear: depreciation.depreciationPerYear
     };
 
-    return assetRepository.update(id, data);
+    const updated = await assetRepository.update(id, data);
+    return enrichAsset(updated);
   },
 
   async remove(id: string) {
@@ -217,12 +253,24 @@ export const assetService = {
     payload: {
       dateOfMaintenance: Date;
       repairCostInclGst?: number;
-      depreciationTillDate?: number;
       sellAmount?: number;
     }
   ) {
-    await this.getById(assetId);
-    return assetRepository.addMaintenance(assetId, { ...payload, assetId });
+    const asset = await this.getById(assetId);
+    const depreciation = calculateAssetDepreciation(
+      {
+        assetClass: asset.assetClass,
+        purchaseAmount: asset.purchaseAmount,
+        dateOfPurchase: asset.dateOfPurchase ?? null
+      },
+      payload.dateOfMaintenance
+    );
+
+    return assetRepository.addMaintenance(assetId, {
+      ...payload,
+      depreciationTillDate: depreciation.currentValue,
+      assetId
+    });
   },
 
   async getStats() {

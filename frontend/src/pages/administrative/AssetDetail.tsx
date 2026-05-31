@@ -80,6 +80,18 @@ function toNumber(value: string) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function formatCurrency(value: number) {
+  return `₹${value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function calculateBookValue(asset: Pick<AssetItem, "purchaseAmount" | "dateOfPurchase" | "depreciationPerYear">, asOfDate: Date) {
+  const purchaseYear = asset.dateOfPurchase ? new Date(asset.dateOfPurchase).getFullYear() : asOfDate.getFullYear();
+  const yearsElapsed = Math.max(asOfDate.getFullYear() - purchaseYear, 0);
+  const currentValue = Number((asset.purchaseAmount - asset.depreciationPerYear * yearsElapsed).toFixed(2));
+
+  return { yearsElapsed, currentValue };
+}
+
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl bg-secondary/30 border border-border/40 p-3">
@@ -149,23 +161,29 @@ function MovementDialog({ assetId, open, onOpenChange }: { assetId: string; open
   );
 }
 
-function MaintenanceDialog({ assetId, open, onOpenChange }: { assetId: string; open: boolean; onOpenChange: (open: boolean) => void }) {
+function MaintenanceDialog({ asset, open, onOpenChange }: { asset: AssetItem; open: boolean; onOpenChange: (open: boolean) => void }) {
   const queryClient = useQueryClient();
   const [dateOfMaintenance, setDateOfMaintenance] = useState("");
   const [repairCostInclGst, setRepairCostInclGst] = useState("0");
-  const [depreciationTillDate, setDepreciationTillDate] = useState("0");
   const [sellAmount, setSellAmount] = useState("0");
+
+  const depreciationSnapshot = useMemo(() => {
+    if (!dateOfMaintenance) {
+      return null;
+    }
+
+    return calculateBookValue(asset, new Date(dateOfMaintenance));
+  }, [asset, dateOfMaintenance]);
 
   const mutation = useMutation({
     mutationFn: () =>
-      api.addAssetMaintenance(assetId, {
+      api.addAssetMaintenance(asset.id, {
         dateOfMaintenance: new Date(dateOfMaintenance).toISOString(),
         repairCostInclGst: toNumber(repairCostInclGst),
-        depreciationTillDate: toNumber(depreciationTillDate),
         sellAmount: toNumber(sellAmount)
       }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["assets", assetId] });
+      await queryClient.invalidateQueries({ queryKey: ["assets", asset.id] });
       await queryClient.invalidateQueries({ queryKey: ["assets"] });
       toast.success("Maintenance logged");
       onOpenChange(false);
@@ -177,7 +195,6 @@ function MaintenanceDialog({ assetId, open, onOpenChange }: { assetId: string; o
     if (open) {
       setDateOfMaintenance(new Date().toISOString().slice(0, 10));
       setRepairCostInclGst("0");
-      setDepreciationTillDate("0");
       setSellAmount("0");
     }
   }, [open]);
@@ -199,8 +216,13 @@ function MaintenanceDialog({ assetId, open, onOpenChange }: { assetId: string; o
             <Input type="number" min="0" value={repairCostInclGst} onChange={(event) => setRepairCostInclGst(event.target.value)} className="mt-1" />
           </div>
           <div>
-            <Label>Depreciation Till Date</Label>
-            <Input type="number" min="0" value={depreciationTillDate} onChange={(event) => setDepreciationTillDate(event.target.value)} className="mt-1" />
+            <Label>Depreciation / Current Value</Label>
+            <Input
+              value={depreciationSnapshot ? formatCurrency(depreciationSnapshot.currentValue) : "Select a maintenance date"}
+              readOnly
+              className="mt-1 bg-secondary/40"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">Auto-calculated from the purchase year, 5% scrap value and useful life.</p>
           </div>
           <div>
             <Label>Sell Amount</Label>
@@ -269,6 +291,21 @@ export default function AssetDetail() {
   });
 
   const totalAmount = useMemo(() => (toNumber(form.purchaseAmount) + toNumber(form.gst)).toFixed(2), [form.purchaseAmount, form.gst]);
+  const editingDepreciation = useMemo(() => {
+    if (!form.assetClass) {
+      return null;
+    }
+
+    const usefulLifeYears = form.assetClass === "Bike - Owned" ? 5 : form.assetClass === "Car - Owned" ? 8 : 10;
+    const purchaseAmount = toNumber(form.purchaseAmount);
+    const scrapValue = Number((purchaseAmount * 0.05).toFixed(2));
+    const depreciationPerYear = usefulLifeYears > 0 ? Number(((purchaseAmount - scrapValue) / usefulLifeYears).toFixed(2)) : 0;
+    const purchaseYear = form.dateOfPurchase ? new Date(form.dateOfPurchase).getFullYear() : new Date().getFullYear();
+    const yearsElapsed = Math.max(new Date().getFullYear() - purchaseYear, 0);
+    const currentValue = Number((purchaseAmount - depreciationPerYear * yearsElapsed).toFixed(2));
+
+    return { usefulLifeYears, scrapValue, depreciationPerYear, yearsElapsed, currentValue };
+  }, [form.assetClass, form.dateOfPurchase, form.purchaseAmount]);
 
   if (isLoading || !id) {
     return <PageWrapper><div className="page-header"><h1 className="page-title">Asset Detail</h1><p className="page-subtitle">Loading asset...</p></div></PageWrapper>;
@@ -336,6 +373,9 @@ export default function AssetDetail() {
               <div><Label>Purchase Amount</Label><Input type="number" min="0" value={form.purchaseAmount} onChange={(event) => setForm((prev) => ({ ...prev, purchaseAmount: event.target.value }))} className="mt-1" /></div>
               <div><Label>GST</Label><Input type="number" min="0" value={form.gst} onChange={(event) => setForm((prev) => ({ ...prev, gst: event.target.value }))} className="mt-1" /></div>
               <div><Label>Total Amount with GST</Label><Input readOnly value={totalAmount} className="mt-1 bg-secondary/40" /></div>
+              <div><Label>Useful Life (years)</Label><Input readOnly value={editingDepreciation ? String(editingDepreciation.usefulLifeYears) : "-"} className="mt-1 bg-secondary/40" /></div>
+              <div><Label>Depreciation / Year</Label><Input readOnly value={editingDepreciation ? formatCurrency(editingDepreciation.depreciationPerYear) : "-"} className="mt-1 bg-secondary/40" /></div>
+              <div><Label>Current Value</Label><Input readOnly value={editingDepreciation ? formatCurrency(editingDepreciation.currentValue) : "-"} className="mt-1 bg-secondary/40" /></div>
               <div><Label>Project Number</Label><Input value={form.projectNumber} onChange={(event) => setForm((prev) => ({ ...prev, projectNumber: event.target.value }))} className="mt-1" /></div>
               <div><Label>Assigned User</Label><Input value={form.assignedUser} onChange={(event) => setForm((prev) => ({ ...prev, assignedUser: event.target.value }))} className="mt-1" /></div>
               <div><Label>Status</Label>
@@ -364,6 +404,10 @@ export default function AssetDetail() {
               <Field label="Purchase Amount" value={`₹${asset.purchaseAmount.toLocaleString("en-IN")}`} />
               <Field label="GST" value={`₹${asset.gst.toLocaleString("en-IN")}`} />
               <Field label="Total Amount with GST" value={`₹${asset.totalAmountWithGst.toLocaleString("en-IN")}`} />
+              <Field label="Useful Life (years)" value={String(asset.usefulLifeYears)} />
+              <Field label="Scrap Value (5%)" value={formatCurrency(asset.scrapValue)} />
+              <Field label="Depreciation / Year" value={formatCurrency(asset.depreciationPerYear)} />
+              <Field label="Current Value" value={formatCurrency(asset.currentValue)} />
               <Field label="Project Number" value={asset.projectNumber ?? "-"} />
               <Field label="Assigned User" value={asset.assignedUser ?? "-"} />
               <Field label="For Month" value={asset.forMonth ?? "-"} />
@@ -439,7 +483,7 @@ export default function AssetDetail() {
       </div>
 
       <MovementDialog assetId={asset.id} open={movementOpen} onOpenChange={setMovementOpen} />
-      <MaintenanceDialog assetId={asset.id} open={maintenanceOpen} onOpenChange={setMaintenanceOpen} />
+      <MaintenanceDialog asset={asset} open={maintenanceOpen} onOpenChange={setMaintenanceOpen} />
     </PageWrapper>
   );
 }
