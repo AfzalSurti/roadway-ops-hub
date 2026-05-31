@@ -34,3 +34,11 @@ services:
         value: Admin
       - key: FORCE_BOOTSTRAP_ADMIN
         value: "false"
+      - key: BOOTSTRAP_ADMINISTRATIVE_EMAIL
+        sync: false
+      - key: BOOTSTRAP_ADMINISTRATIVE_PASSWORD
+        sync: false
+      - key: BOOTSTRAP_ADMINISTRATIVE_NAME
+        value: Administrative
+      - key: FORCE_BOOTSTRAP_ADMINISTRATIVE
+        value: "false"

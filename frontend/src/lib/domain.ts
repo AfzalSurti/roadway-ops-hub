@@ -1,8 +1,9 @@
-export type Role = "ADMIN" | "EMPLOYEE";
+export type Role = "ADMIN" | "PMO" | "EMPLOYEE"; // HOD will be added later.
 export type Priority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 export type TaskStatus = "TODO" | "IN_PROGRESS" | "BLOCKED" | "DONE";
 export type ReportStatus = "SUBMITTED" | "APPROVED" | "CHANGES_REQUESTED" | "REJECTED";
 export type FinancialBillStatus = "PLANNING" | "PUT_UP" | "RECEIVED";
+export type AssetStatus = "IN_USE" | "IN_STORE" | "UNDER_REPAIR" | "DISPOSED";
 
 export type TemplateField = {
   id: string;
@@ -46,6 +47,56 @@ export type ProjectItem = {
   projectNumberAssignedAt?: string | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type AssetMovementItem = {
+  id: string;
+  assetId: string;
+  movedToProjectNumber?: string | null;
+  dateOfMoving: string;
+  movedToUser?: string | null;
+  createdAt: string;
+};
+
+export type AssetMaintenanceItem = {
+  id: string;
+  assetId: string;
+  dateOfMaintenance: string;
+  repairCostInclGst: number;
+  depreciationTillDate: number;
+  sellAmount: number;
+  createdAt: string;
+};
+
+export type AssetItem = {
+  id: string;
+  assetId: string;
+  itAssetId?: string | null;
+  assetClass: string;
+  markModel?: string | null;
+  dateOfPurchase?: string | null;
+  warrantyPeriod?: string | null;
+  purchaseAmount: number;
+  gst: number;
+  totalAmountWithGst: number;
+  projectNumber?: string | null;
+  assignedUser?: string | null;
+  status: AssetStatus;
+  remarks?: string | null;
+  forMonth?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  movements?: AssetMovementItem[];
+  maintenances?: AssetMaintenanceItem[];
+};
+
+export type AssetStatsResponse = {
+  totalAssets: number;
+  totalAssetValue: number;
+  projectsWithAssets: number;
+  assetsWithProjectNumber: number;
+  statusCounts: Partial<Record<AssetStatus, number>>;
+  assetClassCounts: Record<string, { count: number; group: string }>;
 };
 
 export type ProjectRequisitionFormItem = {

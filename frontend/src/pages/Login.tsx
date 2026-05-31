@@ -5,6 +5,12 @@ import { motion } from "framer-motion";
 import { HardHat } from "lucide-react";
 import { toast } from "sonner";
 
+function getLandingPath(role: string) {
+  if (role === "ADMIN") return "/admin/dashboard";
+  if (role === "PMO") return "/administrative/dashboard";
+  return "/app/dashboard";
+}
+
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -16,7 +22,7 @@ export default function Login() {
     try {
       setLoading(true);
       const user = await login(email, password);
-      navigate(user.role === "ADMIN" ? "/admin/dashboard" : "/app/dashboard");
+      navigate(getLandingPath(user.role));
     } catch (error) {
       const message = error instanceof Error ? error.message : "Login failed";
       toast.error(message);

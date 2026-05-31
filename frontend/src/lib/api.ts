@@ -1,4 +1,4 @@
-import type { ApiUser, AppNotification, AssistantChatResponse, AssistantConversationMessage, AssistantDraft, CreateEmployeeResponse, FinancialAllProjectsBillStatusSummary, FinancialBillItem, FinancialBillStatus, FinancialPlan, FinancialProjectDetail, FinancialProjectSummary, FinancialRaBill, ProjectItem, ProjectRequisitionFormItem, ReportItem, ReportStatus, ReportTemplate, TaskComment, TaskItem, TaskStatus } from "./domain";
+import type { ApiUser, AppNotification, AssetItem, AssetMaintenanceItem, AssetMovementItem, AssetStatsResponse, AssetStatus, AssistantChatResponse, AssistantConversationMessage, AssistantDraft, CreateEmployeeResponse, FinancialAllProjectsBillStatusSummary, FinancialBillItem, FinancialBillStatus, FinancialPlan, FinancialProjectDetail, FinancialProjectSummary, FinancialRaBill, ProjectItem, ProjectRequisitionFormItem, ReportItem, ReportStatus, ReportTemplate, TaskComment, TaskItem, TaskStatus } from "./domain";
 
   const API_BASE_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:4000").replace(/\/+$/, "");
 
@@ -401,6 +401,87 @@ export const api = {
 
   getProjectsWithoutNumber() {
     return request<ProjectItem[]>("/projects/without-number");
+  },
+
+  getAssets(params?: { page?: number; limit?: number; search?: string; assetClass?: string; projectNumber?: string; status?: AssetStatus }) {
+    const query = new URLSearchParams();
+    if (params?.page) query.set("page", String(params.page));
+    if (params?.limit) query.set("limit", String(params.limit));
+    if (params?.search) query.set("search", params.search);
+    if (params?.assetClass) query.set("assetClass", params.assetClass);
+    if (params?.projectNumber) query.set("projectNumber", params.projectNumber);
+    if (params?.status) query.set("status", params.status);
+    return request<{ items: AssetItem[]; pagination: { page: number; limit: number; total: number; totalPages: number } }>(
+      `/assets${query.toString() ? `?${query.toString()}` : ""}`
+    );
+  },
+
+  getAsset(id: string) {
+    return request<AssetItem>(`/assets/${id}`);
+  },
+
+  createAsset(payload: {
+    assetClass: string;
+    markModel?: string | null;
+    dateOfPurchase?: string | null;
+    warrantyPeriod?: string | null;
+    purchaseAmount?: number;
+    gst?: number;
+    projectNumber?: string | null;
+    assignedUser?: string | null;
+    status?: AssetStatus;
+    remarks?: string | null;
+    forMonth?: string | null;
+    itAssetId?: string | null;
+  }) {
+    return request<AssetItem>("/assets", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+  },
+
+  updateAsset(id: string, payload: Partial<{
+    assetClass: string;
+    markModel: string | null;
+    dateOfPurchase: string | null;
+    warrantyPeriod: string | null;
+    purchaseAmount: number;
+    gst: number;
+    projectNumber: string | null;
+    assignedUser: string | null;
+    status: AssetStatus;
+    remarks: string | null;
+    forMonth: string | null;
+    itAssetId: string | null;
+  }>) {
+    return request<AssetItem>(`/assets/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    });
+  },
+
+  deleteAsset(id: string) {
+    return request<{ deleted: boolean }>(`/assets/${id}`, {
+      method: "DELETE"
+    });
+  },
+
+  addAssetMovement(assetId: string, payload: { movedToProjectNumber?: string | null; dateOfMoving: string; movedToUser?: string | null }) {
+    return request<AssetMovementItem>(`/assets/${assetId}/movements`, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+  },
+
+  addAssetMaintenance(assetId: string, payload: { dateOfMaintenance: string; repairCostInclGst: number; depreciationTillDate: number; sellAmount: number }) {
+    return request<AssetMaintenanceItem>(`/assets/${assetId}/maintenances`, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+  },
+
+  getAssetStats() {
+    return request<AssetStatsResponse>("/assets/stats");
   },
 
   getProjectNumberingOptions() {

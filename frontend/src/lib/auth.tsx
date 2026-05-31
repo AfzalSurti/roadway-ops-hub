@@ -10,6 +10,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<UserWithAvatar>;
   logout: () => Promise<void>;
   isAdmin: boolean;
+  isPmo: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -18,7 +19,8 @@ const AuthContext = createContext<AuthContextType>({
     throw new Error("AuthProvider not initialized");
   },
   logout: async () => undefined,
-  isAdmin: false
+  isAdmin: false,
+  isPmo: false
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -75,7 +77,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       user,
       login,
       logout,
-      isAdmin: user?.role === "ADMIN"
+      isAdmin: user?.role === "ADMIN",
+      isPmo: user?.role === "PMO"
     }),
     [user]
   );

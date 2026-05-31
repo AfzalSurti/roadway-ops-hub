@@ -3,13 +3,13 @@ import type { NextFunction, Request, Response } from "express";
 import { prisma } from "../prisma/client.js";
 import { forbidden, notFound, unauthorized } from "../utils/errors.js";
 
-export function requireRole(role: Role) {
+export function requireRole(...roles: Role[]) {
   return (req: Request, _res: Response, next: NextFunction): void => {
     if (!req.user) {
       throw unauthorized();
     }
 
-    if (req.user.role !== role) {
+    if (!roles.includes(req.user.role)) {
       throw forbidden("Insufficient permissions");
     }
 
@@ -24,7 +24,7 @@ export function allowSelfOrAdmin(resource: "task" | "report") {
       throw unauthorized();
     }
 
-    if (currentUser.role === "ADMIN") {
+    if (currentUser.role === "ADMIN" || currentUser.role === "PMO") {
       next();
       return;
     }

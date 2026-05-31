@@ -8,6 +8,7 @@ import {
   FolderKanban,
   FileCheck,
   Landmark,
+  Package,
   ChevronLeft,
   ChevronRight,
   LogOut,
@@ -25,6 +26,12 @@ const adminNav = [
   { to: "/admin/projects", icon: FolderKanban, label: "Projects" },
 ];
 
+const administrativeNav = [
+  { to: "/administrative/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+  { to: "/administrative/project-management", icon: FolderKanban, label: "Project Management" },
+  { to: "/administrative/assets", icon: Package, label: "Asset Management" },
+];
+
 const employeeNav = [
   { to: "/app/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/app/tasks", icon: ListTodo, label: "My Tasks" },
@@ -33,9 +40,9 @@ const employeeNav = [
 ];
 
 export function AppSidebar() {
-  const { user, isAdmin, logout } = useAuth();
+  const { user, isAdmin, isPmo, logout } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
-  const navItems = isAdmin ? adminNav : employeeNav;
+  const navItems = isAdmin ? adminNav : isPmo ? administrativeNav : employeeNav;
 
   const handleLogout = async () => {
     const confirmed = window.confirm("Are you sure you want to logout?");

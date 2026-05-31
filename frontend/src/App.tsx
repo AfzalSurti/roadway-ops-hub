@@ -21,6 +21,9 @@ import TaskDetail from "./pages/employee/TaskDetail";
 import EmployeeReports from "./pages/employee/Reports";
 import EmployeeProfile from "./pages/employee/Profile";
 import NotFound from "./pages/NotFound";
+import AdministrativeDashboard from "./pages/administrative/Dashboard";
+import AssetManagement from "./pages/administrative/AssetManagement";
+import AssetDetail from "./pages/administrative/AssetDetail";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -41,17 +44,30 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function getLandingPath(role?: string | null) {
+  if (role === "ADMIN") return "/admin/dashboard";
+  if (role === "PMO") return "/administrative/dashboard";
+  return "/app/dashboard";
+}
+
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
-  if (user.role !== "ADMIN") return <Navigate to="/app/dashboard" replace />;
+  if (user.role !== "ADMIN") return <Navigate to={getLandingPath(user.role)} replace />;
+  return <>{children}</>;
+}
+
+function PmoRoute({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role !== "PMO") return <Navigate to={getLandingPath(user.role)} replace />;
   return <>{children}</>;
 }
 
 function EmployeeRoute({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
-  if (user.role !== "EMPLOYEE") return <Navigate to="/admin/dashboard" replace />;
+  if (user.role !== "EMPLOYEE") return <Navigate to={getLandingPath(user.role)} replace />;
   return <>{children}</>;
 }
 
@@ -60,8 +76,8 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route path="/login" element={user ? <Navigate to={user.role === "ADMIN" ? "/admin/dashboard" : "/app/dashboard"} replace /> : <Login />} />
-      <Route path="/" element={user ? <Navigate to={user.role === "ADMIN" ? "/admin/dashboard" : "/app/dashboard"} replace /> : <Index />} />
+      <Route path="/login" element={user ? <Navigate to={getLandingPath(user.role)} replace /> : <Login />} />
+      <Route path="/" element={user ? <Navigate to={getLandingPath(user.role)} replace /> : <Index />} />
 
       {/* Admin Routes */}
       <Route path="/admin" element={<AdminRoute><AppLayout /></AdminRoute>}>
@@ -72,6 +88,13 @@ function AppRoutes() {
         <Route path="financial" element={<AdminFinancial />} />
         <Route path="team" element={<AdminTeam />} />
         <Route path="projects" element={<AdminProjects />} />
+      </Route>
+
+      <Route path="/administrative" element={<PmoRoute><AppLayout /></PmoRoute>}>
+        <Route path="dashboard" element={<AdministrativeDashboard />} />
+        <Route path="project-management" element={<AdminProjects />} />
+        <Route path="assets" element={<AssetManagement />} />
+        <Route path="assets/:id" element={<AssetDetail />} />
       </Route>
 
       {/* Employee Routes */}

@@ -10,7 +10,15 @@ datasource db {
 
 enum Role {
   ADMIN
+  PMO
   EMPLOYEE
+}
+
+enum AssetStatus {
+  IN_USE
+  IN_STORE
+  UNDER_REPAIR
+  DISPOSED
 }
 
 enum TaskStatus {
@@ -123,6 +131,57 @@ model Project {
 
   @@index([name])
   @@index([projectCodePrefix, financialYearShort])
+}
+
+model Asset {
+  id                 String          @id @default(cuid())
+  assetId            String          @unique
+  itAssetId          String?
+  assetClass         String
+  markModel          String?
+  dateOfPurchase     DateTime?
+  warrantyPeriod     String?
+  purchaseAmount     Float           @default(0)
+  gst                Float           @default(0)
+  totalAmountWithGst Float           @default(0)
+  projectNumber      String?
+  assignedUser       String?
+  status             AssetStatus     @default(IN_USE)
+  remarks            String?
+  forMonth           String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  movements          AssetMovement[]
+  maintenances       AssetMaintenance[]
+
+  @@index([projectNumber])
+  @@index([assetClass])
+  @@index([status])
+}
+
+model AssetMovement {
+  id                  String   @id @default(cuid())
+  assetId             String
+  movedToProjectNumber String?
+  dateOfMoving        DateTime
+  movedToUser         String?
+  createdAt           DateTime @default(now())
+  asset               Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([assetId])
+}
+
+model AssetMaintenance {
+  id                   String   @id @default(cuid())
+  assetId              String
+  dateOfMaintenance    DateTime
+  repairCostInclGst    Float    @default(0)
+  depreciationTillDate Float    @default(0)
+  sellAmount           Float    @default(0)
+  createdAt            DateTime @default(now())
+  asset                Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([assetId])
 }
 
 model ProjectRequisitionForm {

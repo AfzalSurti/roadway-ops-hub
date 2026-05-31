@@ -10,6 +10,7 @@ import { notificationsRouter } from "./notifications.routes.js";
 import { projectRequisitionFormsRouter } from "./project-requisition-forms.routes.js";
 import { financialRouter } from "./financial.routes.js";
 import { assistantRouter } from "./assistant.routes.js";
+import { assetRouter } from "./asset.routes.js";
 
 export const apiRouter = Router();
 
@@ -24,3 +25,4 @@ apiRouter.use("/notifications", notificationsRouter);
 apiRouter.use("/project-requisition-forms", projectRequisitionFormsRouter);
 apiRouter.use("/financials", financialRouter);
 apiRouter.use("/assistant", assistantRouter);
+apiRouter.use("/assets", assetRouter);
