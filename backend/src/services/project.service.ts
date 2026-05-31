@@ -176,14 +176,6 @@ export const projectService = {
       throw conflict("Project with this name already exists");
     }
 
-    if (payload.projectNumber) {
-      const projects = await projectRepository.findMany();
-      const numberExists = projects.some((project) => project.projectNumber === payload.projectNumber);
-      if (numberExists) {
-        throw conflict("Project number already exists");
-      }
-    }
-
     return projectRepository.create({
       name: payload.name,
       description: payload.description,
@@ -215,14 +207,6 @@ export const projectService = {
       const byName = await projectRepository.findByName(payload.name);
       if (byName && byName.id !== id) {
         throw conflict("Project with this name already exists");
-      }
-    }
-
-    if (payload.projectNumber && payload.projectNumber !== existing.projectNumber) {
-      const duplicate = await projectRepository.findMany();
-      const numberExists = duplicate.some((project) => project.id !== id && project.projectNumber === payload.projectNumber);
-      if (numberExists) {
-        throw conflict("Project number already exists");
       }
     }
 

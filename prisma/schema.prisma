@@ -107,7 +107,7 @@ model Project {
   id                    String   @id @default(cuid())
   name                  String   @unique
   description           String?
-  projectNumber         String?  @unique
+  projectNumber         String?
   projectCodePrefix     String?
   companyCode           String?
   technicalUnitCode     String?
