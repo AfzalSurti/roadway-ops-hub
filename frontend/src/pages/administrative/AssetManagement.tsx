@@ -88,6 +88,23 @@ function toNumber(value: string) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function getDaysSincePurchase(dateOfPurchase?: string | null) {
+  if (!dateOfPurchase) {
+    return null;
+  }
+
+  const purchaseDate = new Date(dateOfPurchase);
+  if (Number.isNaN(purchaseDate.getTime())) {
+    return null;
+  }
+
+  const today = new Date();
+  const start = new Date(purchaseDate.getFullYear(), purchaseDate.getMonth(), purchaseDate.getDate());
+  const end = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const diffMs = end.getTime() - start.getTime();
+  return Math.max(Math.floor(diffMs / (1000 * 60 * 60 * 24)), 0);
+}
+
 function AssetEditorDialog({
   open,
   onOpenChange,
@@ -121,14 +138,12 @@ function AssetEditorDialog({
         gst: toNumber(form.gst),
         projectNumber: form.projectNumber.trim() || null,
         assignedUser: form.assignedUser.trim() || null,
-        status: form.status,
         remarks: form.remarks.trim() || null,
-        forMonth: form.forMonth.trim() || null,
         itAssetId: form.itAssetId.trim() || null
       };
 
       return asset
-        ? api.updateAsset(asset.id, payload)
+        ? api.updateAsset(asset.id, { ...payload, status: form.status })
         : api.createAsset(payload);
     },
     onSuccess: async (result) => {
@@ -143,6 +158,7 @@ function AssetEditorDialog({
   });
 
   const totalAmount = useMemo(() => (toNumber(form.purchaseAmount) + toNumber(form.gst)).toFixed(2), [form.purchaseAmount, form.gst]);
+  const daysSincePurchase = useMemo(() => getDaysSincePurchase(form.dateOfPurchase), [form.dateOfPurchase]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -228,25 +244,27 @@ function AssetEditorDialog({
             <Label>Assigned User</Label>
             <Input value={form.assignedUser} onChange={(event) => setForm((prev) => ({ ...prev, assignedUser: event.target.value }))} className="mt-1" />
           </div>
-          <div>
-            <Label>Status</Label>
-            <Select value={form.status} onValueChange={(value) => setForm((prev) => ({ ...prev, status: value as AssetStatus }))}>
-              <SelectTrigger className="mt-1">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {STATUS_OPTIONS.filter((item) => item.value !== "ALL").map((option) => (
-                  <SelectItem key={option.value} value={option.value as AssetStatus}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {asset ? (
+            <div>
+              <Label>Status</Label>
+              <Select value={form.status} onValueChange={(value) => setForm((prev) => ({ ...prev, status: value as AssetStatus }))}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUS_OPTIONS.filter((item) => item.value !== "ALL").map((option) => (
+                    <SelectItem key={option.value} value={option.value as AssetStatus}>
+                      {option.label === "DISPOSED" ? "SOLD" : option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
 
           <div>
-            <Label>For Month</Label>
-            <Input value={form.forMonth} onChange={(event) => setForm((prev) => ({ ...prev, forMonth: event.target.value }))} className="mt-1" placeholder="April-2025" />
+            <Label>Days Since Purchase</Label>
+            <Input value={daysSincePurchase === null ? "-" : String(daysSincePurchase)} readOnly className="mt-1 bg-secondary/40" />
           </div>
           <div />
 
@@ -313,7 +331,7 @@ export default function AssetManagement() {
       "IT Asset ID": asset.itAssetId ?? "",
       "Project Number": asset.projectNumber ?? "",
       User: asset.assignedUser ?? "",
-      Status: asset.status,
+      Status: asset.status === "DISPOSED" ? "SOLD" : asset.status,
       Remarks: asset.remarks ?? ""
     }));
     const worksheet = XLSX.utils.json_to_sheet(rows, {
@@ -417,7 +435,7 @@ export default function AssetManagement() {
                   <td className="py-3 px-4">{asset.projectNumber ?? "-"}</td>
                   <td className="py-3 px-4">{asset.assignedUser ?? "-"}</td>
                   <td className="py-3 px-4">
-                    <span className={`status-badge border ${STATUS_COLORS[asset.status]}`}>{asset.status.replace(/_/g, " ")}</span>
+                    <span className={`status-badge border ${STATUS_COLORS[asset.status]}`}>{asset.status === "DISPOSED" ? "SOLD" : asset.status.replace(/_/g, " ")}</span>
                   </td>
                   <td className="py-3 px-4">
                     <div className="flex gap-2">

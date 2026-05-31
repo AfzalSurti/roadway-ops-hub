@@ -270,6 +270,12 @@ export const assetService = {
       ...payload,
       depreciationTillDate: depreciation.currentValue,
       assetId
+    }).then(async (maintenance) => {
+      if ((payload.sellAmount ?? 0) > 0) {
+        await assetRepository.update(assetId, { status: "DISPOSED" });
+      }
+
+      return maintenance;
     });
   },
 

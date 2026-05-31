@@ -22,6 +22,10 @@ const STATUS_COLORS: Record<AssetStatus, string> = {
   DISPOSED: "bg-slate-500/10 text-slate-600 border-slate-500/20"
 };
 
+function getStatusLabel(status: AssetStatus) {
+  return status === "DISPOSED" ? "SOLD" : status.replace(/_/g, " ");
+}
+
 type AssetFormState = {
   assetClass: string;
   markModel: string;
@@ -90,6 +94,22 @@ function calculateBookValue(asset: Pick<AssetItem, "purchaseAmount" | "dateOfPur
   const currentValue = Number((asset.purchaseAmount - asset.depreciationPerYear * yearsElapsed).toFixed(2));
 
   return { yearsElapsed, currentValue };
+}
+
+function getDaysSincePurchase(dateOfPurchase?: string | null) {
+  if (!dateOfPurchase) {
+    return null;
+  }
+
+  const purchaseDate = new Date(dateOfPurchase);
+  if (Number.isNaN(purchaseDate.getTime())) {
+    return null;
+  }
+
+  const today = new Date();
+  const start = new Date(purchaseDate.getFullYear(), purchaseDate.getMonth(), purchaseDate.getDate());
+  const end = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  return Math.max(Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)), 0);
 }
 
 function Field({ label, value }: { label: string; value: string }) {
@@ -227,6 +247,7 @@ function MaintenanceDialog({ asset, open, onOpenChange }: { asset: AssetItem; op
           <div>
             <Label>Sell Amount</Label>
             <Input type="number" min="0" value={sellAmount} onChange={(event) => setSellAmount(event.target.value)} className="mt-1" />
+            <p className="mt-1 text-xs text-muted-foreground">Entering a sell amount will automatically mark the asset as SOLD.</p>
           </div>
         </div>
         <DialogFooter>
@@ -306,6 +327,7 @@ export default function AssetDetail() {
 
     return { usefulLifeYears, scrapValue, depreciationPerYear, yearsElapsed, currentValue };
   }, [form.assetClass, form.dateOfPurchase, form.purchaseAmount]);
+  const daysSincePurchase = useMemo(() => getDaysSincePurchase(form.dateOfPurchase), [form.dateOfPurchase]);
 
   if (isLoading || !id) {
     return <PageWrapper><div className="page-header"><h1 className="page-title">Asset Detail</h1><p className="page-subtitle">Loading asset...</p></div></PageWrapper>;
@@ -331,7 +353,7 @@ export default function AssetDetail() {
             <Button variant="outline" size="sm" onClick={() => navigate("/administrative/assets")} className="gap-2">
               <ArrowLeft className="h-4 w-4" /> Back
             </Button>
-            <span className={`status-badge border ${STATUS_COLORS[asset.status]}`}>{asset.status.replace(/_/g, " ")}</span>
+            <span className={`status-badge border ${STATUS_COLORS[asset.status]}`}>{getStatusLabel(asset.status)}</span>
           </div>
           <h1 className="page-title">{asset.assetId}</h1>
           <p className="page-subtitle">{asset.assetClass}</p>
@@ -347,7 +369,7 @@ export default function AssetDetail() {
         <div className="glass-panel-strong p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold">Asset Information</h3>
-            {!isEditing && <span className={`status-badge border ${STATUS_COLORS[asset.status]}`}>{asset.status.replace(/_/g, " ")}</span>}
+            {!isEditing && <span className={`status-badge border ${STATUS_COLORS[asset.status]}`}>{getStatusLabel(asset.status)}</span>}
           </div>
 
           {isEditing ? (
@@ -382,7 +404,7 @@ export default function AssetDetail() {
                 <Select value={form.status} onValueChange={(value) => setForm((prev) => ({ ...prev, status: value as AssetStatus }))}>
                   <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {(["IN_USE", "IN_STORE", "UNDER_REPAIR", "DISPOSED"] as AssetStatus[]).map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}
+                    {(["IN_USE", "IN_STORE", "UNDER_REPAIR", "DISPOSED"] as AssetStatus[]).map((value) => <SelectItem key={value} value={value}>{getStatusLabel(value)}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -408,9 +430,9 @@ export default function AssetDetail() {
               <Field label="Scrap Value (5%)" value={formatCurrency(asset.scrapValue)} />
               <Field label="Depreciation / Year" value={formatCurrency(asset.depreciationPerYear)} />
               <Field label="Current Value" value={formatCurrency(asset.currentValue)} />
+              <Field label="Days Since Purchase" value={daysSincePurchase === null ? "-" : String(daysSincePurchase)} />
               <Field label="Project Number" value={asset.projectNumber ?? "-"} />
               <Field label="Assigned User" value={asset.assignedUser ?? "-"} />
-              <Field label="For Month" value={asset.forMonth ?? "-"} />
               <div className="md:col-span-2"><Field label="Remarks" value={asset.remarks ?? "-"} /></div>
             </div>
           )}
