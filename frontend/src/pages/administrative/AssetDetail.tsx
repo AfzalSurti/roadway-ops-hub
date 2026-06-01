@@ -404,7 +404,7 @@ export default function AssetDetail() {
                 <Select value={form.status} onValueChange={(value) => setForm((prev) => ({ ...prev, status: value as AssetStatus }))}>
                   <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {(["IN_USE", "IN_STORE", "UNDER_REPAIR", "DISPOSED"] as AssetStatus[]).map((value) => <SelectItem key={value} value={value}>{getStatusLabel(value)}</SelectItem>)}
+                    {(["IN_USE", "DISPOSED"] as AssetStatus[]).map((value) => <SelectItem key={value} value={value}>{getStatusLabel(value)}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

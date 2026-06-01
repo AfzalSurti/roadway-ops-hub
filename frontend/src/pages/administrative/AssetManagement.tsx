@@ -18,9 +18,7 @@ import * as XLSX from "xlsx";
 const STATUS_OPTIONS: Array<{ label: string; value: AssetStatus | "ALL" }> = [
   { label: "All", value: "ALL" },
   { label: "IN_USE", value: "IN_USE" },
-  { label: "IN_STORE", value: "IN_STORE" },
-  { label: "UNDER_REPAIR", value: "UNDER_REPAIR" },
-  { label: "DISPOSED", value: "DISPOSED" }
+  { label: "SOLD", value: "DISPOSED" }
 ];
 
 const STATUS_COLORS: Record<AssetStatus, string> = {
@@ -86,6 +84,10 @@ function toFormState(asset?: AssetItem | null): AssetFormState {
 function toNumber(value: string) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function getStatusLabel(status: AssetStatus) {
+  return status === "DISPOSED" ? "SOLD" : "IN USE";
 }
 
 function getDaysSincePurchase(dateOfPurchase?: string | null) {
@@ -435,7 +437,7 @@ export default function AssetManagement() {
                   <td className="py-3 px-4">{asset.projectNumber ?? "-"}</td>
                   <td className="py-3 px-4">{asset.assignedUser ?? "-"}</td>
                   <td className="py-3 px-4">
-                    <span className={`status-badge border ${STATUS_COLORS[asset.status]}`}>{asset.status === "DISPOSED" ? "SOLD" : asset.status.replace(/_/g, " ")}</span>
+                    <span className={`status-badge border ${STATUS_COLORS[asset.status]}`}>{getStatusLabel(asset.status)}</span>
                   </td>
                   <td className="py-3 px-4">
                     <div className="flex gap-2">
