@@ -43,5 +43,10 @@ export const addMovementSchema = z.object({
 export const addMaintenanceSchema = z.object({
   dateOfMaintenance: z.coerce.date(),
   repairCostInclGst: z.coerce.number().min(0).default(0),
-  sellAmount: z.coerce.number().min(0).default(0)
+  sellAmount: z.coerce.number().min(0).default(0),
+  soldTo: z.string().trim().min(2).optional().nullable(),
+  remark: z.string().trim().optional().nullable()
+}).refine((payload) => (payload.sellAmount ?? 0) <= 0 || Boolean(payload.soldTo?.trim()), {
+  message: "Sold To is required when Sell Amount is entered",
+  path: ["soldTo"]
 });

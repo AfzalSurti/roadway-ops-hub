@@ -192,6 +192,8 @@ model AssetMaintenance {
   repairCostInclGst    Float    @default(0)
   depreciationTillDate Float    @default(0)
   sellAmount           Float    @default(0)
+  soldTo               String?
+  remark               String?
   createdAt            DateTime @default(now())
   asset                Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
 

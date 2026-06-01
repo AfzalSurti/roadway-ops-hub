@@ -186,6 +186,8 @@ function MaintenanceDialog({ asset, open, onOpenChange }: { asset: AssetItem; op
   const [dateOfMaintenance, setDateOfMaintenance] = useState("");
   const [repairCostInclGst, setRepairCostInclGst] = useState("0");
   const [sellAmount, setSellAmount] = useState("0");
+  const [soldTo, setSoldTo] = useState("");
+  const [saleRemark, setSaleRemark] = useState("");
 
   const depreciationSnapshot = useMemo(() => {
     if (!dateOfMaintenance) {
@@ -200,7 +202,9 @@ function MaintenanceDialog({ asset, open, onOpenChange }: { asset: AssetItem; op
       api.addAssetMaintenance(asset.id, {
         dateOfMaintenance: new Date(dateOfMaintenance).toISOString(),
         repairCostInclGst: toNumber(repairCostInclGst),
-        sellAmount: toNumber(sellAmount)
+        sellAmount: toNumber(sellAmount),
+        soldTo: toNumber(sellAmount) > 0 ? soldTo.trim() || null : null,
+        remark: saleRemark.trim() || null
       }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["assets", asset.id] });
@@ -216,8 +220,12 @@ function MaintenanceDialog({ asset, open, onOpenChange }: { asset: AssetItem; op
       setDateOfMaintenance(new Date().toISOString().slice(0, 10));
       setRepairCostInclGst("0");
       setSellAmount("0");
+      setSoldTo("");
+      setSaleRemark("");
     }
   }, [open]);
+
+  const isSoldEntry = toNumber(sellAmount) > 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -249,6 +257,18 @@ function MaintenanceDialog({ asset, open, onOpenChange }: { asset: AssetItem; op
             <Input type="number" min="0" value={sellAmount} onChange={(event) => setSellAmount(event.target.value)} className="mt-1" />
             <p className="mt-1 text-xs text-muted-foreground">Entering a sell amount will automatically mark the asset as SOLD.</p>
           </div>
+          {isSoldEntry && (
+            <>
+              <div>
+                <Label>Sold To</Label>
+                <Input value={soldTo} onChange={(event) => setSoldTo(event.target.value)} className="mt-1" placeholder="Person or party name" />
+              </div>
+              <div>
+                <Label>Remark</Label>
+                <Textarea value={saleRemark} onChange={(event) => setSaleRemark(event.target.value)} className="mt-1 min-h-24" placeholder="Optional sale note" />
+              </div>
+            </>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
@@ -328,6 +348,7 @@ export default function AssetDetail() {
     return { usefulLifeYears, scrapValue, depreciationPerYear, yearsElapsed, currentValue };
   }, [form.assetClass, form.dateOfPurchase, form.purchaseAmount]);
   const daysSincePurchase = useMemo(() => getDaysSincePurchase(form.dateOfPurchase), [form.dateOfPurchase]);
+  const isSold = asset.status === "DISPOSED";
 
   if (isLoading || !id) {
     return <PageWrapper><div className="page-header"><h1 className="page-title">Asset Detail</h1><p className="page-subtitle">Loading asset...</p></div></PageWrapper>;
@@ -359,8 +380,8 @@ export default function AssetDetail() {
           <p className="page-subtitle">{asset.assetClass}</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" onClick={() => setMovementOpen(true)} className="gap-2"><CalendarPlus className="h-4 w-4" /> Log Movement</Button>
-          <Button variant="outline" onClick={() => setMaintenanceOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> Log Maintenance</Button>
+          <Button variant="outline" onClick={() => setMovementOpen(true)} className="gap-2" disabled={isSold}><CalendarPlus className="h-4 w-4" /> Log Movement</Button>
+          <Button variant="outline" onClick={() => setMaintenanceOpen(true)} className="gap-2" disabled={isSold}><Plus className="h-4 w-4" /> Log Maintenance</Button>
           <Button onClick={() => setIsEditing((current) => !current)} className="gap-2"><Pencil className="h-4 w-4" /> {isEditing ? "Cancel Edit" : "Edit Asset"}</Button>
         </div>
       </div>
@@ -446,7 +467,7 @@ export default function AssetDetail() {
             </TabsList>
             <TabsContent value="movements">
               <div className="flex justify-end mb-3">
-                <Button onClick={() => setMovementOpen(true)} className="gap-2"><CalendarPlus className="h-4 w-4" /> Log Movement</Button>
+                <Button onClick={() => setMovementOpen(true)} className="gap-2" disabled={isSold}><CalendarPlus className="h-4 w-4" /> Log Movement</Button>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -473,7 +494,7 @@ export default function AssetDetail() {
             </TabsContent>
             <TabsContent value="maintenance">
               <div className="flex justify-end mb-3">
-                <Button onClick={() => setMaintenanceOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> Log Maintenance</Button>
+                <Button onClick={() => setMaintenanceOpen(true)} className="gap-2" disabled={isSold}><Plus className="h-4 w-4" /> Log Maintenance</Button>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -481,19 +502,21 @@ export default function AssetDetail() {
                     <tr className="border-b border-border/40">
                       <th className="text-left py-3 px-4 font-medium text-muted-foreground">Date</th>
                       <th className="text-left py-3 px-4 font-medium text-muted-foreground">Repair Cost (incl. GST)</th>
-                      <th className="text-left py-3 px-4 font-medium text-muted-foreground">Depreciation Till Date</th>
                       <th className="text-left py-3 px-4 font-medium text-muted-foreground">Sell Amount</th>
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground">Sold To</th>
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground">Remark</th>
                     </tr>
                   </thead>
                   <tbody>
                     {(asset.maintenances ?? []).length === 0 ? (
-                      <tr><td colSpan={4} className="py-8 text-center text-muted-foreground">No maintenance records.</td></tr>
+                      <tr><td colSpan={5} className="py-8 text-center text-muted-foreground">No maintenance records.</td></tr>
                     ) : asset.maintenances!.map((maintenance) => (
                       <tr key={maintenance.id} className="border-b border-border/20">
                         <td className="py-3 px-4">{new Date(maintenance.dateOfMaintenance).toLocaleDateString("en-IN")}</td>
                         <td className="py-3 px-4">₹{maintenance.repairCostInclGst.toLocaleString("en-IN")}</td>
-                        <td className="py-3 px-4">₹{maintenance.depreciationTillDate.toLocaleString("en-IN")}</td>
                         <td className="py-3 px-4">₹{maintenance.sellAmount.toLocaleString("en-IN")}</td>
+                        <td className="py-3 px-4">{maintenance.soldTo ?? "-"}</td>
+                        <td className="py-3 px-4">{maintenance.remark ?? "-"}</td>
                       </tr>
                     ))}
                   </tbody>

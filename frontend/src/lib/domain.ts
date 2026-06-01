@@ -75,6 +75,8 @@ export type AssetMaintenanceItem = {
   repairCostInclGst: number;
   depreciationTillDate: number;
   sellAmount: number;
+  soldTo?: string | null;
+  remark?: string | null;
   createdAt: string;
 };
 

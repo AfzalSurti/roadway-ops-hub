@@ -244,7 +244,10 @@ export const assetService = {
       movedToUser?: string | null;
     }
   ) {
-    await this.getById(assetId);
+    const asset = await this.getById(assetId);
+    if (asset.status === "DISPOSED") {
+      throw badRequest("Sold assets cannot have movement entries");
+    }
     return assetRepository.addMovement(assetId, { ...payload, assetId });
   },
 
@@ -254,9 +257,14 @@ export const assetService = {
       dateOfMaintenance: Date;
       repairCostInclGst?: number;
       sellAmount?: number;
+      soldTo?: string | null;
+      remark?: string | null;
     }
   ) {
     const asset = await this.getById(assetId);
+    if (asset.status === "DISPOSED") {
+      throw badRequest("Sold assets cannot have maintenance entries");
+    }
     const depreciation = calculateAssetDepreciation(
       {
         assetClass: asset.assetClass,
@@ -269,6 +277,8 @@ export const assetService = {
     return assetRepository.addMaintenance(assetId, {
       ...payload,
       depreciationTillDate: depreciation.currentValue,
+      soldTo: payload.sellAmount && payload.sellAmount > 0 ? payload.soldTo ?? null : null,
+      remark: payload.remark ?? null,
       assetId
     }).then(async (maintenance) => {
       if ((payload.sellAmount ?? 0) > 0) {

@@ -505,7 +505,7 @@ export const api = {
     });
   },
 
-  addAssetMaintenance(assetId: string, payload: { dateOfMaintenance: string; repairCostInclGst: number; sellAmount: number }) {
+  addAssetMaintenance(assetId: string, payload: { dateOfMaintenance: string; repairCostInclGst: number; sellAmount: number; soldTo?: string | null; remark?: string | null }) {
     return request<AssetMaintenanceItem>(`/assets/${assetId}/maintenances`, {
       method: "POST",
       body: JSON.stringify(payload)
