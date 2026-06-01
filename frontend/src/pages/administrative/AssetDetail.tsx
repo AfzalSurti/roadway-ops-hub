@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { PageWrapper } from "@/components/PageWrapper";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import type { AssetItem, AssetStatus } from "@/lib/domain";
+import type { AssetItem, AssetStatus, ProjectItem } from "@/lib/domain";
 import { ASSET_CLASS_OPTIONS_BY_GROUP } from "@/lib/asset-catalog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -59,7 +59,20 @@ const EMPTY_FORM: AssetFormState = {
 
 function toDateInputValue(value?: string | null) {
   if (!value) return "";
-  return value.slice(0, 10);
+  const datePart = value.slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(datePart) ? datePart : "";
+}
+
+function isDateBefore(value: string, minimum: string) {
+  if (!value || !minimum) return false;
+  return new Date(value).getTime() < new Date(minimum).getTime();
+}
+
+function formatWarrantyEndDate(value?: string | null) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("en-IN");
 }
 
 function toFormState(asset?: AssetItem | null): AssetFormState {
@@ -317,6 +330,10 @@ export default function AssetDetail() {
         throw new Error("Asset id is missing");
       }
 
+      if (form.warrantyPeriod && form.dateOfPurchase && isDateBefore(form.warrantyPeriod, form.dateOfPurchase)) {
+        throw new Error("Warranty end date cannot be before the date of purchase");
+      }
+
       return api.updateAsset(id, {
         assetClass: form.assetClass,
         markModel: form.markModel.trim() || null,
@@ -434,8 +451,37 @@ export default function AssetDetail() {
               </div>
               <div><Label>Mark / Model</Label><Input value={form.markModel} onChange={(event) => setForm((prev) => ({ ...prev, markModel: event.target.value }))} className="mt-1" /></div>
               <div><Label>IT Asset ID</Label><Input value={form.itAssetId} onChange={(event) => setForm((prev) => ({ ...prev, itAssetId: event.target.value }))} className="mt-1" /></div>
-              <div><Label>Date of Purchase</Label><Input type="date" value={form.dateOfPurchase} onChange={(event) => setForm((prev) => ({ ...prev, dateOfPurchase: event.target.value }))} className="mt-1" /></div>
-              <div><Label>Warranty Period</Label><Input value={form.warrantyPeriod} onChange={(event) => setForm((prev) => ({ ...prev, warrantyPeriod: event.target.value }))} className="mt-1" /></div>
+              <div>
+                <Label>Date of Purchase</Label>
+                <Input
+                  type="date"
+                  value={form.dateOfPurchase}
+                  onChange={(event) =>
+                    setForm((prev) => {
+                      const nextDateOfPurchase = event.target.value;
+                      return {
+                        ...prev,
+                        dateOfPurchase: nextDateOfPurchase,
+                        warrantyPeriod:
+                          prev.warrantyPeriod && isDateBefore(prev.warrantyPeriod, nextDateOfPurchase)
+                            ? ""
+                            : prev.warrantyPeriod
+                      };
+                    })
+                  }
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label>Warranty End Date</Label>
+                <Input
+                  type="date"
+                  min={form.dateOfPurchase || undefined}
+                  value={form.warrantyPeriod}
+                  onChange={(event) => setForm((prev) => ({ ...prev, warrantyPeriod: event.target.value }))}
+                  className="mt-1"
+                />
+              </div>
               <div><Label>Purchase Amount</Label><Input type="number" min="0" value={form.purchaseAmount} onChange={(event) => setForm((prev) => ({ ...prev, purchaseAmount: event.target.value }))} className="mt-1" /></div>
               <div><Label>GST</Label><Input type="number" min="0" value={form.gst} onChange={(event) => setForm((prev) => ({ ...prev, gst: event.target.value }))} className="mt-1" /></div>
               <div><Label>Total Amount with GST</Label><Input readOnly value={totalAmount} className="mt-1 bg-secondary/40" /></div>
@@ -467,7 +513,7 @@ export default function AssetDetail() {
               <Field label="Asset Class" value={asset.assetClass} />
               <Field label="Mark / Model" value={asset.markModel ?? "-"} />
               <Field label="Date of Purchase" value={asset.dateOfPurchase ? new Date(asset.dateOfPurchase).toLocaleDateString("en-IN") : "-"} />
-              <Field label="Warranty Period" value={asset.warrantyPeriod ?? "-"} />
+              <Field label="Warranty End Date" value={formatWarrantyEndDate(asset.warrantyPeriod)} />
               <Field label="Purchase Amount" value={`₹${asset.purchaseAmount.toLocaleString("en-IN")}`} />
               <Field label="GST" value={`₹${asset.gst.toLocaleString("en-IN")}`} />
               <Field label="Total Amount with GST" value={`₹${asset.totalAmountWithGst.toLocaleString("en-IN")}`} />

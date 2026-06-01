@@ -62,7 +62,20 @@ const EMPTY_FORM: AssetFormState = {
 
 function toDateInputValue(value?: string | null) {
   if (!value) return "";
-  return value.slice(0, 10);
+  const datePart = value.slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(datePart) ? datePart : "";
+}
+
+function isDateBefore(value: string, minimum: string) {
+  if (!value || !minimum) return false;
+  return new Date(value).getTime() < new Date(minimum).getTime();
+}
+
+function formatWarrantyEndDate(value?: string | null) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("en-IN");
 }
 
 function toFormState(asset?: AssetItem | null): AssetFormState {
@@ -142,6 +155,10 @@ function AssetEditorDialog({
 
   const mutation = useMutation({
     mutationFn: async () => {
+      if (form.warrantyPeriod && form.dateOfPurchase && isDateBefore(form.warrantyPeriod, form.dateOfPurchase)) {
+        throw new Error("Warranty end date cannot be before the date of purchase");
+      }
+
       const payload = {
         assetClass: form.assetClass,
         markModel: form.markModel.trim() || null,
@@ -214,11 +231,34 @@ function AssetEditorDialog({
 
           <div>
             <Label>Date of Purchase</Label>
-            <Input type="date" value={form.dateOfPurchase} onChange={(event) => setForm((prev) => ({ ...prev, dateOfPurchase: event.target.value }))} className="mt-1" />
+            <Input
+              type="date"
+              value={form.dateOfPurchase}
+              onChange={(event) =>
+                setForm((prev) => {
+                  const nextDateOfPurchase = event.target.value;
+                  return {
+                    ...prev,
+                    dateOfPurchase: nextDateOfPurchase,
+                    warrantyPeriod:
+                      prev.warrantyPeriod && isDateBefore(prev.warrantyPeriod, nextDateOfPurchase)
+                        ? ""
+                        : prev.warrantyPeriod
+                  };
+                })
+              }
+              className="mt-1"
+            />
           </div>
           <div>
-            <Label>Warranty Period</Label>
-            <Input value={form.warrantyPeriod} onChange={(event) => setForm((prev) => ({ ...prev, warrantyPeriod: event.target.value }))} className="mt-1" />
+            <Label>Warranty End Date</Label>
+            <Input
+              type="date"
+              min={form.dateOfPurchase || undefined}
+              value={form.warrantyPeriod}
+              onChange={(event) => setForm((prev) => ({ ...prev, warrantyPeriod: event.target.value }))}
+              className="mt-1"
+            />
           </div>
 
           <div>
@@ -342,7 +382,7 @@ export default function AssetManagement() {
       "Asset Class": asset.assetClass,
       "Date of Purchase": asset.dateOfPurchase ? new Date(asset.dateOfPurchase).toLocaleDateString("en-IN") : "",
       "Mark/Model": asset.markModel ?? "",
-      "Warranty Period": asset.warrantyPeriod ?? "",
+      "Warranty End Date": formatWarrantyEndDate(asset.warrantyPeriod),
       "Purchase Amount": asset.purchaseAmount,
       GST: asset.gst,
       "Total Amount with GST": asset.totalAmountWithGst,
@@ -354,7 +394,7 @@ export default function AssetManagement() {
       Remarks: asset.remarks ?? ""
     }));
     const worksheet = XLSX.utils.json_to_sheet(rows, {
-      header: ["#", "Asset Class", "Date of Purchase", "Mark/Model", "Warranty Period", "Purchase Amount", "GST", "Total Amount with GST", "Asset ID", "IT Asset ID", "Project Number", "User", "Status", "Remarks"]
+      header: ["#", "Asset Class", "Date of Purchase", "Mark/Model", "Warranty End Date", "Purchase Amount", "GST", "Total Amount with GST", "Asset ID", "IT Asset ID", "Project Number", "User", "Status", "Remarks"]
     });
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Assets");
