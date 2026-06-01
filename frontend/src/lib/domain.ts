@@ -1,9 +1,10 @@
-export type Role = "ADMIN" | "PMO" | "EMPLOYEE"; // HOD will be added later.
+export type Role = "ADMIN" | "PMO" | "HOD" | "EMPLOYEE";
 export type Priority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 export type TaskStatus = "TODO" | "IN_PROGRESS" | "BLOCKED" | "DONE";
 export type ReportStatus = "SUBMITTED" | "APPROVED" | "CHANGES_REQUESTED" | "REJECTED";
 export type FinancialBillStatus = "PLANNING" | "PUT_UP" | "RECEIVED";
 export type AssetStatus = "IN_USE" | "IN_STORE" | "UNDER_REPAIR" | "DISPOSED";
+export type DprReportStatus = "NOT_STARTED" | "UNDER_PREPARATION" | "DRAFT_SUBMITTED" | "UNDER_APPROVAL" | "APPROVED";
 
 export type TemplateField = {
   id: string;
@@ -45,6 +46,15 @@ export type ProjectItem = {
   financialYearShort?: number | null;
   serialNumber?: number | null;
   projectNumberAssignedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ProjectDprOverviewItem = {
+  id: string;
+  projectId: string;
+  status: DprReportStatus;
+  data?: Record<string, unknown> | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -426,6 +436,14 @@ export const financialBillStatusConfig: Record<FinancialBillStatus, { label: str
   PLANNING: { label: "Planning", color: "text-muted-foreground bg-muted" },
   PUT_UP: { label: "Put Up", color: "text-primary bg-primary/10" },
   RECEIVED: { label: "Received", color: "text-accent bg-accent/10" }
+};
+
+export const dprReportStatusConfig: Record<DprReportStatus, { label: string; color: string }> = {
+  NOT_STARTED: { label: "Not Started", color: "text-muted-foreground bg-muted" },
+  UNDER_PREPARATION: { label: "Under Preparation", color: "text-primary bg-primary/10" },
+  DRAFT_SUBMITTED: { label: "Draft Submitted", color: "text-warning bg-warning/10" },
+  UNDER_APPROVAL: { label: "Under Approval", color: "text-indigo-400 bg-indigo-400/10" },
+  APPROVED: { label: "Approved", color: "text-accent bg-accent/10" }
 };
 
 export const toAvatarUrl = (name: string) =>

@@ -1,4 +1,4 @@
-import type { ApiUser, AppNotification, AssetItem, AssetMaintenanceItem, AssetMovementItem, AssetStatsResponse, AssetStatus, AssistantChatResponse, AssistantConversationMessage, AssistantDraft, CreateEmployeeResponse, FinancialAllProjectsBillStatusSummary, FinancialBillItem, FinancialBillStatus, FinancialPlan, FinancialProjectDetail, FinancialProjectSummary, FinancialRaBill, ProjectItem, ProjectRequisitionFormItem, ReportItem, ReportStatus, ReportTemplate, TaskComment, TaskItem, TaskStatus } from "./domain";
+import type { ApiUser, AppNotification, AssetItem, AssetMaintenanceItem, AssetMovementItem, AssetStatsResponse, AssetStatus, AssistantChatResponse, AssistantConversationMessage, AssistantDraft, CreateEmployeeResponse, DprReportStatus, FinancialAllProjectsBillStatusSummary, FinancialBillItem, FinancialBillStatus, FinancialPlan, FinancialProjectDetail, FinancialProjectSummary, FinancialRaBill, ProjectDprOverviewItem, ProjectItem, ProjectRequisitionFormItem, ReportItem, ReportStatus, ReportTemplate, TaskComment, TaskItem, TaskStatus } from "./domain";
 
   const API_BASE_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:4000").replace(/\/+$/, "");
 
@@ -401,6 +401,38 @@ export const api = {
 
   getProjectsWithoutNumber() {
     return request<ProjectItem[]>("/projects/without-number");
+  },
+
+  getProjectDprOverviews() {
+    return request<ProjectDprOverviewItem[]>("/dpr-overviews");
+  },
+
+  getProjectDprOverview(projectId: string) {
+    return request<ProjectDprOverviewItem | null>(`/dpr-overviews/project/${projectId}`);
+  },
+
+  getProjectDprOverviewByProject(projectId: string) {
+    return request<ProjectDprOverviewItem | null>(`/dpr-overviews/project/${projectId}`);
+  },
+
+  createProjectDprOverview(payload: { projectId: string; status?: DprReportStatus; data?: Record<string, unknown> | null }) {
+    return request<ProjectDprOverviewItem>("/dpr-overviews", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+  },
+
+  updateProjectDprOverview(id: string, payload: Partial<{ status: DprReportStatus; data: Record<string, unknown> | null }>) {
+    return request<ProjectDprOverviewItem>(`/dpr-overviews/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    });
+  },
+
+  deleteProjectDprOverview(id: string) {
+    return request<{ deleted: boolean }>(`/dpr-overviews/${id}`, {
+      method: "DELETE"
+    });
   },
 
   getAssets(params?: { page?: number; limit?: number; search?: string; assetClass?: string; projectNumber?: string; status?: AssetStatus }) {

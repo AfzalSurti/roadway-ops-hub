@@ -8,6 +8,7 @@ import { toast } from "sonner";
 function getLandingPath(role: string) {
   if (role === "ADMIN") return "/admin/dashboard";
   if (role === "PMO") return "/administrative/dashboard";
+  if (role === "HOD") return "/hod/dashboard";
   return "/app/dashboard";
 }
 

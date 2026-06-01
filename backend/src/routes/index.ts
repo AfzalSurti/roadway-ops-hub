@@ -11,6 +11,7 @@ import { projectRequisitionFormsRouter } from "./project-requisition-forms.route
 import { financialRouter } from "./financial.routes.js";
 import { assistantRouter } from "./assistant.routes.js";
 import { assetRouter } from "./asset.routes.js";
+import { dprOverviewRouter } from "./dpr-overview.routes.js";
 
 export const apiRouter = Router();
 
@@ -26,3 +27,4 @@ apiRouter.use("/project-requisition-forms", projectRequisitionFormsRouter);
 apiRouter.use("/financials", financialRouter);
 apiRouter.use("/assistant", assistantRouter);
 apiRouter.use("/assets", assetRouter);
+apiRouter.use("/dpr-overviews", dprOverviewRouter);

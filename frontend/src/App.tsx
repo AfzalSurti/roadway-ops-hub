@@ -24,6 +24,7 @@ import NotFound from "./pages/NotFound";
 import AdministrativeDashboard from "./pages/administrative/Dashboard";
 import AssetManagement from "./pages/administrative/AssetManagement";
 import AssetDetail from "./pages/administrative/AssetDetail";
+import HodDashboard from "./pages/hod/Dashboard";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -47,6 +48,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function getLandingPath(role?: string | null) {
   if (role === "ADMIN") return "/admin/dashboard";
   if (role === "PMO") return "/administrative/dashboard";
+  if (role === "HOD") return "/hod/dashboard";
   return "/app/dashboard";
 }
 
@@ -61,6 +63,13 @@ function PmoRoute({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
   if (user.role !== "PMO") return <Navigate to={getLandingPath(user.role)} replace />;
+  return <>{children}</>;
+}
+
+function HodRoute({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role !== "HOD") return <Navigate to={getLandingPath(user.role)} replace />;
   return <>{children}</>;
 }
 
@@ -95,6 +104,10 @@ function AppRoutes() {
         <Route path="project-management" element={<AdminProjects />} />
         <Route path="assets" element={<AssetManagement />} />
         <Route path="assets/:id" element={<AssetDetail />} />
+      </Route>
+
+      <Route path="/hod" element={<HodRoute><AppLayout /></HodRoute>}>
+        <Route path="dashboard" element={<HodDashboard />} />
       </Route>
 
       {/* Employee Routes */}

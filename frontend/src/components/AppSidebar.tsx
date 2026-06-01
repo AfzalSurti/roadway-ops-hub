@@ -32,6 +32,10 @@ const administrativeNav = [
   { to: "/administrative/assets", icon: Package, label: "Asset Management" },
 ];
 
+const hodNav = [
+  { to: "/hod/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+];
+
 const employeeNav = [
   { to: "/app/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/app/tasks", icon: ListTodo, label: "My Tasks" },
@@ -40,9 +44,9 @@ const employeeNav = [
 ];
 
 export function AppSidebar() {
-  const { user, isAdmin, isPmo, logout } = useAuth();
+  const { user, isAdmin, isPmo, isHod, logout } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
-  const navItems = isAdmin ? adminNav : isPmo ? administrativeNav : employeeNav;
+  const navItems = isAdmin ? adminNav : isPmo ? administrativeNav : isHod ? hodNav : employeeNav;
 
   const handleLogout = async () => {
     const confirmed = window.confirm("Are you sure you want to logout?");

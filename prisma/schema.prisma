@@ -11,7 +11,16 @@ datasource db {
 enum Role {
   ADMIN
   PMO
+  HOD
   EMPLOYEE
+}
+
+enum DprReportStatus {
+  NOT_STARTED
+  UNDER_PREPARATION
+  DRAFT_SUBMITTED
+  UNDER_APPROVAL
+  APPROVED
 }
 
 enum AssetStatus {
@@ -128,6 +137,7 @@ model Project {
   financialPlan         ProjectFinancialPlan?
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
+  dprOverview           ProjectDprOverview?
 
   @@index([name])
   @@index([projectCodePrefix, financialYearShort])
@@ -472,4 +482,17 @@ model Notification {
 
   @@index([userId, createdAt])
   @@index([userId, isRead])
+}
+
+model ProjectDprOverview {
+  id         String          @id @default(cuid())
+  projectId  String          @unique
+  status     DprReportStatus @default(NOT_STARTED)
+  data       Json?
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  project    Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
 }
