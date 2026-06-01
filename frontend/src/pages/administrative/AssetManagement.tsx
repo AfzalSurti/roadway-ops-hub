@@ -88,6 +88,11 @@ function toNumber(value: string) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function getProjectNameByNumber(projects: ProjectItem[], projectNumber?: string | null) {
+  if (!projectNumber) return "";
+  return projects.find((project) => project.projectNumber === projectNumber)?.name ?? "";
+}
+
 function getStatusLabel(status: AssetStatus) {
   return status === "DISPOSED" ? "SOLD" : "IN USE";
 }
@@ -124,6 +129,10 @@ function AssetEditorDialog({
 }) {
   const queryClient = useQueryClient();
   const [form, setForm] = useState<AssetFormState>(EMPTY_FORM);
+  const selectedProjectName = useMemo(
+    () => getProjectNameByNumber(projects, form.projectNumber.trim() || null),
+    [form.projectNumber, projects]
+  );
 
   useEffect(() => {
     if (open) {
@@ -242,6 +251,11 @@ function AssetEditorDialog({
                     ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div>
+            <Label>Project Name</Label>
+            <Input value={selectedProjectName || "-"} readOnly className="mt-1 bg-secondary/40" />
           </div>
 
           <div>

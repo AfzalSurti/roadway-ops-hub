@@ -113,6 +113,11 @@ function getDaysSincePurchase(dateOfPurchase?: string | null) {
   return Math.max(Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)), 0);
 }
 
+function getProjectNameByNumber(projects: ProjectItem[], projectNumber?: string | null) {
+  if (!projectNumber) return "";
+  return projects.find((project) => project.projectNumber === projectNumber)?.name ?? "";
+}
+
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl bg-secondary/30 border border-border/40 p-3">
@@ -295,6 +300,11 @@ export default function AssetDetail() {
     enabled: Boolean(id)
   });
 
+  const { data: projects = [] } = useQuery({
+    queryKey: ["projects"],
+    queryFn: () => api.getProjects()
+  });
+
   useEffect(() => {
     if (asset) {
       setForm(toFormState(asset));
@@ -333,6 +343,10 @@ export default function AssetDetail() {
   });
 
   const totalAmount = useMemo(() => (toNumber(form.purchaseAmount) + toNumber(form.gst)).toFixed(2), [form.purchaseAmount, form.gst]);
+  const selectedProjectName = useMemo(
+    () => getProjectNameByNumber(projects, form.projectNumber.trim() || null),
+    [form.projectNumber, projects]
+  );
   const editingDepreciation = useMemo(() => {
     if (!form.assetClass) {
       return null;
@@ -429,6 +443,7 @@ export default function AssetDetail() {
               <div><Label>Depreciation / Year</Label><Input readOnly value={editingDepreciation ? formatCurrency(editingDepreciation.depreciationPerYear) : "-"} className="mt-1 bg-secondary/40" /></div>
               <div><Label>Current Value</Label><Input readOnly value={editingDepreciation ? formatCurrency(editingDepreciation.currentValue) : "-"} className="mt-1 bg-secondary/40" /></div>
               <div><Label>Project Number</Label><Input value={form.projectNumber} onChange={(event) => setForm((prev) => ({ ...prev, projectNumber: event.target.value }))} className="mt-1" /></div>
+              <div><Label>Project Name</Label><Input value={selectedProjectName || "-"} readOnly className="mt-1 bg-secondary/40" /></div>
               <div><Label>Assigned User</Label><Input value={form.assignedUser} onChange={(event) => setForm((prev) => ({ ...prev, assignedUser: event.target.value }))} className="mt-1" /></div>
               <div><Label>Status</Label>
                 <Select value={form.status} onValueChange={(value) => setForm((prev) => ({ ...prev, status: value as AssetStatus }))}>
@@ -462,6 +477,7 @@ export default function AssetDetail() {
               <Field label="Current Value" value={formatCurrency(asset.currentValue)} />
               <Field label="Days Since Purchase" value={daysSincePurchase === null ? "-" : String(daysSincePurchase)} />
               <Field label="Project Number" value={asset.projectNumber ?? "-"} />
+              <Field label="Project Name" value={getProjectNameByNumber(projects, asset.projectNumber) || "-"} />
               <Field label="Assigned User" value={asset.assignedUser ?? "-"} />
               <div className="md:col-span-2"><Field label="Remarks" value={asset.remarks ?? "-"} /></div>
             </div>
