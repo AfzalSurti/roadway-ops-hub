@@ -81,7 +81,7 @@ function toFormState(asset?: AssetItem | null): AssetFormState {
     assetClass: asset.assetClass,
     markModel: asset.markModel ?? "",
     dateOfPurchase: toDateInputValue(asset.dateOfPurchase),
-    warrantyPeriod: asset.warrantyPeriod ?? "",
+    warrantyPeriod: toDateInputValue(asset.warrantyPeriod),
     purchaseAmount: String(asset.purchaseAmount ?? 0),
     gst: String(asset.gst ?? 0),
     projectNumber: asset.projectNumber ?? "",

@@ -42,6 +42,13 @@ function formatDate(value?: string | Date | null): string {
   return date.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
+function formatWarrantyEndDate(value?: string | null): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return formatDate(value);
+}
+
 function formatMoney(value: number): string {
   if (!value) return "—";
   return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(value);
@@ -183,7 +190,7 @@ export function downloadAssetPdf(asset: AssetItem): void {
   const rows = [
     ["Asset ID", asset.assetId, "Asset Class", asset.assetClass],
     ["Mark / Model", asset.markModel ?? "—", "IT Asset ID", asset.itAssetId ?? "—"],
-    ["Purchase Date", purchaseDate, "Warranty Period", asset.warrantyPeriod ?? "—"],
+    ["Purchase Date", purchaseDate, "Warranty End Date", formatWarrantyEndDate(asset.warrantyPeriod)],
     ["Purchase Amount", formatMoney(asset.purchaseAmount), "GST", formatMoney(asset.gst)],
     ["Total Amount", formatMoney(asset.totalAmountWithGst), "For Month", asset.forMonth ?? "—"],
     ["Project Number", asset.projectNumber ?? "—", "Assigned User", asset.assignedUser ?? "—"],

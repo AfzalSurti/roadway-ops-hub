@@ -104,6 +104,25 @@ function getAssetPrefix(assetClass: string): string {
   return prefix;
 }
 
+function toDateOnlyTime(value: Date): number {
+  return new Date(value.getFullYear(), value.getMonth(), value.getDate()).getTime();
+}
+
+function validateWarrantyEndDate(dateOfPurchase?: Date | null, warrantyEndDate?: string | null): void {
+  if (!warrantyEndDate) {
+    return;
+  }
+
+  const parsedWarrantyEndDate = new Date(warrantyEndDate);
+  if (Number.isNaN(parsedWarrantyEndDate.getTime())) {
+    throw badRequest("Warranty end date must be a valid date");
+  }
+
+  if (dateOfPurchase && toDateOnlyTime(parsedWarrantyEndDate) < toDateOnlyTime(dateOfPurchase)) {
+    throw badRequest("Warranty end date cannot be before the date of purchase");
+  }
+}
+
 async function generateAssetId(assetClass: string): Promise<string> {
   const prefix = getAssetPrefix(assetClass);
   const existingCount = await assetRepository.countByAssetIdPrefix(prefix);
@@ -151,6 +170,8 @@ export const assetService = {
     forMonth?: string | null;
     itAssetId?: string | null;
   }) {
+    validateWarrantyEndDate(payload.dateOfPurchase ?? null, payload.warrantyPeriod ?? null);
+
     const assetId = await generateAssetId(payload.assetClass);
     const purchaseAmount = payload.purchaseAmount ?? 0;
     const gst = payload.gst ?? 0;
@@ -205,6 +226,14 @@ export const assetService = {
     }
   ) {
     const existing = await this.getById(id);
+    const shouldValidateWarranty = Object.prototype.hasOwnProperty.call(payload, "warrantyPeriod");
+    if (shouldValidateWarranty) {
+      validateWarrantyEndDate(
+        payload.dateOfPurchase ?? existing.dateOfPurchase ?? null,
+        payload.warrantyPeriod ?? null
+      );
+    }
+
     const nextPurchaseAmount = payload.purchaseAmount ?? existing.purchaseAmount;
     const nextGst = payload.gst ?? existing.gst;
     const nextAssetClass = payload.assetClass ?? existing.assetClass;
