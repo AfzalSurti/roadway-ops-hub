@@ -11,9 +11,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue, SelectLabel } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, CalendarPlus, Pencil, Plus } from "lucide-react";
+import { ArrowLeft, CalendarPlus, FileText, Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { downloadAssetPdf } from "@/lib/asset-pdf";
 
 const STATUS_COLORS: Record<AssetStatus, string> = {
   IN_USE: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
@@ -380,6 +381,14 @@ export default function AssetDetail() {
           <p className="page-subtitle">{asset.assetClass}</p>
         </div>
         <div className="flex gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => downloadAssetPdf(asset)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-amber-500/30 text-amber-400 text-sm font-medium hover:bg-amber-500/10 transition-colors"
+          >
+            <FileText className="h-4 w-4" />
+            Download PDF
+          </button>
           <Button variant="outline" onClick={() => setMovementOpen(true)} className="gap-2" disabled={isSold}><CalendarPlus className="h-4 w-4" /> Log Movement</Button>
           <Button variant="outline" onClick={() => setMaintenanceOpen(true)} className="gap-2" disabled={isSold}><Plus className="h-4 w-4" /> Log Maintenance</Button>
           <Button onClick={() => setIsEditing((current) => !current)} className="gap-2"><Pencil className="h-4 w-4" /> {isEditing ? "Cancel Edit" : "Edit Asset"}</Button>

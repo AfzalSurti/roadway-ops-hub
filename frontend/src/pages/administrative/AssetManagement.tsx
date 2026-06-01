@@ -13,6 +13,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { downloadAssetPdf } from "@/lib/asset-pdf";
+import { FileText, Loader2 } from "lucide-react";
 import * as XLSX from "xlsx";
 
 const STATUS_OPTIONS: Array<{ label: string; value: AssetStatus | "ALL" }> = [
@@ -295,6 +297,7 @@ export default function AssetManagement() {
   const [statusFilter, setStatusFilter] = useState<AssetStatus | "ALL">("ALL");
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<AssetItem | null>(null);
+  const [pdfLoading, setPdfLoading] = useState<string | null>(null);
 
   const { data: projects = [] } = useQuery({
     queryKey: ["projects"],
@@ -447,6 +450,26 @@ export default function AssetManagement() {
                       <Button variant="outline" size="sm" className="gap-1" onClick={() => { setEditingAsset(asset); setIsEditorOpen(true); }}>
                         <Pencil className="h-3.5 w-3.5" /> Edit
                       </Button>
+                      <button
+                        type="button"
+                        title="Download Asset PDF"
+                        aria-label={`Download PDF for ${asset.assetId}`}
+                        className="p-1.5 rounded-lg border border-amber-500/30 text-amber-400 hover:bg-amber-500/10 transition-colors"
+                        onClick={async (event) => {
+                          event.stopPropagation();
+                          setPdfLoading(asset.id);
+                          try {
+                            const fullAsset = await api.getAsset(asset.id);
+                            downloadAssetPdf(fullAsset);
+                          } catch {
+                            toast.error("Failed to generate PDF");
+                          } finally {
+                            setPdfLoading(null);
+                          }
+                        }}
+                      >
+                        {pdfLoading === asset.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+                      </button>
                     </div>
                   </td>
                 </tr>
