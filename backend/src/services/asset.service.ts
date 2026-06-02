@@ -5,26 +5,26 @@ import { badRequest, notFound } from "../utils/errors.js";
 import { getPagination } from "../utils/pagination.js";
 
 export const ASSET_ID_PREFIXES: Record<string, string> = {
-  "Appliances - Air Conditioner": "AC",
-  "Appliances - Air Cooler": "ACOOLR",
-  "Appliances - Table Fan": "TF",
-  "Appliances - Ceiling Fan": "CF",
-  "Appliances - Cylinder": "CYL",
-  "Appliances - Gas Stove": "GS",
-  "Appliances - Induction Cooktop": "IND",
-  "Appliances - Oven": "OVN",
-  "Appliances - Invertor": "INV",
-  "Appliances - Stabiliser": "STAB",
-  "Appliances - UPS": "UPS",
-  "Appliances - Kitchen Utensils": "KU",
-  "Appliances - Refrigerator": "REF",
-  "Appliances - TV": "TV",
-  "Appliances - Set-up Box": "STB",
-  "Appliances - Geyser": "GYS",
-  "Appliances - Heater": "HTR",
-  "Appliance - Electric Kettle": "KTL",
-  "Appliance - Water Purifier (RO)": "RO",
-  "Applance- Washing machine": "WM",
+  "Air Conditioner": "AC",
+  "Air Cooler": "ACOOLR",
+  "Table Fan": "TF",
+  "Ceiling Fan": "CF",
+  Cylinder: "CYL",
+  "Gas Stove": "GS",
+  "Induction Cooktop": "IND",
+  Oven: "OVN",
+  Invertor: "INV",
+  Stabiliser: "STAB",
+  UPS: "UPS",
+  "Kitchen Utensils": "KU",
+  Refrigerator: "REF",
+  TV: "TV",
+  "Set-up Box": "STB",
+  Geyser: "GYS",
+  Heater: "HTR",
+  "Electric Kettle": "KTL",
+  "Water Purifier (RO)": "RO",
+  "Washing machine": "WM",
   "Bike - Owned": "BIKE",
   "Car - Owned": "CAR",
   "Chair - Office": "CHR-O",
@@ -37,38 +37,38 @@ export const ASSET_ID_PREFIXES: Record<string, string> = {
   Cupboard: "CPB",
   Almirah: "ALM",
   "Steel Rack": "RACK",
-  "IT - Computer (CPU / Monitor / KB / Mouse)": "CPU",
-  "IT - Laptop": "LAP",
-  "IT - Printer / Scanner": "PRT",
-  "IT - HDD": "HDD",
-  "IT - SSD": "SSD",
-  "IT - Pendrive": "PEN",
-  "IT - Wifi Router": "WIFI",
-  "IT - Broadband": "BB",
-  "IT - Dongle": "DNG",
-  "Misc - Box file": "BF",
-  "Misc - Bucket / Mug / Bath Stool": "BCK",
-  "Misc - Bulb & Tubelights": "BLBT",
-  "Misc - Calculator": "CALC",
-  "Misc - Curtains": "CRT",
-  "Misc - Door Mat": "DM",
-  "Misc - Door Bell": "DB",
-  "Misc - Dustbin": "DST",
-  "Misc - Extension Board": "EXT",
-  "Misc - File Stand": "FST",
-  "Misc - File tray": "FTY",
-  "Misc - Lock & Keys": "LK",
-  "Misc - Measuring Tape": "MT",
-  "Misc - Mirror": "MIR",
-  "Misc - Punching Machine": "PM",
-  "Misc - Register": "REG",
-  "Misc - Stamp": "STP",
-  "Misc - Stapler": "STPL",
-  "Misc - Wall Clock": "WCK",
-  "Misc - Water Heating Rod": "WHR",
-  "Misc - Water Jug": "WJ",
-  "Misc - White Board": "WB",
-  "Misc - Window Screen": "WS",
+  "Computer (CPU / Monitor / KB / Mouse)": "CPU",
+  Laptop: "LAP",
+  "Printer / Scanner": "PRT",
+  HDD: "HDD",
+  SSD: "SSD",
+  Pendrive: "PEN",
+  "Wifi Router": "WIFI",
+  Broadband: "BB",
+  Dongle: "DNG",
+  "Box file": "BF",
+  "Bucket / Mug / Bath Stool": "BCK",
+  "Bulb & Tubelights": "BLBT",
+  Calculator: "CALC",
+  Curtains: "CRT",
+  "Door Mat": "DM",
+  "Door Bell": "DB",
+  Dustbin: "DST",
+  "Extension Board": "EXT",
+  "File Stand": "FST",
+  "File tray": "FTY",
+  "Lock & Keys": "LK",
+  "Measuring Tape": "MT",
+  Mirror: "MIR",
+  "Punching Machine": "PM",
+  Register: "REG",
+  Stamp: "STP",
+  Stapler: "STPL",
+  "Wall Clock": "WCK",
+  "Water Heating Rod": "WHR",
+  "Water Jug": "WJ",
+  "White Board": "WB",
+  "Window Screen": "WS",
   "SF - Bed": "BED",
   "SF - Bed sheet": "BDSH",
   "SF - Blanket": "BLK",
@@ -89,17 +89,19 @@ function calculateTotalAmountWithGst(purchaseAmount: number, gst: number): numbe
   return Number((purchaseAmount + gst).toFixed(2));
 }
 
-function enrichAsset<T extends { assetClass: string; purchaseAmount: number; dateOfPurchase?: Date | null }>(asset: T) {
+function enrichAsset<T extends { assetType: string; purchaseAmount: number; dateOfPurchase?: Date | null }>(
+  asset: T
+): T & ReturnType<typeof calculateAssetDepreciation> {
   return {
     ...asset,
     ...calculateAssetDepreciation(asset, new Date())
   };
 }
 
-function getAssetPrefix(assetClass: string): string {
-  const prefix = ASSET_ID_PREFIXES[assetClass];
+function getAssetPrefix(assetType: string): string {
+  const prefix = ASSET_ID_PREFIXES[assetType];
   if (!prefix) {
-    throw badRequest("Invalid asset class");
+    return "OTR";
   }
   return prefix;
 }
@@ -123,8 +125,8 @@ function validateWarrantyEndDate(dateOfPurchase?: Date | null, warrantyEndDate?:
   }
 }
 
-async function generateAssetId(assetClass: string): Promise<string> {
-  const prefix = getAssetPrefix(assetClass);
+async function generateAssetId(assetType: string): Promise<string> {
+  const prefix = getAssetPrefix(assetType);
   const existingCount = await assetRepository.countByAssetIdPrefix(prefix);
   return `${prefix}-${existingCount + 1}`;
 }
@@ -158,6 +160,7 @@ export const assetService = {
 
   async create(payload: {
     assetClass: string;
+    assetType: string;
     markModel?: string | null;
     dateOfPurchase?: Date | null;
     warrantyPeriod?: string | null;
@@ -172,12 +175,12 @@ export const assetService = {
   }) {
     validateWarrantyEndDate(payload.dateOfPurchase ?? null, payload.warrantyPeriod ?? null);
 
-    const assetId = await generateAssetId(payload.assetClass);
+    const assetId = await generateAssetId(payload.assetType);
     const purchaseAmount = payload.purchaseAmount ?? 0;
     const gst = payload.gst ?? 0;
     const depreciation = calculateAssetDepreciation(
       {
-        assetClass: payload.assetClass,
+        assetType: payload.assetType,
         purchaseAmount,
         dateOfPurchase: payload.dateOfPurchase ?? null
       },
@@ -188,6 +191,7 @@ export const assetService = {
       assetId,
       itAssetId: payload.itAssetId ?? null,
       assetClass: payload.assetClass,
+      assetType: payload.assetType,
       markModel: payload.markModel ?? null,
       dateOfPurchase: payload.dateOfPurchase ?? null,
       warrantyPeriod: payload.warrantyPeriod ?? null,
@@ -212,6 +216,7 @@ export const assetService = {
     id: string,
     payload: {
       assetClass?: string;
+      assetType?: string;
       markModel?: string | null;
       dateOfPurchase?: Date | null;
       warrantyPeriod?: string | null;
@@ -236,10 +241,10 @@ export const assetService = {
 
     const nextPurchaseAmount = payload.purchaseAmount ?? existing.purchaseAmount;
     const nextGst = payload.gst ?? existing.gst;
-    const nextAssetClass = payload.assetClass ?? existing.assetClass;
+    const nextAssetType = payload.assetType ?? existing.assetType;
     const depreciation = calculateAssetDepreciation(
       {
-        assetClass: nextAssetClass,
+        assetType: nextAssetType,
         purchaseAmount: nextPurchaseAmount,
         dateOfPurchase: payload.dateOfPurchase ?? existing.dateOfPurchase ?? null
       },
@@ -296,7 +301,7 @@ export const assetService = {
     }
     const depreciation = calculateAssetDepreciation(
       {
-        assetClass: asset.assetClass,
+        assetType: asset.assetType,
         purchaseAmount: asset.purchaseAmount,
         dateOfPurchase: asset.dateOfPurchase ?? null
       },

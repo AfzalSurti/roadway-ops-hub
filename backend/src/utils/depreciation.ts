@@ -9,15 +9,15 @@ function roundToTwo(value: number): number {
   return Number(value.toFixed(2));
 }
 
-export function getUsefulLifeYears(assetClass: string): number {
-  return USEFUL_LIFE_BY_ASSET_CLASS[assetClass] ?? 10;
+export function getUsefulLifeYears(assetType: string): number {
+  return USEFUL_LIFE_BY_ASSET_CLASS[assetType] ?? 10;
 }
 
 export function calculateAssetDepreciation(
-  asset: { assetClass: string; purchaseAmount: number; dateOfPurchase?: Date | string | null },
+  asset: { assetType: string; purchaseAmount: number; dateOfPurchase?: Date | string | null },
   asOfDate: Date = new Date()
 ) {
-  const usefulLifeYears = getUsefulLifeYears(asset.assetClass);
+  const usefulLifeYears = getUsefulLifeYears(asset.assetType);
   const purchaseAmount = Number(asset.purchaseAmount ?? 0);
   const scrapRate = DEFAULT_SCRAP_RATE;
   const scrapValue = roundToTwo(purchaseAmount * scrapRate);

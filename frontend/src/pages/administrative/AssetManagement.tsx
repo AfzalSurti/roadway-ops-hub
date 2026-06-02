@@ -3,7 +3,7 @@ import { PageWrapper } from "@/components/PageWrapper";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { AssetItem, AssetStatus, ProjectItem } from "@/lib/domain";
-import { ASSET_CLASS_GROUP_OPTIONS, ASSET_CLASS_OPTIONS_BY_GROUP, getAssetClassGroup } from "@/lib/asset-catalog";
+import { ASSET_CLASS_GROUP_OPTIONS, ASSET_CLASS_OPTIONS, ASSET_TYPES_BY_CLASS, getAssetClassGroup, getAssetTypesForClass } from "@/lib/asset-catalog";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { Download, Eye, Pencil, Plus, Search } from "lucide-react";
@@ -32,6 +32,9 @@ const STATUS_COLORS: Record<AssetStatus, string> = {
 
 type AssetFormState = {
   assetClass: string;
+  assetType: string;
+  customAssetClass: string;
+  customAssetType: string;
   markModel: string;
   dateOfPurchase: string;
   warrantyPeriod: string;
@@ -47,6 +50,9 @@ type AssetFormState = {
 
 const EMPTY_FORM: AssetFormState = {
   assetClass: "",
+  assetType: "",
+  customAssetClass: "",
+  customAssetType: "",
   markModel: "",
   dateOfPurchase: "",
   warrantyPeriod: "",
@@ -80,8 +86,15 @@ function formatWarrantyEndDate(value?: string | null) {
 
 function toFormState(asset?: AssetItem | null): AssetFormState {
   if (!asset) return EMPTY_FORM;
+  const normalizedClass = ASSET_CLASS_OPTIONS.includes(asset.assetClass as (typeof ASSET_CLASS_OPTIONS)[number]) ? asset.assetClass : "Other";
+  const typeOptions = getAssetTypesForClass(normalizedClass);
+  const normalizedType = typeOptions.includes(asset.assetType) ? asset.assetType : "Other";
+
   return {
-    assetClass: asset.assetClass,
+    assetClass: normalizedClass,
+    assetType: normalizedType,
+    customAssetClass: normalizedClass === "Other" ? asset.assetClass : "",
+    customAssetType: normalizedType === "Other" ? asset.assetType : "",
     markModel: asset.markModel ?? "",
     dateOfPurchase: toDateInputValue(asset.dateOfPurchase),
     warrantyPeriod: toDateInputValue(asset.warrantyPeriod),
@@ -132,16 +145,33 @@ function AssetEditorDialog({
   onOpenChange,
   asset,
   projects,
+  assets,
   onSaved
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   asset?: AssetItem | null;
   projects: ProjectItem[];
+  assets: AssetItem[];
   onSaved: () => void;
 }) {
   const queryClient = useQueryClient();
   const [form, setForm] = useState<AssetFormState>(EMPTY_FORM);
+  const classOptions = useMemo(() => {
+    const dynamic = assets.map((item) => item.assetClass).filter(Boolean);
+    return Array.from(new Set([...ASSET_CLASS_OPTIONS, ...dynamic]));
+  }, [assets]);
+
+  const typeOptions = useMemo(() => {
+    const builtIn = getAssetTypesForClass(form.assetClass);
+    const dynamic = assets
+      .filter((item) => item.assetClass === (form.assetClass === "Other" ? form.customAssetClass.trim() : form.assetClass))
+      .map((item) => item.assetType)
+      .filter(Boolean);
+
+    return Array.from(new Set([...builtIn, ...dynamic]));
+  }, [assets, form.assetClass, form.customAssetClass]);
+
   const selectedProjectName = useMemo(
     () => getProjectNameByNumber(projects, form.projectNumber.trim() || null),
     [form.projectNumber, projects]
@@ -160,7 +190,8 @@ function AssetEditorDialog({
       }
 
       const payload = {
-        assetClass: form.assetClass,
+        assetClass: form.assetClass === "Other" ? form.customAssetClass.trim() : form.assetClass,
+        assetType: form.assetType === "Other" ? form.customAssetType.trim() : form.assetType,
         markModel: form.markModel.trim() || null,
         dateOfPurchase: form.dateOfPurchase ? new Date(form.dateOfPurchase).toISOString() : null,
         warrantyPeriod: form.warrantyPeriod.trim() || null,
@@ -199,26 +230,41 @@ function AssetEditorDialog({
         </DialogHeader>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="md:col-span-2">
+          <div>
             <Label>Asset Class</Label>
-            <Select value={form.assetClass} onValueChange={(value) => setForm((prev) => ({ ...prev, assetClass: value }))}>
+            <Select value={form.assetClass} onValueChange={(value) => setForm((prev) => ({ ...prev, assetClass: value, assetType: "", customAssetClass: value === "Other" ? prev.customAssetClass : "", customAssetType: "" }))}>
               <SelectTrigger className="mt-1">
                 <SelectValue placeholder="Select asset class" />
               </SelectTrigger>
               <SelectContent>
-                {ASSET_CLASS_OPTIONS_BY_GROUP.map((group) => (
-                  <SelectGroup key={group.group}>
-                    <SelectLabel>{group.group}</SelectLabel>
-                    {group.options.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                ))}
+                {classOptions.map((assetClass) => <SelectItem key={assetClass} value={assetClass}>{assetClass}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
+          <div>
+            <Label>Asset Type</Label>
+            <Select value={form.assetType} onValueChange={(value) => setForm((prev) => ({ ...prev, assetType: value }))} disabled={!form.assetClass}>
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="Select asset type" />
+              </SelectTrigger>
+              <SelectContent>
+                {typeOptions.map((assetType) => <SelectItem key={assetType} value={assetType}>{assetType}</SelectItem>)}
+                <SelectItem value="Other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {form.assetClass === "Other" ? (
+            <div className="md:col-span-2">
+              <Label>Other Asset Class</Label>
+              <Input value={form.customAssetClass} onChange={(event) => setForm((prev) => ({ ...prev, customAssetClass: event.target.value }))} className="mt-1" placeholder="Enter custom asset class" />
+            </div>
+          ) : null}
+          {form.assetType === "Other" ? (
+            <div className="md:col-span-2">
+              <Label>Other Asset Type</Label>
+              <Input value={form.customAssetType} onChange={(event) => setForm((prev) => ({ ...prev, customAssetType: event.target.value }))} className="mt-1" placeholder="Enter custom asset type" />
+            </div>
+          ) : null}
 
           <div>
             <Label>Mark / Model</Label>
@@ -334,7 +380,17 @@ function AssetEditorDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} type="button">Cancel</Button>
-          <Button type="button" onClick={() => mutation.mutate()} disabled={mutation.isPending || !form.assetClass}>
+          <Button
+            type="button"
+            onClick={() => mutation.mutate()}
+            disabled={
+              mutation.isPending ||
+              !form.assetClass ||
+              !form.assetType ||
+              (form.assetClass === "Other" && !form.customAssetClass.trim()) ||
+              (form.assetType === "Other" && !form.customAssetType.trim())
+            }
+          >
             {mutation.isPending ? "Saving..." : asset ? "Update Asset" : "Create Asset"}
           </Button>
         </DialogFooter>
@@ -380,6 +436,7 @@ export default function AssetManagement() {
     const rows = filteredAssets.map((asset, index) => ({
       "#": index + 1,
       "Asset Class": asset.assetClass,
+      "Asset Type": asset.assetType,
       "Date of Purchase": asset.dateOfPurchase ? new Date(asset.dateOfPurchase).toLocaleDateString("en-IN") : "",
       "Mark/Model": asset.markModel ?? "",
       "Warranty End Date": formatWarrantyEndDate(asset.warrantyPeriod),
@@ -394,7 +451,7 @@ export default function AssetManagement() {
       Remarks: asset.remarks ?? ""
     }));
     const worksheet = XLSX.utils.json_to_sheet(rows, {
-      header: ["#", "Asset Class", "Date of Purchase", "Mark/Model", "Warranty End Date", "Purchase Amount", "GST", "Total Amount with GST", "Asset ID", "IT Asset ID", "Project Number", "User", "Status", "Remarks"]
+      header: ["#", "Asset Class", "Asset Type", "Date of Purchase", "Mark/Model", "Warranty End Date", "Purchase Amount", "GST", "Total Amount with GST", "Asset ID", "IT Asset ID", "Project Number", "User", "Status", "Remarks"]
     });
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Assets");
@@ -469,6 +526,7 @@ export default function AssetManagement() {
             <tr className="border-b border-border/40">
               <th className="text-left py-3 px-4 font-medium text-muted-foreground">Asset ID</th>
               <th className="text-left py-3 px-4 font-medium text-muted-foreground">Asset Class</th>
+              <th className="text-left py-3 px-4 font-medium text-muted-foreground">Asset Type</th>
               <th className="text-left py-3 px-4 font-medium text-muted-foreground">Mark/Model</th>
               <th className="text-left py-3 px-4 font-medium text-muted-foreground">Purchase Date</th>
               <th className="text-left py-3 px-4 font-medium text-muted-foreground">Total Amount</th>
@@ -481,13 +539,14 @@ export default function AssetManagement() {
           <tbody>
             {filteredAssets.length === 0 ? (
               <tr>
-                <td colSpan={9} className="py-10 text-center text-muted-foreground">No assets found.</td>
+                <td colSpan={10} className="py-10 text-center text-muted-foreground">No assets found.</td>
               </tr>
             ) : (
               filteredAssets.map((asset) => (
                 <tr key={asset.id} className="border-b border-border/20 hover:bg-secondary/20 transition-colors">
                   <td className="py-3 px-4 font-medium">{asset.assetId}</td>
                   <td className="py-3 px-4">{asset.assetClass}</td>
+                  <td className="py-3 px-4">{asset.assetType}</td>
                   <td className="py-3 px-4">{asset.markModel ?? "-"}</td>
                   <td className="py-3 px-4">{asset.dateOfPurchase ? new Date(asset.dateOfPurchase).toLocaleDateString("en-IN") : "-"}</td>
                   <td className="py-3 px-4">₹{asset.totalAmountWithGst.toLocaleString("en-IN")}</td>
@@ -538,6 +597,7 @@ export default function AssetManagement() {
         onOpenChange={setIsEditorOpen}
         asset={editingAsset}
         projects={projects}
+        assets={assets}
         onSaved={() => void refetch()}
       />
     </PageWrapper>

@@ -85,6 +85,7 @@ export type AssetItem = {
   assetId: string;
   itAssetId?: string | null;
   assetClass: string;
+  assetType: string;
   markModel?: string | null;
   dateOfPurchase?: string | null;
   warrantyPeriod?: string | null;

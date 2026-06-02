@@ -3,7 +3,7 @@ import { PageWrapper } from "@/components/PageWrapper";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { AssetItem, AssetStatus, ProjectItem } from "@/lib/domain";
-import { ASSET_CLASS_OPTIONS_BY_GROUP } from "@/lib/asset-catalog";
+import { ASSET_CLASS_OPTIONS, ASSET_TYPES_BY_CLASS, getAssetTypesForClass } from "@/lib/asset-catalog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -29,6 +29,9 @@ function getStatusLabel(status: AssetStatus) {
 
 type AssetFormState = {
   assetClass: string;
+  assetType: string;
+  customAssetClass: string;
+  customAssetType: string;
   markModel: string;
   dateOfPurchase: string;
   warrantyPeriod: string;
@@ -44,6 +47,9 @@ type AssetFormState = {
 
 const EMPTY_FORM: AssetFormState = {
   assetClass: "",
+  assetType: "",
+  customAssetClass: "",
+  customAssetType: "",
   markModel: "",
   dateOfPurchase: "",
   warrantyPeriod: "",
@@ -77,8 +83,15 @@ function formatWarrantyEndDate(value?: string | null) {
 
 function toFormState(asset?: AssetItem | null): AssetFormState {
   if (!asset) return EMPTY_FORM;
+  const normalizedClass = ASSET_CLASS_OPTIONS.includes(asset.assetClass as (typeof ASSET_CLASS_OPTIONS)[number]) ? asset.assetClass : "Other";
+  const typeOptions = getAssetTypesForClass(normalizedClass);
+  const normalizedType = typeOptions.includes(asset.assetType) ? asset.assetType : "Other";
+
   return {
-    assetClass: asset.assetClass,
+    assetClass: normalizedClass,
+    assetType: normalizedType,
+    customAssetClass: normalizedClass === "Other" ? asset.assetClass : "",
+    customAssetType: normalizedType === "Other" ? asset.assetType : "",
     markModel: asset.markModel ?? "",
     dateOfPurchase: toDateInputValue(asset.dateOfPurchase),
     warrantyPeriod: toDateInputValue(asset.warrantyPeriod),
@@ -318,6 +331,11 @@ export default function AssetDetail() {
     queryFn: () => api.getProjects()
   });
 
+  const { data: assetsResponse } = useQuery({
+    queryKey: ["assets", "for-options"],
+    queryFn: () => api.getAssets({ limit: 500 })
+  });
+
   useEffect(() => {
     if (asset) {
       setForm(toFormState(asset));
@@ -335,7 +353,8 @@ export default function AssetDetail() {
       }
 
       return api.updateAsset(id, {
-        assetClass: form.assetClass,
+        assetClass: form.assetClass === "Other" ? form.customAssetClass.trim() : form.assetClass,
+        assetType: form.assetType === "Other" ? form.customAssetType.trim() : form.assetType,
         markModel: form.markModel.trim() || null,
         dateOfPurchase: form.dateOfPurchase ? new Date(form.dateOfPurchase).toISOString() : null,
         warrantyPeriod: form.warrantyPeriod.trim() || null,
@@ -360,6 +379,18 @@ export default function AssetDetail() {
   });
 
   const totalAmount = useMemo(() => (toNumber(form.purchaseAmount) + toNumber(form.gst)).toFixed(2), [form.purchaseAmount, form.gst]);
+  const classOptions = useMemo(() => {
+    const dynamic = (assetsResponse?.items ?? []).map((item) => item.assetClass).filter(Boolean);
+    return Array.from(new Set([...ASSET_CLASS_OPTIONS, ...dynamic]));
+  }, [assetsResponse?.items]);
+  const typeOptions = useMemo(() => {
+    const builtIn = getAssetTypesForClass(form.assetClass);
+    const dynamic = (assetsResponse?.items ?? [])
+      .filter((item) => item.assetClass === (form.assetClass === "Other" ? form.customAssetClass.trim() : form.assetClass))
+      .map((item) => item.assetType)
+      .filter(Boolean);
+    return Array.from(new Set([...builtIn, ...dynamic]));
+  }, [assetsResponse?.items, form.assetClass, form.customAssetClass]);
   const selectedProjectName = useMemo(
     () => getProjectNameByNumber(projects, form.projectNumber.trim() || null),
     [form.projectNumber, projects]
@@ -410,7 +441,7 @@ export default function AssetDetail() {
             <span className={`status-badge border ${STATUS_COLORS[asset.status]}`}>{getStatusLabel(asset.status)}</span>
           </div>
           <h1 className="page-title">{asset.assetId}</h1>
-          <p className="page-subtitle">{asset.assetClass}</p>
+          <p className="page-subtitle">{asset.assetClass} / {asset.assetType}</p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <button
@@ -438,18 +469,35 @@ export default function AssetDetail() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
                 <Label>Asset Class</Label>
-                <Select value={form.assetClass} onValueChange={(value) => setForm((prev) => ({ ...prev, assetClass: value }))}>
+                <Select value={form.assetClass} onValueChange={(value) => setForm((prev) => ({ ...prev, assetClass: value, assetType: "", customAssetClass: value === "Other" ? prev.customAssetClass : "", customAssetType: "" }))}>
                   <SelectTrigger className="mt-1"><SelectValue placeholder="Select asset class" /></SelectTrigger>
                   <SelectContent>
-                    {ASSET_CLASS_OPTIONS_BY_GROUP.map((group) => (
-                      <SelectGroup key={group.group}>
-                        <SelectLabel>{group.group}</SelectLabel>
-                        {group.options.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
-                      </SelectGroup>
-                    ))}
+                    {classOptions.map((assetClass) => <SelectItem key={assetClass} value={assetClass}>{assetClass}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
+              <div>
+                <Label>Asset Type</Label>
+                <Select value={form.assetType} onValueChange={(value) => setForm((prev) => ({ ...prev, assetType: value }))} disabled={!form.assetClass}>
+                  <SelectTrigger className="mt-1"><SelectValue placeholder="Select asset type" /></SelectTrigger>
+                  <SelectContent>
+                    {typeOptions.map((assetType) => <SelectItem key={assetType} value={assetType}>{assetType}</SelectItem>)}
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {form.assetClass === "Other" ? (
+                <div className="md:col-span-2">
+                  <Label>Other Asset Class</Label>
+                  <Input value={form.customAssetClass} onChange={(event) => setForm((prev) => ({ ...prev, customAssetClass: event.target.value }))} className="mt-1" placeholder="Enter custom asset class" />
+                </div>
+              ) : null}
+              {form.assetType === "Other" ? (
+                <div className="md:col-span-2">
+                  <Label>Other Asset Type</Label>
+                  <Input value={form.customAssetType} onChange={(event) => setForm((prev) => ({ ...prev, customAssetType: event.target.value }))} className="mt-1" placeholder="Enter custom asset type" />
+                </div>
+              ) : null}
               <div><Label>Mark / Model</Label><Input value={form.markModel} onChange={(event) => setForm((prev) => ({ ...prev, markModel: event.target.value }))} className="mt-1" /></div>
               <div><Label>IT Asset ID</Label><Input value={form.itAssetId} onChange={(event) => setForm((prev) => ({ ...prev, itAssetId: event.target.value }))} className="mt-1" /></div>
               <div>
@@ -504,7 +552,7 @@ export default function AssetDetail() {
               <div className="md:col-span-2"><Label>Remarks</Label><Textarea value={form.remarks} onChange={(event) => setForm((prev) => ({ ...prev, remarks: event.target.value }))} className="mt-1 min-h-24" /></div>
               <div className="md:col-span-2 flex justify-end gap-2">
                 <Button variant="outline" onClick={() => { setIsEditing(false); setForm(toFormState(asset)); }}>Cancel</Button>
-                <Button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending}>Save Changes</Button>
+                <Button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending || !form.assetType || (form.assetClass === "Other" && !form.customAssetClass.trim()) || (form.assetType === "Other" && !form.customAssetType.trim())}>Save Changes</Button>
               </div>
             </div>
           ) : (
@@ -512,6 +560,7 @@ export default function AssetDetail() {
               <Field label="Asset ID" value={asset.assetId} />
               <Field label="IT Asset ID" value={asset.itAssetId ?? "-"} />
               <Field label="Asset Class" value={asset.assetClass} />
+              <Field label="Asset Type" value={asset.assetType} />
               <Field label="Mark / Model" value={asset.markModel ?? "-"} />
               <Field label="Date of Purchase" value={asset.dateOfPurchase ? new Date(asset.dateOfPurchase).toLocaleDateString("en-IN") : "-"} />
               <Field label="Warranty End Date" value={formatWarrantyEndDate(asset.warrantyPeriod)} />

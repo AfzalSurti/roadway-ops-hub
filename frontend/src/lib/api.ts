@@ -454,6 +454,7 @@ export const api = {
 
   createAsset(payload: {
     assetClass: string;
+    assetType: string;
     markModel?: string | null;
     dateOfPurchase?: string | null;
     warrantyPeriod?: string | null;
@@ -474,6 +475,7 @@ export const api = {
 
   updateAsset(id: string, payload: Partial<{
     assetClass: string;
+    assetType: string;
     markModel: string | null;
     dateOfPurchase: string | null;
     warrantyPeriod: string | null;

@@ -1,37 +1,27 @@
-export const ASSET_CLASS_GROUPS = {
+export const ASSET_TYPES_BY_CLASS = {
   Appliances: [
-    "Appliances - Air Conditioner",
-    "Appliances - Air Cooler",
-    "Appliances - Table Fan",
-    "Appliances - Ceiling Fan",
-    "Appliances - Cylinder",
-    "Appliances - Gas Stove",
-    "Appliances - Induction Cooktop",
-    "Appliances - Oven",
-    "Appliances - Invertor",
-    "Appliances - Stabiliser",
-    "Appliances - UPS",
-    "Appliances - Kitchen Utensils",
-    "Appliances - Refrigerator",
-    "Appliances - TV",
-    "Appliances - Set-up Box",
-    "Appliances - Geyser",
-    "Appliances - Heater",
-    "Appliance - Electric Kettle",
-    "Appliance - Water Purifier (RO)",
-    "Applance- Washing machine"
+    "Air Conditioner",
+    "Air Cooler",
+    "Table Fan",
+    "Ceiling Fan",
+    "Cylinder",
+    "Gas Stove",
+    "Induction Cooktop",
+    "Oven",
+    "Invertor",
+    "Stabiliser",
+    "UPS",
+    "Kitchen Utensils",
+    "Refrigerator",
+    "TV",
+    "Set-up Box",
+    "Geyser",
+    "Heater",
+    "Electric Kettle",
+    "Water Purifier (RO)",
+    "Washing machine"
   ],
-  IT: [
-    "IT - Computer (CPU / Monitor / KB / Mouse)",
-    "IT - Laptop",
-    "IT - Printer / Scanner",
-    "IT - HDD",
-    "IT - SSD",
-    "IT - Pendrive",
-    "IT - Wifi Router",
-    "IT - Broadband",
-    "IT - Dongle"
-  ],
+  IT: ["Computer (CPU / Monitor / KB / Mouse)", "Laptop", "Printer / Scanner", "HDD", "SSD", "Pendrive", "Wifi Router", "Broadband", "Dongle"],
   Furniture: [
     "Chair - Office",
     "Chair - Revolving",
@@ -53,46 +43,44 @@ export const ASSET_CLASS_GROUPS = {
   ],
   Vehicles: ["Bike - Owned", "Car - Owned"],
   Misc: [
-    "Misc - Box file",
-    "Misc - Bucket / Mug / Bath Stool",
-    "Misc - Bulb & Tubelights",
-    "Misc - Calculator",
-    "Misc - Curtains",
-    "Misc - Door Mat",
-    "Misc - Door Bell",
-    "Misc - Dustbin",
-    "Misc - Extension Board",
-    "Misc - File Stand",
-    "Misc - File tray",
-    "Misc - Lock & Keys",
-    "Misc - Measuring Tape",
-    "Misc - Mirror",
-    "Misc - Punching Machine",
-    "Misc - Register",
-    "Misc - Stamp",
-    "Misc - Stapler",
-    "Misc - Wall Clock",
-    "Misc - Water Heating Rod",
-    "Misc - Water Jug",
-    "Misc - White Board",
-    "Misc - Window Screen"
+    "Box file",
+    "Bucket / Mug / Bath Stool",
+    "Bulb & Tubelights",
+    "Calculator",
+    "Curtains",
+    "Door Mat",
+    "Door Bell",
+    "Dustbin",
+    "Extension Board",
+    "File Stand",
+    "File tray",
+    "Lock & Keys",
+    "Measuring Tape",
+    "Mirror",
+    "Punching Machine",
+    "Register",
+    "Stamp",
+    "Stapler",
+    "Wall Clock",
+    "Water Heating Rod",
+    "Water Jug",
+    "White Board",
+    "Window Screen"
   ]
 } as const;
 
-export const ASSET_CLASS_GROUP_OPTIONS = ["All", "Appliances", "IT", "Furniture", "Vehicles", "Misc"] as const;
+export const ASSET_CLASS_OPTIONS = ["Appliances", "IT", "Furniture", "Vehicles", "Misc", "Other"] as const;
+export const ASSET_CLASS_GROUP_OPTIONS = ["All", ...ASSET_CLASS_OPTIONS] as const;
 
-export type AssetClassGroup = (typeof ASSET_CLASS_GROUP_OPTIONS)[number];
+export type AssetClassGroup = (typeof ASSET_CLASS_OPTIONS)[number];
 
-export const ASSET_CLASS_OPTIONS_BY_GROUP = Object.entries(ASSET_CLASS_GROUPS).map(([group, options]) => ({
-  group,
-  options: options.map((label) => ({ label, value: label }))
-}));
-
-export function getAssetClassGroup(assetClass: string): AssetClassGroup | "Other" {
-  for (const [group, values] of Object.entries(ASSET_CLASS_GROUPS)) {
-    if (values.includes(assetClass)) {
-      return group as AssetClassGroup;
-    }
+export function getAssetTypesForClass(assetClass: string): string[] {
+  if (assetClass in ASSET_TYPES_BY_CLASS) {
+    return [...ASSET_TYPES_BY_CLASS[assetClass as keyof typeof ASSET_TYPES_BY_CLASS]];
   }
-  return "Other";
+  return [];
+}
+
+export function getAssetClassGroup(assetClass: string): AssetClassGroup {
+  return ASSET_CLASS_OPTIONS.includes(assetClass as AssetClassGroup) ? (assetClass as AssetClassGroup) : "Other";
 }

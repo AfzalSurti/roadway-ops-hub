@@ -4,6 +4,7 @@ export const assetStatusSchema = z.enum(["IN_USE", "IN_STORE", "UNDER_REPAIR", "
 
 export const createAssetSchema = z.object({
   assetClass: z.string().trim().min(1),
+  assetType: z.string().trim().min(1),
   markModel: z.string().trim().optional().nullable(),
   dateOfPurchase: z.coerce.date().optional().nullable(),
   warrantyPeriod: z.string().trim().optional().nullable(),
@@ -20,6 +21,7 @@ export const createAssetSchema = z.object({
 export const updateAssetSchema = z
   .object({
     assetClass: z.string().trim().min(1).optional(),
+    assetType: z.string().trim().min(1).optional(),
     markModel: z.string().trim().optional().nullable(),
     dateOfPurchase: z.coerce.date().optional().nullable(),
     warrantyPeriod: z.string().trim().optional().nullable(),

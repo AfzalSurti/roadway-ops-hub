@@ -148,6 +148,7 @@ model Asset {
   assetId            String          @unique
   itAssetId          String?
   assetClass         String
+  assetType          String
   markModel          String?
   dateOfPurchase     DateTime?
   warrantyPeriod     String?
@@ -170,6 +171,7 @@ model Asset {
 
   @@index([projectNumber])
   @@index([assetClass])
+  @@index([assetType])
   @@index([status])
 }
 
