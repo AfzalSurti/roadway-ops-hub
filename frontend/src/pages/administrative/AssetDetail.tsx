@@ -380,7 +380,6 @@ export default function AssetDetail() {
     return { usefulLifeYears, scrapValue, depreciationPerYear, yearsElapsed, currentValue };
   }, [form.assetClass, form.dateOfPurchase, form.purchaseAmount]);
   const daysSincePurchase = useMemo(() => getDaysSincePurchase(form.dateOfPurchase), [form.dateOfPurchase]);
-  const isSold = asset.status === "DISPOSED";
 
   if (isLoading || !id) {
     return <PageWrapper><div className="page-header"><h1 className="page-title">Asset Detail</h1><p className="page-subtitle">Loading asset...</p></div></PageWrapper>;
@@ -397,6 +396,8 @@ export default function AssetDetail() {
       </PageWrapper>
     );
   }
+
+  const isSold = asset.status === "DISPOSED";
 
   return (
     <PageWrapper>
