@@ -410,7 +410,7 @@ export default function AssetDetail() {
 
     const usefulLifeYears = form.assetClass === "Bike - Owned" ? 5 : form.assetClass === "Car - Owned" ? 8 : 10;
     const purchaseAmount = toNumber(form.purchaseAmount);
-    const scrapValue = Number((purchaseAmount * 0.05).toFixed(2));
+    const scrapValue = Number((purchaseAmount * 0.1).toFixed(2));
     const depreciationPerYear = usefulLifeYears > 0 ? Number(((purchaseAmount - scrapValue) / usefulLifeYears).toFixed(2)) : 0;
     const purchaseYear = form.dateOfPurchase ? new Date(form.dateOfPurchase).getFullYear() : new Date().getFullYear();
     const yearsElapsed = Math.max(new Date().getFullYear() - purchaseYear, 0);
@@ -573,7 +573,7 @@ export default function AssetDetail() {
               <Field label="Purchase Amount" value={`₹${asset.purchaseAmount.toLocaleString("en-IN")}`} />
               <Field label="GST" value={`₹${asset.gst.toLocaleString("en-IN")}`} />
               <Field label="Total Amount with GST" value={`₹${asset.totalAmountWithGst.toLocaleString("en-IN")}`} />
-              <Field label="Scrap Value (5%)" value={formatCurrency(asset.scrapValue)} />
+              <Field label="Scrap Value (10%)" value={formatCurrency(asset.scrapValue)} />
               <Field label="Current Value" value={formatCurrency(asset.currentValue)} />
               <Field label="Days Since Purchase" value={daysSincePurchase === null ? "-" : String(daysSincePurchase)} />
               <Field label="Project Number" value={asset.projectNumber ?? "-"} />

@@ -1,4 +1,4 @@
-const DEFAULT_SCRAP_RATE = 0.05;
+const DEFAULT_SCRAP_RATE = 0.1;
 
 const USEFUL_LIFE_BY_ASSET_CLASS: Record<string, number> = {
   "Bike - Owned": 5,
