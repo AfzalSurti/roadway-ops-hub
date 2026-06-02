@@ -6,7 +6,17 @@ import type { AssetItem, AssetStatus, ProjectItem } from "@/lib/domain";
 import { ASSET_CLASS_GROUP_OPTIONS, ASSET_CLASS_OPTIONS, getAssetClassGroup, getAssetTypesForClass } from "@/lib/asset-catalog";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
-import { Download, Eye, Pencil, Plus, Search } from "lucide-react";
+import { Download, Eye, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -408,11 +418,26 @@ export default function AssetManagement() {
   const [statusFilter, setStatusFilter] = useState<AssetStatus | "ALL">("ALL");
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<AssetItem | null>(null);
+  const [assetToDelete, setAssetToDelete] = useState<AssetItem | null>(null);
   const [pdfLoading, setPdfLoading] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const { data: projects = [] } = useQuery({
     queryKey: ["projects"],
     queryFn: () => api.getProjects()
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (assetId: string) => api.deleteAsset(assetId),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["assets"] }),
+        queryClient.invalidateQueries({ queryKey: ["assets", "stats"] })
+      ]);
+      toast.success("Asset deleted");
+      setAssetToDelete(null);
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to delete asset")
   });
 
   const { data: assetsResponse, refetch } = useQuery({
@@ -567,6 +592,14 @@ export default function AssetManagement() {
                       <Button variant="outline" size="sm" className="gap-1" onClick={() => { setEditingAsset(asset); setIsEditorOpen(true); }}>
                         <Pencil className="h-3.5 w-3.5" /> Edit
                       </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1 border-red-500/40 text-red-500 hover:bg-red-500/10 hover:text-red-600"
+                        onClick={() => setAssetToDelete(asset)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" /> Delete
+                      </Button>
                       <button
                         type="button"
                         title="Download Asset PDF"
@@ -604,6 +637,30 @@ export default function AssetManagement() {
         assets={assets}
         onSaved={() => void refetch()}
       />
+
+      <AlertDialog open={Boolean(assetToDelete)} onOpenChange={(open) => !open && setAssetToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete asset</AlertDialogTitle>
+            <AlertDialogDescription>Are you sure you want to delete this asset?</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 text-white hover:bg-red-700"
+              disabled={deleteMutation.isPending}
+              onClick={(event) => {
+                event.preventDefault();
+                if (assetToDelete) {
+                  deleteMutation.mutate(assetToDelete.id);
+                }
+              }}
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Yes, delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PageWrapper>
   );
 }
