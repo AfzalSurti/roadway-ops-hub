@@ -51,6 +51,9 @@ type AssetFormState = {
   purchaseAmount: string;
   gst: string;
   projectNumber: string;
+  projectName: string;
+  customProjectNumber: string;
+  customProjectName: string;
   assignedUser: string;
   status: AssetStatus;
   remarks: string;
@@ -69,6 +72,9 @@ const EMPTY_FORM: AssetFormState = {
   purchaseAmount: "0",
   gst: "0",
   projectNumber: "",
+  projectName: "",
+  customProjectNumber: "",
+  customProjectName: "",
   assignedUser: "",
   status: "IN_USE",
   remarks: "",
@@ -111,6 +117,9 @@ function toFormState(asset?: AssetItem | null): AssetFormState {
     purchaseAmount: String(asset.purchaseAmount ?? 0),
     gst: String(asset.gst ?? 0),
     projectNumber: asset.projectNumber ?? "",
+    projectName: asset.projectName ?? "",
+    customProjectNumber: "",
+    customProjectName: "",
     assignedUser: asset.assignedUser ?? "",
     status: asset.status,
     remarks: asset.remarks ?? "",
@@ -167,6 +176,8 @@ function AssetEditorDialog({
 }) {
   const queryClient = useQueryClient();
   const [form, setForm] = useState<AssetFormState>(EMPTY_FORM);
+  const [projectInputMode, setProjectInputMode] = useState<"select" | "other">("select");
+  const [userInputMode, setUserInputMode] = useState<"select" | "other">("select");
   const classOptions = useMemo(() => {
     const dynamic = assets.map((item) => item.assetClass).filter(Boolean);
     return Array.from(new Set([...ASSET_CLASS_OPTIONS, ...dynamic]));
@@ -183,15 +194,49 @@ function AssetEditorDialog({
   }, [assets, form.assetClass, form.customAssetClass]);
 
   const selectedProjectName = useMemo(
-    () => getProjectNameByNumber(projects, form.projectNumber.trim() || null),
-    [form.projectNumber, projects]
+    () => form.projectName || getProjectNameByNumber(projects, form.projectNumber.trim() || null),
+    [form.projectNumber, form.projectName, projects]
+  );
+
+  const projectOptions = useMemo(() => {
+    const fromProjects = projects
+      .filter((project) => project.projectNumber || project.name)
+      .map((project) => ({
+        number: project.projectNumber ?? "",
+        name: project.name ?? "",
+        value: `${project.projectNumber ?? ""}|||${project.name ?? ""}`
+      }));
+    const fromAssets = assets
+      .filter((item) => item.projectNumber || item.projectName)
+      .map((item) => ({
+        number: item.projectNumber ?? "",
+        name: item.projectName ?? getProjectNameByNumber(projects, item.projectNumber) ?? "",
+        value: `${item.projectNumber ?? ""}|||${item.projectName ?? getProjectNameByNumber(projects, item.projectNumber) ?? ""}`
+      }));
+    const deduped = new Map<string, { number: string; name: string; value: string }>();
+    [...fromProjects, ...fromAssets].forEach((item) => {
+      if (item.number || item.name) deduped.set(item.value, item);
+    });
+    return Array.from(deduped.values()).sort((a, b) => `${a.number} ${a.name}`.localeCompare(`${b.number} ${b.name}`));
+  }, [projects, assets]);
+
+  const userOptions = useMemo(
+    () => Array.from(new Set(assets.map((item) => item.assignedUser).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b)),
+    [assets]
   );
 
   useEffect(() => {
     if (open) {
       setForm(toFormState(asset));
+      if (asset && ((!asset.projectNumber && asset.projectName) || (asset.projectNumber && asset.projectName && !projectOptions.some((item) => item.number === asset.projectNumber && item.name === asset.projectName)))) {
+        setProjectInputMode("other");
+        setForm((prev) => ({ ...prev, customProjectNumber: asset.projectNumber ?? "", customProjectName: asset.projectName ?? "" }));
+      } else {
+        setProjectInputMode("select");
+      }
+      setUserInputMode(asset?.assignedUser && !userOptions.includes(asset.assignedUser) ? "other" : "select");
     }
-  }, [asset, open]);
+  }, [asset, open, projectOptions, userOptions]);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -207,8 +252,8 @@ function AssetEditorDialog({
         warrantyPeriod: form.warrantyPeriod.trim() || null,
         purchaseAmount: toNumber(form.purchaseAmount),
         gst: toNumber(form.gst),
-        projectNumber: form.projectNumber.trim() || null,
-        projectName: selectedProjectName || null,
+        projectNumber: (projectInputMode === "other" ? form.customProjectNumber : form.projectNumber).trim() || null,
+        projectName: (projectInputMode === "other" ? form.customProjectName : selectedProjectName).trim() || null,
         assignedUser: form.assignedUser.trim() || null,
         remarks: form.remarks.trim() || null,
         itAssetId: form.itAssetId.trim() || null
@@ -333,32 +378,86 @@ function AssetEditorDialog({
           </div>
           <div>
             <Label>Project Number</Label>
-              <Select value={form.projectNumber || "__NONE__"} onValueChange={(value) => setForm((prev) => ({ ...prev, projectNumber: value === "__NONE__" ? "" : value }))}>
+              <Select
+                value={projectInputMode === "other" ? "__OTHER__" : (projectOptions.find((item) => item.number === form.projectNumber && item.name === form.projectName)?.value ?? "__NONE__")}
+                onValueChange={(value) => {
+                  if (value === "__NONE__") {
+                    setProjectInputMode("select");
+                    setForm((prev) => ({ ...prev, projectNumber: "", projectName: "", customProjectNumber: "", customProjectName: "" }));
+                    return;
+                  }
+                  if (value === "__OTHER__") {
+                    setProjectInputMode("other");
+                    setForm((prev) => ({ ...prev, projectNumber: "", projectName: "", customProjectNumber: prev.customProjectNumber, customProjectName: prev.customProjectName }));
+                    return;
+                  }
+                  setProjectInputMode("select");
+                  const [projectNumber, projectName] = value.split("|||");
+                  setForm((prev) => ({ ...prev, projectNumber, projectName: projectName ?? "", customProjectNumber: "", customProjectName: "" }));
+                }}
+              >
               <SelectTrigger className="mt-1">
                 <SelectValue placeholder="Select project" />
               </SelectTrigger>
               <SelectContent>
                   <SelectItem value="__NONE__">None</SelectItem>
-                  {projects
-                    .filter((project) => project.projectNumber)
-                    .map((project) => (
-                      <SelectItem key={project.id} value={project.projectNumber!}>
-                        {project.projectNumber} - {project.name}
-                      </SelectItem>
-                    ))}
+                  {projectOptions.map((project) => (
+                    <SelectItem key={project.value} value={project.value}>
+                      {project.number || "-"} - {project.name || "-"}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="__OTHER__">Other</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div>
             <Label>Project Name</Label>
-            <Input value={selectedProjectName || "-"} readOnly className="mt-1 bg-secondary/40" />
+            <Input value={projectInputMode === "other" ? form.customProjectName : selectedProjectName || "-"} readOnly={projectInputMode !== "other"} onChange={(event) => setForm((prev) => ({ ...prev, customProjectName: event.target.value }))} className={`mt-1 ${projectInputMode !== "other" ? "bg-secondary/40" : ""}`} />
           </div>
-
+          {projectInputMode === "other" ? (
+            <div>
+              <Label>Other Project Number</Label>
+              <Input value={form.customProjectNumber} onChange={(event) => setForm((prev) => ({ ...prev, customProjectNumber: event.target.value }))} className="mt-1" />
+            </div>
+          ) : null}
           <div>
             <Label>Assigned User</Label>
-            <Input value={form.assignedUser} onChange={(event) => setForm((prev) => ({ ...prev, assignedUser: event.target.value }))} className="mt-1" />
+            <Select
+              value={userInputMode === "other" ? "__OTHER__" : (form.assignedUser || "__NONE__")}
+              onValueChange={(value) => {
+                if (value === "__NONE__") {
+                  setUserInputMode("select");
+                  setForm((prev) => ({ ...prev, assignedUser: "" }));
+                  return;
+                }
+                if (value === "__OTHER__") {
+                  setUserInputMode("other");
+                  setForm((prev) => ({ ...prev, assignedUser: "" }));
+                  return;
+                }
+                setUserInputMode("select");
+                setForm((prev) => ({ ...prev, assignedUser: value }));
+              }}
+            >
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="Select user" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__NONE__">None</SelectItem>
+                {userOptions.map((user) => (
+                  <SelectItem key={user} value={user}>{user}</SelectItem>
+                ))}
+                <SelectItem value="__OTHER__">Other</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
+          {userInputMode === "other" ? (
+            <div>
+              <Label>Other User</Label>
+              <Input value={form.assignedUser} onChange={(event) => setForm((prev) => ({ ...prev, assignedUser: event.target.value }))} className="mt-1" />
+            </div>
+          ) : null}
           {asset ? (
             <div>
               <Label>Status</Label>
@@ -398,6 +497,7 @@ function AssetEditorDialog({
               mutation.isPending ||
               !form.assetClass ||
               !form.assetType ||
+              (projectInputMode === "other" && (!form.customProjectNumber.trim() || !form.customProjectName.trim())) ||
               (form.assetClass === "Other" && !form.customAssetClass.trim()) ||
               (form.assetType === "Other" && !form.customAssetType.trim())
             }
@@ -415,6 +515,8 @@ export default function AssetManagement() {
   const [search, setSearch] = useState("");
   const [groupFilter, setGroupFilter] = useState<(typeof ASSET_CLASS_GROUP_OPTIONS)[number]>("All");
   const [projectFilter, setProjectFilter] = useState("ALL");
+  const [assetTypeFilter, setAssetTypeFilter] = useState("ALL");
+  const [userFilter, setUserFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState<AssetStatus | "ALL">("ALL");
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<AssetItem | null>(null);
@@ -441,22 +543,75 @@ export default function AssetManagement() {
   });
 
   const { data: assetsResponse, refetch } = useQuery({
-    queryKey: ["assets", search, groupFilter, projectFilter, statusFilter],
+    queryKey: ["assets", search, groupFilter, statusFilter],
     queryFn: () =>
       api.getAssets({
         limit: 500,
         search: search.trim() || undefined,
         assetClass: groupFilter === "All" ? undefined : groupFilter,
-        projectNumber: projectFilter === "ALL" ? undefined : projectFilter,
         status: statusFilter === "ALL" ? undefined : statusFilter
       })
   });
 
   const assets = assetsResponse?.items ?? [];
 
+  const projectOptions = useMemo(() => {
+    const fromProjects = projects
+      .filter((project) => project.projectNumber || project.name)
+      .map((project) => ({
+        number: project.projectNumber ?? "",
+        name: project.name ?? "",
+        value: `${project.projectNumber ?? ""}|||${project.name ?? ""}`
+      }));
+
+    const fromAssets = assets
+      .filter((asset) => asset.projectNumber || asset.projectName)
+      .map((asset) => ({
+        number: asset.projectNumber ?? "",
+        name: asset.projectName ?? getProjectNameByNumber(projects, asset.projectNumber) ?? "",
+        value: `${asset.projectNumber ?? ""}|||${asset.projectName ?? getProjectNameByNumber(projects, asset.projectNumber) ?? ""}`
+      }));
+
+    const deduped = new Map<string, { number: string; name: string; value: string }>();
+    [...fromProjects, ...fromAssets].forEach((item) => {
+      if (item.number || item.name) {
+        deduped.set(item.value, item);
+      }
+    });
+
+    return Array.from(deduped.values()).sort((a, b) =>
+      `${a.number} ${a.name}`.localeCompare(`${b.number} ${b.name}`, undefined, { sensitivity: "base" })
+    );
+  }, [assets, projects]);
+
+  const assetTypeOptions = useMemo(
+    () => Array.from(new Set(assets.map((asset) => asset.assetType).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [assets]
+  );
+
+  const userOptions = useMemo(
+    () => Array.from(new Set(assets.map((asset) => asset.assignedUser).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b)),
+    [assets]
+  );
+
   const filteredAssets = useMemo(() => {
-    return assets.filter((asset) => groupFilter === "All" || getAssetClassGroup(asset.assetClass) === groupFilter);
-  }, [assets, groupFilter]);
+    const filtered = assets.filter((asset) => {
+      const groupOk = groupFilter === "All" || getAssetClassGroup(asset.assetClass) === groupFilter;
+      const projectValue = `${asset.projectNumber ?? ""}|||${asset.projectName ?? getProjectNameByNumber(projects, asset.projectNumber) ?? ""}`;
+      const projectOk = projectFilter === "ALL" || projectValue === projectFilter;
+      const typeOk = assetTypeFilter === "ALL" || asset.assetType === assetTypeFilter;
+      const userOk = userFilter === "ALL" || (asset.assignedUser ?? "") === userFilter;
+      return groupOk && projectOk && typeOk && userOk;
+    });
+
+    return filtered.sort((a, b) => {
+      const projectA = `${a.projectNumber ?? ""} ${a.projectName ?? ""}`;
+      const projectB = `${b.projectNumber ?? ""} ${b.projectName ?? ""}`;
+      const projectCompare = projectA.localeCompare(projectB, undefined, { sensitivity: "base" });
+      if (projectCompare !== 0) return projectCompare;
+      return a.assetId.localeCompare(b.assetId, undefined, { sensitivity: "base" });
+    });
+  }, [assets, groupFilter, projectFilter, assetTypeFilter, userFilter, projects]);
 
   const createExport = () => {
     const rows = filteredAssets.map((asset, index) => ({
@@ -502,7 +657,7 @@ export default function AssetManagement() {
         </div>
       </div>
 
-      <div className="glass-panel p-4 mb-6 grid grid-cols-1 lg:grid-cols-4 gap-3">
+      <div className="glass-panel p-4 mb-6 grid grid-cols-1 lg:grid-cols-6 gap-3">
         <div className="relative lg:col-span-2">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search asset ID, class, model" className="pl-9" />
@@ -521,17 +676,39 @@ export default function AssetManagement() {
 
         <Select value={projectFilter} onValueChange={setProjectFilter}>
           <SelectTrigger>
-            <SelectValue placeholder="Project Number" />
+            <SelectValue placeholder="Project Number / Name" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="ALL">All Projects</SelectItem>
-            {projects
-              .filter((project) => project.projectNumber)
-              .map((project) => (
-                <SelectItem key={project.id} value={project.projectNumber!}>
-                  {project.projectNumber} - {project.name}
-                </SelectItem>
-              ))}
+            {projectOptions.map((project) => (
+              <SelectItem key={project.value} value={project.value}>
+                {project.number || "-"} - {project.name || "-"}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={assetTypeFilter} onValueChange={setAssetTypeFilter}>
+          <SelectTrigger>
+            <SelectValue placeholder="Asset Type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">All Asset Types</SelectItem>
+            {assetTypeOptions.map((assetType) => (
+              <SelectItem key={assetType} value={assetType}>{assetType}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={userFilter} onValueChange={setUserFilter}>
+          <SelectTrigger>
+            <SelectValue placeholder="User" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">All Users</SelectItem>
+            {userOptions.map((user) => (
+              <SelectItem key={user} value={user}>{user}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
 
