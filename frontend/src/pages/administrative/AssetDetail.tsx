@@ -446,7 +446,7 @@ export default function AssetDetail() {
         <div className="flex gap-2 flex-wrap">
           <button
             type="button"
-            onClick={() => downloadAssetPdf(asset)}
+            onClick={() => downloadAssetPdf(asset, { projectName: getProjectNameByNumber(projects, asset.projectNumber) })}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-amber-500/30 text-amber-400 text-sm font-medium hover:bg-amber-500/10 transition-colors"
           >
             <FileText className="h-4 w-4" />

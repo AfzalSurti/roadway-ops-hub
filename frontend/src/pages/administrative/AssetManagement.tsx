@@ -573,7 +573,7 @@ export default function AssetManagement() {
                           setPdfLoading(asset.id);
                           try {
                             const fullAsset = await api.getAsset(asset.id);
-                            downloadAssetPdf(fullAsset);
+                            downloadAssetPdf(fullAsset, { projectName: getProjectNameByNumber(projects, fullAsset.projectNumber) });
                           } catch {
                             toast.error("Failed to generate PDF");
                           } finally {

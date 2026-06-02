@@ -145,7 +145,7 @@ function drawFooter(doc: jsPDF, pageNumber: number, totalPages: number) {
   doc.text(`Page ${pageNumber} of ${totalPages}`, PAGE_W - MARGIN, PAGE_H - 4, { align: "right" });
 }
 
-export function downloadAssetPdf(asset: AssetItem): void {
+export function downloadAssetPdf(asset: AssetItem, options?: { projectName?: string | null }): void {
   const fullAsset = asset as AssetFull;
   const movements = fullAsset.movements ?? [];
   const maintenances = fullAsset.maintenances ?? [];
@@ -186,14 +186,15 @@ export function downloadAssetPdf(asset: AssetItem): void {
   const statusLabel = getAssetStatusLabel(asset.status);
   const statusColor = getAssetStatusColor(asset.status);
   const purchaseDate = formatDate(asset.dateOfPurchase);
+  const projectName = options?.projectName?.trim() ? options.projectName : "—";
 
   const rows = [
     ["Asset ID", asset.assetId, "Asset Class", asset.assetClass],
     ["Mark / Model", asset.markModel ?? "—", "IT Asset ID", asset.itAssetId ?? "—"],
     ["Purchase Date", purchaseDate, "Warranty End Date", formatWarrantyEndDate(asset.warrantyPeriod)],
     ["Purchase Amount", formatMoney(asset.purchaseAmount), "GST", formatMoney(asset.gst)],
-    ["Total Amount", formatMoney(asset.totalAmountWithGst), "For Month", asset.forMonth ?? "—"],
-    ["Project Number", asset.projectNumber ?? "—", "Assigned User", asset.assignedUser ?? "—"],
+    ["Total Amount", formatMoney(asset.totalAmountWithGst), "Project Number", asset.projectNumber ?? "—"],
+    ["Project Name", projectName, "Assigned User", asset.assignedUser ?? "—"],
     ["Status", statusLabel, "Remarks", asset.remarks ?? "—"]
   ] as const;
 
