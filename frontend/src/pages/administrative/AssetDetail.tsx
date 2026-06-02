@@ -542,8 +542,6 @@ export default function AssetDetail() {
               <div><Label>Purchase Amount</Label><Input type="number" min="0" value={form.purchaseAmount} onChange={(event) => setForm((prev) => ({ ...prev, purchaseAmount: event.target.value }))} className="mt-1" /></div>
               <div><Label>GST</Label><Input type="number" min="0" value={form.gst} onChange={(event) => setForm((prev) => ({ ...prev, gst: event.target.value }))} className="mt-1" /></div>
               <div><Label>Total Amount with GST</Label><Input readOnly value={totalAmount} className="mt-1 bg-secondary/40" /></div>
-              <div><Label>Useful Life (years)</Label><Input readOnly value={editingDepreciation ? String(editingDepreciation.usefulLifeYears) : "-"} className="mt-1 bg-secondary/40" /></div>
-              <div><Label>Depreciation / Year</Label><Input readOnly value={editingDepreciation ? formatCurrency(editingDepreciation.depreciationPerYear) : "-"} className="mt-1 bg-secondary/40" /></div>
               <div><Label>Current Value</Label><Input readOnly value={editingDepreciation ? formatCurrency(editingDepreciation.currentValue) : "-"} className="mt-1 bg-secondary/40" /></div>
               <div><Label>Project Number</Label><Input value={form.projectNumber} onChange={(event) => setForm((prev) => ({ ...prev, projectNumber: event.target.value }))} className="mt-1" /></div>
               <div><Label>Project Name</Label><Input value={selectedProjectName || "-"} readOnly className="mt-1 bg-secondary/40" /></div>
@@ -575,9 +573,7 @@ export default function AssetDetail() {
               <Field label="Purchase Amount" value={`₹${asset.purchaseAmount.toLocaleString("en-IN")}`} />
               <Field label="GST" value={`₹${asset.gst.toLocaleString("en-IN")}`} />
               <Field label="Total Amount with GST" value={`₹${asset.totalAmountWithGst.toLocaleString("en-IN")}`} />
-              <Field label="Useful Life (years)" value={String(asset.usefulLifeYears)} />
               <Field label="Scrap Value (5%)" value={formatCurrency(asset.scrapValue)} />
-              <Field label="Depreciation / Year" value={formatCurrency(asset.depreciationPerYear)} />
               <Field label="Current Value" value={formatCurrency(asset.currentValue)} />
               <Field label="Days Since Purchase" value={daysSincePurchase === null ? "-" : String(daysSincePurchase)} />
               <Field label="Project Number" value={asset.projectNumber ?? "-"} />
