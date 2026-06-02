@@ -20,7 +20,7 @@ Full-stack HighwayOps application with:
 - **Frontend**: React + Vite + Tailwind (now under `frontend/`)
 - **Backend**: Node.js + Express + Prisma + PostgreSQL (Neon) (under `backend/`)
 - **Auth**: JWT access + refresh tokens
-- **Roles**: `ADMIN`, `EMPLOYEE`
+- **Roles**: `ADMIN`, `EMPLOYEE` , `PMO` , `HOD`
 
 ---
 
