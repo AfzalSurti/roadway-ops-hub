@@ -21,7 +21,22 @@ export const ASSET_TYPES_BY_CLASS = {
     "Water Purifier (RO)",
     "Washing machine"
   ],
-  IT: ["Computer (CPU / Monitor / KB / Mouse)", "Laptop", "Printer / Scanner", "HDD", "SSD", "Pendrive", "Wifi Router", "Broadband", "Dongle"],
+  IT: [
+    "Computer (CPU / Monitor / KB / Mouse)",
+    "Laptop",
+    "Printer / Scanner",
+    "HDD",
+    "SSD",
+    "Pendrive",
+    "Wifi Router",
+    "Broadband",
+    "Dongle",
+    "Memory Card",
+    "Hard Disk 4TB",
+    "Hard Disk 8TB",
+    "Hard Disk 2TB",
+    "Card Reader"
+  ],
   Furniture: [
     "Chair - Office",
     "Chair - Revolving",
@@ -41,7 +56,19 @@ export const ASSET_TYPES_BY_CLASS = {
     "SF - Mattress",
     "SF - Pillow & Cover"
   ],
-  Vehicles: ["Bike - Owned", "Car - Owned"],
+  Vehicles: ["Bike - Owned", "Car - Owned", "Network Survey Vehicle"],
+  "Survey Equipment": [
+    "Falling Weight Deflectometer",
+    "Retro Reflectometer (Pavement Marking)",
+    "Retro Reflectometer (Sign Board)",
+    "Traffic Survey Camera",
+    "Cyclic Plate Load Test Equipment",
+    "Axle Pad",
+    "ATCC Set"
+  ],
+  "Measuring Instruments": ["Vernier Caliper", "Measuring Tape 15m", "Dial Gauge", "Thermometer"],
+  "Safety Equipment": ["Company Logo Safety Jacket", "Safety Jacket", "Safety Shoes"],
+  "Utility Equipment": ["Ladder"],
   Misc: [
     "Box file",
     "Bucket / Mug / Bath Stool",
@@ -69,7 +96,18 @@ export const ASSET_TYPES_BY_CLASS = {
   ]
 } as const;
 
-export const ASSET_CLASS_OPTIONS = ["Appliances", "IT", "Furniture", "Vehicles", "Misc", "Other"] as const;
+export const ASSET_CLASS_OPTIONS = [
+  "Appliances",
+  "IT",
+  "Furniture",
+  "Vehicles",
+  "Survey Equipment",
+  "Measuring Instruments",
+  "Safety Equipment",
+  "Utility Equipment",
+  "Misc",
+  "Other"
+] as const;
 export const ASSET_CLASS_GROUP_OPTIONS = ["All", ...ASSET_CLASS_OPTIONS] as const;
 
 export type AssetClassGroup = (typeof ASSET_CLASS_OPTIONS)[number];

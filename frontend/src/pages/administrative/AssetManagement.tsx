@@ -181,10 +181,7 @@ function AssetEditorDialog({
   const [form, setForm] = useState<AssetFormState>(EMPTY_FORM);
   const [projectInputMode, setProjectInputMode] = useState<"select" | "other">("select");
   const [userInputMode, setUserInputMode] = useState<"select" | "other">("select");
-  const classOptions = useMemo(() => {
-    const dynamic = assets.map((item) => item.assetClass).filter(Boolean);
-    return Array.from(new Set([...ASSET_CLASS_OPTIONS, ...dynamic]));
-  }, [assets]);
+  const classOptions = useMemo(() => [...ASSET_CLASS_OPTIONS], []);
 
   const typeOptions = useMemo(() => {
     const builtIn = getAssetTypesForClass(form.assetClass);

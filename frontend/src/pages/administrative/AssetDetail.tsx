@@ -401,10 +401,7 @@ export default function AssetDetail() {
   });
 
   const totalAmount = useMemo(() => (toNumber(form.purchaseAmount) + toNumber(form.gst)).toFixed(2), [form.purchaseAmount, form.gst]);
-  const classOptions = useMemo(() => {
-    const dynamic = (assetsResponse?.items ?? []).map((item) => item.assetClass).filter(Boolean);
-    return Array.from(new Set([...ASSET_CLASS_OPTIONS, ...dynamic]));
-  }, [assetsResponse?.items]);
+  const classOptions = useMemo(() => [...ASSET_CLASS_OPTIONS], []);
   const typeOptions = useMemo(() => {
     const builtIn = getAssetTypesForClass(form.assetClass);
     const dynamic = (assetsResponse?.items ?? [])
