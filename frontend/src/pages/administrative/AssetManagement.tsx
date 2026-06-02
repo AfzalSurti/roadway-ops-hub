@@ -6,7 +6,7 @@ import type { AssetItem, AssetStatus, ProjectItem } from "@/lib/domain";
 import { ASSET_CLASS_GROUP_OPTIONS, ASSET_CLASS_OPTIONS, getAssetClassGroup, getAssetTypesForClass } from "@/lib/asset-catalog";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
-import { Download, Eye, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Download, Eye, Pencil, Plus, RefreshCcw, Search, Trash2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -640,6 +640,15 @@ export default function AssetManagement() {
     XLSX.writeFile(workbook, "asset-management.xlsx");
   };
 
+  const resetFilters = () => {
+    setSearch("");
+    setGroupFilter("All");
+    setProjectFilter("ALL");
+    setAssetTypeFilter("ALL");
+    setUserFilter("ALL");
+    setStatusFilter("ALL");
+  };
+
   return (
     <PageWrapper>
       <div className="page-header flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -722,6 +731,10 @@ export default function AssetManagement() {
             ))}
           </SelectContent>
         </Select>
+
+        <Button variant="outline" onClick={resetFilters} className="gap-2">
+          <RefreshCcw className="h-4 w-4" /> Refresh
+        </Button>
       </div>
 
       <div className="glass-panel overflow-x-auto">
