@@ -148,7 +148,7 @@ model Asset {
   assetId            String          @unique
   itAssetId          String?
   assetClass         String
-  assetType          String
+  assetType          String          @default("Other")
   markModel          String?
   dateOfPurchase     DateTime?
   warrantyPeriod     String?

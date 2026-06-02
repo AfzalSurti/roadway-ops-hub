@@ -1,6 +1,6 @@
 -- Add separate type field for assets.
 ALTER TABLE "Asset"
-ADD COLUMN "assetType" TEXT;
+ADD COLUMN "assetType" TEXT DEFAULT 'Other';
 
 -- Backfill class/type from existing combined class values.
 UPDATE "Asset"
