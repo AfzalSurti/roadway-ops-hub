@@ -482,40 +482,6 @@ export default function AssetDetail() {
           <Button onClick={() => setIsEditing((current) => !current)} className="gap-2"><Pencil className="h-4 w-4" /> {isEditing ? "Cancel Edit" : "Edit Asset"}</Button>
         </div>
 
-        <div className="glass-panel p-6">
-          <h3 className="font-semibold mb-4">Sold Information</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label>Sold Amount</Label>
-              <Input
-                type="number"
-                min="0"
-                value={soldAmountInput}
-                onChange={(event) => setSoldAmountInput(event.target.value)}
-                className="mt-1"
-                disabled={isSold}
-              />
-            </div>
-            <div className="md:col-span-2">
-              <Label>Remark</Label>
-              <Textarea
-                value={soldRemarkInput}
-                onChange={(event) => setSoldRemarkInput(event.target.value)}
-                className="mt-1 min-h-24"
-                placeholder="Enter sale remark"
-                disabled={isSold}
-              />
-            </div>
-            <div className="md:col-span-2 flex justify-end">
-              <Button
-                onClick={() => soldMutation.mutate()}
-                disabled={isSold || soldMutation.isPending || toNumber(soldAmountInput) <= 0 || !soldRemarkInput.trim()}
-              >
-                {isSold ? "Already Sold" : soldMutation.isPending ? "Saving..." : "Submit Sold Information"}
-              </Button>
-            </div>
-          </div>
-        </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_1fr] gap-6">
@@ -704,6 +670,41 @@ export default function AssetDetail() {
               </div>
             </TabsContent>
           </Tabs>
+        </div>
+      </div>
+
+      <div className="glass-panel p-6 mt-6">
+        <h3 className="font-semibold mb-4">Sold Information</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label>Sold Amount</Label>
+            <Input
+              type="number"
+              min="0"
+              value={soldAmountInput}
+              onChange={(event) => setSoldAmountInput(event.target.value)}
+              className="mt-1"
+              disabled={isSold}
+            />
+          </div>
+          <div className="md:col-span-2">
+            <Label>Remark</Label>
+            <Textarea
+              value={soldRemarkInput}
+              onChange={(event) => setSoldRemarkInput(event.target.value)}
+              className="mt-1 min-h-24"
+              placeholder="Enter sale remark"
+              disabled={isSold}
+            />
+          </div>
+          <div className="md:col-span-2 flex justify-end">
+            <Button
+              onClick={() => soldMutation.mutate()}
+              disabled={isSold || soldMutation.isPending || toNumber(soldAmountInput) <= 0 || !soldRemarkInput.trim()}
+            >
+              {isSold ? "Already Sold" : soldMutation.isPending ? "Saving..." : "Submit Sold Information"}
+            </Button>
+          </div>
         </div>
       </div>
 
