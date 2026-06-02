@@ -115,13 +115,13 @@ function formatCurrency(value: number) {
   return `₹${value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-function calculateBookValue(asset: Pick<AssetItem, "purchaseAmount" | "dateOfPurchase" | "depreciationPerYear">, asOfDate: Date) {
+function calculateBookValue(asset: Pick<AssetItem, "purchaseAmount" | "dateOfPurchase" | "depreciationPerYear" | "scrapValue">, asOfDate: Date) {
   const purchaseDate = asset.dateOfPurchase ? new Date(asset.dateOfPurchase) : asOfDate;
   const fromMonth = purchaseDate.getFullYear() * 12 + purchaseDate.getMonth();
   const toMonth = asOfDate.getFullYear() * 12 + asOfDate.getMonth();
   const monthsElapsed = Math.max(toMonth - fromMonth, 0);
   const depreciationPerMonth = Number((asset.depreciationPerYear / 12).toFixed(2));
-  const currentValue = Number((asset.purchaseAmount - depreciationPerMonth * monthsElapsed).toFixed(2));
+  const currentValue = Number(Math.max(asset.scrapValue, asset.purchaseAmount - depreciationPerMonth * monthsElapsed).toFixed(2));
   return { monthsElapsed, currentValue };
 }
 
@@ -226,9 +226,7 @@ function MaintenanceDialog({ asset, open, onOpenChange }: { asset: AssetItem; op
   const queryClient = useQueryClient();
   const [dateOfMaintenance, setDateOfMaintenance] = useState("");
   const [repairCostInclGst, setRepairCostInclGst] = useState("0");
-  const [sellAmount, setSellAmount] = useState("0");
-  const [soldTo, setSoldTo] = useState("");
-  const [saleRemark, setSaleRemark] = useState("");
+  const [remark, setRemark] = useState("");
 
   const depreciationSnapshot = useMemo(() => {
     if (!dateOfMaintenance) {
@@ -243,9 +241,7 @@ function MaintenanceDialog({ asset, open, onOpenChange }: { asset: AssetItem; op
       api.addAssetMaintenance(asset.id, {
         dateOfMaintenance: new Date(dateOfMaintenance).toISOString(),
         repairCostInclGst: toNumber(repairCostInclGst),
-        sellAmount: toNumber(sellAmount),
-        soldTo: toNumber(sellAmount) > 0 ? soldTo.trim() || null : null,
-        remark: saleRemark.trim() || null
+        remark: remark.trim() || null
       }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["assets", asset.id] });
@@ -260,13 +256,9 @@ function MaintenanceDialog({ asset, open, onOpenChange }: { asset: AssetItem; op
     if (open) {
       setDateOfMaintenance(new Date().toISOString().slice(0, 10));
       setRepairCostInclGst("0");
-      setSellAmount("0");
-      setSoldTo("");
-      setSaleRemark("");
+      setRemark("");
     }
   }, [open]);
-
-  const isSoldEntry = toNumber(sellAmount) > 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -291,25 +283,12 @@ function MaintenanceDialog({ asset, open, onOpenChange }: { asset: AssetItem; op
               readOnly
               className="mt-1 bg-secondary/40"
             />
-            <p className="mt-1 text-xs text-muted-foreground">Auto-calculated from the purchase year, 5% scrap value and useful life.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Auto-calculated with monthly depreciation and floor at scrap value.</p>
           </div>
           <div>
-            <Label>Sell Amount</Label>
-            <Input type="number" min="0" value={sellAmount} onChange={(event) => setSellAmount(event.target.value)} className="mt-1" />
-            <p className="mt-1 text-xs text-muted-foreground">Entering a sell amount will automatically mark the asset as SOLD.</p>
+            <Label>Remark</Label>
+            <Textarea value={remark} onChange={(event) => setRemark(event.target.value)} className="mt-1 min-h-24" placeholder="Optional maintenance note" />
           </div>
-          {isSoldEntry && (
-            <>
-              <div>
-                <Label>Sold To</Label>
-                <Input value={soldTo} onChange={(event) => setSoldTo(event.target.value)} className="mt-1" placeholder="Person or party name" />
-              </div>
-              <div>
-                <Label>Remark</Label>
-                <Textarea value={saleRemark} onChange={(event) => setSaleRemark(event.target.value)} className="mt-1 min-h-24" placeholder="Optional sale note" />
-              </div>
-            </>
-          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
@@ -328,6 +307,8 @@ export default function AssetDetail() {
   const [movementOpen, setMovementOpen] = useState(false);
   const [maintenanceOpen, setMaintenanceOpen] = useState(false);
   const [form, setForm] = useState<AssetFormState>(EMPTY_FORM);
+  const [soldAmountInput, setSoldAmountInput] = useState("0");
+  const [soldRemarkInput, setSoldRemarkInput] = useState("");
 
   const { data: asset, isLoading } = useQuery({
     queryKey: ["assets", id],
@@ -348,6 +329,8 @@ export default function AssetDetail() {
   useEffect(() => {
     if (asset) {
       setForm(toFormState(asset));
+      setSoldAmountInput(String(asset.soldAmount ?? 0));
+      setSoldRemarkInput(asset.soldRemark ?? "");
     }
   }, [asset]);
 
@@ -388,6 +371,31 @@ export default function AssetDetail() {
     onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to update asset")
   });
 
+  const soldMutation = useMutation({
+    mutationFn: () => {
+      if (!id) throw new Error("Asset id is missing");
+      const soldAmount = toNumber(soldAmountInput);
+      if (soldAmount <= 0) {
+        throw new Error("Sold amount must be greater than 0");
+      }
+      if (!soldRemarkInput.trim()) {
+        throw new Error("Sold remark is required");
+      }
+      return api.updateAsset(id, {
+        soldAmount,
+        soldRemark: soldRemarkInput.trim(),
+        status: "DISPOSED"
+      });
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["assets", id] });
+      await queryClient.invalidateQueries({ queryKey: ["assets"] });
+      await queryClient.invalidateQueries({ queryKey: ["assets", "stats"] });
+      toast.success("Asset marked as sold");
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to save sold information")
+  });
+
   const totalAmount = useMemo(() => (toNumber(form.purchaseAmount) + toNumber(form.gst)).toFixed(2), [form.purchaseAmount, form.gst]);
   const classOptions = useMemo(() => {
     const dynamic = (assetsResponse?.items ?? []).map((item) => item.assetClass).filter(Boolean);
@@ -419,7 +427,7 @@ export default function AssetDetail() {
     const fromMonth = purchaseDate.getFullYear() * 12 + purchaseDate.getMonth();
     const toMonth = new Date().getFullYear() * 12 + new Date().getMonth();
     const monthsElapsed = Math.max(toMonth - fromMonth, 0);
-    const currentValue = Number((purchaseAmount - depreciationPerMonth * monthsElapsed).toFixed(2));
+    const currentValue = Number(Math.max(scrapValue, purchaseAmount - depreciationPerMonth * monthsElapsed).toFixed(2));
 
     return { usefulLifeYears, scrapValue, depreciationPerYear, depreciationPerMonth, monthsElapsed, currentValue };
   }, [form.assetClass, form.dateOfPurchase, form.purchaseAmount]);
@@ -468,6 +476,41 @@ export default function AssetDetail() {
           <Button variant="outline" onClick={() => setMovementOpen(true)} className="gap-2" disabled={isSold}><CalendarPlus className="h-4 w-4" /> Log Movement</Button>
           <Button variant="outline" onClick={() => setMaintenanceOpen(true)} className="gap-2" disabled={isSold}><Plus className="h-4 w-4" /> Log Maintenance</Button>
           <Button onClick={() => setIsEditing((current) => !current)} className="gap-2"><Pencil className="h-4 w-4" /> {isEditing ? "Cancel Edit" : "Edit Asset"}</Button>
+        </div>
+
+        <div className="glass-panel p-6">
+          <h3 className="font-semibold mb-4">Sold Information</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label>Sold Amount</Label>
+              <Input
+                type="number"
+                min="0"
+                value={soldAmountInput}
+                onChange={(event) => setSoldAmountInput(event.target.value)}
+                className="mt-1"
+                disabled={isSold}
+              />
+            </div>
+            <div className="md:col-span-2">
+              <Label>Remark</Label>
+              <Textarea
+                value={soldRemarkInput}
+                onChange={(event) => setSoldRemarkInput(event.target.value)}
+                className="mt-1 min-h-24"
+                placeholder="Enter sale remark"
+                disabled={isSold}
+              />
+            </div>
+            <div className="md:col-span-2 flex justify-end">
+              <Button
+                onClick={() => soldMutation.mutate()}
+                disabled={isSold || soldMutation.isPending || toNumber(soldAmountInput) <= 0 || !soldRemarkInput.trim()}
+              >
+                {isSold ? "Already Sold" : soldMutation.isPending ? "Saving..." : "Submit Sold Information"}
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -578,7 +621,6 @@ export default function AssetDetail() {
               <Field label="Purchase Amount" value={`₹${asset.purchaseAmount.toLocaleString("en-IN")}`} />
               <Field label="GST" value={`₹${asset.gst.toLocaleString("en-IN")}`} />
               <Field label="Total Amount with GST" value={`₹${asset.totalAmountWithGst.toLocaleString("en-IN")}`} />
-              <Field label="Scrap Value (10%)" value={formatCurrency(asset.scrapValue)} />
               <Field label="Current Value" value={formatCurrency(asset.currentValue)} />
               <Field label="Days Since Purchase" value={daysSincePurchase === null ? "-" : String(daysSincePurchase)} />
               <Field label="Project Number" value={asset.projectNumber ?? "-"} />
@@ -636,20 +678,16 @@ export default function AssetDetail() {
                     <tr className="border-b border-border/40">
                       <th className="text-left py-3 px-4 font-medium text-muted-foreground">Date</th>
                       <th className="text-left py-3 px-4 font-medium text-muted-foreground">Repair Cost (incl. GST)</th>
-                      <th className="text-left py-3 px-4 font-medium text-muted-foreground">Sell Amount</th>
-                      <th className="text-left py-3 px-4 font-medium text-muted-foreground">Sold To</th>
                       <th className="text-left py-3 px-4 font-medium text-muted-foreground">Remark</th>
                     </tr>
                   </thead>
                   <tbody>
                     {(asset.maintenances ?? []).length === 0 ? (
-                      <tr><td colSpan={5} className="py-8 text-center text-muted-foreground">No maintenance records.</td></tr>
+                      <tr><td colSpan={3} className="py-8 text-center text-muted-foreground">No maintenance records.</td></tr>
                     ) : asset.maintenances!.map((maintenance) => (
                       <tr key={maintenance.id} className="border-b border-border/20">
                         <td className="py-3 px-4">{new Date(maintenance.dateOfMaintenance).toLocaleDateString("en-IN")}</td>
                         <td className="py-3 px-4">₹{maintenance.repairCostInclGst.toLocaleString("en-IN")}</td>
-                        <td className="py-3 px-4">₹{maintenance.sellAmount.toLocaleString("en-IN")}</td>
-                        <td className="py-3 px-4">{maintenance.soldTo ?? "-"}</td>
                         <td className="py-3 px-4">{maintenance.remark ?? "-"}</td>
                       </tr>
                     ))}

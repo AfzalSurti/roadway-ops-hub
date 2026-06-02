@@ -163,6 +163,8 @@ model Asset {
   projectName        String?
   assignedUser       String?
   status             AssetStatus     @default(IN_USE)
+  soldAmount         Float           @default(0)
+  soldRemark         String?
   remarks            String?
   forMonth           String?
   createdAt          DateTime        @default(now())
@@ -199,8 +201,6 @@ model AssetMaintenance {
   dateOfMaintenance    DateTime
   repairCostInclGst    Float    @default(0)
   depreciationTillDate Float    @default(0)
-  sellAmount           Float    @default(0)
-  soldTo               String?
   remark               String?
   createdAt            DateTime @default(now())
   asset                Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)

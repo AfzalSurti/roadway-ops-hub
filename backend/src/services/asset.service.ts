@@ -170,6 +170,8 @@ export const assetService = {
     projectName?: string | null;
     assignedUser?: string | null;
     status?: AssetStatus;
+    soldAmount?: number | null;
+    soldRemark?: string | null;
     remarks?: string | null;
     forMonth?: string | null;
     itAssetId?: string | null;
@@ -207,6 +209,8 @@ export const assetService = {
       projectName: payload.projectName ?? null,
       assignedUser: payload.assignedUser ?? null,
       status: payload.status ?? "IN_USE",
+      soldAmount: payload.soldAmount ?? 0,
+      soldRemark: payload.soldRemark ?? null,
       remarks: payload.remarks ?? null,
       forMonth: payload.forMonth ?? null
     });
@@ -228,6 +232,8 @@ export const assetService = {
       projectName?: string | null;
       assignedUser?: string | null;
       status?: AssetStatus;
+      soldAmount?: number | null;
+      soldRemark?: string | null;
       remarks?: string | null;
       forMonth?: string | null;
       itAssetId?: string | null;
@@ -256,6 +262,8 @@ export const assetService = {
 
     const data: Prisma.AssetUncheckedUpdateInput = {
       ...payload,
+      soldAmount: payload.soldAmount ?? undefined,
+      soldRemark: payload.soldRemark ?? undefined,
       totalAmountWithGst: calculateTotalAmountWithGst(nextPurchaseAmount, nextGst),
       usefulLifeYears: depreciation.usefulLifeYears,
       scrapRate: depreciation.scrapRate,
@@ -316,8 +324,6 @@ export const assetService = {
     payload: {
       dateOfMaintenance: Date;
       repairCostInclGst?: number;
-      sellAmount?: number;
-      soldTo?: string | null;
       remark?: string | null;
     }
   ) {
@@ -337,15 +343,8 @@ export const assetService = {
     return assetRepository.addMaintenance(assetId, {
       ...payload,
       depreciationTillDate: depreciation.currentValue,
-      soldTo: payload.sellAmount && payload.sellAmount > 0 ? payload.soldTo ?? null : null,
       remark: payload.remark ?? null,
       assetId
-    }).then(async (maintenance) => {
-      if ((payload.sellAmount ?? 0) > 0) {
-        await assetRepository.update(assetId, { status: "DISPOSED" });
-      }
-
-      return maintenance;
     });
   },
 

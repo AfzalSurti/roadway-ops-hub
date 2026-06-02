@@ -464,6 +464,8 @@ export const api = {
     projectName?: string | null;
     assignedUser?: string | null;
     status?: AssetStatus;
+    soldAmount?: number | null;
+    soldRemark?: string | null;
     remarks?: string | null;
     forMonth?: string | null;
     itAssetId?: string | null;
@@ -486,6 +488,8 @@ export const api = {
     projectName: string | null;
     assignedUser: string | null;
     status: AssetStatus;
+    soldAmount: number | null;
+    soldRemark: string | null;
     remarks: string | null;
     forMonth: string | null;
     itAssetId: string | null;
@@ -509,7 +513,7 @@ export const api = {
     });
   },
 
-  addAssetMaintenance(assetId: string, payload: { dateOfMaintenance: string; repairCostInclGst: number; sellAmount: number; soldTo?: string | null; remark?: string | null }) {
+  addAssetMaintenance(assetId: string, payload: { dateOfMaintenance: string; repairCostInclGst: number; remark?: string | null }) {
     return request<AssetMaintenanceItem>(`/assets/${assetId}/maintenances`, {
       method: "POST",
       body: JSON.stringify(payload)

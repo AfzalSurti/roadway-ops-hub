@@ -14,6 +14,8 @@ export const createAssetSchema = z.object({
   projectName: z.string().trim().optional().nullable(),
   assignedUser: z.string().trim().optional().nullable(),
   status: assetStatusSchema.optional().default("IN_USE"),
+  soldAmount: z.coerce.number().min(0).optional().nullable(),
+  soldRemark: z.string().trim().optional().nullable(),
   remarks: z.string().trim().optional().nullable(),
   forMonth: z.string().trim().optional().nullable(),
   itAssetId: z.string().trim().optional().nullable()
@@ -32,6 +34,8 @@ export const updateAssetSchema = z
     projectName: z.string().trim().optional().nullable(),
     assignedUser: z.string().trim().optional().nullable(),
     status: assetStatusSchema.optional(),
+    soldAmount: z.coerce.number().min(0).optional().nullable(),
+    soldRemark: z.string().trim().optional().nullable(),
     remarks: z.string().trim().optional().nullable(),
     forMonth: z.string().trim().optional().nullable(),
     itAssetId: z.string().trim().optional().nullable()
@@ -48,10 +52,5 @@ export const addMovementSchema = z.object({
 export const addMaintenanceSchema = z.object({
   dateOfMaintenance: z.coerce.date(),
   repairCostInclGst: z.coerce.number().min(0).default(0),
-  sellAmount: z.coerce.number().min(0).default(0),
-  soldTo: z.string().trim().min(2).optional().nullable(),
   remark: z.string().trim().optional().nullable()
-}).refine((payload) => (payload.sellAmount ?? 0) <= 0 || Boolean(payload.soldTo?.trim()), {
-  message: "Sold To is required when Sell Amount is entered",
-  path: ["soldTo"]
 });

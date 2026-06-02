@@ -79,8 +79,6 @@ export type AssetMaintenanceItem = {
   dateOfMaintenance: string;
   repairCostInclGst: number;
   depreciationTillDate: number;
-  sellAmount: number;
-  soldTo?: string | null;
   remark?: string | null;
   createdAt: string;
 };
@@ -110,6 +108,8 @@ export type AssetItem = {
   projectName?: string | null;
   assignedUser?: string | null;
   status: AssetStatus;
+  soldAmount?: number;
+  soldRemark?: string | null;
   remarks?: string | null;
   forMonth?: string | null;
   createdAt: string;
