@@ -55,6 +55,7 @@ type AssetFormState = {
   customProjectNumber: string;
   customProjectName: string;
   assignedUser: string;
+  assignedDate: string;
   status: AssetStatus;
   remarks: string;
   forMonth: string;
@@ -76,6 +77,7 @@ const EMPTY_FORM: AssetFormState = {
   customProjectNumber: "",
   customProjectName: "",
   assignedUser: "",
+  assignedDate: "",
   status: "IN_USE",
   remarks: "",
   forMonth: "",
@@ -121,6 +123,7 @@ function toFormState(asset?: AssetItem | null): AssetFormState {
     customProjectNumber: "",
     customProjectName: "",
     assignedUser: asset.assignedUser ?? "",
+    assignedDate: toDateInputValue(asset.assignedDate),
     status: asset.status,
     remarks: asset.remarks ?? "",
     forMonth: asset.forMonth ?? "",
@@ -255,6 +258,7 @@ function AssetEditorDialog({
         projectNumber: (projectInputMode === "other" ? form.customProjectNumber : form.projectNumber).trim() || null,
         projectName: (projectInputMode === "other" ? form.customProjectName : selectedProjectName).trim() || null,
         assignedUser: form.assignedUser.trim() || null,
+        assignedDate: form.assignedDate ? new Date(form.assignedDate).toISOString() : null,
         remarks: form.remarks.trim() || null,
         itAssetId: form.itAssetId.trim() || null
       };
@@ -452,6 +456,15 @@ function AssetEditorDialog({
               </SelectContent>
             </Select>
           </div>
+          <div>
+            <Label>Assigned Date</Label>
+            <Input
+              type="date"
+              value={form.assignedDate}
+              onChange={(event) => setForm((prev) => ({ ...prev, assignedDate: event.target.value }))}
+              className="mt-1"
+            />
+          </div>
           {userInputMode === "other" ? (
             <div>
               <Label>Other User</Label>
@@ -497,6 +510,7 @@ function AssetEditorDialog({
               mutation.isPending ||
               !form.assetClass ||
               !form.assetType ||
+              (!asset && !form.assignedDate) ||
               (projectInputMode === "other" && (!form.customProjectNumber.trim() || !form.customProjectName.trim())) ||
               (form.assetClass === "Other" && !form.customAssetClass.trim()) ||
               (form.assetType === "Other" && !form.customAssetType.trim())

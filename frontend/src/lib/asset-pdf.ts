@@ -195,7 +195,9 @@ export function downloadAssetPdf(asset: AssetItem, options?: { projectName?: str
     ["Purchase Amount", formatMoney(asset.purchaseAmount), "GST", formatMoney(asset.gst)],
     ["Total Amount", formatMoney(asset.totalAmountWithGst), "Project Number", asset.projectNumber ?? "—"],
     ["Project Name", projectName, "Assigned User", asset.assignedUser ?? "—"],
-    ["Status", statusLabel, "Remarks", asset.remarks ?? "—"]
+    ["Assigned Date", formatDate(asset.assignedDate), "Current Value", formatMoney(asset.currentValue)],
+    ["Status", statusLabel, "Remarks", asset.remarks ?? "—"],
+    ["Sold Amount", formatMoney(asset.soldAmount ?? 0), "Sold Remark", asset.soldRemark ?? "—"]
   ] as const;
 
   const rowH = 8;
@@ -228,11 +230,14 @@ export function downloadAssetPdf(asset: AssetItem, options?: { projectName?: str
 
     autoTable(doc, {
       startY: y,
-      head: [["#", "Date of Moving", "Moved To Project", "Moved To User"]],
+      head: [["#", "Old Project", "Transferred Project", "Assigned Date", "Date of Moving", "Old User", "New User"]],
       body: movements.map((movement, index) => [
         String(index + 1),
+        [movement.previousProjectNumber, movement.previousProjectName].filter(Boolean).join(" - ") || "—",
+        [movement.movedToProjectNumber, movement.movedToProjectName].filter(Boolean).join(" - ") || "—",
+        formatDate(movement.previousAssignedDate),
         formatDate(movement.dateOfMoving),
-        movement.movedToProjectNumber || "—",
+        movement.previousUser || "—",
         movement.movedToUser || "—"
       ]),
       theme: "grid",
@@ -254,10 +259,13 @@ export function downloadAssetPdf(asset: AssetItem, options?: { projectName?: str
       },
       alternateRowStyles: { fillColor: LIGHT },
       columnStyles: {
-        0: { cellWidth: 12 },
-        1: { cellWidth: 40 },
-        2: { cellWidth: 70 },
-        3: { cellWidth: 60 }
+        0: { cellWidth: 8 },
+        1: { cellWidth: 34 },
+        2: { cellWidth: 34 },
+        3: { cellWidth: 22 },
+        4: { cellWidth: 22 },
+        5: { cellWidth: 20 },
+        6: { cellWidth: 20 }
       },
       didDrawPage: (data) => {
         drawFooter(doc, doc.getCurrentPageInfo().pageNumber, doc.getNumberOfPages());
@@ -277,13 +285,13 @@ export function downloadAssetPdf(asset: AssetItem, options?: { projectName?: str
 
     autoTable(doc, {
       startY: y,
-      head: [["#", "Date", "Repair Cost (incl. GST)", "Depreciation Till Date", "Sell Amount"]],
+      head: [["#", "Date", "Repair Cost (incl. GST)", "Depreciation Till Date", "Remark"]],
       body: maintenances.map((maintenance, index) => [
         String(index + 1),
         formatDate(maintenance.dateOfMaintenance),
         formatMoney(maintenance.repairCostInclGst),
         formatMoney(maintenance.depreciationTillDate),
-        formatMoney(maintenance.sellAmount)
+        maintenance.remark || "—"
       ]),
       theme: "grid",
       margin: { left: MARGIN, right: MARGIN },

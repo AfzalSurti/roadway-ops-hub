@@ -64,6 +64,8 @@ export type AssetMovementItem = {
   assetId: string;
   previousProjectNumber?: string | null;
   previousProjectName?: string | null;
+  previousAssignedDate?: string | null;
+  previousUser?: string | null;
   movedToProjectNumber?: string | null;
   movedToProjectName?: string | null;
   assignedDate?: string | null;
@@ -107,6 +109,7 @@ export type AssetItem = {
   projectNumber?: string | null;
   projectName?: string | null;
   assignedUser?: string | null;
+  assignedDate?: string | null;
   status: AssetStatus;
   soldAmount?: number;
   soldRemark?: string | null;

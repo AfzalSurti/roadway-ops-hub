@@ -162,6 +162,7 @@ model Asset {
   projectNumber      String?
   projectName        String?
   assignedUser       String?
+  assignedDate       DateTime?
   status             AssetStatus     @default(IN_USE)
   soldAmount         Float           @default(0)
   soldRemark         String?
@@ -183,6 +184,8 @@ model AssetMovement {
   assetId             String
   previousProjectNumber String?
   previousProjectName String?
+  previousAssignedDate DateTime?
+  previousUser        String?
   movedToProjectNumber String?
   movedToProjectName  String?
   assignedDate        DateTime?

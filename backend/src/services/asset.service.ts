@@ -169,6 +169,7 @@ export const assetService = {
     projectNumber?: string | null;
     projectName?: string | null;
     assignedUser?: string | null;
+    assignedDate?: Date | null;
     status?: AssetStatus;
     soldAmount?: number | null;
     soldRemark?: string | null;
@@ -208,6 +209,7 @@ export const assetService = {
       projectNumber: payload.projectNumber ?? null,
       projectName: payload.projectName ?? null,
       assignedUser: payload.assignedUser ?? null,
+      assignedDate: payload.assignedDate ?? payload.dateOfPurchase ?? new Date(),
       status: payload.status ?? "IN_USE",
       soldAmount: payload.soldAmount ?? 0,
       soldRemark: payload.soldRemark ?? null,
@@ -231,6 +233,7 @@ export const assetService = {
       projectNumber?: string | null;
       projectName?: string | null;
       assignedUser?: string | null;
+      assignedDate?: Date | null;
       status?: AssetStatus;
       soldAmount?: number | null;
       soldRemark?: string | null;
@@ -303,6 +306,8 @@ export const assetService = {
       assetId,
       previousProjectNumber: asset.projectNumber ?? null,
       previousProjectName: asset.projectName ?? null,
+      previousAssignedDate: latestOpenMovement?.assignedDate ?? asset.assignedDate ?? asset.dateOfPurchase ?? asset.createdAt,
+      previousUser: asset.assignedUser ?? null,
       movedToProjectNumber: payload.movedToProjectNumber,
       movedToProjectName: payload.movedToProjectName,
       assignedDate: payload.dateOfMoving,
@@ -313,7 +318,8 @@ export const assetService = {
     await assetRepository.update(assetId, {
       projectNumber: payload.movedToProjectNumber,
       projectName: payload.movedToProjectName,
-      assignedUser: payload.movedToUser
+      assignedUser: payload.movedToUser,
+      assignedDate: payload.dateOfMoving
     });
 
     return movement;

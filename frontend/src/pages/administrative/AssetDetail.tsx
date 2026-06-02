@@ -39,6 +39,7 @@ type AssetFormState = {
   gst: string;
   projectNumber: string;
   assignedUser: string;
+  assignedDate: string;
   status: AssetStatus;
   remarks: string;
   forMonth: string;
@@ -57,6 +58,7 @@ const EMPTY_FORM: AssetFormState = {
   gst: "0",
   projectNumber: "",
   assignedUser: "",
+  assignedDate: "",
   status: "IN_USE",
   remarks: "",
   forMonth: "",
@@ -99,6 +101,7 @@ function toFormState(asset?: AssetItem | null): AssetFormState {
     gst: String(asset.gst ?? 0),
     projectNumber: asset.projectNumber ?? "",
     assignedUser: asset.assignedUser ?? "",
+    assignedDate: toDateInputValue(asset.assignedDate),
     status: asset.status,
     remarks: asset.remarks ?? "",
     forMonth: asset.forMonth ?? "",
@@ -355,6 +358,7 @@ export default function AssetDetail() {
         projectNumber: form.projectNumber.trim() || null,
         projectName: selectedProjectName || null,
         assignedUser: form.assignedUser.trim() || null,
+        assignedDate: form.assignedDate ? new Date(form.assignedDate).toISOString() : null,
         status: form.status,
         remarks: form.remarks.trim() || null,
         forMonth: form.forMonth.trim() || null,
@@ -594,6 +598,7 @@ export default function AssetDetail() {
               <div><Label>Project Number</Label><Input value={form.projectNumber} onChange={(event) => setForm((prev) => ({ ...prev, projectNumber: event.target.value }))} className="mt-1" /></div>
               <div><Label>Project Name</Label><Input value={selectedProjectName || "-"} readOnly className="mt-1 bg-secondary/40" /></div>
               <div><Label>Assigned User</Label><Input value={form.assignedUser} onChange={(event) => setForm((prev) => ({ ...prev, assignedUser: event.target.value }))} className="mt-1" /></div>
+              <div><Label>Assigned Date</Label><Input type="date" value={form.assignedDate} onChange={(event) => setForm((prev) => ({ ...prev, assignedDate: event.target.value }))} className="mt-1" /></div>
               <div><Label>Status</Label>
                 <Select value={form.status} onValueChange={(value) => setForm((prev) => ({ ...prev, status: value as AssetStatus }))}>
                   <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
@@ -626,6 +631,7 @@ export default function AssetDetail() {
               <Field label="Project Number" value={asset.projectNumber ?? "-"} />
               <Field label="Project Name" value={asset.projectName ?? getProjectNameByNumber(projects, asset.projectNumber) ?? "-"} />
               <Field label="Assigned User" value={asset.assignedUser ?? "-"} />
+              <Field label="Assigned Date" value={asset.assignedDate ? new Date(asset.assignedDate).toLocaleDateString("en-IN") : "-"} />
               <div className="md:col-span-2"><Field label="Remarks" value={asset.remarks ?? "-"} /></div>
             </div>
           )}
@@ -645,22 +651,24 @@ export default function AssetDetail() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border/40">
-                      <th className="text-left py-3 px-4 font-medium text-muted-foreground">Previous Project</th>
-                      <th className="text-left py-3 px-4 font-medium text-muted-foreground">Moved To Project</th>
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground">Old Project</th>
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground">Transferred Project</th>
                       <th className="text-left py-3 px-4 font-medium text-muted-foreground">Assigned Date</th>
-                      <th className="text-left py-3 px-4 font-medium text-muted-foreground">Return Date</th>
-                      <th className="text-left py-3 px-4 font-medium text-muted-foreground">Moved To User</th>
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground">Date of Moving</th>
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground">Old User</th>
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground">New User</th>
                     </tr>
                   </thead>
                   <tbody>
                     {(asset.movements ?? []).length === 0 ? (
-                      <tr><td colSpan={5} className="py-8 text-center text-muted-foreground">No movement history.</td></tr>
+                      <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">No movement history.</td></tr>
                     ) : asset.movements!.map((movement) => (
                       <tr key={movement.id} className="border-b border-border/20">
                         <td className="py-3 px-4">{[movement.previousProjectNumber, movement.previousProjectName].filter(Boolean).join(" - ") || "-"}</td>
                         <td className="py-3 px-4">{[movement.movedToProjectNumber, movement.movedToProjectName].filter(Boolean).join(" - ") || "-"}</td>
-                        <td className="py-3 px-4">{new Date(movement.assignedDate ?? movement.dateOfMoving).toLocaleDateString("en-IN")}</td>
-                        <td className="py-3 px-4">{movement.returnDate ? new Date(movement.returnDate).toLocaleDateString("en-IN") : "-"}</td>
+                        <td className="py-3 px-4">{movement.previousAssignedDate ? new Date(movement.previousAssignedDate).toLocaleDateString("en-IN") : "-"}</td>
+                        <td className="py-3 px-4">{new Date(movement.dateOfMoving).toLocaleDateString("en-IN")}</td>
+                        <td className="py-3 px-4">{movement.previousUser ?? "-"}</td>
                         <td className="py-3 px-4">{movement.movedToUser ?? "-"}</td>
                       </tr>
                     ))}

@@ -463,6 +463,7 @@ export const api = {
     projectNumber?: string | null;
     projectName?: string | null;
     assignedUser?: string | null;
+    assignedDate?: string | null;
     status?: AssetStatus;
     soldAmount?: number | null;
     soldRemark?: string | null;
@@ -487,6 +488,7 @@ export const api = {
     projectNumber: string | null;
     projectName: string | null;
     assignedUser: string | null;
+    assignedDate: string | null;
     status: AssetStatus;
     soldAmount: number | null;
     soldRemark: string | null;
