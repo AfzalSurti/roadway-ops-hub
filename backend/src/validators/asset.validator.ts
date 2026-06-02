@@ -11,6 +11,7 @@ export const createAssetSchema = z.object({
   purchaseAmount: z.coerce.number().min(0).default(0),
   gst: z.coerce.number().min(0).default(0),
   projectNumber: z.string().trim().optional().nullable(),
+  projectName: z.string().trim().optional().nullable(),
   assignedUser: z.string().trim().optional().nullable(),
   status: assetStatusSchema.optional().default("IN_USE"),
   remarks: z.string().trim().optional().nullable(),
@@ -28,6 +29,7 @@ export const updateAssetSchema = z
     purchaseAmount: z.coerce.number().min(0).optional(),
     gst: z.coerce.number().min(0).optional(),
     projectNumber: z.string().trim().optional().nullable(),
+    projectName: z.string().trim().optional().nullable(),
     assignedUser: z.string().trim().optional().nullable(),
     status: assetStatusSchema.optional(),
     remarks: z.string().trim().optional().nullable(),
@@ -37,9 +39,10 @@ export const updateAssetSchema = z
   .refine((payload) => Object.keys(payload).length > 0, "At least one field is required");
 
 export const addMovementSchema = z.object({
-  movedToProjectNumber: z.string().trim().optional().nullable(),
+  movedToProjectNumber: z.string().trim().min(1),
+  movedToProjectName: z.string().trim().min(1),
   dateOfMoving: z.coerce.date(),
-  movedToUser: z.string().trim().optional().nullable()
+  movedToUser: z.string().trim().min(1)
 });
 
 export const addMaintenanceSchema = z.object({

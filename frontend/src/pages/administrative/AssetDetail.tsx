@@ -3,12 +3,12 @@ import { PageWrapper } from "@/components/PageWrapper";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { AssetItem, AssetStatus, ProjectItem } from "@/lib/domain";
-import { ASSET_CLASS_OPTIONS, ASSET_TYPES_BY_CLASS, getAssetTypesForClass } from "@/lib/asset-catalog";
+import { ASSET_CLASS_OPTIONS, getAssetTypesForClass } from "@/lib/asset-catalog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue, SelectLabel } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, CalendarPlus, FileText, Pencil, Plus } from "lucide-react";
@@ -156,15 +156,17 @@ function Field({ label, value }: { label: string; value: string }) {
 function MovementDialog({ assetId, open, onOpenChange }: { assetId: string; open: boolean; onOpenChange: (open: boolean) => void }) {
   const queryClient = useQueryClient();
   const [movedToProjectNumber, setMovedToProjectNumber] = useState("");
+  const [movedToProjectName, setMovedToProjectName] = useState("");
   const [dateOfMoving, setDateOfMoving] = useState("");
   const [movedToUser, setMovedToUser] = useState("");
 
   const mutation = useMutation({
     mutationFn: () =>
       api.addAssetMovement(assetId, {
-        movedToProjectNumber: movedToProjectNumber.trim() || null,
+        movedToProjectNumber: movedToProjectNumber.trim(),
+        movedToProjectName: movedToProjectName.trim(),
         dateOfMoving: new Date(dateOfMoving).toISOString(),
-        movedToUser: movedToUser.trim() || null
+        movedToUser: movedToUser.trim()
       }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["assets", assetId] });
@@ -178,6 +180,7 @@ function MovementDialog({ assetId, open, onOpenChange }: { assetId: string; open
   useEffect(() => {
     if (open) {
       setMovedToProjectNumber("");
+      setMovedToProjectName("");
       setDateOfMoving(new Date().toISOString().slice(0, 10));
       setMovedToUser("");
     }
@@ -196,6 +199,10 @@ function MovementDialog({ assetId, open, onOpenChange }: { assetId: string; open
             <Input value={movedToProjectNumber} onChange={(event) => setMovedToProjectNumber(event.target.value)} className="mt-1" />
           </div>
           <div>
+            <Label>Moved To Project Name</Label>
+            <Input value={movedToProjectName} onChange={(event) => setMovedToProjectName(event.target.value)} className="mt-1" />
+          </div>
+          <div>
             <Label>Date of Moving</Label>
             <Input type="date" value={dateOfMoving} onChange={(event) => setDateOfMoving(event.target.value)} className="mt-1" />
           </div>
@@ -206,7 +213,7 @@ function MovementDialog({ assetId, open, onOpenChange }: { assetId: string; open
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={() => mutation.mutate()} disabled={mutation.isPending}>Save Movement</Button>
+          <Button onClick={() => mutation.mutate()} disabled={mutation.isPending || !movedToProjectNumber.trim() || !movedToProjectName.trim() || !dateOfMoving || !movedToUser.trim()}>Save Movement</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -361,6 +368,7 @@ export default function AssetDetail() {
         purchaseAmount: toNumber(form.purchaseAmount),
         gst: toNumber(form.gst),
         projectNumber: form.projectNumber.trim() || null,
+        projectName: selectedProjectName || null,
         assignedUser: form.assignedUser.trim() || null,
         status: form.status,
         remarks: form.remarks.trim() || null,
@@ -573,7 +581,7 @@ export default function AssetDetail() {
               <Field label="Current Value" value={formatCurrency(asset.currentValue)} />
               <Field label="Days Since Purchase" value={daysSincePurchase === null ? "-" : String(daysSincePurchase)} />
               <Field label="Project Number" value={asset.projectNumber ?? "-"} />
-              <Field label="Project Name" value={getProjectNameByNumber(projects, asset.projectNumber) || "-"} />
+              <Field label="Project Name" value={asset.projectName ?? getProjectNameByNumber(projects, asset.projectNumber) ?? "-"} />
               <Field label="Assigned User" value={asset.assignedUser ?? "-"} />
               <div className="md:col-span-2"><Field label="Remarks" value={asset.remarks ?? "-"} /></div>
             </div>
@@ -594,18 +602,22 @@ export default function AssetDetail() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border/40">
-                      <th className="text-left py-3 px-4 font-medium text-muted-foreground">Date of Moving</th>
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground">Previous Project</th>
                       <th className="text-left py-3 px-4 font-medium text-muted-foreground">Moved To Project</th>
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground">Assigned Date</th>
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground">Return Date</th>
                       <th className="text-left py-3 px-4 font-medium text-muted-foreground">Moved To User</th>
                     </tr>
                   </thead>
                   <tbody>
                     {(asset.movements ?? []).length === 0 ? (
-                      <tr><td colSpan={3} className="py-8 text-center text-muted-foreground">No movement history.</td></tr>
+                      <tr><td colSpan={5} className="py-8 text-center text-muted-foreground">No movement history.</td></tr>
                     ) : asset.movements!.map((movement) => (
                       <tr key={movement.id} className="border-b border-border/20">
-                        <td className="py-3 px-4">{new Date(movement.dateOfMoving).toLocaleDateString("en-IN")}</td>
-                        <td className="py-3 px-4">{movement.movedToProjectNumber ?? "-"}</td>
+                        <td className="py-3 px-4">{[movement.previousProjectNumber, movement.previousProjectName].filter(Boolean).join(" - ") || "-"}</td>
+                        <td className="py-3 px-4">{[movement.movedToProjectNumber, movement.movedToProjectName].filter(Boolean).join(" - ") || "-"}</td>
+                        <td className="py-3 px-4">{new Date(movement.assignedDate ?? movement.dateOfMoving).toLocaleDateString("en-IN")}</td>
+                        <td className="py-3 px-4">{movement.returnDate ? new Date(movement.returnDate).toLocaleDateString("en-IN") : "-"}</td>
                         <td className="py-3 px-4">{movement.movedToUser ?? "-"}</td>
                       </tr>
                     ))}

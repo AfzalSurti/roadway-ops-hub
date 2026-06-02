@@ -461,6 +461,7 @@ export const api = {
     purchaseAmount?: number;
     gst?: number;
     projectNumber?: string | null;
+    projectName?: string | null;
     assignedUser?: string | null;
     status?: AssetStatus;
     remarks?: string | null;
@@ -482,6 +483,7 @@ export const api = {
     purchaseAmount: number;
     gst: number;
     projectNumber: string | null;
+    projectName: string | null;
     assignedUser: string | null;
     status: AssetStatus;
     remarks: string | null;
@@ -500,7 +502,7 @@ export const api = {
     });
   },
 
-  addAssetMovement(assetId: string, payload: { movedToProjectNumber?: string | null; dateOfMoving: string; movedToUser?: string | null }) {
+  addAssetMovement(assetId: string, payload: { movedToProjectNumber: string; movedToProjectName: string; dateOfMoving: string; movedToUser: string }) {
     return request<AssetMovementItem>(`/assets/${assetId}/movements`, {
       method: "POST",
       body: JSON.stringify(payload)

@@ -62,7 +62,12 @@ export type ProjectDprOverviewItem = {
 export type AssetMovementItem = {
   id: string;
   assetId: string;
+  previousProjectNumber?: string | null;
+  previousProjectName?: string | null;
   movedToProjectNumber?: string | null;
+  movedToProjectName?: string | null;
+  assignedDate?: string | null;
+  returnDate?: string | null;
   dateOfMoving: string;
   movedToUser?: string | null;
   createdAt: string;
@@ -100,6 +105,7 @@ export type AssetItem = {
   currentValue: number;
   depreciationAsOfYear: number;
   projectNumber?: string | null;
+  projectName?: string | null;
   assignedUser?: string | null;
   status: AssetStatus;
   remarks?: string | null;

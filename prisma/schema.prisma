@@ -160,6 +160,7 @@ model Asset {
   scrapValue         Float           @default(0)
   depreciationPerYear Float          @default(0)
   projectNumber      String?
+  projectName        String?
   assignedUser       String?
   status             AssetStatus     @default(IN_USE)
   remarks            String?
@@ -178,7 +179,12 @@ model Asset {
 model AssetMovement {
   id                  String   @id @default(cuid())
   assetId             String
+  previousProjectNumber String?
+  previousProjectName String?
   movedToProjectNumber String?
+  movedToProjectName  String?
+  assignedDate        DateTime?
+  returnDate          DateTime?
   dateOfMoving        DateTime
   movedToUser         String?
   createdAt           DateTime @default(now())

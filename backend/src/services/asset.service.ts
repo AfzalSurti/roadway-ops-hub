@@ -167,6 +167,7 @@ export const assetService = {
     purchaseAmount?: number;
     gst?: number;
     projectNumber?: string | null;
+    projectName?: string | null;
     assignedUser?: string | null;
     status?: AssetStatus;
     remarks?: string | null;
@@ -203,6 +204,7 @@ export const assetService = {
       scrapValue: depreciation.scrapValue,
       depreciationPerYear: depreciation.depreciationPerYear,
       projectNumber: payload.projectNumber ?? null,
+      projectName: payload.projectName ?? null,
       assignedUser: payload.assignedUser ?? null,
       status: payload.status ?? "IN_USE",
       remarks: payload.remarks ?? null,
@@ -223,6 +225,7 @@ export const assetService = {
       purchaseAmount?: number;
       gst?: number;
       projectNumber?: string | null;
+      projectName?: string | null;
       assignedUser?: string | null;
       status?: AssetStatus;
       remarks?: string | null;
@@ -273,16 +276,39 @@ export const assetService = {
   async addMovement(
     assetId: string,
     payload: {
-      movedToProjectNumber?: string | null;
+      movedToProjectNumber: string;
+      movedToProjectName: string;
       dateOfMoving: Date;
-      movedToUser?: string | null;
+      movedToUser: string;
     }
   ) {
     const asset = await this.getById(assetId);
     if (asset.status === "DISPOSED") {
       throw badRequest("Sold assets cannot have movement entries");
     }
-    return assetRepository.addMovement(assetId, { ...payload, assetId });
+    const latestOpenMovement = await assetRepository.findLatestOpenMovement(assetId);
+    if (latestOpenMovement) {
+      await assetRepository.updateMovement(latestOpenMovement.id, { returnDate: payload.dateOfMoving });
+    }
+
+    const movement = await assetRepository.addMovement(assetId, {
+      assetId,
+      previousProjectNumber: asset.projectNumber ?? null,
+      previousProjectName: asset.projectName ?? null,
+      movedToProjectNumber: payload.movedToProjectNumber,
+      movedToProjectName: payload.movedToProjectName,
+      assignedDate: payload.dateOfMoving,
+      dateOfMoving: payload.dateOfMoving,
+      movedToUser: payload.movedToUser
+    });
+
+    await assetRepository.update(assetId, {
+      projectNumber: payload.movedToProjectNumber,
+      projectName: payload.movedToProjectName,
+      assignedUser: payload.movedToUser
+    });
+
+    return movement;
   },
 
   async addMaintenance(

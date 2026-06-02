@@ -3,7 +3,7 @@ import { PageWrapper } from "@/components/PageWrapper";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { AssetItem, AssetStatus, ProjectItem } from "@/lib/domain";
-import { ASSET_CLASS_GROUP_OPTIONS, ASSET_CLASS_OPTIONS, ASSET_TYPES_BY_CLASS, getAssetClassGroup, getAssetTypesForClass } from "@/lib/asset-catalog";
+import { ASSET_CLASS_GROUP_OPTIONS, ASSET_CLASS_OPTIONS, getAssetClassGroup, getAssetTypesForClass } from "@/lib/asset-catalog";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { Download, Eye, Pencil, Plus, Search } from "lucide-react";
@@ -198,6 +198,7 @@ function AssetEditorDialog({
         purchaseAmount: toNumber(form.purchaseAmount),
         gst: toNumber(form.gst),
         projectNumber: form.projectNumber.trim() || null,
+        projectName: selectedProjectName || null,
         assignedUser: form.assignedUser.trim() || null,
         remarks: form.remarks.trim() || null,
         itAssetId: form.itAssetId.trim() || null
@@ -446,12 +447,13 @@ export default function AssetManagement() {
       "Asset ID": asset.assetId,
       "IT Asset ID": asset.itAssetId ?? "",
       "Project Number": asset.projectNumber ?? "",
+      "Project Name": asset.projectName ?? getProjectNameByNumber(projects, asset.projectNumber) ?? "",
       User: asset.assignedUser ?? "",
       Status: asset.status === "DISPOSED" ? "SOLD" : asset.status,
       Remarks: asset.remarks ?? ""
     }));
     const worksheet = XLSX.utils.json_to_sheet(rows, {
-      header: ["#", "Asset Class", "Asset Type", "Date of Purchase", "Mark/Model", "Warranty End Date", "Purchase Amount", "GST", "Total Amount with GST", "Asset ID", "IT Asset ID", "Project Number", "User", "Status", "Remarks"]
+      header: ["#", "Asset Class", "Asset Type", "Date of Purchase", "Mark/Model", "Warranty End Date", "Purchase Amount", "GST", "Total Amount with GST", "Asset ID", "IT Asset ID", "Project Number", "Project Name", "User", "Status", "Remarks"]
     });
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Assets");
@@ -531,6 +533,7 @@ export default function AssetManagement() {
               <th className="text-left py-3 px-4 font-medium text-muted-foreground">Purchase Date</th>
               <th className="text-left py-3 px-4 font-medium text-muted-foreground">Total Amount</th>
               <th className="text-left py-3 px-4 font-medium text-muted-foreground">Project</th>
+              <th className="text-left py-3 px-4 font-medium text-muted-foreground">Project Name</th>
               <th className="text-left py-3 px-4 font-medium text-muted-foreground">User</th>
               <th className="text-left py-3 px-4 font-medium text-muted-foreground">Status</th>
               <th className="text-left py-3 px-4 font-medium text-muted-foreground">Actions</th>
@@ -539,7 +542,7 @@ export default function AssetManagement() {
           <tbody>
             {filteredAssets.length === 0 ? (
               <tr>
-                <td colSpan={10} className="py-10 text-center text-muted-foreground">No assets found.</td>
+                <td colSpan={11} className="py-10 text-center text-muted-foreground">No assets found.</td>
               </tr>
             ) : (
               filteredAssets.map((asset) => (
@@ -551,6 +554,7 @@ export default function AssetManagement() {
                   <td className="py-3 px-4">{asset.dateOfPurchase ? new Date(asset.dateOfPurchase).toLocaleDateString("en-IN") : "-"}</td>
                   <td className="py-3 px-4">₹{asset.totalAmountWithGst.toLocaleString("en-IN")}</td>
                   <td className="py-3 px-4">{asset.projectNumber ?? "-"}</td>
+                  <td className="py-3 px-4">{asset.projectName ?? getProjectNameByNumber(projects, asset.projectNumber) ?? "-"}</td>
                   <td className="py-3 px-4">{asset.assignedUser ?? "-"}</td>
                   <td className="py-3 px-4">
                     <span className={`status-badge border ${STATUS_COLORS[asset.status]}`}>{getStatusLabel(asset.status)}</span>

@@ -99,6 +99,17 @@ export const assetRepository = {
     return prisma.assetMovement.create({ data: { ...data, assetId } });
   },
 
+  findLatestOpenMovement(assetId: string) {
+    return prisma.assetMovement.findFirst({
+      where: { assetId, returnDate: null },
+      orderBy: { assignedDate: "desc" }
+    });
+  },
+
+  updateMovement(id: string, data: Prisma.AssetMovementUncheckedUpdateInput) {
+    return prisma.assetMovement.update({ where: { id }, data });
+  },
+
   addMaintenance(assetId: string, data: Prisma.AssetMaintenanceUncheckedCreateInput) {
     return prisma.assetMaintenance.create({ data: { ...data, assetId } });
   },
