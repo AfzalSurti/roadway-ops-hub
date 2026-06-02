@@ -101,6 +101,8 @@ export type AssetItem = {
   scrapRate: number;
   scrapValue: number;
   depreciationPerYear: number;
+  depreciationPerMonth?: number;
+  monthsElapsed?: number;
   yearsElapsed: number;
   currentValue: number;
   depreciationAsOfYear: number;

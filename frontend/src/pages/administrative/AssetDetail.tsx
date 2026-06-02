@@ -116,11 +116,13 @@ function formatCurrency(value: number) {
 }
 
 function calculateBookValue(asset: Pick<AssetItem, "purchaseAmount" | "dateOfPurchase" | "depreciationPerYear">, asOfDate: Date) {
-  const purchaseYear = asset.dateOfPurchase ? new Date(asset.dateOfPurchase).getFullYear() : asOfDate.getFullYear();
-  const yearsElapsed = Math.max(asOfDate.getFullYear() - purchaseYear, 0);
-  const currentValue = Number((asset.purchaseAmount - asset.depreciationPerYear * yearsElapsed).toFixed(2));
-
-  return { yearsElapsed, currentValue };
+  const purchaseDate = asset.dateOfPurchase ? new Date(asset.dateOfPurchase) : asOfDate;
+  const fromMonth = purchaseDate.getFullYear() * 12 + purchaseDate.getMonth();
+  const toMonth = asOfDate.getFullYear() * 12 + asOfDate.getMonth();
+  const monthsElapsed = Math.max(toMonth - fromMonth, 0);
+  const depreciationPerMonth = Number((asset.depreciationPerYear / 12).toFixed(2));
+  const currentValue = Number((asset.purchaseAmount - depreciationPerMonth * monthsElapsed).toFixed(2));
+  return { monthsElapsed, currentValue };
 }
 
 function getDaysSincePurchase(dateOfPurchase?: string | null) {
@@ -412,11 +414,14 @@ export default function AssetDetail() {
     const purchaseAmount = toNumber(form.purchaseAmount);
     const scrapValue = Number((purchaseAmount * 0.1).toFixed(2));
     const depreciationPerYear = usefulLifeYears > 0 ? Number(((purchaseAmount - scrapValue) / usefulLifeYears).toFixed(2)) : 0;
-    const purchaseYear = form.dateOfPurchase ? new Date(form.dateOfPurchase).getFullYear() : new Date().getFullYear();
-    const yearsElapsed = Math.max(new Date().getFullYear() - purchaseYear, 0);
-    const currentValue = Number((purchaseAmount - depreciationPerYear * yearsElapsed).toFixed(2));
+    const depreciationPerMonth = Number((depreciationPerYear / 12).toFixed(2));
+    const purchaseDate = form.dateOfPurchase ? new Date(form.dateOfPurchase) : new Date();
+    const fromMonth = purchaseDate.getFullYear() * 12 + purchaseDate.getMonth();
+    const toMonth = new Date().getFullYear() * 12 + new Date().getMonth();
+    const monthsElapsed = Math.max(toMonth - fromMonth, 0);
+    const currentValue = Number((purchaseAmount - depreciationPerMonth * monthsElapsed).toFixed(2));
 
-    return { usefulLifeYears, scrapValue, depreciationPerYear, yearsElapsed, currentValue };
+    return { usefulLifeYears, scrapValue, depreciationPerYear, depreciationPerMonth, monthsElapsed, currentValue };
   }, [form.assetClass, form.dateOfPurchase, form.purchaseAmount]);
   const daysSincePurchase = useMemo(() => getDaysSincePurchase(form.dateOfPurchase), [form.dateOfPurchase]);
 
