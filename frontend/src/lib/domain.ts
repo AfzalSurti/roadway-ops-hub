@@ -81,6 +81,8 @@ export type AssetMaintenanceItem = {
   dateOfMaintenance: string;
   repairCostInclGst: number;
   depreciationTillDate: number;
+  projectNumber?: string | null;
+  projectName?: string | null;
   remark?: string | null;
   createdAt: string;
 };

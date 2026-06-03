@@ -285,12 +285,13 @@ export function downloadAssetPdf(asset: AssetItem, options?: { projectName?: str
 
     autoTable(doc, {
       startY: y,
-      head: [["#", "Date", "Repair Cost (incl. GST)", "Depreciation Till Date", "Remark"]],
+      head: [["#", "Date", "Project Number", "Project Name", "Repair Cost (incl. GST)", "Remark"]],
       body: maintenances.map((maintenance, index) => [
         String(index + 1),
         formatDate(maintenance.dateOfMaintenance),
+        maintenance.projectNumber || "—",
+        maintenance.projectName || "—",
         formatMoney(maintenance.repairCostInclGst),
-        formatMoney(maintenance.depreciationTillDate),
         maintenance.remark || "—"
       ]),
       theme: "grid",
