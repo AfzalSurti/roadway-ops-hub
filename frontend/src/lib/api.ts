@@ -508,7 +508,16 @@ export const api = {
     });
   },
 
-  addAssetMovement(assetId: string, payload: { movedToProjectNumber: string; movedToProjectName: string; dateOfMoving: string; movedToUser: string }) {
+  addAssetMovement(
+    assetId: string,
+    payload: {
+      movedToProjectNumber?: string | null;
+      movedToProjectName?: string | null;
+      dateOfMoving: string;
+      movedToUser?: string | null;
+      moveToStore?: boolean;
+    }
+  ) {
     return request<AssetMovementItem>(`/assets/${assetId}/movements`, {
       method: "POST",
       body: JSON.stringify(payload)
@@ -524,6 +533,30 @@ export const api = {
 
   getAssetStats() {
     return request<AssetStatsResponse>("/assets/stats");
+  },
+
+  getAssetCatalog() {
+    return request<Array<{ id: string; className: string; types: string[]; sortOrder: number }>>("/assets/catalog");
+  },
+
+  createAssetCatalogEntry(payload: { className: string; types: string[] }) {
+    return request<{ id: string; className: string; types: string[]; sortOrder: number }>("/assets/catalog", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+  },
+
+  updateAssetCatalogEntry(id: string, payload: { className?: string; types?: string[] }) {
+    return request<{ id: string; className: string; types: string[]; sortOrder: number }>(`/assets/catalog/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    });
+  },
+
+  deleteAssetCatalogEntry(id: string) {
+    return request<{ deleted: boolean }>(`/assets/catalog/${id}`, {
+      method: "DELETE"
+    });
   },
 
   getProjectNumberingOptions() {

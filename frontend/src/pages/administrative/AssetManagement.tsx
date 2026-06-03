@@ -3,10 +3,12 @@ import { PageWrapper } from "@/components/PageWrapper";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { AssetItem, AssetStatus, ProjectItem } from "@/lib/domain";
-import { ASSET_CLASS_GROUP_OPTIONS, ASSET_CLASS_OPTIONS, getAssetClassGroup, getAssetTypesForClass } from "@/lib/asset-catalog";
+import { ASSET_CLASS_OPTIONS, getAssetClassGroup } from "@/lib/asset-catalog";
+import { AssetCatalogManager } from "@/components/AssetCatalogManager";
+import { useAssetCatalog } from "@/hooks/useAssetCatalog";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
-import { Download, Eye, Pencil, Plus, RefreshCcw, Search, Trash2 } from "lucide-react";
+import { Download, Eye, Pencil, Plus, RefreshCcw, Search, Settings2, Trash2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -102,10 +104,10 @@ function formatWarrantyEndDate(value?: string | null) {
   return date.toLocaleDateString("en-IN");
 }
 
-function toFormState(asset?: AssetItem | null): AssetFormState {
+function toFormState(asset: AssetItem | null | undefined, classOptions: string[], getTypesForClass: (assetClass: string) => string[]): AssetFormState {
   if (!asset) return EMPTY_FORM;
-  const normalizedClass = ASSET_CLASS_OPTIONS.includes(asset.assetClass as (typeof ASSET_CLASS_OPTIONS)[number]) ? asset.assetClass : "Other";
-  const typeOptions = getAssetTypesForClass(normalizedClass);
+  const normalizedClass = classOptions.includes(asset.assetClass) ? asset.assetClass : "Other";
+  const typeOptions = getTypesForClass(normalizedClass);
   const normalizedType = typeOptions.includes(asset.assetType) ? asset.assetType : "Other";
 
   return {
@@ -168,6 +170,8 @@ function AssetEditorDialog({
   asset,
   projects,
   assets,
+  classOptions,
+  getTypesForClass,
   onSaved
 }: {
   open: boolean;
@@ -175,23 +179,24 @@ function AssetEditorDialog({
   asset?: AssetItem | null;
   projects: ProjectItem[];
   assets: AssetItem[];
+  classOptions: string[];
+  getTypesForClass: (assetClass: string) => string[];
   onSaved: () => void;
 }) {
   const queryClient = useQueryClient();
   const [form, setForm] = useState<AssetFormState>(EMPTY_FORM);
   const [projectInputMode, setProjectInputMode] = useState<"select" | "other">("select");
   const [userInputMode, setUserInputMode] = useState<"select" | "other">("select");
-  const classOptions = useMemo(() => [...ASSET_CLASS_OPTIONS], []);
 
   const typeOptions = useMemo(() => {
-    const builtIn = getAssetTypesForClass(form.assetClass);
+    const builtIn = getTypesForClass(form.assetClass);
     const dynamic = assets
       .filter((item) => item.assetClass === (form.assetClass === "Other" ? form.customAssetClass.trim() : form.assetClass))
       .map((item) => item.assetType)
       .filter(Boolean);
 
     return Array.from(new Set([...builtIn, ...dynamic]));
-  }, [assets, form.assetClass, form.customAssetClass]);
+  }, [assets, form.assetClass, form.customAssetClass, getTypesForClass]);
 
   const selectedProjectName = useMemo(
     () => form.projectName || getProjectNameByNumber(projects, form.projectNumber.trim() || null),
@@ -227,7 +232,7 @@ function AssetEditorDialog({
 
   useEffect(() => {
     if (open) {
-      setForm(toFormState(asset));
+      setForm(toFormState(asset, classOptions, getTypesForClass));
       if (asset && ((!asset.projectNumber && asset.projectName) || (asset.projectNumber && asset.projectName && !projectOptions.some((item) => item.number === asset.projectNumber && item.name === asset.projectName)))) {
         setProjectInputMode("other");
         setForm((prev) => ({ ...prev, customProjectNumber: asset.projectNumber ?? "", customProjectName: asset.projectName ?? "" }));
@@ -236,7 +241,7 @@ function AssetEditorDialog({
       }
       setUserInputMode(asset?.assignedUser && !userOptions.includes(asset.assignedUser) ? "other" : "select");
     }
-  }, [asset, open, projectOptions, userOptions]);
+  }, [asset, open, projectOptions, userOptions, classOptions, getTypesForClass]);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -252,10 +257,11 @@ function AssetEditorDialog({
         warrantyPeriod: form.warrantyPeriod.trim() || null,
         purchaseAmount: toNumber(form.purchaseAmount),
         gst: toNumber(form.gst),
-        projectNumber: (projectInputMode === "other" ? form.customProjectNumber : form.projectNumber).trim() || null,
-        projectName: (projectInputMode === "other" ? form.customProjectName : selectedProjectName).trim() || null,
-        assignedUser: form.assignedUser.trim() || null,
         assignedDate: form.assignedDate ? new Date(form.assignedDate).toISOString() : null,
+        status: form.status,
+        projectNumber: form.status === "IN_USE" ? ((projectInputMode === "other" ? form.customProjectNumber : form.projectNumber).trim() || null) : null,
+        projectName: form.status === "IN_USE" ? ((projectInputMode === "other" ? form.customProjectName : selectedProjectName).trim() || null) : null,
+        assignedUser: form.status === "IN_USE" ? form.assignedUser.trim() || null : null,
         remarks: form.remarks.trim() || null,
         itAssetId: form.itAssetId.trim() || null
       };
@@ -377,6 +383,37 @@ function AssetEditorDialog({
             <Label>Total Amount with GST</Label>
             <Input value={totalAmount} readOnly className="mt-1 bg-secondary/40" />
           </div>
+
+          {!asset ? (
+            <div>
+              <Label>Status</Label>
+              <Select
+                value={form.status}
+                onValueChange={(value) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    status: value as AssetStatus,
+                    projectNumber: value === "IN_STORE" ? "" : prev.projectNumber,
+                    projectName: value === "IN_STORE" ? "" : prev.projectName,
+                    customProjectNumber: value === "IN_STORE" ? "" : prev.customProjectNumber,
+                    customProjectName: value === "IN_STORE" ? "" : prev.customProjectName,
+                    assignedUser: value === "IN_STORE" ? "" : prev.assignedUser
+                  }))
+                }
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="IN_USE">IN USE</SelectItem>
+                  <SelectItem value="IN_STORE">IN STORE</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
+
+          {form.status === "IN_USE" ? (
+            <>
           <div>
             <Label>Project Number</Label>
               <Select
@@ -468,6 +505,8 @@ function AssetEditorDialog({
               <Input value={form.assignedUser} onChange={(event) => setForm((prev) => ({ ...prev, assignedUser: event.target.value }))} className="mt-1" />
             </div>
           ) : null}
+            </>
+          ) : null}
           {asset ? (
             <div>
               <Label>Status</Label>
@@ -508,7 +547,8 @@ function AssetEditorDialog({
               !form.assetClass ||
               !form.assetType ||
               (!asset && !form.assignedDate) ||
-              (projectInputMode === "other" && (!form.customProjectNumber.trim() || !form.customProjectName.trim())) ||
+              (form.status === "IN_USE" && projectInputMode !== "other" && !form.projectNumber.trim()) ||
+              (form.status === "IN_USE" && projectInputMode === "other" && (!form.customProjectNumber.trim() || !form.customProjectName.trim())) ||
               (form.assetClass === "Other" && !form.customAssetClass.trim()) ||
               (form.assetType === "Other" && !form.customAssetType.trim())
             }
@@ -533,7 +573,9 @@ export default function AssetManagement() {
   const [editingAsset, setEditingAsset] = useState<AssetItem | null>(null);
   const [assetToDelete, setAssetToDelete] = useState<AssetItem | null>(null);
   const [pdfLoading, setPdfLoading] = useState<string | null>(null);
+  const [catalogManagerOpen, setCatalogManagerOpen] = useState(false);
   const queryClient = useQueryClient();
+  const { catalog, classOptions, getTypesForClass } = useAssetCatalog();
 
   const { data: projects = [] } = useQuery({
     queryKey: ["projects"],
@@ -668,6 +710,9 @@ export default function AssetManagement() {
           <p className="page-subtitle">Track stock, movement history, maintenance and allocation.</p>
         </div>
         <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" onClick={() => setCatalogManagerOpen(true)} className="gap-2">
+            <Settings2 className="h-4 w-4" /> Asset Class & Type Setup
+          </Button>
           <Button variant="outline" onClick={createExport} className="gap-2">
             <Download className="h-4 w-4" /> Export Excel
           </Button>
@@ -836,8 +881,12 @@ export default function AssetManagement() {
         asset={editingAsset}
         projects={projects}
         assets={assets}
+        classOptions={classOptions}
+        getTypesForClass={getTypesForClass}
         onSaved={() => void refetch()}
       />
+
+      <AssetCatalogManager open={catalogManagerOpen} onOpenChange={setCatalogManagerOpen} catalog={catalog} />
 
       <AlertDialog open={Boolean(assetToDelete)} onOpenChange={(open) => !open && setAssetToDelete(null)}>
         <AlertDialogContent>
