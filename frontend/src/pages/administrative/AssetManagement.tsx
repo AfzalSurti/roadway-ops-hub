@@ -3,7 +3,7 @@ import { PageWrapper } from "@/components/PageWrapper";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { AssetItem, AssetStatus, ProjectItem } from "@/lib/domain";
-import { ASSET_CLASS_OPTIONS, getAssetClassGroup } from "@/lib/asset-catalog";
+import { ASSET_CLASS_GROUP_OPTIONS, ASSET_CLASS_OPTIONS, getAssetClassGroup } from "@/lib/asset-catalog";
 import { AssetCatalogManager } from "@/components/AssetCatalogManager";
 import { useAssetCatalog } from "@/hooks/useAssetCatalog";
 import { toast } from "sonner";
