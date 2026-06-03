@@ -6,7 +6,13 @@ import { requireRole } from "../middleware/rbac.js";
 import { validate } from "../middleware/validate.js";
 import { asyncHandler } from "../utils/async-handler.js";
 import { createAssetCatalogSchema, updateAssetCatalogSchema } from "../validators/asset-catalog.validator.js";
-import { addMaintenanceSchema, addMovementSchema, createAssetSchema, updateAssetSchema } from "../validators/asset.validator.js";
+import {
+  addMaintenanceSchema,
+  addMovementSchema,
+  bulkImportAssetsSchema,
+  createAssetSchema,
+  updateAssetSchema
+} from "../validators/asset.validator.js";
 
 export const assetRouter = Router();
 
@@ -19,6 +25,7 @@ assetRouter.delete("/catalog/:id", requireRole("PMO", "ADMIN"), asyncHandler(ass
 
 assetRouter.get("/stats", requireRole("PMO", "ADMIN"), asyncHandler(assetController.getStats));
 assetRouter.get("/", requireRole("PMO", "ADMIN"), asyncHandler(assetController.list));
+assetRouter.post("/import", requireRole("PMO", "ADMIN"), validate(bulkImportAssetsSchema), asyncHandler(assetController.bulkImport));
 assetRouter.get("/:id", requireRole("PMO", "ADMIN"), asyncHandler(assetController.getById));
 assetRouter.post("/", requireRole("PMO", "ADMIN"), validate(createAssetSchema), asyncHandler(assetController.create));
 assetRouter.patch("/:id", requireRole("PMO", "ADMIN"), validate(updateAssetSchema), asyncHandler(assetController.update));

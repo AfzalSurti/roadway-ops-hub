@@ -226,6 +226,49 @@ export const assetService = {
     return enrichAsset(created);
   },
 
+  async bulkImport(
+    rows: Array<{
+      assetClass: string;
+      assetType: string;
+      markModel?: string | null;
+      dateOfPurchase?: Date | null;
+      warrantyPeriod?: string | null;
+      purchaseAmount?: number;
+      gst?: number;
+      projectNumber?: string | null;
+      projectName?: string | null;
+      assignedUser?: string | null;
+      assignedDate?: Date | null;
+      status?: AssetStatus;
+      soldAmount?: number | null;
+      soldRemark?: string | null;
+      remarks?: string | null;
+      forMonth?: string | null;
+      itAssetId?: string | null;
+    }>
+  ) {
+    const created: Array<{ row: number; assetId: string; id: string }> = [];
+    const errors: Array<{ row: number; message: string }> = [];
+
+    for (let index = 0; index < rows.length; index += 1) {
+      const rowNumber = index + 1;
+      try {
+        const asset = await this.create(rows[index]);
+        created.push({ row: rowNumber, assetId: asset.assetId, id: asset.id });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to create asset";
+        errors.push({ row: rowNumber, message });
+      }
+    }
+
+    return {
+      createdCount: created.length,
+      failedCount: errors.length,
+      created,
+      errors
+    };
+  },
+
   async update(
     id: string,
     payload: {

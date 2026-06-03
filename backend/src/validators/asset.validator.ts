@@ -97,3 +97,7 @@ export const addMaintenanceSchema = z.object({
   repairCostInclGst: z.coerce.number().min(0).default(0),
   remark: z.string().trim().optional().nullable()
 });
+
+export const bulkImportAssetsSchema = z.object({
+  rows: z.array(createAssetSchema).min(1, "At least one asset row is required").max(500, "Maximum 500 assets per import")
+});

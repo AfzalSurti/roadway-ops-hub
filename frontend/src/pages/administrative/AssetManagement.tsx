@@ -5,10 +5,11 @@ import { api } from "@/lib/api";
 import type { AssetItem, AssetStatus, ProjectItem } from "@/lib/domain";
 import { ASSET_CLASS_GROUP_OPTIONS, ASSET_CLASS_OPTIONS, getAssetClassGroup } from "@/lib/asset-catalog";
 import { AssetCatalogManager } from "@/components/AssetCatalogManager";
+import { AssetImportDialog } from "@/components/AssetImportDialog";
 import { IN_STORE_PROJECT_LABEL, useAssetCatalog } from "@/hooks/useAssetCatalog";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
-import { Download, Eye, Pencil, Plus, RefreshCcw, Search, Settings2, Trash2 } from "lucide-react";
+import { Download, Eye, FileUp, Pencil, Plus, RefreshCcw, Search, Settings2, Trash2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -605,6 +606,7 @@ export default function AssetManagement() {
   const [assetToDelete, setAssetToDelete] = useState<AssetItem | null>(null);
   const [pdfLoading, setPdfLoading] = useState<string | null>(null);
   const [catalogManagerOpen, setCatalogManagerOpen] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const queryClient = useQueryClient();
   const { catalog, classOptions, getTypesForClass } = useAssetCatalog();
 
@@ -761,6 +763,9 @@ export default function AssetManagement() {
         <div className="flex gap-2 flex-wrap">
           <Button variant="outline" onClick={() => setCatalogManagerOpen(true)} className="gap-2">
             <Settings2 className="h-4 w-4" /> Asset Class & Type Setup
+          </Button>
+          <Button variant="outline" onClick={() => setImportDialogOpen(true)} className="gap-2">
+            <FileUp className="h-4 w-4" /> Import Excel
           </Button>
           <Button variant="outline" onClick={createExport} className="gap-2">
             <Download className="h-4 w-4" /> Export Excel
@@ -956,6 +961,7 @@ export default function AssetManagement() {
       />
 
       <AssetCatalogManager open={catalogManagerOpen} onOpenChange={setCatalogManagerOpen} catalog={catalog} />
+      <AssetImportDialog open={importDialogOpen} onOpenChange={setImportDialogOpen} />
 
       <AlertDialog open={Boolean(assetToDelete)} onOpenChange={(open) => !open && setAssetToDelete(null)}>
         <AlertDialogContent>

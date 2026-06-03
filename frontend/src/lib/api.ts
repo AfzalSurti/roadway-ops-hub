@@ -477,6 +477,38 @@ export const api = {
     });
   },
 
+  bulkImportAssets(
+    rows: Array<{
+      assetClass: string;
+      assetType: string;
+      markModel?: string | null;
+      dateOfPurchase?: string | null;
+      warrantyPeriod?: string | null;
+      purchaseAmount?: number;
+      gst?: number;
+      projectNumber?: string | null;
+      projectName?: string | null;
+      assignedUser?: string | null;
+      assignedDate?: string | null;
+      status?: AssetStatus;
+      soldAmount?: number | null;
+      soldRemark?: string | null;
+      remarks?: string | null;
+      forMonth?: string | null;
+      itAssetId?: string | null;
+    }>
+  ) {
+    return request<{
+      createdCount: number;
+      failedCount: number;
+      created: Array<{ row: number; assetId: string; id: string }>;
+      errors: Array<{ row: number; message: string }>;
+    }>("/assets/import", {
+      method: "POST",
+      body: JSON.stringify({ rows })
+    });
+  },
+
   updateAsset(id: string, payload: Partial<{
     assetClass: string;
     assetType: string;

@@ -27,6 +27,11 @@ export const assetController = {
     return sendSuccess(res, result, 201);
   },
 
+  async bulkImport(req: Request, res: Response) {
+    const result = await assetService.bulkImport(req.body.rows);
+    return sendSuccess(res, result, 201);
+  },
+
   async update(req: Request, res: Response) {
     const result = await assetService.update(req.params.id, req.body);
     return sendSuccess(res, result);
