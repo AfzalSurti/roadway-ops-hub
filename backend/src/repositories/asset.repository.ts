@@ -83,6 +83,29 @@ export const assetRepository = {
     });
   },
 
+  findForImportDuplicateCheck() {
+    return prisma.asset.findMany({
+      select: {
+        assetId: true,
+        assetClass: true,
+        assetType: true,
+        markModel: true,
+        dateOfPurchase: true,
+        warrantyPeriod: true,
+        purchaseAmount: true,
+        gst: true,
+        status: true,
+        projectNumber: true,
+        projectName: true,
+        assignedUser: true,
+        assignedDate: true,
+        itAssetId: true,
+        soldAmount: true,
+        soldRemark: true
+      }
+    });
+  },
+
   create(data: Prisma.AssetCreateInput) {
     return prisma.asset.create({ data, include: { movements: true, maintenances: true } });
   },

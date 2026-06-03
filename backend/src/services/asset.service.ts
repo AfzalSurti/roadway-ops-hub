@@ -2,7 +2,12 @@ import type { AssetStatus, Prisma } from "@prisma/client";
 import { IN_STORE_PROJECT_LABEL, SURVEY_EQUIPMENT_CLASS } from "../data/default-asset-catalog.js";
 import { assetRepository } from "../repositories/asset.repository.js";
 import { calculateAssetDepreciation } from "../utils/depreciation.js";
-import { badRequest, notFound } from "../utils/errors.js";
+import {
+  buildAssetImportFingerprint,
+  normalizeItAssetId,
+  type AssetImportFingerprintInput
+} from "../utils/asset-import-duplicate.js";
+import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { getPagination } from "../utils/pagination.js";
 
 export const ASSET_ID_PREFIXES: Record<string, string> = {
@@ -226,34 +231,66 @@ export const assetService = {
     return enrichAsset(created);
   },
 
-  async bulkImport(
-    rows: Array<{
-      assetClass: string;
-      assetType: string;
-      markModel?: string | null;
-      dateOfPurchase?: Date | null;
-      warrantyPeriod?: string | null;
-      purchaseAmount?: number;
-      gst?: number;
-      projectNumber?: string | null;
-      projectName?: string | null;
-      assignedUser?: string | null;
-      assignedDate?: Date | null;
-      status?: AssetStatus;
-      soldAmount?: number | null;
-      soldRemark?: string | null;
-      remarks?: string | null;
-      forMonth?: string | null;
-      itAssetId?: string | null;
-    }>
-  ) {
+  async bulkImport(rows: Array<AssetImportFingerprintInput & { remarks?: string | null; forMonth?: string | null }>) {
     const created: Array<{ row: number; assetId: string; id: string }> = [];
     const errors: Array<{ row: number; message: string }> = [];
 
+    const existingAssets = await assetRepository.findForImportDuplicateCheck();
+    const existingByFingerprint = new Map<string, string>();
+    const existingByItAssetId = new Map<string, string>();
+
+    for (const asset of existingAssets) {
+      const fingerprint = buildAssetImportFingerprint(asset);
+      existingByFingerprint.set(fingerprint, asset.assetId);
+      const itAssetId = normalizeItAssetId(asset.itAssetId);
+      if (itAssetId) {
+        existingByItAssetId.set(itAssetId, asset.assetId);
+      }
+    }
+
+    const batchFingerprints = new Map<string, number>();
+    const batchItAssetIds = new Map<string, number>();
+
     for (let index = 0; index < rows.length; index += 1) {
       const rowNumber = index + 1;
+      const row = rows[index];
+
       try {
-        const asset = await this.create(rows[index]);
+        const fingerprint = buildAssetImportFingerprint(row);
+        const existingAssetId = existingByFingerprint.get(fingerprint);
+        if (existingAssetId) {
+          throw conflict(`This asset is not allowed because it already exists (matches ${existingAssetId})`);
+        }
+
+        const duplicateBatchRow = batchFingerprints.get(fingerprint);
+        if (duplicateBatchRow !== undefined) {
+          throw conflict(`This asset is not allowed because it is a duplicate of row ${duplicateBatchRow} in this Excel file`);
+        }
+
+        const itAssetId = normalizeItAssetId(row.itAssetId);
+        if (itAssetId) {
+          const existingByIt = existingByItAssetId.get(itAssetId);
+          if (existingByIt) {
+            throw conflict(`This asset is not allowed because IT Asset ID already exists (matches ${existingByIt})`);
+          }
+          const duplicateItRow = batchItAssetIds.get(itAssetId);
+          if (duplicateItRow !== undefined) {
+            throw conflict(`This asset is not allowed because IT Asset ID is duplicated in row ${duplicateItRow} of this Excel file`);
+          }
+        }
+
+        const asset = await this.create({
+          ...row,
+          dateOfPurchase: row.dateOfPurchase ? new Date(row.dateOfPurchase) : null,
+          assignedDate: row.assignedDate ? new Date(row.assignedDate) : null
+        });
+        batchFingerprints.set(fingerprint, rowNumber);
+        if (itAssetId) {
+          batchItAssetIds.set(itAssetId, rowNumber);
+          existingByItAssetId.set(itAssetId, asset.assetId);
+        }
+        existingByFingerprint.set(fingerprint, asset.assetId);
+
         created.push({ row: rowNumber, assetId: asset.assetId, id: asset.id });
       } catch (error) {
         const message = error instanceof Error ? error.message : "Failed to create asset";

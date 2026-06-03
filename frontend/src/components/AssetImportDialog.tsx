@@ -7,6 +7,7 @@ import {
   type AssetImportParseIssue,
   type ParsedAssetImportRow
 } from "@/lib/asset-import";
+import { findImportDuplicates } from "@/lib/asset-import-duplicate";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Download, FileUp, Loader2 } from "lucide-react";
@@ -92,17 +93,23 @@ export function AssetImportDialog({ open, onOpenChange }: AssetImportDialogProps
 
     try {
       const parsed = await readAssetImportFile(file);
-      setParsedRows(parsed.rows);
-      setParseErrors(parsed.parseErrors);
+      const existingResponse = await api.getAssets({ limit: 5000 });
+      const duplicateErrors = findImportDuplicates(parsed.rows, existingResponse.items);
+      const duplicateRows = new Set(duplicateErrors.map((item) => item.excelRow));
+      const importableRows = parsed.rows.filter((row) => !duplicateRows.has(row.excelRow));
+      const allErrors = [...parsed.parseErrors, ...duplicateErrors];
 
-      if (parsed.rows.length === 0 && parsed.parseErrors.length === 0) {
+      setParsedRows(importableRows);
+      setParseErrors(allErrors);
+
+      if (importableRows.length === 0 && allErrors.length === 0) {
         toast.error("No asset rows found in the Excel file");
-      } else if (parsed.rows.length === 0) {
+      } else if (importableRows.length === 0) {
         toast.error("All rows have errors. Fix the Excel file and try again.");
-      } else if (parsed.parseErrors.length > 0) {
-        toast.warning(`${parsed.rows.length} valid row(s), ${parsed.parseErrors.length} row(s) with errors`);
+      } else if (allErrors.length > 0) {
+        toast.warning(`${importableRows.length} row(s) ready to import, ${allErrors.length} row(s) skipped`);
       } else {
-        toast.success(`${parsed.rows.length} row(s) ready to import`);
+        toast.success(`${importableRows.length} row(s) ready to import`);
       }
     } catch {
       toast.error("Could not read the Excel file");

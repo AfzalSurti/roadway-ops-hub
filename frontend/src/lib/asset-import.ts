@@ -309,53 +309,21 @@ export function downloadAssetImportTemplate() {
     ["Amounts: numbers only (no currency symbol)"],
     ["Asset Class and Asset Type must match values in Asset Class & Type Setup"],
     [""],
-    ["Delete the sample rows before import, or replace them with your data."]
+    ["Delete the sample rows before import, or replace them with your data."],
+    [""],
+    ["Duplicates are not allowed:"],
+    ["- Same asset data already entered manually will be skipped"],
+    ["- Duplicate rows inside the same Excel file will be skipped"],
+    ["- Duplicate IT Asset ID will be skipped"]
   ];
 
-  const sampleRows = [
-    {
-      "Asset Class*": "IT",
-      "Asset Type*": "Laptop",
-      "Mark / Model": "Dell Latitude",
-      "Date of Purchase": "12/03/2024",
-      "Warranty End Date": "11/03/2027",
-      "Purchase Amount": 85000,
-      GST: 15300,
-      "Status*": "IN_USE",
-      "Project Number": "GPIR2507R",
-      "Project Name": "DHOLERA",
-      "Assigned User": "afzal",
-      "Assigned Date": "12/03/2024",
-      "IT Asset ID": "",
-      Remarks: "",
-      "For Month": "",
-      "Sold Amount": "",
-      "Sold Remark": ""
-    },
-    {
-      "Asset Class*": "Survey Equipment",
-      "Asset Type*": "Network Survey Vehicle",
-      "Mark / Model": "",
-      "Date of Purchase": "12/12/2021",
-      "Warranty End Date": "",
-      "Purchase Amount": 2500000,
-      GST: 0,
-      "Status*": "IN_STORE",
-      "Project Number": "",
-      "Project Name": "",
-      "Assigned User": "",
-      "Assigned Date": "",
-      "IT Asset ID": "",
-      Remarks: "In company store",
-      "For Month": "",
-      "Sold Amount": "",
-      "Sold Remark": ""
-    }
-  ];
+  const emptyRow = Object.fromEntries(ASSET_IMPORT_HEADERS.map((header) => [header, ""]));
+  const blankRows = Array.from({ length: 48 }, () => ({ ...emptyRow }));
 
-  const assetsSheet = XLSX.utils.json_to_sheet(sampleRows, { header: [...ASSET_IMPORT_HEADERS] });
+  const assetsSheet = XLSX.utils.json_to_sheet(blankRows, { header: [...ASSET_IMPORT_HEADERS] });
   const instructionsSheet = XLSX.utils.aoa_to_sheet(instructions);
-  assetsSheet["!cols"] = ASSET_IMPORT_HEADERS.map(() => ({ wch: 18 }));
+  assetsSheet["!cols"] = ASSET_IMPORT_HEADERS.map((header) => ({ wch: Math.max(16, header.length + 2) }));
+  assetsSheet["!freeze"] = { xSplit: 0, ySplit: 1, topLeftCell: "A2", activePane: "bottomLeft", state: "frozen" };
 
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, assetsSheet, "Assets");
