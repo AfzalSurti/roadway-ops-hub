@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { BarChart3, Download, FileText, Hash, Pencil, Plus, Search, X } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { downloadProjectRequisitionPdf } from "@/lib/project-requisition-pdf";
 import { downloadProjectReport } from "@/lib/reports-pdf";
@@ -452,6 +453,8 @@ function ProjectRequisitionStepContent({
 }
 
 export default function AdminProjects() {
+  const { isPmo } = useAuth();
+  const showPlanAndReportColumns = !isPmo;
   const queryClient = useQueryClient();
   const [showCreate, setShowCreate] = useState(false);
   const [showNumberWizard, setShowNumberWizard] = useState(false);
@@ -890,11 +893,17 @@ export default function AdminProjects() {
 
       <div className="glass-panel overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[760px]">
+          <table className={`w-full text-sm ${showPlanAndReportColumns ? "min-w-[1040px]" : "min-w-[760px]"}`}>
             <thead>
               <tr className="border-b border-border/50 text-muted-foreground">
                 <th className="text-left p-4 font-medium">Project Name</th>
                 <th className="text-left p-4 font-medium">Project Number</th>
+                {showPlanAndReportColumns ? (
+                  <>
+                    <th className="text-left p-4 font-medium">Project Plan</th>
+                    <th className="text-left p-4 font-medium">Task Report</th>
+                  </>
+                ) : null}
                 <th className="text-left p-4 font-medium">Project No. Requisition Form</th>
               </tr>
             </thead>
@@ -903,6 +912,53 @@ export default function AdminProjects() {
                 <motion.tr key={row.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.03 }} onClick={() => setSelectedProjectId(row.id)} className="border-b border-border/30 cursor-pointer hover:bg-secondary/30 transition-colors">
                   <td className="p-4"><span className="font-medium">{row.projectName}</span></td>
                   <td className="p-4 font-medium">{row.projectNumber}</td>
+                  {showPlanAndReportColumns ? (
+                    <>
+                      <td className="p-4" onClick={(event) => event.stopPropagation()}>
+                        {!row.projectNumber || row.projectNumber === "-" ? (
+                          <p className="text-xs text-muted-foreground">Add project number first</p>
+                        ) : row.projectPlan ? (
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <button
+                              onClick={() => openProjectPlanEditor(row.id)}
+                              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/15 text-primary font-medium hover:bg-primary/20"
+                            >
+                              <Pencil className="h-4 w-4" />
+                              Edit Plan
+                            </button>
+                            <button
+                              onClick={() => setPlanChartProjectId(row.id)}
+                              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-accent/15 text-accent font-medium hover:bg-accent/20"
+                            >
+                              <BarChart3 className="h-4 w-4" />
+                              Bar Chart
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => openProjectPlanEditor(row.id)}
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/15 text-primary font-medium hover:bg-primary/20"
+                          >
+                            <FileText className="h-4 w-4" />
+                            Generate Plan
+                          </button>
+                        )}
+                      </td>
+                      <td className="p-4" onClick={(event) => event.stopPropagation()}>
+                        <button
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            downloadProjectReport({ tasks: row.tasks, projectName: row.projectName });
+                          }}
+                          title="Download project task report"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-primary/30 text-primary text-xs font-medium hover:bg-primary/10 transition-colors whitespace-nowrap"
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                          Task Report
+                        </button>
+                      </td>
+                    </>
+                  ) : null}
                   <td className="p-4" onClick={(event) => event.stopPropagation()}>
                     {!row.projectNumber || row.projectNumber === "-" ? null : row.requisitionForm ? (
                       <div className="flex items-center gap-2 flex-wrap">
@@ -915,7 +971,13 @@ export default function AdminProjects() {
                   </td>
                 </motion.tr>
               ))}
-              {filteredRows.length === 0 && <tr><td colSpan={3} className="p-6 text-muted-foreground">No projects found.</td></tr>}
+              {filteredRows.length === 0 && (
+                <tr>
+                  <td colSpan={showPlanAndReportColumns ? 5 : 3} className="p-6 text-muted-foreground">
+                    No projects found.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
