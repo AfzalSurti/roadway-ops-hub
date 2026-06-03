@@ -3,7 +3,8 @@ import { PageWrapper } from "@/components/PageWrapper";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { AssetItem, AssetStatus, ProjectItem } from "@/lib/domain";
-import { ASSET_CLASS_OPTIONS, getAssetTypesForClass } from "@/lib/asset-catalog";
+import { useAssetCatalog, IN_STORE_PROJECT_LABEL, SURVEY_EQUIPMENT_CLASS } from "@/hooks/useAssetCatalog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -83,10 +84,10 @@ function formatWarrantyEndDate(value?: string | null) {
   return date.toLocaleDateString("en-IN");
 }
 
-function toFormState(asset?: AssetItem | null): AssetFormState {
+function toFormState(asset: AssetItem | null | undefined, classOptions: string[], getTypesForClass: (assetClass: string) => string[]): AssetFormState {
   if (!asset) return EMPTY_FORM;
-  const normalizedClass = ASSET_CLASS_OPTIONS.includes(asset.assetClass as (typeof ASSET_CLASS_OPTIONS)[number]) ? asset.assetClass : "Other";
-  const typeOptions = getAssetTypesForClass(normalizedClass);
+  const normalizedClass = classOptions.includes(asset.assetClass) ? asset.assetClass : "Other";
+  const typeOptions = getTypesForClass(normalizedClass);
   const normalizedType = typeOptions.includes(asset.assetType) ? asset.assetType : "Other";
 
   return {
@@ -158,25 +159,39 @@ function Field({ label, value }: { label: string; value: string }) {
   );
 }
 
-function MovementDialog({ assetId, open, onOpenChange }: { assetId: string; open: boolean; onOpenChange: (open: boolean) => void }) {
+function MovementDialog({
+  asset,
+  open,
+  onOpenChange
+}: {
+  asset: AssetItem;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   const queryClient = useQueryClient();
   const [movedToProjectNumber, setMovedToProjectNumber] = useState("");
   const [movedToProjectName, setMovedToProjectName] = useState("");
   const [dateOfMoving, setDateOfMoving] = useState("");
   const [movedToUser, setMovedToUser] = useState("");
+  const [moveToStore, setMoveToStore] = useState(false);
+
+  const isSurveyEquipment = asset.assetClass === SURVEY_EQUIPMENT_CLASS;
+  const canMoveToStore = isSurveyEquipment && asset.status === "IN_USE";
+  const isAssigningFromStore = isSurveyEquipment && asset.status === "IN_STORE";
 
   const mutation = useMutation({
     mutationFn: () =>
-      api.addAssetMovement(assetId, {
-        movedToProjectNumber: movedToProjectNumber.trim(),
-        movedToProjectName: movedToProjectName.trim(),
+      api.addAssetMovement(asset.id, {
+        movedToProjectNumber: moveToStore ? IN_STORE_PROJECT_LABEL : movedToProjectNumber.trim(),
+        movedToProjectName: moveToStore ? IN_STORE_PROJECT_LABEL : movedToProjectName.trim(),
         dateOfMoving: new Date(dateOfMoving).toISOString(),
-        movedToUser: movedToUser.trim()
+        movedToUser: moveToStore ? null : movedToUser.trim() || null,
+        moveToStore
       }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["assets", assetId] });
+      await queryClient.invalidateQueries({ queryKey: ["assets", asset.id] });
       await queryClient.invalidateQueries({ queryKey: ["assets"] });
-      toast.success("Movement logged");
+      toast.success(moveToStore ? "Asset moved to store" : "Movement logged");
       onOpenChange(false);
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to log movement")
@@ -188,37 +203,70 @@ function MovementDialog({ assetId, open, onOpenChange }: { assetId: string; open
       setMovedToProjectName("");
       setDateOfMoving(new Date().toISOString().slice(0, 10));
       setMovedToUser("");
+      setMoveToStore(false);
     }
   }, [open]);
+
+  const canSave =
+    Boolean(dateOfMoving) &&
+    (moveToStore ||
+      (movedToProjectNumber.trim() && movedToProjectName.trim() && movedToUser.trim()));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Log Movement</DialogTitle>
-          <DialogDescription>Record where the asset has been moved.</DialogDescription>
+          <DialogDescription>
+            {isAssigningFromStore
+              ? "Assign this stored survey equipment to a project."
+              : "Record where the asset has been moved."}
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
-          <div>
-            <Label>Moved To Project Number</Label>
-            <Input value={movedToProjectNumber} onChange={(event) => setMovedToProjectNumber(event.target.value)} className="mt-1" />
-          </div>
-          <div>
-            <Label>Moved To Project Name</Label>
-            <Input value={movedToProjectName} onChange={(event) => setMovedToProjectName(event.target.value)} className="mt-1" />
-          </div>
+          {canMoveToStore ? (
+            <div className="flex items-start gap-3 rounded-xl border border-border/40 p-3">
+              <Checkbox
+                id="move-to-store"
+                checked={moveToStore}
+                onCheckedChange={(checked) => setMoveToStore(Boolean(checked))}
+              />
+              <div>
+                <Label htmlFor="move-to-store" className="cursor-pointer">Move this equipment to store (IN_STORE)</Label>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Use this when survey equipment returns to office storage. Project fields are not required.
+                </p>
+              </div>
+            </div>
+          ) : null}
+
+          {!moveToStore ? (
+            <>
+              <div>
+                <Label>Moved To Project Number</Label>
+                <Input value={movedToProjectNumber} onChange={(event) => setMovedToProjectNumber(event.target.value)} className="mt-1" />
+              </div>
+              <div>
+                <Label>Moved To Project Name</Label>
+                <Input value={movedToProjectName} onChange={(event) => setMovedToProjectName(event.target.value)} className="mt-1" />
+              </div>
+              <div>
+                <Label>Moved To User</Label>
+                <Input value={movedToUser} onChange={(event) => setMovedToUser(event.target.value)} className="mt-1" />
+              </div>
+            </>
+          ) : null}
+
           <div>
             <Label>Date of Moving</Label>
             <Input type="date" value={dateOfMoving} onChange={(event) => setDateOfMoving(event.target.value)} className="mt-1" />
           </div>
-          <div>
-            <Label>Moved To User</Label>
-            <Input value={movedToUser} onChange={(event) => setMovedToUser(event.target.value)} className="mt-1" />
-          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={() => mutation.mutate()} disabled={mutation.isPending || !movedToProjectNumber.trim() || !movedToProjectName.trim() || !dateOfMoving || !movedToUser.trim()}>Save Movement</Button>
+          <Button onClick={() => mutation.mutate()} disabled={mutation.isPending || !canSave}>
+            {moveToStore ? "Move To Store" : "Save Movement"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -230,14 +278,6 @@ function MaintenanceDialog({ asset, open, onOpenChange }: { asset: AssetItem; op
   const [dateOfMaintenance, setDateOfMaintenance] = useState("");
   const [repairCostInclGst, setRepairCostInclGst] = useState("0");
   const [remark, setRemark] = useState("");
-
-  const depreciationSnapshot = useMemo(() => {
-    if (!dateOfMaintenance) {
-      return null;
-    }
-
-    return calculateBookValue(asset, new Date(dateOfMaintenance));
-  }, [asset, dateOfMaintenance]);
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -268,7 +308,7 @@ function MaintenanceDialog({ asset, open, onOpenChange }: { asset: AssetItem; op
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Log Maintenance</DialogTitle>
-          <DialogDescription>Capture repair and depreciation details.</DialogDescription>
+          <DialogDescription>Capture repair details for this asset.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div>
@@ -278,15 +318,6 @@ function MaintenanceDialog({ asset, open, onOpenChange }: { asset: AssetItem; op
           <div>
             <Label>Repair Cost (incl. GST)</Label>
             <Input type="number" min="0" value={repairCostInclGst} onChange={(event) => setRepairCostInclGst(event.target.value)} className="mt-1" />
-          </div>
-          <div>
-            <Label>Depreciation / Current Value</Label>
-            <Input
-              value={depreciationSnapshot ? formatCurrency(depreciationSnapshot.currentValue) : "Select a maintenance date"}
-              readOnly
-              className="mt-1 bg-secondary/40"
-            />
-            <p className="mt-1 text-xs text-muted-foreground">Auto-calculated with monthly depreciation and floor at scrap value.</p>
           </div>
           <div>
             <Label>Remark</Label>
@@ -329,13 +360,15 @@ export default function AssetDetail() {
     queryFn: () => api.getAssets({ limit: 500 })
   });
 
+  const { classOptions, getTypesForClass } = useAssetCatalog();
+
   useEffect(() => {
     if (asset) {
-      setForm(toFormState(asset));
+      setForm(toFormState(asset, classOptions, getTypesForClass));
       setSoldAmountInput(String(asset.soldAmount ?? 0));
       setSoldRemarkInput(asset.soldRemark ?? "");
     }
-  }, [asset]);
+  }, [asset, classOptions, getTypesForClass]);
 
   const updateMutation = useMutation({
     mutationFn: () => {
@@ -401,15 +434,14 @@ export default function AssetDetail() {
   });
 
   const totalAmount = useMemo(() => (toNumber(form.purchaseAmount) + toNumber(form.gst)).toFixed(2), [form.purchaseAmount, form.gst]);
-  const classOptions = useMemo(() => [...ASSET_CLASS_OPTIONS], []);
   const typeOptions = useMemo(() => {
-    const builtIn = getAssetTypesForClass(form.assetClass);
+    const builtIn = getTypesForClass(form.assetClass);
     const dynamic = (assetsResponse?.items ?? [])
       .filter((item) => item.assetClass === (form.assetClass === "Other" ? form.customAssetClass.trim() : form.assetClass))
       .map((item) => item.assetType)
       .filter(Boolean);
     return Array.from(new Set([...builtIn, ...dynamic]));
-  }, [assetsResponse?.items, form.assetClass, form.customAssetClass]);
+  }, [assetsResponse?.items, form.assetClass, form.customAssetClass, getTypesForClass]);
   const selectedProjectName = useMemo(
     () => getProjectNameByNumber(projects, form.projectNumber.trim() || null),
     [form.projectNumber, projects]
@@ -573,7 +605,7 @@ export default function AssetDetail() {
               <div><Label>For Month</Label><Input value={form.forMonth} onChange={(event) => setForm((prev) => ({ ...prev, forMonth: event.target.value }))} className="mt-1" /></div>
               <div className="md:col-span-2"><Label>Remarks</Label><Textarea value={form.remarks} onChange={(event) => setForm((prev) => ({ ...prev, remarks: event.target.value }))} className="mt-1 min-h-24" /></div>
               <div className="md:col-span-2 flex justify-end gap-2">
-                <Button variant="outline" onClick={() => { setIsEditing(false); setForm(toFormState(asset)); }}>Cancel</Button>
+                <Button variant="outline" onClick={() => { setIsEditing(false); setForm(toFormState(asset, classOptions, getTypesForClass)); }}>Cancel</Button>
                 <Button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending || !form.assetType || (form.assetClass === "Other" && !form.customAssetClass.trim()) || (form.assetType === "Other" && !form.customAssetType.trim())}>Save Changes</Button>
               </div>
             </div>
@@ -648,16 +680,20 @@ export default function AssetDetail() {
                   <thead>
                     <tr className="border-b border-border/40">
                       <th className="text-left py-3 px-4 font-medium text-muted-foreground">Date</th>
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground">Project Number</th>
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground">Project Name</th>
                       <th className="text-left py-3 px-4 font-medium text-muted-foreground">Repair Cost (incl. GST)</th>
                       <th className="text-left py-3 px-4 font-medium text-muted-foreground">Remark</th>
                     </tr>
                   </thead>
                   <tbody>
                     {(asset.maintenances ?? []).length === 0 ? (
-                      <tr><td colSpan={3} className="py-8 text-center text-muted-foreground">No maintenance records.</td></tr>
+                      <tr><td colSpan={5} className="py-8 text-center text-muted-foreground">No maintenance records.</td></tr>
                     ) : asset.maintenances!.map((maintenance) => (
                       <tr key={maintenance.id} className="border-b border-border/20">
                         <td className="py-3 px-4">{new Date(maintenance.dateOfMaintenance).toLocaleDateString("en-IN")}</td>
+                        <td className="py-3 px-4">{maintenance.projectNumber ?? "-"}</td>
+                        <td className="py-3 px-4">{maintenance.projectName ?? "-"}</td>
                         <td className="py-3 px-4">₹{maintenance.repairCostInclGst.toLocaleString("en-IN")}</td>
                         <td className="py-3 px-4">{maintenance.remark ?? "-"}</td>
                       </tr>
@@ -705,7 +741,7 @@ export default function AssetDetail() {
         </div>
       </div>
 
-      <MovementDialog assetId={asset.id} open={movementOpen} onOpenChange={setMovementOpen} />
+      <MovementDialog asset={asset} open={movementOpen} onOpenChange={setMovementOpen} />
       <MaintenanceDialog asset={asset} open={maintenanceOpen} onOpenChange={setMaintenanceOpen} />
     </PageWrapper>
   );
