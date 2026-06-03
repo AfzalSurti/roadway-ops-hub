@@ -45,3 +45,21 @@ export function useAssetCatalog() {
 
 export const SURVEY_EQUIPMENT_CLASS = "Survey Equipment";
 export const IN_STORE_PROJECT_LABEL = "IN_STORE";
+
+export function formatAssetProjectLabel(
+  projectNumber?: string | null,
+  projectName?: string | null
+): string {
+  const number = projectNumber?.trim() ?? "";
+  const name = projectName?.trim() ?? "";
+  if (!number && !name) {
+    return "";
+  }
+  if (number.toUpperCase() === IN_STORE_PROJECT_LABEL || name.toUpperCase() === IN_STORE_PROJECT_LABEL) {
+    return IN_STORE_PROJECT_LABEL;
+  }
+  if (number && name) {
+    return number === name ? number : `${number} - ${name}`;
+  }
+  return number || name;
+}

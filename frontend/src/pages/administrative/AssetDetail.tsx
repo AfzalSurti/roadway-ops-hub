@@ -3,7 +3,12 @@ import { PageWrapper } from "@/components/PageWrapper";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { AssetItem, AssetStatus, ProjectItem } from "@/lib/domain";
-import { useAssetCatalog, IN_STORE_PROJECT_LABEL, SURVEY_EQUIPMENT_CLASS } from "@/hooks/useAssetCatalog";
+import {
+  useAssetCatalog,
+  IN_STORE_PROJECT_LABEL,
+  SURVEY_EQUIPMENT_CLASS,
+  formatAssetProjectLabel
+} from "@/hooks/useAssetCatalog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -672,8 +677,12 @@ export default function AssetDetail() {
                       <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">No movement history.</td></tr>
                     ) : asset.movements!.map((movement) => (
                       <tr key={movement.id} className="border-b border-border/20">
-                        <td className="py-3 px-4">{[movement.previousProjectNumber, movement.previousProjectName].filter(Boolean).join(" - ") || "-"}</td>
-                        <td className="py-3 px-4">{[movement.movedToProjectNumber, movement.movedToProjectName].filter(Boolean).join(" - ") || "-"}</td>
+                        <td className="py-3 px-4">
+                          {formatAssetProjectLabel(movement.previousProjectNumber, movement.previousProjectName) || "-"}
+                        </td>
+                        <td className="py-3 px-4">
+                          {formatAssetProjectLabel(movement.movedToProjectNumber, movement.movedToProjectName) || "-"}
+                        </td>
                         <td className="py-3 px-4">{movement.previousAssignedDate ? new Date(movement.previousAssignedDate).toLocaleDateString("en-IN") : "-"}</td>
                         <td className="py-3 px-4">{new Date(movement.dateOfMoving).toLocaleDateString("en-IN")}</td>
                         <td className="py-3 px-4">{movement.previousUser ?? "-"}</td>

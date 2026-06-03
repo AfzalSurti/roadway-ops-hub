@@ -1,5 +1,6 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { formatAssetProjectLabel } from "@/hooks/useAssetCatalog";
 import type { AssetItem, AssetMaintenanceItem, AssetMovementItem } from "./domain";
 
 type AssetFull = AssetItem & {
@@ -233,8 +234,8 @@ export function downloadAssetPdf(asset: AssetItem, options?: { projectName?: str
       head: [["#", "Old Project", "Transferred Project", "Assigned Date", "Date of Moving", "Old User", "New User"]],
       body: movements.map((movement, index) => [
         String(index + 1),
-        [movement.previousProjectNumber, movement.previousProjectName].filter(Boolean).join(" - ") || "—",
-        [movement.movedToProjectNumber, movement.movedToProjectName].filter(Boolean).join(" - ") || "—",
+        formatAssetProjectLabel(movement.previousProjectNumber, movement.previousProjectName) || "—",
+        formatAssetProjectLabel(movement.movedToProjectNumber, movement.movedToProjectName) || "—",
         formatDate(movement.previousAssignedDate),
         formatDate(movement.dateOfMoving),
         movement.previousUser || "—",
