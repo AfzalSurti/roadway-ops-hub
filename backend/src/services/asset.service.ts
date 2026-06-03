@@ -1,4 +1,5 @@
 import type { AssetStatus, Prisma } from "@prisma/client";
+import { IN_STORE_PROJECT_LABEL, SURVEY_EQUIPMENT_CLASS } from "../data/default-asset-catalog.js";
 import { assetRepository } from "../repositories/asset.repository.js";
 import { calculateAssetDepreciation } from "../utils/depreciation.js";
 import { badRequest, notFound } from "../utils/errors.js";
@@ -26,6 +27,7 @@ export const ASSET_ID_PREFIXES: Record<string, string> = {
   "Water Purifier (RO)": "RO",
   "Washing machine": "WM",
   "Bike - Owned": "BIKE",
+  "Network Survey Vehicle": "NSV",
   "Car - Owned": "CAR",
   "Chair - Office": "CHR-O",
   "Chair - Revolving": "CHR-R",
@@ -179,6 +181,10 @@ export const assetService = {
   }) {
     validateWarrantyEndDate(payload.dateOfPurchase ?? null, payload.warrantyPeriod ?? null);
 
+    const status = payload.status ?? "IN_USE";
+    const projectNumber = status === "IN_STORE" ? IN_STORE_PROJECT_LABEL : payload.projectNumber ?? null;
+    const projectName = status === "IN_STORE" ? IN_STORE_PROJECT_LABEL : payload.projectName ?? null;
+
     const assetId = await generateAssetId(payload.assetType);
     const purchaseAmount = payload.purchaseAmount ?? 0;
     const gst = payload.gst ?? 0;
@@ -206,11 +212,11 @@ export const assetService = {
       scrapRate: depreciation.scrapRate,
       scrapValue: depreciation.scrapValue,
       depreciationPerYear: depreciation.depreciationPerYear,
-      projectNumber: payload.projectNumber ?? null,
-      projectName: payload.projectName ?? null,
-      assignedUser: payload.assignedUser ?? null,
+      projectNumber,
+      projectName,
+      assignedUser: status === "IN_STORE" ? null : payload.assignedUser ?? null,
       assignedDate: payload.assignedDate ?? payload.dateOfPurchase ?? new Date(),
-      status: payload.status ?? "IN_USE",
+      status,
       soldAmount: payload.soldAmount ?? 0,
       soldRemark: payload.soldRemark ?? null,
       remarks: payload.remarks ?? null,
@@ -287,39 +293,66 @@ export const assetService = {
   async addMovement(
     assetId: string,
     payload: {
-      movedToProjectNumber: string;
-      movedToProjectName: string;
+      movedToProjectNumber?: string | null;
+      movedToProjectName?: string | null;
       dateOfMoving: Date;
-      movedToUser: string;
+      movedToUser?: string | null;
+      moveToStore?: boolean;
     }
   ) {
     const asset = await this.getById(assetId);
     if (asset.status === "DISPOSED") {
       throw badRequest("Sold assets cannot have movement entries");
     }
+
+    const isSurveyEquipment = asset.assetClass === SURVEY_EQUIPMENT_CLASS;
+    const moveToStore = Boolean(payload.moveToStore);
+
+    if (moveToStore) {
+      if (!isSurveyEquipment) {
+        throw badRequest("Only Survey Equipment can be moved to store");
+      }
+      if (asset.status !== "IN_USE") {
+        throw badRequest("Only in-use assets can be moved to store");
+      }
+    } else if (asset.status === "IN_STORE" && !isSurveyEquipment) {
+      throw badRequest("This asset must be assigned from store using Survey Equipment workflow");
+    }
+
     const latestOpenMovement = await assetRepository.findLatestOpenMovement(assetId);
     if (latestOpenMovement) {
       await assetRepository.updateMovement(latestOpenMovement.id, { returnDate: payload.dateOfMoving });
     }
 
+    const previousProjectNumber = asset.projectNumber ?? null;
+    const previousProjectName = asset.projectName ?? null;
+    const previousAssignedDate = latestOpenMovement?.assignedDate ?? asset.assignedDate ?? asset.dateOfPurchase ?? asset.createdAt;
+    const previousUser = asset.assignedUser ?? null;
+
+    const nextProjectNumber = moveToStore ? IN_STORE_PROJECT_LABEL : payload.movedToProjectNumber?.trim() ?? null;
+    const nextProjectName = moveToStore ? IN_STORE_PROJECT_LABEL : payload.movedToProjectName?.trim() ?? null;
+    const nextUser = moveToStore ? null : payload.movedToUser?.trim() ?? null;
+    const nextStatus: AssetStatus = moveToStore ? "IN_STORE" : "IN_USE";
+
     const movement = await assetRepository.addMovement(assetId, {
       assetId,
-      previousProjectNumber: asset.projectNumber ?? null,
-      previousProjectName: asset.projectName ?? null,
-      previousAssignedDate: latestOpenMovement?.assignedDate ?? asset.assignedDate ?? asset.dateOfPurchase ?? asset.createdAt,
-      previousUser: asset.assignedUser ?? null,
-      movedToProjectNumber: payload.movedToProjectNumber,
-      movedToProjectName: payload.movedToProjectName,
+      previousProjectNumber,
+      previousProjectName,
+      previousAssignedDate,
+      previousUser,
+      movedToProjectNumber: nextProjectNumber,
+      movedToProjectName: nextProjectName,
       assignedDate: payload.dateOfMoving,
       dateOfMoving: payload.dateOfMoving,
-      movedToUser: payload.movedToUser
+      movedToUser: nextUser
     });
 
     await assetRepository.update(assetId, {
-      projectNumber: payload.movedToProjectNumber,
-      projectName: payload.movedToProjectName,
-      assignedUser: payload.movedToUser,
-      assignedDate: payload.dateOfMoving
+      projectNumber: nextProjectNumber,
+      projectName: nextProjectName,
+      assignedUser: nextUser,
+      assignedDate: payload.dateOfMoving,
+      status: nextStatus
     });
 
     return movement;
@@ -346,9 +379,16 @@ export const assetService = {
       payload.dateOfMaintenance
     );
 
+    const maintenanceProjectNumber =
+      asset.status === "IN_STORE" ? IN_STORE_PROJECT_LABEL : asset.projectNumber ?? null;
+    const maintenanceProjectName =
+      asset.status === "IN_STORE" ? IN_STORE_PROJECT_LABEL : asset.projectName ?? null;
+
     return assetRepository.addMaintenance(assetId, {
       ...payload,
       depreciationTillDate: depreciation.currentValue,
+      projectNumber: maintenanceProjectNumber,
+      projectName: maintenanceProjectName,
       remark: payload.remark ?? null,
       assetId
     });
