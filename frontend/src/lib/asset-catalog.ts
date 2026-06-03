@@ -56,8 +56,9 @@ export const ASSET_TYPES_BY_CLASS = {
     "SF - Mattress",
     "SF - Pillow & Cover"
   ],
-  Vehicles: ["Bike - Owned", "Car - Owned", "Network Survey Vehicle"],
+  Vehicles: ["Bike - Owned", "Car - Owned"],
   "Survey Equipment": [
+    "Network Survey Vehicle",
     "Falling Weight Deflectometer",
     "Retro Reflectometer (Pavement Marking)",
     "Retro Reflectometer (Sign Board)",

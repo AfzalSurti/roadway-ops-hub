@@ -204,11 +204,22 @@ model AssetMaintenance {
   dateOfMaintenance    DateTime
   repairCostInclGst    Float    @default(0)
   depreciationTillDate Float    @default(0)
+  projectNumber        String?
+  projectName          String?
   remark               String?
   createdAt            DateTime @default(now())
   asset                Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
 
   @@index([assetId])
+}
+
+model AssetClassCatalog {
+  id        String   @id @default(cuid())
+  className String   @unique
+  types     String[]
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model ProjectRequisitionForm {
