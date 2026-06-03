@@ -166,6 +166,18 @@ function formatAssetProjectName(asset: AssetItem, projects: ProjectItem[]) {
   return asset.projectName ?? getProjectNameByNumber(projects, asset.projectNumber) ?? "-";
 }
 
+function formatCurrency(value: number) {
+  return `₹${value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function formatSoldAmount(asset: AssetItem) {
+  if (asset.status !== "DISPOSED") {
+    return "-";
+  }
+  const amount = asset.soldAmount ?? 0;
+  return amount > 0 ? formatCurrency(amount) : "-";
+}
+
 function getDaysSincePurchase(dateOfPurchase?: string | null) {
   if (!dateOfPurchase) {
     return null;
@@ -691,6 +703,18 @@ export default function AssetManagement() {
     });
   }, [assets, groupFilter, projectFilter, assetTypeFilter, userFilter, projects]);
 
+  const amountTotals = useMemo(() => {
+    return filteredAssets.reduce(
+      (totals, asset) => ({
+        purchaseAmount: totals.purchaseAmount + (asset.purchaseAmount ?? 0),
+        totalAmountWithGst: totals.totalAmountWithGst + (asset.totalAmountWithGst ?? 0),
+        soldAmount: totals.soldAmount + (asset.status === "DISPOSED" ? asset.soldAmount ?? 0 : 0),
+        currentValue: totals.currentValue + (asset.currentValue ?? 0)
+      }),
+      { purchaseAmount: 0, totalAmountWithGst: 0, soldAmount: 0, currentValue: 0 }
+    );
+  }, [filteredAssets]);
+
   const createExport = () => {
     const rows = filteredAssets.map((asset, index) => ({
       "#": index + 1,
@@ -827,7 +851,10 @@ export default function AssetManagement() {
               <th className="text-left py-3 px-4 font-medium text-muted-foreground">Asset Type</th>
               <th className="text-left py-3 px-4 font-medium text-muted-foreground">Mark/Model</th>
               <th className="text-left py-3 px-4 font-medium text-muted-foreground">Purchase Date</th>
-              <th className="text-left py-3 px-4 font-medium text-muted-foreground">Total Amount</th>
+              <th className="text-right py-3 px-4 font-medium text-muted-foreground">Asset Purchase Amount</th>
+              <th className="text-right py-3 px-4 font-medium text-muted-foreground">Total Amount</th>
+              <th className="text-right py-3 px-4 font-medium text-muted-foreground">Asset Sold Amount</th>
+              <th className="text-right py-3 px-4 font-medium text-muted-foreground">Current Asset Value</th>
               <th className="text-left py-3 px-4 font-medium text-muted-foreground">Project</th>
               <th className="text-left py-3 px-4 font-medium text-muted-foreground">Project Name</th>
               <th className="text-left py-3 px-4 font-medium text-muted-foreground">User</th>
@@ -838,7 +865,7 @@ export default function AssetManagement() {
           <tbody>
             {filteredAssets.length === 0 ? (
               <tr>
-                <td colSpan={11} className="py-10 text-center text-muted-foreground">No assets found.</td>
+                <td colSpan={14} className="py-10 text-center text-muted-foreground">No assets found.</td>
               </tr>
             ) : (
               filteredAssets.map((asset) => (
@@ -848,7 +875,10 @@ export default function AssetManagement() {
                   <td className="py-3 px-4">{asset.assetType}</td>
                   <td className="py-3 px-4">{asset.markModel ?? "-"}</td>
                   <td className="py-3 px-4">{asset.dateOfPurchase ? new Date(asset.dateOfPurchase).toLocaleDateString("en-IN") : "-"}</td>
-                  <td className="py-3 px-4">₹{asset.totalAmountWithGst.toLocaleString("en-IN")}</td>
+                  <td className="py-3 px-4 text-right tabular-nums">{formatCurrency(asset.purchaseAmount)}</td>
+                  <td className="py-3 px-4 text-right tabular-nums">{formatCurrency(asset.totalAmountWithGst)}</td>
+                  <td className="py-3 px-4 text-right tabular-nums">{formatSoldAmount(asset)}</td>
+                  <td className="py-3 px-4 text-right tabular-nums">{formatCurrency(asset.currentValue)}</td>
                   <td className="py-3 px-4">{formatAssetProjectNumber(asset)}</td>
                   <td className="py-3 px-4">{formatAssetProjectName(asset, projects)}</td>
                   <td className="py-3 px-4">{asset.assignedUser ?? "-"}</td>
@@ -897,6 +927,20 @@ export default function AssetManagement() {
               ))
             )}
           </tbody>
+          {filteredAssets.length > 0 ? (
+            <tfoot>
+              <tr className="border-t border-border/50 bg-secondary/30 font-semibold">
+                <td colSpan={5} className="py-3 px-4 text-right text-muted-foreground">
+                  Total ({filteredAssets.length} assets)
+                </td>
+                <td className="py-3 px-4 text-right tabular-nums">{formatCurrency(amountTotals.purchaseAmount)}</td>
+                <td className="py-3 px-4 text-right tabular-nums">{formatCurrency(amountTotals.totalAmountWithGst)}</td>
+                <td className="py-3 px-4 text-right tabular-nums">{formatCurrency(amountTotals.soldAmount)}</td>
+                <td className="py-3 px-4 text-right tabular-nums">{formatCurrency(amountTotals.currentValue)}</td>
+                <td colSpan={5} />
+              </tr>
+            </tfoot>
+          ) : null}
         </table>
       </div>
 
