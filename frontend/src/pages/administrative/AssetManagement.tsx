@@ -5,7 +5,7 @@ import { api } from "@/lib/api";
 import type { AssetItem, AssetStatus, ProjectItem } from "@/lib/domain";
 import { ASSET_CLASS_GROUP_OPTIONS, ASSET_CLASS_OPTIONS, getAssetClassGroup } from "@/lib/asset-catalog";
 import { AssetCatalogManager } from "@/components/AssetCatalogManager";
-import { useAssetCatalog } from "@/hooks/useAssetCatalog";
+import { IN_STORE_PROJECT_LABEL, useAssetCatalog } from "@/hooks/useAssetCatalog";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { Download, Eye, Pencil, Plus, RefreshCcw, Search, Settings2, Trash2 } from "lucide-react";
@@ -144,7 +144,25 @@ function getProjectNameByNumber(projects: ProjectItem[], projectNumber?: string 
 }
 
 function getStatusLabel(status: AssetStatus) {
-  return status === "DISPOSED" ? "SOLD" : "IN USE";
+  return status === "DISPOSED" ? "SOLD" : status.replace(/_/g, " ");
+}
+
+function isInStoreProjectValue(value?: string | null) {
+  return value?.trim().toUpperCase() === IN_STORE_PROJECT_LABEL;
+}
+
+function formatAssetProjectNumber(asset: AssetItem) {
+  if (asset.status === "IN_STORE" || isInStoreProjectValue(asset.projectNumber)) {
+    return "-";
+  }
+  return asset.projectNumber ?? "-";
+}
+
+function formatAssetProjectName(asset: AssetItem, projects: ProjectItem[]) {
+  if (asset.status === "IN_STORE" || isInStoreProjectValue(asset.projectName) || isInStoreProjectValue(asset.projectNumber)) {
+    return "-";
+  }
+  return asset.projectName ?? getProjectNameByNumber(projects, asset.projectNumber) ?? "-";
 }
 
 function getDaysSincePurchase(dateOfPurchase?: string | null) {
@@ -618,7 +636,13 @@ export default function AssetManagement() {
       }));
 
     const fromAssets = assets
-      .filter((asset) => asset.projectNumber || asset.projectName)
+      .filter(
+        (asset) =>
+          asset.status !== "IN_STORE" &&
+          !isInStoreProjectValue(asset.projectNumber) &&
+          !isInStoreProjectValue(asset.projectName) &&
+          (asset.projectNumber || asset.projectName)
+      )
       .map((asset) => ({
         number: asset.projectNumber ?? "",
         name: asset.projectName ?? getProjectNameByNumber(projects, asset.projectNumber) ?? "",
@@ -824,8 +848,8 @@ export default function AssetManagement() {
                   <td className="py-3 px-4">{asset.markModel ?? "-"}</td>
                   <td className="py-3 px-4">{asset.dateOfPurchase ? new Date(asset.dateOfPurchase).toLocaleDateString("en-IN") : "-"}</td>
                   <td className="py-3 px-4">₹{asset.totalAmountWithGst.toLocaleString("en-IN")}</td>
-                  <td className="py-3 px-4">{asset.projectNumber ?? "-"}</td>
-                  <td className="py-3 px-4">{asset.projectName ?? getProjectNameByNumber(projects, asset.projectNumber) ?? "-"}</td>
+                  <td className="py-3 px-4">{formatAssetProjectNumber(asset)}</td>
+                  <td className="py-3 px-4">{formatAssetProjectName(asset, projects)}</td>
                   <td className="py-3 px-4">{asset.assignedUser ?? "-"}</td>
                   <td className="py-3 px-4">
                     <span className={`status-badge border ${STATUS_COLORS[asset.status]}`}>{getStatusLabel(asset.status)}</span>

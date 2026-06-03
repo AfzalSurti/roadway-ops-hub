@@ -28,6 +28,10 @@ function getStatusLabel(status: AssetStatus) {
   return status === "DISPOSED" ? "SOLD" : status.replace(/_/g, " ");
 }
 
+function isInStoreProjectValue(value?: string | null) {
+  return value?.trim().toUpperCase() === IN_STORE_PROJECT_LABEL;
+}
+
 type AssetFormState = {
   assetClass: string;
   assetType: string;
@@ -515,9 +519,8 @@ export default function AssetDetail() {
 
       <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_1fr] gap-6">
         <div className="glass-panel-strong p-6">
-          <div className="flex items-center justify-between mb-4">
+          <div className="mb-4">
             <h3 className="font-semibold">Asset Information</h3>
-            {!isEditing && <span className={`status-badge border ${STATUS_COLORS[asset.status]}`}>{getStatusLabel(asset.status)}</span>}
           </div>
 
           {isEditing ? (
@@ -623,8 +626,18 @@ export default function AssetDetail() {
               <Field label="Total Amount with GST" value={`₹${asset.totalAmountWithGst.toLocaleString("en-IN")}`} />
               <Field label="Current Value" value={formatCurrency(asset.currentValue)} />
               <Field label="Days Since Purchase" value={daysSincePurchase === null ? "-" : String(daysSincePurchase)} />
-              <Field label="Project Number" value={asset.projectNumber ?? "-"} />
-              <Field label="Project Name" value={asset.projectName ?? getProjectNameByNumber(projects, asset.projectNumber) ?? "-"} />
+              <Field
+                label="Project Number"
+                value={asset.status === "IN_STORE" || isInStoreProjectValue(asset.projectNumber) ? "-" : asset.projectNumber ?? "-"}
+              />
+              <Field
+                label="Project Name"
+                value={
+                  asset.status === "IN_STORE" || isInStoreProjectValue(asset.projectName) || isInStoreProjectValue(asset.projectNumber)
+                    ? "-"
+                    : asset.projectName ?? getProjectNameByNumber(projects, asset.projectNumber) ?? "-"
+                }
+              />
               <Field label="Assigned User" value={asset.assignedUser ?? "-"} />
               <Field label="Assigned Date" value={asset.assignedDate ? new Date(asset.assignedDate).toLocaleDateString("en-IN") : "-"} />
               <div className="md:col-span-2"><Field label="Remarks" value={asset.remarks ?? "-"} /></div>
