@@ -31,7 +31,8 @@ import * as XLSX from "xlsx";
 
 const STATUS_OPTIONS: Array<{ label: string; value: AssetStatus | "ALL" }> = [
   { label: "All", value: "ALL" },
-  { label: "IN_USE", value: "IN_USE" },
+  { label: "IN USE", value: "IN_USE" },
+  { label: "IN STORE", value: "IN_STORE" },
   { label: "SOLD", value: "DISPOSED" }
 ];
 
