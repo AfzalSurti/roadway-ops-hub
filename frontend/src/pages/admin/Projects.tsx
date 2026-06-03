@@ -9,6 +9,12 @@ import { downloadProjectRequisitionPdf } from "@/lib/project-requisition-pdf";
 import { downloadProjectReport } from "@/lib/reports-pdf";
 import { isTaskOverdue, statusConfig, type ProjectRequisitionFormItem } from "@/lib/domain";
 import { PROJECT_PLAN_TEMPLATE } from "@/lib/project-plan-template";
+import {
+  buildProjectBaseCode,
+  formatFinancialYearShort,
+  getFinancialYearShort,
+  parseManualFinancialYearShort
+} from "@/lib/project-numbering";
 
 type WizardStep = 1 | 2 | 3 | 4 | 5;
 type RequisitionStep = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
@@ -33,6 +39,8 @@ type ProjectPlansStore = Record<string, ProjectPlanStoreItem>;
 
 const PROJECT_PLAN_STORAGE_KEY = "roadway.ops.projectPlans.v1";
 
+type FinancialYearMode = "CURRENT" | "MANUAL";
+
 type NumberWizardState = {
   projectId: string;
   companyCode: "G" | "S" | "I" | "H" | "";
@@ -40,6 +48,8 @@ type NumberWizardState = {
   subTechnicalUnitCode: string;
   workCategoryCode: string;
   baseCode: string;
+  financialYearMode: FinancialYearMode;
+  manualFinancialYearInput: string;
 };
 
 type RequisitionFormDraft = {
@@ -159,7 +169,9 @@ const DEFAULT_WIZARD: NumberWizardState = {
   technicalUnitCode: "",
   subTechnicalUnitCode: "",
   workCategoryCode: "",
-  baseCode: ""
+  baseCode: "",
+  financialYearMode: "CURRENT",
+  manualFinancialYearInput: ""
 };
 
 const DEFAULT_REQUISITION_DRAFT: RequisitionFormDraft = {
@@ -200,10 +212,11 @@ const DEFAULT_REQUISITION_DRAFT: RequisitionFormDraft = {
   approvedBy: ""
 };
 
-function getFinancialYearShort(referenceDate = new Date()): number {
-  const month = referenceDate.getMonth();
-  const year = referenceDate.getFullYear();
-  return month >= 3 ? year % 100 : (year - 1) % 100;
+function resolveWizardFinancialYear(wizard: NumberWizardState): number | null {
+  if (wizard.financialYearMode === "MANUAL") {
+    return parseManualFinancialYearShort(wizard.manualFinancialYearInput);
+  }
+  return getFinancialYearShort();
 }
 
 function addDays(dateText: string, daysText: string) {
@@ -665,22 +678,18 @@ export default function AdminProjects() {
     if (wizardStep === 4) {
       if (!wizard.technicalUnitCode) return toast.error("Please select technical unit");
       if (!wizard.subTechnicalUnitCode) return toast.error("Please select sub technical unit");
-      const projectCodePrefix = `${wizard.companyCode}${wizard.technicalUnitCode}${wizard.subTechnicalUnitCode}`;
-      const fy = getFinancialYearShort();
-      const fyText = String(fy).padStart(2, "0");
-      const maxSerial = projects
-        .map((project) => {
-          if (project.projectCodePrefix === projectCodePrefix && project.financialYearShort === fy) return project.serialNumber ?? 0;
-          const number = project.projectNumber?.trim();
-          if (!number) return 0;
-          const match = number.match(/^([A-Z]{4})(\d{2})(\d{2})[A-Z]$/);
-          if (!match) return 0;
-          const [, prefix, year, serial] = match;
-          if (prefix !== projectCodePrefix || Number(year) !== fy) return 0;
-          return Number(serial) || 0;
-        })
-        .reduce((max, value) => Math.max(max, value), 0);
-      setWizard((prev) => ({ ...prev, baseCode: `${projectCodePrefix}${fyText}${String(maxSerial + 1).padStart(2, "0")}` }));
+      const financialYearShort = resolveWizardFinancialYear(wizard);
+      if (financialYearShort === null) {
+        return toast.error("Enter a valid financial year (e.g. 22 or 2022)");
+      }
+      const baseCode = buildProjectBaseCode({
+        companyCode: wizard.companyCode,
+        technicalUnitCode: wizard.technicalUnitCode,
+        subTechnicalUnitCode: wizard.subTechnicalUnitCode,
+        financialYearShort,
+        projects
+      });
+      setWizard((prev) => ({ ...prev, baseCode }));
     }
     setWizardStep((prev) => (prev >= 5 ? 5 : ((prev + 1) as WizardStep)));
   };
@@ -699,11 +708,16 @@ export default function AdminProjects() {
     try {
       setAssigningNumber(true);
       try {
+        const financialYearShort = resolveWizardFinancialYear(wizard);
+        if (financialYearShort === null) {
+          return toast.error("Enter a valid financial year (e.g. 22 or 2022)");
+        }
         await api.assignProjectNumber(wizard.projectId, {
           companyCode: wizard.companyCode,
           technicalUnitCode: wizard.technicalUnitCode,
           subTechnicalUnitCode: wizard.subTechnicalUnitCode,
-          workCategoryCode: wizard.workCategoryCode
+          workCategoryCode: wizard.workCategoryCode,
+          ...(wizard.financialYearMode === "MANUAL" ? { financialYearShort } : {})
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : "Failed to assign project number";
@@ -1044,7 +1058,63 @@ export default function AdminProjects() {
             {wizardStep === 1 && <div className="space-y-3"><p className="text-sm font-medium">Select Project (only projects without number)</p><select value={wizard.projectId} onChange={(event) => setWizard((prev) => ({ ...prev, projectId: event.target.value }))} title="Select project" aria-label="Select project" className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50"><option value="">Select project</option>{projectsWithoutNumber.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select>{projectsWithoutNumber.length === 0 && <p className="text-xs text-muted-foreground">All projects already have numbers.</p>}</div>}
             {wizardStep === 2 && <div className="space-y-3"><p className="text-sm font-medium">a) Initial of Company Name (select one)</p><div className="grid grid-cols-1 sm:grid-cols-2 gap-2">{resolvedCompanies.map((item) => <button key={item.code} onClick={() => setWizard((prev) => ({ ...prev, companyCode: item.code as NumberWizardState["companyCode"] }))} className={`text-left px-3 py-2 rounded-xl border ${wizard.companyCode === item.code ? "border-primary bg-primary/10" : "border-border/50 bg-secondary/20"}`}><p className="text-sm font-medium">{item.label}</p><p className="text-xs text-muted-foreground">Code: {item.code}</p></button>)}</div></div>}
             {wizardStep === 3 && <div className="space-y-3"><p className="text-sm font-medium">b) Initial of Technical Unit (select one)</p><div className="grid grid-cols-1 sm:grid-cols-3 gap-2">{resolvedTechnicalUnits.map((item) => <button key={item.code} onClick={() => setWizard((prev) => ({ ...prev, technicalUnitCode: item.code as NumberWizardState["technicalUnitCode"], subTechnicalUnitCode: "", workCategoryCode: "", baseCode: "" }))} className={`text-left px-3 py-2 rounded-xl border ${wizard.technicalUnitCode === item.code ? "border-primary bg-primary/10" : "border-border/50 bg-secondary/20"}`}><p className="text-sm font-medium">{item.label}</p><p className="text-xs text-muted-foreground">Code: {item.code}</p></button>)}</div></div>}
-            {wizardStep === 4 && <div className="space-y-3"><p className="text-sm font-medium">c) Initial of Sub Technical Unit ({wizard.technicalUnitCode})</p><div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1">{subTechnicalOptions.map((item) => <button key={item.code} onClick={() => setWizard((prev) => ({ ...prev, subTechnicalUnitCode: item.code, workCategoryCode: "", baseCode: "" }))} className={`text-left px-3 py-2 rounded-xl border ${wizard.subTechnicalUnitCode === item.code ? "border-primary bg-primary/10" : "border-border/50 bg-secondary/20"}`}><p className="text-sm font-medium">{item.label}</p><p className="text-xs text-muted-foreground">Code: {item.code}</p></button>)}</div></div>}
+            {wizardStep === 4 && (
+              <div className="space-y-3">
+                <p className="text-sm font-medium">c) Initial of Sub Technical Unit ({wizard.technicalUnitCode})</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
+                  {subTechnicalOptions.map((item) => (
+                    <button
+                      key={item.code}
+                      onClick={() => setWizard((prev) => ({ ...prev, subTechnicalUnitCode: item.code, workCategoryCode: "", baseCode: "" }))}
+                      className={`text-left px-3 py-2 rounded-xl border ${wizard.subTechnicalUnitCode === item.code ? "border-primary bg-primary/10" : "border-border/50 bg-secondary/20"}`}
+                    >
+                      <p className="text-sm font-medium">{item.label}</p>
+                      <p className="text-xs text-muted-foreground">Code: {item.code}</p>
+                    </button>
+                  ))}
+                </div>
+                {wizard.subTechnicalUnitCode ? (
+                  <div className="rounded-xl border border-border/50 bg-secondary/20 p-3 space-y-3">
+                    <p className="text-sm font-medium">d) Financial Year</p>
+                    <label className="flex items-start gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="financial-year-mode"
+                        checked={wizard.financialYearMode === "CURRENT"}
+                        onChange={() => setWizard((prev) => ({ ...prev, financialYearMode: "CURRENT", baseCode: "" }))}
+                        className="mt-1"
+                      />
+                      <span className="text-sm">
+                        New project — use current financial year ({formatFinancialYearShort(getFinancialYearShort())})
+                      </span>
+                    </label>
+                    <label className="flex items-start gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="financial-year-mode"
+                        checked={wizard.financialYearMode === "MANUAL"}
+                        onChange={() => setWizard((prev) => ({ ...prev, financialYearMode: "MANUAL", baseCode: "" }))}
+                        className="mt-1"
+                      />
+                      <span className="text-sm">Old project — enter financial year manually</span>
+                    </label>
+                    {wizard.financialYearMode === "MANUAL" ? (
+                      <div>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={wizard.manualFinancialYearInput}
+                          onChange={(event) => setWizard((prev) => ({ ...prev, manualFinancialYearInput: event.target.value, baseCode: "" }))}
+                          placeholder="e.g. 22 or 2022"
+                          className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">Enter 2 digits (22) or 4 digits (2022). We use the last two digits in the project number.</p>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            )}
             {wizardStep === 5 && <div className="space-y-3"><p className="text-sm font-medium">f) Prefix Initial of Work Category</p><p className="text-xs text-muted-foreground">{wizard.subTechnicalUnitCode === "FH" ? "Field Highway Testing selected, choose one service code" : "Choose one work category code"}</p><div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1">{workCategoryOptions.map((item) => <button key={item.code} onClick={() => setWizard((prev) => ({ ...prev, workCategoryCode: item.code }))} className={`text-left px-3 py-2 rounded-xl border ${wizard.workCategoryCode === item.code ? "border-primary bg-primary/10" : "border-border/50 bg-secondary/20"}`}><p className="text-sm font-medium">{item.label}</p><p className="text-xs text-muted-foreground">Code: {item.code}</p></button>)}</div>{wizard.baseCode && <div className="rounded-xl border border-primary/30 bg-primary/5 p-3"><p className="text-xs text-muted-foreground">Generated Base Code</p><p className="text-base font-semibold mt-1">{wizard.baseCode}</p><p className="text-xs text-muted-foreground mt-1">Final Project Number: {wizard.baseCode}{wizard.workCategoryCode || ""}</p></div>}</div>}
             <div className="flex items-center justify-between gap-2 mt-5"><button onClick={goBackWizard} disabled={wizardStep === 1} className="px-4 py-2 rounded-lg border border-border/50 text-sm disabled:opacity-40">Back</button>{wizardStep < 5 ? <button onClick={() => void goNextWizard()} className="px-4 py-2 rounded-lg bg-gradient-to-r from-primary to-accent text-primary-foreground text-sm font-medium">Next</button> : <button onClick={() => void handleAssignProjectNumber()} disabled={assigningNumber || !wizard.workCategoryCode} className="px-4 py-2 rounded-lg bg-gradient-to-r from-primary to-accent text-primary-foreground text-sm font-medium disabled:opacity-60">{assigningNumber ? "Assigning..." : "Finish"}</button>}</div>
           </motion.div>

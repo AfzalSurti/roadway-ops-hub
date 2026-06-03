@@ -571,7 +571,12 @@ export const api = {
     }>("/projects/numbering-options");
   },
 
-  previewProjectNumber(payload: { companyCode: string; technicalUnitCode: "T" | "S" | "D"; subTechnicalUnitCode: string }) {
+  previewProjectNumber(payload: {
+    companyCode: string;
+    technicalUnitCode: "T" | "S" | "D";
+    subTechnicalUnitCode: string;
+    financialYearShort?: number;
+  }) {
     return request<{ projectCodePrefix: string; financialYearShort: number; serialNumber: number; baseCode: string }>("/projects/preview-number", {
       method: "POST",
       body: JSON.stringify(payload)
@@ -580,7 +585,13 @@ export const api = {
 
   assignProjectNumber(
     projectId: string,
-    payload: { companyCode: string; technicalUnitCode: "T" | "S" | "D"; subTechnicalUnitCode: string; workCategoryCode: string }
+    payload: {
+      companyCode: string;
+      technicalUnitCode: "T" | "S" | "D";
+      subTechnicalUnitCode: string;
+      workCategoryCode: string;
+      financialYearShort?: number;
+    }
   ) {
     const candidates = [
       `/projects/${projectId}/assign-number`,

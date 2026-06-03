@@ -55,10 +55,13 @@ const subTechnicalUnitCodeSchema = z.enum([
   "TE"
 ]);
 
+const financialYearShortSchema = z.coerce.number().int().min(0).max(99).optional();
+
 export const previewProjectNumberSchema = z.object({
   companyCode: companyCodeSchema,
   technicalUnitCode: technicalUnitCodeSchema,
-  subTechnicalUnitCode: subTechnicalUnitCodeSchema
+  subTechnicalUnitCode: subTechnicalUnitCodeSchema,
+  financialYearShort: financialYearShortSchema
 });
 
 export const assignProjectNumberSchema = previewProjectNumberSchema.extend({

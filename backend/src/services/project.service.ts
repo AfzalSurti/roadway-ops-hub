@@ -1,4 +1,5 @@
 import { projectRepository } from "../repositories/project.repository.js";
+import { getFinancialYearShort, resolveFinancialYearShort } from "../utils/financial-year.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 
 export const COMPANY_OPTIONS = [
@@ -74,12 +75,6 @@ export const DEFAULT_WORK_CATEGORY_OPTIONS = [
   { label: "Drainage", code: "D" }
 ] as const;
 
-function getFinancialYearShort(referenceDate = new Date()): number {
-  const month = referenceDate.getMonth();
-  const year = referenceDate.getFullYear();
-  return month >= 3 ? year % 100 : (year - 1) % 100;
-}
-
 function validateSubTechnicalUnit(technicalUnitCode: "T" | "S" | "D", subTechnicalUnitCode: string) {
   const options = SUB_TECHNICAL_UNIT_OPTIONS[technicalUnitCode] ?? [];
   if (!options.some((item) => item.code === subTechnicalUnitCode)) {
@@ -91,11 +86,21 @@ async function buildBaseCode(args: {
   companyCode: string;
   technicalUnitCode: "T" | "S" | "D";
   subTechnicalUnitCode: string;
+  financialYearShort?: number;
+  manualFinancialYear?: string;
 }) {
   validateSubTechnicalUnit(args.technicalUnitCode, args.subTechnicalUnitCode);
 
   const projectCodePrefix = `${args.companyCode}${args.technicalUnitCode}${args.subTechnicalUnitCode}`;
-  const financialYearShort = getFinancialYearShort();
+  let financialYearShort: number;
+  try {
+    financialYearShort = resolveFinancialYearShort({
+      financialYearShort: args.financialYearShort,
+      manualFinancialYear: args.manualFinancialYear
+    });
+  } catch {
+    throw badRequest("Invalid financial year. Enter 2 digits (e.g. 22) or 4 digits (e.g. 2022).");
+  }
   const maxSerial = await projectRepository.findMaxSerialForPrefixYear(projectCodePrefix, financialYearShort);
   const serialNumber = (maxSerial?.serialNumber ?? 0) + 1;
   const serial = String(serialNumber).padStart(2, "0");
