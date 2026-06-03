@@ -14,7 +14,7 @@ dprOverviewRouter.use(requireAuth);
 dprOverviewRouter.get("/", requireRole("ADMIN", "PMO", "HOD"), asyncHandler(dprOverviewController.list));
 dprOverviewRouter.get("/project/:projectId", requireRole("ADMIN", "PMO", "HOD"), asyncHandler(dprOverviewController.getByProject));
 
-// Create/update/remove (HOD/PMO/Admin)
-dprOverviewRouter.post("/", requireRole("ADMIN", "PMO", "HOD"), validate(createDprOverviewSchema), asyncHandler(dprOverviewController.create));
-dprOverviewRouter.patch("/:id", requireRole("ADMIN", "PMO", "HOD"), validate(updateDprOverviewSchema), asyncHandler(dprOverviewController.update));
-dprOverviewRouter.delete("/:id", requireRole("ADMIN", "PMO", "HOD"), asyncHandler(dprOverviewController.remove));
+// Create/update/remove (PMO/Admin only — HOD is view-only on projects/tasks)
+dprOverviewRouter.post("/", requireRole("ADMIN", "PMO"), validate(createDprOverviewSchema), asyncHandler(dprOverviewController.create));
+dprOverviewRouter.patch("/:id", requireRole("ADMIN", "PMO"), validate(updateDprOverviewSchema), asyncHandler(dprOverviewController.update));
+dprOverviewRouter.delete("/:id", requireRole("ADMIN", "PMO"), asyncHandler(dprOverviewController.remove));

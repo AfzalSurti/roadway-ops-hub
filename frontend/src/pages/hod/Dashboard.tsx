@@ -3,244 +3,353 @@ import { PageWrapper } from "@/components/PageWrapper";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { HodProjectDetailDialog } from "@/components/hod/HodProjectDetailDialog";
+import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { dprReportStatusConfig, type DprReportStatus, type ProjectDprOverviewItem, type ProjectItem } from "@/lib/domain";
-import { ClipboardList, FolderKanban, Loader2, Search, Sparkles, TrendingUp, CircleDollarSign } from "lucide-react";
-import { toast } from "sonner";
-import { DprStatusModal } from "@/components/hod/DprStatusModal";
-
-function shortDate(value?: string | null) {
-  if (!value) return "-";
-  return new Date(value).toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric"
-  });
-}
-
-function getOverviewNote(overview: ProjectDprOverviewItem | null) {
-  const data = overview?.data;
-  if (!data || typeof data !== "object" || Array.isArray(data)) return "";
-  const note = (data as { notes?: unknown }).notes;
-  return typeof note === "string" ? note : "";
-}
-
-function statusTone(status?: DprReportStatus) {
-  if (!status) return "text-muted-foreground bg-muted";
-  return dprReportStatusConfig[status].color;
-}
+import type { ProjectItem } from "@/lib/domain";
+import {
+  getCompanyLabel,
+  getProjectLifecycle,
+  getTasksForProject,
+  HOD_COMPANY_OPTIONS,
+  HOD_SUB_TECHNICAL_UNIT_OPTIONS,
+  HOD_TECHNICAL_UNIT_OPTIONS,
+  summarizeProjectTasks
+} from "@/lib/hod-dashboard";
+import { CheckCircle2, ClipboardList, Eye, FolderKanban, Loader2, RefreshCcw, Search, Timer } from "lucide-react";
 
 export default function HodDashboard() {
-  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
+  const [organizationFilter, setOrganizationFilter] = useState("ALL");
+  const [technicalUnitFilter, setTechnicalUnitFilter] = useState("ALL");
+  const [subTechnicalUnitFilter, setSubTechnicalUnitFilter] = useState("ALL");
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
 
-  const { data: projects = [], isLoading: loadingProjects } = useQuery({
+  const { data: projects = [], isLoading: loadingProjects, refetch: refetchProjects } = useQuery({
     queryKey: ["hod-projects"],
     queryFn: () => api.getProjects(),
     staleTime: 5 * 60 * 1000
   });
 
-  const { data: overviews = [], isLoading: loadingOverviews } = useQuery({
-    queryKey: ["hod-dpr-overviews"],
-    queryFn: () => api.getProjectDprOverviews(),
+  const { data: tasksResponse, isLoading: loadingTasks, refetch: refetchTasks } = useQuery({
+    queryKey: ["hod-tasks"],
+    queryFn: () => api.getTasks({ limit: 1000 }),
     staleTime: 2 * 60 * 1000
   });
 
-  const overviewByProjectId = useMemo(() => {
-    return new Map(overviews.map((overview) => [overview.projectId, overview]));
-  }, [overviews]);
+  const tasks = tasksResponse?.items ?? [];
+
+  const subTechnicalOptions = useMemo(() => {
+    if (technicalUnitFilter === "ALL") {
+      return Object.values(HOD_SUB_TECHNICAL_UNIT_OPTIONS).flat();
+    }
+    return HOD_SUB_TECHNICAL_UNIT_OPTIONS[technicalUnitFilter] ?? [];
+  }, [technicalUnitFilter]);
 
   const filteredProjects = useMemo(() => {
     const query = search.trim().toLowerCase();
-    if (!query) return projects;
+
     return projects.filter((project) => {
-      const overview = overviewByProjectId.get(project.id);
-      const haystack = [
-        project.name,
-        project.projectNumber,
-        project.description,
-        overview?.status,
-        getOverviewNote(overview)
-      ]
+      const orgOk = organizationFilter === "ALL" || project.companyCode === organizationFilter;
+      const unitOk = technicalUnitFilter === "ALL" || project.technicalUnitCode === technicalUnitFilter;
+      const subOk = subTechnicalUnitFilter === "ALL" || project.subTechnicalUnitCode === subTechnicalUnitFilter;
+
+      if (!orgOk || !unitOk || !subOk) {
+        return false;
+      }
+
+      if (!query) {
+        return true;
+      }
+
+      const haystack = [project.name, project.projectNumber, project.description, getCompanyLabel(project.companyCode)]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
+
       return haystack.includes(query);
     });
-  }, [overviewByProjectId, projects, search]);
+  }, [organizationFilter, projects, search, subTechnicalUnitFilter, technicalUnitFilter]);
 
-  const selectedProject = selectedProjectId ? projects.find((project) => project.id === selectedProjectId) ?? null : null;
-  const selectedOverview = selectedProjectId ? overviewByProjectId.get(selectedProjectId) ?? null : null;
+  const projectRows = useMemo(() => {
+    return filteredProjects
+      .map((project) => {
+        const projectTasks = getTasksForProject(project, tasks);
+        const summary = summarizeProjectTasks(projectTasks);
+        const lifecycle = getProjectLifecycle(projectTasks);
+
+        return {
+          project,
+          projectTasks,
+          summary,
+          lifecycle
+        };
+      })
+      .sort((a, b) => {
+        const numberCompare = (a.project.projectNumber ?? "").localeCompare(b.project.projectNumber ?? "");
+        if (numberCompare !== 0) return numberCompare;
+        return a.project.name.localeCompare(b.project.name);
+      });
+  }, [filteredProjects, tasks]);
 
   const totals = useMemo(() => {
-    const counts = {
-      total: projects.length,
-      overviewed: overviews.length,
-      notStarted: 0,
-      underPrep: 0,
-      draftSubmitted: 0,
-      underApproval: 0,
-      approved: 0
-    };
+    let completed = 0;
+    let ongoing = 0;
 
-    for (const overview of overviews) {
-      if (overview.status === "NOT_STARTED") counts.notStarted += 1;
-      if (overview.status === "UNDER_PREPARATION") counts.underPrep += 1;
-      if (overview.status === "DRAFT_SUBMITTED") counts.draftSubmitted += 1;
-      if (overview.status === "UNDER_APPROVAL") counts.underApproval += 1;
-      if (overview.status === "APPROVED") counts.approved += 1;
-    }
-
-    return counts;
-  }, [overviews, projects.length]);
-
-  const saveMutation = useMutation({
-    mutationFn: async (payload: { projectId: string; status: DprReportStatus; data: Record<string, unknown> | null }) => {
-      const existing = overviewByProjectId.get(payload.projectId);
-      if (existing) {
-        return api.updateProjectDprOverview(existing.id, { status: payload.status, data: payload.data });
+    for (const row of projectRows) {
+      if (row.lifecycle === "COMPLETED") {
+        completed += 1;
+      } else {
+        ongoing += 1;
       }
-      return api.createProjectDprOverview(payload);
-    },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["hod-dpr-overviews"] });
-      toast.success("DPR status saved");
-      setSelectedProjectId(null);
-    },
-    onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Unable to save DPR status");
     }
-  });
 
-  const deleteMutation = useMutation({
-    mutationFn: async (overviewId: string) => api.deleteProjectDprOverview(overviewId),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["hod-dpr-overviews"] });
-      toast.success("DPR status removed");
-      setSelectedProjectId(null);
-    },
-    onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Unable to delete DPR status");
-    }
-  });
+    return {
+      total: projectRows.length,
+      completed,
+      ongoing
+    };
+  }, [projectRows]);
 
-  const statusCards = [
-    { label: "Total Projects", value: totals.total, icon: FolderKanban, tone: "text-primary bg-primary/10" },
-    { label: "Projects with DPR", value: totals.overviewed, icon: ClipboardList, tone: "text-accent bg-accent/10" },
-    { label: "Under Prep", value: totals.underPrep, icon: Sparkles, tone: "text-blue-400 bg-blue-400/10" },
-    { label: "Under Approval", value: totals.underApproval, icon: TrendingUp, tone: "text-indigo-400 bg-indigo-400/10" },
-    { label: "Approved", value: totals.approved, icon: CircleDollarSign, tone: "text-warning bg-warning/10" },
-  ];
+  const selectedRow = selectedProjectId ? projectRows.find((row) => row.project.id === selectedProjectId) ?? null : null;
+
+  const resetFilters = () => {
+    setSearch("");
+    setOrganizationFilter("ALL");
+    setTechnicalUnitFilter("ALL");
+    setSubTechnicalUnitFilter("ALL");
+  };
+
+  const refreshAll = async () => {
+    await Promise.all([refetchProjects(), refetchTasks()]);
+  };
+
+  const isLoading = loadingProjects || loadingTasks;
 
   return (
     <PageWrapper>
-      <div className="page-header">
-        <h1 className="page-title">HOD Dashboard</h1>
-        <p className="page-subtitle">Track DPR preparation, review, and approval status across projects.</p>
+      <div className="page-header flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <h1 className="page-title">HOD Dashboard</h1>
+          <p className="page-subtitle">Executive view of project progress and task activity (read-only).</p>
+        </div>
+        <Button variant="outline" className="gap-2" onClick={() => void refreshAll()}>
+          <RefreshCcw className="h-4 w-4" />
+          Refresh
+        </Button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 mb-6">
-        {statusCards.map((card) => (
-          <div key={card.label} className="kpi-card">
-            <div className={`p-2.5 rounded-xl ${card.tone} w-fit mb-3`}>
-              <card.icon className="h-5 w-5" />
-            </div>
-            <p className="text-3xl font-bold text-foreground">{card.value}</p>
-            <p className="text-sm text-muted-foreground mt-1">{card.label}</p>
-          </div>
-        ))}
-      </div>
+      <div className="glass-panel p-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+          <FilterField label="Organization">
+            <Select value={organizationFilter} onValueChange={setOrganizationFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="All organizations" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All organizations</SelectItem>
+                {HOD_COMPANY_OPTIONS.map((item) => (
+                  <SelectItem key={item.code} value={item.code}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FilterField>
 
-      <div className="glass-panel p-6 mb-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h3 className="font-semibold text-lg">Project DPR Overview</h3>
-            <p className="text-sm text-muted-foreground">Create or update DPR status and working notes for each project.</p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
-            <div className="relative min-w-[280px]">
+          <FilterField label="Technical Unit">
+            <Select
+              value={technicalUnitFilter}
+              onValueChange={(value) => {
+                setTechnicalUnitFilter(value);
+                setSubTechnicalUnitFilter("ALL");
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="All technical units" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All technical units</SelectItem>
+                {HOD_TECHNICAL_UNIT_OPTIONS.map((item) => (
+                  <SelectItem key={item.code} value={item.code}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FilterField>
+
+          <FilterField label="Sub Technical Unit">
+            <Select value={subTechnicalUnitFilter} onValueChange={setSubTechnicalUnitFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="All sub units" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All sub technical units</SelectItem>
+                {subTechnicalOptions.map((item) => (
+                  <SelectItem key={item.code} value={item.code}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FilterField>
+
+          <FilterField label="Search">
+            <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search projects or status" className="pl-10" />
+              <Input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Project name or number"
+                className="pl-10"
+              />
             </div>
-            <Button variant="outline" onClick={() => void queryClient.invalidateQueries({ queryKey: ["hod-dpr-overviews"] })}>
-              Refresh
-            </Button>
-          </div>
+          </FilterField>
         </div>
 
-        <div className="mt-6 overflow-x-auto">
-          <table className="w-full text-sm">
+        <div className="mt-3 flex justify-end">
+          <Button variant="ghost" size="sm" onClick={resetFilters}>
+            Reset filters
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <KpiCard label="Total Projects" value={totals.total} icon={FolderKanban} tone="text-primary bg-primary/10" />
+        <KpiCard label="Completed Projects" value={totals.completed} icon={CheckCircle2} tone="text-emerald-600 bg-emerald-500/10" />
+        <KpiCard label="Ongoing Projects" value={totals.ongoing} icon={Timer} tone="text-amber-600 bg-amber-500/10" />
+      </div>
+
+      <div className="glass-panel p-6">
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <div>
+            <h3 className="font-semibold text-lg">Project monitoring</h3>
+            <p className="text-sm text-muted-foreground">Task activity synced from DPR Admin assignments.</p>
+          </div>
+          <Badge variant="secondary" className="rounded-full">
+            {projectRows.length} project(s)
+          </Badge>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[900px]">
             <thead>
               <tr className="border-b border-border/40 text-muted-foreground">
-                <th className="py-3 pr-4 text-left font-medium">Project</th>
-                <th className="py-3 px-4 text-left font-medium">Project No.</th>
-                <th className="py-3 px-4 text-left font-medium">Status</th>
-                <th className="py-3 px-4 text-left font-medium">Notes</th>
-                <th className="py-3 px-4 text-left font-medium">Updated</th>
+                <th className="py-3 pr-4 text-left font-medium">Project Number</th>
+                <th className="py-3 px-4 text-left font-medium">Project Name</th>
+                <th className="py-3 px-4 text-left font-medium">Organization</th>
+                <th className="py-3 px-4 text-left font-medium">Lifecycle</th>
+                <th className="py-3 px-4 text-right font-medium">Tasks</th>
+                <th className="py-3 px-4 text-right font-medium">Pending</th>
+                <th className="py-3 px-4 text-right font-medium">Submitted</th>
+                <th className="py-3 px-4 text-right font-medium">Approved</th>
                 <th className="py-3 pl-4 text-right font-medium">Action</th>
               </tr>
             </thead>
             <tbody>
-              {(loadingProjects || loadingOverviews) && (
+              {isLoading ? (
                 <tr>
-                  <td colSpan={6} className="py-10 text-center text-muted-foreground">
+                  <td colSpan={9} className="py-10 text-center text-muted-foreground">
                     <span className="inline-flex items-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin" /> Loading DPR data...
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading projects and tasks...
                     </span>
                   </td>
                 </tr>
-              )}
+              ) : null}
 
-              {!loadingProjects && !loadingOverviews && filteredProjects.length === 0 && (
+              {!isLoading && projectRows.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-10 text-center text-muted-foreground">No projects found.</td>
+                  <td colSpan={9} className="py-10 text-center text-muted-foreground">
+                    No projects match the selected filters.
+                  </td>
                 </tr>
-              )}
+              ) : null}
 
-              {filteredProjects.map((project) => {
-                const overview = overviewByProjectId.get(project.id) ?? null;
-                return (
-                  <tr key={project.id} className="border-b border-border/20 hover:bg-secondary/20 transition-colors">
-                    <td className="py-3 pr-4 font-medium max-w-[260px] truncate">{project.name}</td>
-                    <td className="py-3 px-4 text-muted-foreground">{project.projectNumber || "-"}</td>
-                    <td className="py-3 px-4">
-                      <Badge className={`rounded-full px-2.5 py-1 ${statusTone(overview?.status)}`} variant="secondary">
-                        {overview ? dprReportStatusConfig[overview.status].label : "Not Started"}
-                      </Badge>
-                    </td>
-                    <td className="py-3 px-4 text-muted-foreground max-w-[320px] truncate">{getOverviewNote(overview) || "-"}</td>
-                    <td className="py-3 px-4 text-muted-foreground">{shortDate(overview?.updatedAt)}</td>
-                    <td className="py-3 pl-4 text-right">
-                      <Button size="sm" variant="outline" onClick={() => setSelectedProjectId(project.id)}>
-                        {overview ? "Edit" : "Create"}
-                      </Button>
-                    </td>
-                  </tr>
-                );
-              })}
+              {!isLoading
+                ? projectRows.map((row) => (
+                    <tr key={row.project.id} className="border-b border-border/20 hover:bg-secondary/20 transition-colors">
+                      <td className="py-3 pr-4 font-medium">{row.project.projectNumber || "-"}</td>
+                      <td className="py-3 px-4 max-w-[240px] truncate">{row.project.name}</td>
+                      <td className="py-3 px-4 text-muted-foreground max-w-[180px] truncate">
+                        {getCompanyLabel(row.project.companyCode)}
+                      </td>
+                      <td className="py-3 px-4">
+                        <Badge
+                          variant="secondary"
+                          className={`rounded-full ${
+                            row.lifecycle === "COMPLETED"
+                              ? "bg-emerald-500/15 text-emerald-600"
+                              : "bg-amber-500/15 text-amber-700"
+                          }`}
+                        >
+                          {row.lifecycle === "COMPLETED" ? "Completed" : "Ongoing"}
+                        </Badge>
+                      </td>
+                      <td className="py-3 px-4 text-right tabular-nums">{row.summary.total}</td>
+                      <td className="py-3 px-4 text-right tabular-nums text-amber-700">{row.summary.pending}</td>
+                      <td className="py-3 px-4 text-right tabular-nums text-sky-600">{row.summary.completed}</td>
+                      <td className="py-3 px-4 text-right tabular-nums text-emerald-600">{row.summary.approved}</td>
+                      <td className="py-3 pl-4 text-right">
+                        <Button size="sm" variant="outline" className="gap-1" onClick={() => setSelectedProjectId(row.project.id)}>
+                          <Eye className="h-3.5 w-3.5" />
+                          View
+                        </Button>
+                      </td>
+                    </tr>
+                  ))
+                : null}
             </tbody>
           </table>
         </div>
+
+        <p className="text-xs text-muted-foreground mt-4 inline-flex items-center gap-2">
+          <ClipboardList className="h-3.5 w-3.5" />
+          Completed = all tasks on the project are marked done in DPR Admin.
+        </p>
       </div>
 
-      <DprStatusModal
-        open={Boolean(selectedProject)}
+      <HodProjectDetailDialog
+        open={Boolean(selectedRow)}
         onOpenChange={(open) => {
           if (!open) setSelectedProjectId(null);
         }}
-        project={selectedProject}
-        overview={selectedOverview}
-        saving={saveMutation.isPending}
-        deleting={deleteMutation.isPending}
-        onSave={async (payload) => {
-          await saveMutation.mutateAsync(payload);
-        }}
-        onDelete={async (overviewId) => {
-          await deleteMutation.mutateAsync(overviewId);
-        }}
+        project={selectedRow?.project ?? null}
+        projectTasks={selectedRow?.projectTasks ?? []}
       />
     </PageWrapper>
+  );
+}
+
+function FilterField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <p className="text-xs text-muted-foreground mb-1.5">{label}</p>
+      {children}
+    </div>
+  );
+}
+
+function KpiCard({
+  label,
+  value,
+  icon: Icon,
+  tone
+}: {
+  label: string;
+  value: number;
+  icon: typeof FolderKanban;
+  tone: string;
+}) {
+  return (
+    <div className="kpi-card">
+      <div className={`p-2.5 rounded-xl ${tone} w-fit mb-3`}>
+        <Icon className="h-5 w-5" />
+      </div>
+      <p className="text-3xl font-bold text-foreground">{value}</p>
+      <p className="text-sm text-muted-foreground mt-1">{label}</p>
+    </div>
   );
 }
