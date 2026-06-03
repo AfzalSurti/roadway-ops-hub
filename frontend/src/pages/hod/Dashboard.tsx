@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { HodDprOverviewSection } from "@/components/hod/HodDprOverviewSection";
 import { HodProjectDetailDialog } from "@/components/hod/HodProjectDetailDialog";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
@@ -310,6 +311,8 @@ export default function HodDashboard() {
           Completed = all tasks on the project are marked done in DPR Admin.
         </p>
       </div>
+
+      <HodDprOverviewSection projects={filteredProjects} tasks={tasks} isLoading={isLoading} />
 
       <HodProjectDetailDialog
         open={Boolean(selectedRow)}

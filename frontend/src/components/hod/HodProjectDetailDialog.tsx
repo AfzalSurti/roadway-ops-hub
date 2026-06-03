@@ -13,6 +13,7 @@ import {
 } from "@/lib/hod-dashboard";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { buildProjectDprReportStatuses, getDprReportStatusTone } from "@/lib/hod-dpr-reports";
 import { Loader2 } from "lucide-react";
 
 type HodProjectDetailDialogProps = {
@@ -24,6 +25,7 @@ type HodProjectDetailDialogProps = {
 
 export function HodProjectDetailDialog({ open, onOpenChange, project, projectTasks }: HodProjectDetailDialogProps) {
   const lifecycle = getProjectLifecycle(projectTasks);
+  const dprReports = buildProjectDprReportStatuses(projectTasks);
 
   const { data: commentsByTaskId = {}, isFetching: loadingComments } = useQuery({
     queryKey: ["hod-task-comments", project?.id, projectTasks.map((task) => task.id).join(",")],
@@ -61,6 +63,28 @@ export function HodProjectDetailDialog({ open, onOpenChange, project, projectTas
             label="Sub Technical Unit"
             value={getSubTechnicalUnitLabel(project.technicalUnitCode, project.subTechnicalUnitCode)}
           />
+        </div>
+
+        <div className="mt-4">
+          <h3 className="font-semibold mb-2">DPR report status</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+            {dprReports.map((report) => (
+              <div
+                key={report.key}
+                className={`rounded-lg border px-2.5 py-2 text-xs ${getDprReportStatusTone(report.status)}`}
+                title={report.taskCount ? `${report.taskCount} linked task(s)` : "No linked tasks"}
+              >
+                <p className="font-medium leading-tight">{report.shortLabel}</p>
+                <p className="mt-1 font-semibold">{report.statusLabel}</p>
+                {report.status === "TASK_COMPLETED" && report.submissionDate && report.submissionDate !== "-" ? (
+                  <p className="text-[10px] mt-0.5 opacity-90">Submitted {report.submissionDate}</p>
+                ) : null}
+                {report.status === "APPROVED" && report.approvalDate && report.approvalDate !== "-" ? (
+                  <p className="text-[10px] mt-0.5 opacity-90">Approved {report.approvalDate}</p>
+                ) : null}
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="mt-4">
