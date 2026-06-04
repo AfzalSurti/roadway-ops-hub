@@ -27,7 +27,7 @@ Full-stack HighwayOps application with:
 ## Project Structure
 
 ```txt
-frontend/                                  # Vite + React client application
+frontend/                                  # Vite + React client Application
 |- components.json                         # shadcn/ui component registry config
 |- index.html                              # HTML entry file used by Vite
 |- postcss.config.js                       # PostCSS plugin configuration
