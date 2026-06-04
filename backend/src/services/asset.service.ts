@@ -349,10 +349,18 @@ export const assetService = {
       payload.dateOfPurchase ?? existing.dateOfPurchase ?? new Date()
     );
 
+    const nextSoldAmount = payload.soldAmount ?? existing.soldAmount ?? 0;
+    const nextSoldRemark = (payload.soldRemark ?? existing.soldRemark ?? "").trim();
+    const soldInfoComplete = nextSoldAmount > 0 && Boolean(nextSoldRemark);
+    const shouldMarkSold =
+      soldInfoComplete &&
+      (payload.soldAmount !== undefined || payload.soldRemark !== undefined || payload.status === "DISPOSED");
+
     const data: Prisma.AssetUncheckedUpdateInput = {
       ...payload,
       soldAmount: payload.soldAmount ?? undefined,
       soldRemark: payload.soldRemark ?? undefined,
+      ...(shouldMarkSold ? { status: "DISPOSED" as const } : {}),
       totalAmountWithGst: calculateTotalAmountWithGst(nextPurchaseAmount, nextGst),
       usefulLifeYears: depreciation.usefulLifeYears,
       scrapRate: depreciation.scrapRate,

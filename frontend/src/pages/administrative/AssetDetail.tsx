@@ -384,6 +384,18 @@ export default function AssetDetail() {
     setSoldRemarkInput(asset.soldRemark ?? "");
   }, [asset?.id]);
 
+  // Fix legacy rows: sold info saved before status auto-update.
+  useEffect(() => {
+    if (!id || !asset) return;
+    const hasLegacySold =
+      (asset.soldAmount ?? 0) > 0 && Boolean(asset.soldRemark?.trim()) && asset.status === "IN_USE";
+    if (!hasLegacySold) return;
+    void api.updateAsset(id, { status: "DISPOSED" }).then(() => {
+      void queryClient.invalidateQueries({ queryKey: ["assets", id] });
+      void queryClient.invalidateQueries({ queryKey: ["assets"] });
+    });
+  }, [asset?.id, asset?.soldAmount, asset?.soldRemark, asset?.status, id, queryClient]);
+
   const updateMutation = useMutation({
     mutationFn: () => {
       if (!id) {
@@ -434,16 +446,18 @@ export default function AssetDetail() {
       }
       return api.updateAsset(id, {
         soldAmount,
-        soldRemark: soldRemarkInput.trim()
+        soldRemark: soldRemarkInput.trim(),
+        status: "DISPOSED"
       });
     },
     onSuccess: async (updated) => {
       setSoldAmountInput(updated.soldAmount && updated.soldAmount > 0 ? String(updated.soldAmount) : "");
       setSoldRemarkInput(updated.soldRemark ?? "");
+      setForm((prev) => ({ ...prev, status: updated.status }));
       await queryClient.invalidateQueries({ queryKey: ["assets", id] });
       await queryClient.invalidateQueries({ queryKey: ["assets"] });
       await queryClient.invalidateQueries({ queryKey: ["assets", "stats"] });
-      toast.success("Sold information saved");
+      toast.success("Asset marked as sold — status updated to SOLD");
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to save sold information")
   });
@@ -498,7 +512,8 @@ export default function AssetDetail() {
   }
 
   const hasSoldInfo = (asset.soldAmount ?? 0) > 0 && Boolean(asset.soldRemark?.trim());
-  const isSoldLocked = hasSoldInfo || asset.status === "DISPOSED";
+  const effectiveStatus: AssetStatus = asset.status === "DISPOSED" || hasSoldInfo ? "DISPOSED" : asset.status;
+  const isSoldLocked = effectiveStatus === "DISPOSED";
   const canEnterSoldInfo = asset.status === "IN_USE" && !hasSoldInfo;
 
   return (
@@ -509,7 +524,7 @@ export default function AssetDetail() {
             <Button variant="outline" size="sm" onClick={() => navigate("/administrative/assets")} className="gap-2">
               <ArrowLeft className="h-4 w-4" /> Back
             </Button>
-            <span className={`status-badge border ${STATUS_COLORS[asset.status]}`}>{getStatusLabel(asset.status)}</span>
+            <span className={`status-badge border ${STATUS_COLORS[effectiveStatus]}`}>{getStatusLabel(effectiveStatus)}</span>
           </div>
           <h1 className="page-title">{asset.assetId}</h1>
           <p className="page-subtitle">{asset.assetClass} / {asset.assetType}</p>
@@ -653,7 +668,7 @@ export default function AssetDetail() {
               />
               <Field label="Assigned User" value={asset.assignedUser ?? "-"} />
               <Field label="Assigned Date" value={asset.assignedDate ? new Date(asset.assignedDate).toLocaleDateString("en-IN") : "-"} />
-              <Field label="Status" value={getStatusLabel(asset.status)} />
+              <Field label="Status" value={getStatusLabel(effectiveStatus)} />
               <Field label="Sold Amount" value={hasSoldInfo ? formatCurrency(asset.soldAmount!) : "-"} />
               <div className="md:col-span-2"><Field label="Sold Remark" value={hasSoldInfo ? asset.soldRemark! : "-"} /></div>
               <div className="md:col-span-2"><Field label="Remarks" value={asset.remarks ?? "-"} /></div>
@@ -743,7 +758,7 @@ export default function AssetDetail() {
         <div className="glass-panel p-6 mt-6">
           <h3 className="font-semibold mb-2">Sold Information</h3>
           <p className="text-sm text-muted-foreground mb-4">
-            This asset is IN USE. Enter sold amount and remark, then submit. Fields will be locked after saving.
+            Enter sold amount and remark, then submit. Status will change to SOLD automatically and these fields will be locked.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -788,7 +803,7 @@ export default function AssetDetail() {
             <Field label="Sold Amount" value={asset.soldAmount ? formatCurrency(asset.soldAmount) : "-"} />
             <div className="md:col-span-2"><Field label="Sold Remark" value={asset.soldRemark ?? "-"} /></div>
           </div>
-          <p className="text-xs text-muted-foreground mt-3">Sold fields are locked. Change status to SOLD (DISPOSED) in Edit Asset when the asset is fully disposed.</p>
+          <p className="text-xs text-muted-foreground mt-3">Sold information is locked. This asset is marked as SOLD.</p>
         </div>
       ) : null}
 
