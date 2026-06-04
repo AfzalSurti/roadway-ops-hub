@@ -8,7 +8,8 @@ const COMPANY_NAME = "GEO DESIGNS RESEARCH (P) LTD.";
 const COMPANY_NAME_VOUCHER = "GEO DESIGNS & RESEARCH (P) LTD.";
 const COMPANY_ADDRESS =
   "B-10 Krishna Industrial Estate, Gorwa Estate, Vadodara - 390016. www.geogroup.in / email: info@geogroup.in";
-const EXPENSE_NOTE = "Note: For any clarifications regarding filling up this form, please call +91 99625 29200.";
+const EXPENSE_NOTE =
+  "Note: For any clarifications regarding filling up this form, please call +91 96625 29205.";
 
 const SUMMARY_CATEGORY_ORDER = [
   "Advance from Office",
@@ -22,6 +23,7 @@ const SUMMARY_CATEGORY_ORDER = [
   "Travel / Auto / Bus / Train / Air"
 ] as const;
 
+/** Column headers matching the paper SITE EXPENSE SHEET */
 const SUMMARY_COLUMN_HEADERS = [
   "Date",
   "Adv from Office",
@@ -39,10 +41,27 @@ const SUMMARY_COLUMN_HEADERS = [
 const SIGNATURE_LABELS = ["Employee's Sign", "Team Leader", "Check By", "Approved by", "Accounts Officer"] as const;
 const VOUCHER_SIGNATURE_LABELS = ["Prepared by", "Accountant", "Manager", "Receiver"] as const;
 
-const MIN_SUMMARY_DATA_ROWS = 16;
+const MIN_SUMMARY_DATA_ROWS = 14;
 const MIN_DETAILED_DATA_ROWS = 28;
+const MIN_VOUCHER_ROWS = 10;
+
+const GRID = {
+  lineColor: [0, 0, 0] as [number, number, number],
+  lineWidth: 0.25,
+  fillColor: [255, 255, 255] as [number, number, number],
+  textColor: [0, 0, 0] as [number, number, number]
+};
 
 function fmtDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  const d = String(date.getDate()).padStart(2, "0");
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const y = date.getFullYear();
+  return `${d}-${m}-${y}`;
+}
+
+function fmtDateSlash(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
   return date.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
@@ -93,6 +112,20 @@ function amountInWordsIndian(n: number): string {
   return `${words.trim()} Rupees`;
 }
 
+function gridTableStyles(fontSize = 7) {
+  return {
+    font: "helvetica",
+    fontSize,
+    cellPadding: 1,
+    lineColor: GRID.lineColor,
+    lineWidth: GRID.lineWidth,
+    halign: "center" as const,
+    valign: "middle" as const,
+    textColor: GRID.textColor,
+    fillColor: GRID.fillColor
+  };
+}
+
 function drawCell(
   doc: jsPDF,
   x: number,
@@ -100,21 +133,19 @@ function drawCell(
   w: number,
   h: number,
   text: string,
-  opts?: { bold?: boolean; align?: "left" | "center" | "right"; fontSize?: number; fill?: boolean }
+  opts?: { bold?: boolean; align?: "left" | "center" | "right"; fontSize?: number; fontStyle?: "normal" | "italic" }
 ) {
-  if (opts?.fill) {
-    doc.setFillColor(245, 245, 245);
-    doc.rect(x, y, w, h, "F");
-  }
-  doc.setDrawColor(0);
-  doc.setLineWidth(0.2);
+  doc.setDrawColor(...GRID.lineColor);
+  doc.setLineWidth(GRID.lineWidth);
   doc.rect(x, y, w, h);
-  doc.setFont("helvetica", opts?.bold ? "bold" : "normal");
-  doc.setFontSize(opts?.fontSize ?? 8);
-  doc.setTextColor(0);
-  const pad = 1.2;
+  const fontSize = opts?.fontSize ?? 8;
+  const style = opts?.fontStyle === "italic" ? "italic" : opts?.bold ? "bold" : "normal";
+  doc.setFont("helvetica", style);
+  doc.setFontSize(fontSize);
+  doc.setTextColor(...GRID.textColor);
+  const pad = 1.4;
   const lines = doc.splitTextToSize(text, Math.max(4, w - pad * 2)) as string[];
-  const lineH = (opts?.fontSize ?? 8) * 0.38;
+  const lineH = fontSize * 0.4;
   const blockH = lines.length * lineH;
   let textY = y + Math.max(pad + lineH, (h - blockH) / 2 + lineH);
   const align = opts?.align ?? "left";
@@ -136,11 +167,32 @@ function drawLabelValueRow(
   right: { label: string; value: string }
 ) {
   const half = totalW / 2;
-  const labelW = 42;
-  drawCell(doc, x, y, labelW, rowH, left.label, { bold: true });
-  drawCell(doc, x + labelW, y, half - labelW, rowH, left.value);
-  drawCell(doc, x + half, y, labelW, rowH, right.label, { bold: true });
-  drawCell(doc, x + half + labelW, y, half - labelW, rowH, right.value);
+  const labelW = 46;
+  drawCell(doc, x, y, labelW, rowH, left.label, { bold: true, fontSize: 7.5 });
+  drawCell(doc, x + labelW, y, half - labelW, rowH, left.value, { fontSize: 7.5 });
+  drawCell(doc, x + half, y, labelW, rowH, right.label, { bold: true, fontSize: 7.5 });
+  drawCell(doc, x + half + labelW, y, half - labelW, rowH, right.value, { fontSize: 7.5 });
+}
+
+/** Signature box: empty space above, label anchored at bottom (paper form style). */
+function drawSignatureBoxes(
+  doc: jsPDF,
+  x: number,
+  y: number,
+  totalW: number,
+  labels: readonly string[],
+  boxH = 20
+) {
+  const boxW = totalW / labels.length;
+  for (let i = 0; i < labels.length; i += 1) {
+    const bx = x + boxW * i;
+    doc.setDrawColor(...GRID.lineColor);
+    doc.setLineWidth(GRID.lineWidth);
+    doc.rect(bx, y, boxW, boxH);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7);
+    doc.text(labels[i], bx + boxW / 2, y + boxH - 3, { align: "center" });
+  }
 }
 
 function lastTableY(doc: jsPDF, fallback: number) {
@@ -206,6 +258,17 @@ function voucherDisplayNumber(voucherNumber: string) {
   return String(Number.parseInt(last, 10) || voucherNumber);
 }
 
+function groupVouchersByDate(vouchers: ExpenseVoucherItem[]) {
+  const grouped = new Map<string, ExpenseVoucherItem[]>();
+  for (const voucher of vouchers) {
+    const key = fmtDate(voucher.date);
+    const list = grouped.get(key) ?? [];
+    list.push(voucher);
+    grouped.set(key, list);
+  }
+  return [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b));
+}
+
 export function downloadSummaryExpenseSheetExcel(sheet: ExpenseSheetItem) {
   const { rows, columnTotals, grandTotal, totalAdvance } = buildSummaryRows(sheet);
   const headerRows = [
@@ -243,26 +306,34 @@ export function downloadSummaryExpenseSheetExcel(sheet: ExpenseSheetItem) {
   XLSX.writeFile(workbook, `site-expense-summary-${sheet.id}.xlsx`);
 }
 
+/** Portrait SITE EXPENSE SHEET — matches company paper form (screenshot 2). */
 export function downloadSummaryExpenseSheetPdf(sheet: ExpenseSheetItem) {
   const { rows, columnTotals, grandTotal, totalAdvance } = buildSummaryRows(sheet);
-  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
-  const marginX = 8;
+  const pageH = doc.internal.pageSize.getHeight();
+  const marginX = 10;
   const tableW = pageW - marginX * 2;
-  let y = 10;
+  let y = 12;
 
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(16);
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(15);
   doc.text(COMPANY_NAME, pageW / 2, y, { align: "center" });
-  y += 8;
-  doc.setFontSize(13);
-  doc.text("SITE EXPENSE SHEET", pageW / 2, y, { align: "center" });
-  const titleW = doc.getTextWidth("SITE EXPENSE SHEET");
-  doc.setLineWidth(0.4);
-  doc.line(pageW / 2 - titleW / 2, y + 1.2, pageW / 2 + titleW / 2, y + 1.2);
-  y += 6;
+  y += 9;
 
-  const headerH = 7;
+  const titleH = 9;
+  doc.setDrawColor(...GRID.lineColor);
+  doc.setLineWidth(GRID.lineWidth);
+  doc.rect(marginX, y, tableW, titleH);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.text("SITE EXPENSE SHEET", pageW / 2, y + 6.2, { align: "center" });
+  const titleW = doc.getTextWidth("SITE EXPENSE SHEET");
+  doc.setLineWidth(0.35);
+  doc.line(pageW / 2 - titleW / 2, y + 7.2, pageW / 2 + titleW / 2, y + 7.2);
+  y += titleH;
+
+  const headerH = 7.5;
   const employeeName = sheet.employeeName ?? sheet.employee?.name ?? "";
   const personsLabel = sheet.totalPersons === 1 ? "1 person" : `${sheet.totalPersons} persons`;
   drawLabelValueRow(doc, marginX, y, tableW, headerH, { label: "Full Name of Employee:", value: employeeName }, { label: "Bank Account:", value: sheet.bankAccount ?? "" });
@@ -272,7 +343,7 @@ export function downloadSummaryExpenseSheetPdf(sheet: ExpenseSheetItem) {
   drawLabelValueRow(doc, marginX, y, tableW, headerH, { label: "Name of Work Site:", value: sheet.siteName }, { label: "Project Code:", value: sheet.projectNumber ?? "" });
   y += headerH;
   drawLabelValueRow(doc, marginX, y, tableW, headerH, { label: "Name of Site Incharge:", value: sheet.siteIncharge }, { label: "Mobile no:", value: sheet.mobileNumber ?? sheet.employee?.contactNumber ?? "" });
-  y += headerH + 1;
+  y += headerH;
 
   const dataRows: RowInput[] = rows.map((row) => [
     row.date,
@@ -283,15 +354,22 @@ export function downloadSummaryExpenseSheetPdf(sheet: ExpenseSheetItem) {
     dataRows.push(["", ...SUMMARY_CATEGORY_ORDER.map(() => ""), ""]);
   }
   dataRows.push([
-    "Total (Rs.)",
-    ...SUMMARY_CATEGORY_ORDER.map((cat) => fmtMoney(columnTotals[cat] ?? 0, true)),
-    fmtMoney(grandTotal)
+    { content: "Total (Rs.)", styles: { fontStyle: "bold", halign: "left" } },
+    ...SUMMARY_CATEGORY_ORDER.map((cat) => ({
+      content: fmtMoney(columnTotals[cat] ?? 0, true),
+      styles: { fontStyle: "bold" as const }
+    })),
+    { content: fmtMoney(grandTotal), styles: { fontStyle: "bold" } }
   ]);
 
-  const colWidths: Record<number, { cellWidth: number }> = {
-    0: { cellWidth: 18 },
-    10: { cellWidth: 16 }
+  const dateW = 16;
+  const totalColW = 14;
+  const catW = (tableW - dateW - totalColW) / SUMMARY_CATEGORY_ORDER.length;
+  const columnStyles: Record<number, { cellWidth: number; halign?: "left" | "center" | "right" }> = {
+    0: { cellWidth: dateW, halign: "center" },
+    10: { cellWidth: totalColW, halign: "center" }
   };
+  for (let i = 1; i <= 9; i += 1) columnStyles[i] = { cellWidth: catW, halign: "center" };
 
   autoTable(doc, {
     startY: y,
@@ -300,59 +378,46 @@ export function downloadSummaryExpenseSheetPdf(sheet: ExpenseSheetItem) {
     head: [SUMMARY_COLUMN_HEADERS as unknown as string[]],
     body: dataRows,
     theme: "grid",
-    styles: {
-      font: "helvetica",
-      fontSize: 6.5,
-      cellPadding: 1.2,
-      lineColor: [0, 0, 0],
-      lineWidth: 0.2,
-      halign: "center",
-      valign: "middle",
-      textColor: [0, 0, 0]
-    },
+    styles: gridTableStyles(6.2),
     headStyles: {
-      fillColor: [255, 255, 255],
-      textColor: [0, 0, 0],
+      ...gridTableStyles(5.4),
       fontStyle: "bold",
-      fontSize: 6.2,
-      halign: "center"
+      minCellHeight: 10
     },
-    columnStyles: colWidths,
+    columnStyles,
     didParseCell: (data) => {
+      data.cell.styles.fillColor = GRID.fillColor;
+      data.cell.styles.lineColor = GRID.lineColor;
       if (data.section === "body" && data.row.index === dataRows.length - 1) {
         data.cell.styles.fontStyle = "bold";
       }
     }
   });
 
-  y = lastTableY(doc, y + 40) + 3;
+  y = lastTableY(doc, y + 50) + 2;
   const footerTop = y;
-  const leftW = tableW * 0.34;
+  const leftW = tableW * 0.36;
   const rightW = tableW - leftW;
   const boxH = 7;
 
-  drawCell(doc, marginX, footerTop, leftW * 0.55, boxH, "Total Advance", { bold: true });
-  drawCell(doc, marginX + leftW * 0.55, footerTop, leftW * 0.45, boxH, fmtMoney(totalAdvance, true), { align: "right" });
-  drawCell(doc, marginX, footerTop + boxH, leftW * 0.55, boxH, "Total Expenses", { bold: true });
-  drawCell(doc, marginX + leftW * 0.55, footerTop + boxH, leftW * 0.45, boxH, fmtMoney(grandTotal), { align: "right" });
-  drawCell(doc, marginX, footerTop + boxH * 2, leftW * 0.55, boxH, "Due / Advance Amount", { bold: true });
-  drawCell(doc, marginX + leftW * 0.55, footerTop + boxH * 2, leftW * 0.45, boxH, fmtMoney(totalAdvance - grandTotal), { align: "right" });
+  drawCell(doc, marginX, footerTop, leftW * 0.58, boxH, "Total Advance", { bold: true, fontSize: 7.5 });
+  drawCell(doc, marginX + leftW * 0.58, footerTop, leftW * 0.42, boxH, totalAdvance ? fmtMoney(totalAdvance) : "-", { align: "right", fontSize: 7.5 });
+  drawCell(doc, marginX, footerTop + boxH, leftW * 0.58, boxH, "Total Expenses", { bold: true, fontSize: 7.5 });
+  drawCell(doc, marginX + leftW * 0.58, footerTop + boxH, leftW * 0.42, boxH, fmtMoney(grandTotal), { align: "right", fontSize: 7.5 });
+  drawCell(doc, marginX, footerTop + boxH * 2, leftW * 0.58, boxH, "Due / Advance Amount", { bold: true, fontSize: 7.5 });
+  drawCell(doc, marginX + leftW * 0.58, footerTop + boxH * 2, leftW * 0.42, boxH, fmtMoney(totalAdvance - grandTotal), { align: "right", fontSize: 7.5 });
 
-  drawCell(doc, marginX + leftW, footerTop, 28, boxH * 3, "Amount in Rupees", { bold: true, align: "center" });
-  drawCell(doc, marginX + leftW + 28, footerTop, rightW - 28, boxH * 3, amountInWordsIndian(grandTotal), { align: "center" });
+  drawCell(doc, marginX + leftW, footerTop, 30, boxH * 3, "Amount in Rupees", { bold: true, align: "center", fontSize: 7.5 });
+  drawCell(doc, marginX + leftW + 30, footerTop, rightW - 30, boxH * 3, amountInWordsIndian(grandTotal), { align: "center", fontSize: 7.5 });
 
   y = footerTop + boxH * 3 + 2;
-  const sigW = tableW / SIGNATURE_LABELS.length;
-  const sigH = 16;
-  for (let i = 0; i < SIGNATURE_LABELS.length; i += 1) {
-    drawCell(doc, marginX + sigW * i, y, sigW, sigH, SIGNATURE_LABELS[i], { bold: true, align: "center", fontSize: 7 });
-  }
+  drawSignatureBoxes(doc, marginX, y, tableW, SIGNATURE_LABELS, 20);
+  y += 22;
 
-  y += sigH + 3;
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(7);
+  doc.setFontSize(6.5);
   doc.text(EXPENSE_NOTE, marginX, y);
-  doc.text(financialYearLabel(sheet.expenseDate), marginX, doc.internal.pageSize.getHeight() - 6);
+  doc.text(financialYearLabel(sheet.expenseDate), marginX, pageH - 8);
 
   doc.save(`site-expense-summary-${sheet.id}.pdf`);
 }
@@ -396,14 +461,14 @@ export function downloadDetailedExpenseSheetPdf(sheet: ExpenseSheetItem) {
         body.push([
           { content: String(sr), rowSpan: span, styles: { valign: "middle", halign: "center", fontStyle: "bold" } },
           { content: date, rowSpan: span, styles: { valign: "middle", halign: "center" } },
-          entry.description,
+          { content: entry.description, styles: { halign: "left" } },
           entry.billNumber ?? "",
           { content: fmtMoney(entry.amount), styles: { halign: "right" } },
           { content: fmtMoney(groupTotal), rowSpan: span, styles: { valign: "middle", halign: "center", fontStyle: "bold" } }
         ]);
       } else {
         body.push([
-          entry.description,
+          { content: entry.description, styles: { halign: "left" } },
           entry.billNumber ?? "",
           { content: fmtMoney(entry.amount), styles: { halign: "right" } }
         ]);
@@ -423,22 +488,8 @@ export function downloadDetailedExpenseSheetPdf(sheet: ExpenseSheetItem) {
     head: [["Sr", "Date", "Detail Description of Expense", "Bill No.", "Amount", "Total"]],
     body,
     theme: "grid",
-    styles: {
-      font: "helvetica",
-      fontSize: 8,
-      cellPadding: 1.5,
-      lineColor: [0, 0, 0],
-      lineWidth: 0.2,
-      halign: "center",
-      valign: "middle",
-      textColor: [0, 0, 0]
-    },
-    headStyles: {
-      fillColor: [255, 255, 255],
-      textColor: [0, 0, 0],
-      fontStyle: "bold",
-      halign: "center"
-    },
+    styles: gridTableStyles(8),
+    headStyles: { ...gridTableStyles(8), fontStyle: "bold" },
     columnStyles: {
       0: { cellWidth: 10 },
       1: { cellWidth: 22 },
@@ -446,6 +497,10 @@ export function downloadDetailedExpenseSheetPdf(sheet: ExpenseSheetItem) {
       3: { cellWidth: 24 },
       4: { cellWidth: 24, halign: "right" },
       5: { cellWidth: 24 }
+    },
+    didParseCell: (data) => {
+      data.cell.styles.fillColor = GRID.fillColor;
+      data.cell.styles.lineColor = GRID.lineColor;
     }
   });
 
@@ -494,39 +549,44 @@ function drawVoucherPage(
   let y = 14;
   const first = items[0];
   const voucherNo = voucherDisplayNumber(first.voucherNumber);
-  const voucherDate = fmtDate(first.date);
-  const siteLine = [meta.projectNumber, meta.projectName].filter(Boolean).join("/") || first.projectName;
+  const voucherDate = fmtDateSlash(first.date);
+  const siteLabel = meta.projectNumber
+    ? `${meta.projectNumber}${meta.projectName ? ` (${meta.projectName})` : ""}`
+    : meta.projectName ?? first.projectName;
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(14);
+  doc.setFontSize(13);
   doc.text(COMPANY_NAME_VOUCHER, marginX, y);
-  y += 6;
+  y += 5.5;
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   doc.text(COMPANY_ADDRESS, marginX, y);
-  y += 8;
+  y += 5;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.text(`Proj no / Site: ${siteLabel}`, marginX, y);
+  y += 6;
 
-  const metaH = 8;
-  const leftW = tableW * 0.68;
-  const rightW = tableW - leftW;
-  const rightCol = rightW / 2;
-  drawCell(doc, marginX, y, 34, metaH, "Proj no / Site", { bold: true });
-  drawCell(doc, marginX + 34, y, leftW - 34, metaH, siteLine);
-  drawCell(doc, marginX + leftW, y, rightCol, metaH, "Cash Voucher no", { bold: true });
-  drawCell(doc, marginX + leftW + rightCol, y, rightCol, metaH, voucherNo, { align: "center" });
-  drawCell(doc, marginX, y + metaH, 34, metaH, "Debit / Credit", { bold: true });
-  drawCell(doc, marginX + 34, y + metaH, leftW - 34, metaH, "");
-  drawCell(doc, marginX + leftW, y + metaH, rightCol, metaH, "Date", { bold: true });
-  drawCell(doc, marginX + leftW + rightCol, y + metaH, rightCol, metaH, voucherDate, { align: "center" });
-  y += metaH * 2 + 2;
+  const metaH = 7;
+  const metaLeftW = tableW * 0.55;
+  drawCell(doc, marginX, y, metaLeftW, metaH, "Debit / Credit", { bold: true, fontSize: 8 });
+  drawCell(doc, marginX + metaLeftW, y, tableW - metaLeftW, metaH, "");
+  y += metaH;
+  const half = (tableW - 0) / 2;
+  drawCell(doc, marginX, y, half, metaH, "Cash Voucher no", { bold: true, fontSize: 8 });
+  drawCell(doc, marginX + half, y, half, metaH, voucherNo, { align: "center", fontSize: 9 });
+  y += metaH;
+  drawCell(doc, marginX, y, half, metaH, "Date", { bold: true, fontSize: 8 });
+  drawCell(doc, marginX + half, y, half, metaH, voucherDate, { align: "center", fontSize: 9 });
+  y += metaH + 2;
 
   const total = items.reduce((sum, item) => sum + item.amount, 0);
   const tableBody: RowInput[] = items.map((item, idx) => [
-    idx === 0 ? fmtDate(item.date) : "",
+    idx === 0 ? fmtDateSlash(item.date) : "",
     item.description,
     fmtMoneyRs(item.amount)
   ]);
-  const emptyRows = Math.max(0, 8 - tableBody.length);
+  const emptyRows = Math.max(0, MIN_VOUCHER_ROWS - tableBody.length);
   for (let i = 0; i < emptyRows; i += 1) tableBody.push(["", "", ""]);
 
   autoTable(doc, {
@@ -535,37 +595,35 @@ function drawVoucherPage(
     tableWidth: tableW,
     head: [["Date", "Particulars", "Amount (₹)"]],
     body: tableBody,
-    foot: [["Total", amountInWordsIndian(total), fmtMoneyRs(total)]],
+    foot: [
+      [
+        { content: "Total", styles: { fontStyle: "bold", halign: "left" } },
+        { content: amountInWordsIndian(total), styles: { fontStyle: "bold", halign: "center" } },
+        { content: fmtMoneyRs(total), styles: { fontStyle: "bold", halign: "right" } }
+      ]
+    ],
     theme: "grid",
-    styles: {
-      font: "helvetica",
-      fontSize: 9,
-      cellPadding: 2,
-      lineColor: [0, 0, 0],
-      lineWidth: 0.2,
-      textColor: [0, 0, 0]
-    },
-    headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: "bold", halign: "center" },
-    footStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: "bold" },
+    styles: gridTableStyles(8.5),
+    headStyles: { ...gridTableStyles(8.5), fontStyle: "bold" },
+    footStyles: { ...gridTableStyles(8.5), fontStyle: "bold", fillColor: GRID.fillColor },
     columnStyles: {
-      0: { cellWidth: 26, halign: "center" },
-      1: { cellWidth: tableW - 26 - 34, halign: "left" },
-      2: { cellWidth: 34, halign: "right" }
+      0: { cellWidth: 28, halign: "center" },
+      1: { cellWidth: tableW - 28 - 36, halign: "left" },
+      2: { cellWidth: 36, halign: "right" }
     },
     didParseCell: (data) => {
-      if (data.section === "foot" && data.column.index === 1) {
-        data.cell.styles.halign = "center";
-        data.cell.styles.fontStyle = "bold";
-      }
+      data.cell.styles.fillColor = GRID.fillColor;
+      data.cell.styles.lineColor = GRID.lineColor;
+      data.cell.styles.textColor = GRID.textColor;
     }
   });
 
-  y = lastTableY(doc, y + 60) + 10;
-  const sigW = tableW / VOUCHER_SIGNATURE_LABELS.length;
-  const sigH = 18;
-  for (let i = 0; i < VOUCHER_SIGNATURE_LABELS.length; i += 1) {
-    drawCell(doc, marginX + sigW * i, y, sigW, sigH, VOUCHER_SIGNATURE_LABELS[i], { bold: true, align: "center", fontSize: 8 });
-  }
+  y = lastTableY(doc, y + 70) + 8;
+  drawSignatureBoxes(doc, marginX, y, tableW, VOUCHER_SIGNATURE_LABELS, 22);
+  y += 24;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.text(COMPANY_NAME_VOUCHER, pageW / 2, y, { align: "center" });
 }
 
 export function downloadVoucherReportPdf(
@@ -575,16 +633,9 @@ export function downloadVoucherReportPdf(
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   if (vouchers.length === 0) return;
 
-  const grouped = new Map<string, ExpenseVoucherItem[]>();
-  for (const voucher of vouchers) {
-    const key = voucher.voucherNumber;
-    const list = grouped.get(key) ?? [];
-    list.push(voucher);
-    grouped.set(key, list);
-  }
-
+  const groups = groupVouchersByDate(vouchers);
   let pageIndex = 0;
-  for (const items of grouped.values()) {
+  for (const [, items] of groups) {
     drawVoucherPage(doc, items, meta, pageIndex);
     pageIndex += 1;
   }
