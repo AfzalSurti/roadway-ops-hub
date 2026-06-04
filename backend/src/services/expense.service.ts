@@ -1,10 +1,15 @@
 import type { ExpenseSheetStatus, Role } from "@prisma/client";
-import { expenseRepository, type ExpenseSheetFilters } from "../repositories/expense.repository.js";
+import {
+  expenseRepository,
+  type ExpenseSheetDetail,
+  type ExpenseSheetFilters,
+  type ExpenseSheetListItem
+} from "../repositories/expense.repository.js";
 import { badRequest, forbidden, notFound } from "../utils/errors.js";
 
-type AuthUser = { id: string; role: Role; name: string };
+type AuthUser = { id: string; role: Role };
 
-function mapSheet(sheet: NonNullable<Awaited<ReturnType<typeof expenseRepository.findSheetById>>>) {
+function mapSheet(sheet: ExpenseSheetDetail | ExpenseSheetListItem) {
   const totalAmount = sheet.entries.reduce((sum, entry) => sum + entry.amount, 0);
   const latestApproval = sheet.approvals[0] ?? null;
 

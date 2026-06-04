@@ -41,6 +41,9 @@ const sheetListInclude = {
   }
 } satisfies Prisma.ExpenseSheetInclude;
 
+export type ExpenseSheetDetail = Prisma.ExpenseSheetGetPayload<{ include: typeof sheetInclude }>;
+export type ExpenseSheetListItem = Prisma.ExpenseSheetGetPayload<{ include: typeof sheetListInclude }>;
+
 export type ExpenseSheetFilters = {
   employeeId?: string;
   projectId?: string;
