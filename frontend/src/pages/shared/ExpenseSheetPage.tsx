@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -27,6 +27,18 @@ type ExpenseSheetPageProps = {
   basePath: "/admin/expenses" | "/app/expenses";
 };
 
+function digitsOnly(value: string, maxLength: number) {
+  return value.replace(/\D/g, "").slice(0, maxLength);
+}
+
+function isValidMobile10(value: string) {
+  return /^\d{10}$/.test(value);
+}
+
+function isValidBank12(value: string) {
+  return /^\d{12}$/.test(value);
+}
+
 export default function ExpenseSheetPage({ basePath }: ExpenseSheetPageProps) {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -48,10 +60,18 @@ export default function ExpenseSheetPage({ basePath }: ExpenseSheetPageProps) {
 
   const expenseQueryOptions = { staleTime: 60_000, refetchInterval: false as const, retry: 1 };
 
-  const { data: categories = [] } = useQuery({
+  const {
+    data: categories = [],
+    isError: categoriesError,
+    error: categoriesLoadError,
+    refetch: refetchCategories,
+    isFetching: categoriesFetching
+  } = useQuery({
     queryKey: ["expense-categories"],
     queryFn: () => api.getExpenseCategories(),
-    ...expenseQueryOptions
+    staleTime: 5 * 60_000,
+    refetchInterval: false,
+    retry: 2
   });
   const { data: projects = [] } = useQuery({
     queryKey: ["projects"],
@@ -65,6 +85,14 @@ export default function ExpenseSheetPage({ basePath }: ExpenseSheetPageProps) {
     enabled: canEdit && isNew,
     staleTime: 5 * 60_000
   });
+
+  useEffect(() => {
+    if (!isNew || !profile?.contactNumber) return;
+    setHeaderForm((prev) => {
+      if (prev.mobileNumber) return prev;
+      return { ...prev, mobileNumber: digitsOnly(profile.contactNumber ?? "", 10) };
+    });
+  }, [isNew, profile?.contactNumber]);
 
   const [headerForm, setHeaderForm] = useState({
     projectId: "",
@@ -108,17 +136,26 @@ export default function ExpenseSheetPage({ basePath }: ExpenseSheetPageProps) {
   };
 
   const createMutation = useMutation({
-    mutationFn: () =>
-      api.createExpenseSheet({
+    mutationFn: () => {
+      const mobileNumber = digitsOnly(headerForm.mobileNumber || profile?.contactNumber || "", 10);
+      const bankAccount = digitsOnly(headerForm.bankAccount, 12);
+      if (!isValidMobile10(mobileNumber)) {
+        throw new Error("Mobile number must be exactly 10 digits");
+      }
+      if (!isValidBank12(bankAccount)) {
+        throw new Error("Bank account number must be exactly 12 digits");
+      }
+      return api.createExpenseSheet({
         projectId: headerForm.projectId || null,
         siteName: headerForm.siteName.trim(),
         siteIncharge: headerForm.siteIncharge.trim(),
         totalPersons: Number(headerForm.totalPersons),
         expenseDate: new Date(headerForm.expenseDate).toISOString(),
-        mobileNumber: headerForm.mobileNumber || profile?.contactNumber || null,
-        bankAccount: headerForm.bankAccount || null,
+        mobileNumber,
+        bankAccount,
         sheetNumber: headerForm.sheetNumber ? Number(headerForm.sheetNumber) : null
-      }),
+      });
+    },
     onSuccess: (created) => {
       toast.success("Expense sheet created");
       navigate(`${basePath}/${created.id}`, { replace: true });
@@ -152,11 +189,19 @@ export default function ExpenseSheetPage({ basePath }: ExpenseSheetPageProps) {
         const uploaded = await api.uploadFile(entryForm.billFile);
         billAttachmentUrl = uploaded.url;
       }
+      const description = entryForm.description.trim();
+      if (!description) {
+        throw new Error("Description is required");
+      }
+      const amount = Number(entryForm.amount);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        throw new Error("Amount must be greater than 0");
+      }
       return api.addExpenseEntry(id!, {
         categoryId: entryForm.categoryId,
-        entryDate: entryForm.entryDate,
-        amount: Number(entryForm.amount),
-        description: entryForm.description,
+        entryDate: new Date(entryForm.entryDate).toISOString(),
+        amount,
+        description,
         billAvailable: entryForm.billAvailable === "YES",
         billNumber: entryForm.billNumber || null,
         billAttachmentUrl
@@ -180,6 +225,20 @@ export default function ExpenseSheetPage({ basePath }: ExpenseSheetPageProps) {
   });
 
   const editable = sheet && (sheet.status === "DRAFT" || sheet.status === "REJECTED") && sheet.employeeId === user?.id;
+
+  const canAddEntry =
+    Boolean(entryForm.categoryId) &&
+    Boolean(entryForm.description.trim()) &&
+    Number(entryForm.amount) > 0 &&
+    categories.length > 0 &&
+    (entryForm.billAvailable === "NO" || Boolean(entryForm.billFile));
+
+  const createMobile = digitsOnly(headerForm.mobileNumber || profile?.contactNumber || "", 10);
+  const createBank = digitsOnly(headerForm.bankAccount, 12);
+  const canCreateSheet =
+    Boolean(headerForm.siteName.trim() && headerForm.siteIncharge.trim()) &&
+    isValidMobile10(createMobile) &&
+    isValidBank12(createBank);
 
   if (isNew && canEdit) {
     return (
@@ -211,11 +270,35 @@ export default function ExpenseSheetPage({ basePath }: ExpenseSheetPageProps) {
           </Field>
           <Field label="Site Incharge"><Input value={headerForm.siteIncharge} onChange={(e) => setHeaderForm((p) => ({ ...p, siteIncharge: e.target.value }))} /></Field>
           <Field label="Total Persons at Site"><Input type="number" min={1} value={headerForm.totalPersons} onChange={(e) => setHeaderForm((p) => ({ ...p, totalPersons: e.target.value }))} /></Field>
-          <Field label="Mobile Number"><Input value={headerForm.mobileNumber || profile?.contactNumber || ""} onChange={(e) => setHeaderForm((p) => ({ ...p, mobileNumber: e.target.value }))} /></Field>
-          <Field label="Bank Account"><Input value={headerForm.bankAccount} onChange={(e) => setHeaderForm((p) => ({ ...p, bankAccount: e.target.value }))} /></Field>
+          <Field label="Mobile Number">
+            <Input
+              type="text"
+              inputMode="numeric"
+              maxLength={10}
+              value={headerForm.mobileNumber}
+              onChange={(e) => setHeaderForm((p) => ({ ...p, mobileNumber: digitsOnly(e.target.value, 10) }))}
+              placeholder="10-digit mobile number"
+            />
+            {createMobile.length > 0 && !isValidMobile10(createMobile) ? (
+              <p className="text-xs text-rose-500 mt-1">Enter exactly 10 digits.</p>
+            ) : null}
+          </Field>
+          <Field label="Bank Account">
+            <Input
+              type="text"
+              inputMode="numeric"
+              maxLength={12}
+              value={headerForm.bankAccount}
+              onChange={(e) => setHeaderForm((p) => ({ ...p, bankAccount: digitsOnly(e.target.value, 12) }))}
+              placeholder="12-digit account number"
+            />
+            {createBank.length > 0 && !isValidBank12(createBank) ? (
+              <p className="text-xs text-rose-500 mt-1">Enter exactly 12 digits.</p>
+            ) : null}
+          </Field>
           <Field label="Sheet Number"><Input type="number" value={headerForm.sheetNumber} onChange={(e) => setHeaderForm((p) => ({ ...p, sheetNumber: e.target.value }))} /></Field>
         </div>
-        <Button className="mt-4" onClick={() => createMutation.mutate()} disabled={createMutation.isPending || !headerForm.siteName || !headerForm.siteIncharge}>
+        <Button className="mt-4" onClick={() => createMutation.mutate()} disabled={createMutation.isPending || !canCreateSheet}>
           {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           Create Sheet
         </Button>
@@ -318,7 +401,19 @@ export default function ExpenseSheetPage({ basePath }: ExpenseSheetPageProps) {
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-semibold">Expense Entries</h3>
           {editable ? (
-            <Button size="sm" className="gap-1" onClick={() => addEntryMutation.mutate()} disabled={addEntryMutation.isPending || !entryForm.categoryId || !entryForm.amount}>
+            <Button
+              size="sm"
+              className="gap-1"
+              onClick={() => addEntryMutation.mutate()}
+              disabled={addEntryMutation.isPending || !canAddEntry}
+              title={
+                !canAddEntry
+                  ? categories.length === 0
+                    ? "Categories are not loaded"
+                    : "Select category, amount, description; upload bill if Bill Available is Yes"
+                  : undefined
+              }
+            >
               <Plus className="h-3.5 w-3.5" /> Add Entry
             </Button>
           ) : null}
@@ -326,8 +421,28 @@ export default function ExpenseSheetPage({ basePath }: ExpenseSheetPageProps) {
 
         {editable ? (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 mb-6 p-4 rounded-xl border border-border/40 bg-secondary/10">
+            {categoriesError ? (
+              <div className="md:col-span-2 xl:col-span-3 rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-sm">
+                <p className="text-rose-500">
+                  Could not load expense categories:{" "}
+                  {categoriesLoadError instanceof Error ? categoriesLoadError.message : "Request failed"}
+                </p>
+                <Button size="sm" variant="outline" className="mt-2" onClick={() => void refetchCategories()} disabled={categoriesFetching}>
+                  Retry
+                </Button>
+              </div>
+            ) : null}
+            {!categoriesError && categories.length === 0 ? (
+              <p className="md:col-span-2 xl:col-span-3 text-sm text-amber-500">
+                No expense categories found. Redeploy the backend and run database migrations, then refresh.
+              </p>
+            ) : null}
             <Field label="Category">
-              <Select value={entryForm.categoryId} onValueChange={(v) => setEntryForm((p) => ({ ...p, categoryId: v }))}>
+              <Select
+                value={entryForm.categoryId || undefined}
+                onValueChange={(v) => setEntryForm((p) => ({ ...p, categoryId: v }))}
+                disabled={categories.length === 0 || categoriesError}
+              >
                 <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
                 <SelectContent>
                   {categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
@@ -337,7 +452,11 @@ export default function ExpenseSheetPage({ basePath }: ExpenseSheetPageProps) {
             <Field label="Entry Date"><Input type="date" value={entryForm.entryDate} onChange={(e) => setEntryForm((p) => ({ ...p, entryDate: e.target.value }))} /></Field>
             <Field label="Amount"><Input type="number" min={0} step="0.01" value={entryForm.amount} onChange={(e) => setEntryForm((p) => ({ ...p, amount: e.target.value }))} /></Field>
             <Field label="Description" className="md:col-span-2">
-              <Input value={entryForm.description} onChange={(e) => setEntryForm((p) => ({ ...p, description: e.target.value }))} />
+              <Input
+                value={entryForm.description}
+                onChange={(e) => setEntryForm((p) => ({ ...p, description: e.target.value }))}
+                placeholder="Required"
+              />
             </Field>
             <Field label="Bill Available?">
               <Select value={entryForm.billAvailable} onValueChange={(v) => setEntryForm((p) => ({ ...p, billAvailable: v as "YES" | "NO", billFile: null }))}>

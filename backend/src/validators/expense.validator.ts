@@ -8,8 +8,18 @@ export const createExpenseSheetSchema = z.object({
   siteIncharge: z.string().trim().min(1),
   totalPersons: z.coerce.number().int().min(1),
   expenseDate: z.coerce.date(),
-  mobileNumber: z.string().trim().optional().nullable(),
-  bankAccount: z.string().trim().optional().nullable(),
+  mobileNumber: z
+    .string()
+    .trim()
+    .regex(/^\d{10}$/, "Mobile number must be exactly 10 digits")
+    .optional()
+    .nullable(),
+  bankAccount: z
+    .string()
+    .trim()
+    .regex(/^\d{12}$/, "Bank account number must be exactly 12 digits")
+    .optional()
+    .nullable(),
   sheetNumber: z.coerce.number().int().optional().nullable()
 });
 

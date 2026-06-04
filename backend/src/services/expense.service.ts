@@ -59,7 +59,12 @@ function assertEditable(status: ExpenseSheetStatus) {
 
 export const expenseService = {
   async listCategories() {
-    return expenseRepository.findCategories();
+    let categories = await expenseRepository.findCategories();
+    if (categories.length === 0) {
+      await expenseRepository.seedDefaultCategories();
+      categories = await expenseRepository.findCategories();
+    }
+    return categories;
   },
 
   async getDashboard(user: AuthUser) {

@@ -1,4 +1,5 @@
 import type { ExpenseSheetStatus, Prisma } from "@prisma/client";
+import { DEFAULT_EXPENSE_CATEGORIES } from "../data/expense-categories.js";
 import { prisma } from "../prisma/client.js";
 
 function aggregateMonthlyTrend(entries: Array<{ entryDate: Date; amount: number }>) {
@@ -61,6 +62,21 @@ export const expenseRepository = {
     return prisma.expenseCategory.findMany({
       where: { isActive: true },
       orderBy: { sortOrder: "asc" }
+    });
+  },
+
+  async seedDefaultCategories() {
+    const now = new Date();
+    await prisma.expenseCategory.createMany({
+      data: DEFAULT_EXPENSE_CATEGORIES.map((category) => ({
+        id: category.id,
+        name: category.name,
+        sortOrder: category.sortOrder,
+        isActive: true,
+        createdAt: now,
+        updatedAt: now
+      })),
+      skipDuplicates: true
     });
   },
 
