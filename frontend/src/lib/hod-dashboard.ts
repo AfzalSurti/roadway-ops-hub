@@ -83,6 +83,20 @@ export function getHodWorkCategoryOptions(subTechnicalUnitCode?: string | null) 
   return [...HOD_DEFAULT_WORK_CATEGORY_OPTIONS];
 }
 
+/** All work category codes for standalone HOD filter (default + FH-only codes). */
+export function getAllHodWorkCategoryOptions() {
+  const byCode = new Map<string, { label: string; code: string }>();
+  for (const item of HOD_DEFAULT_WORK_CATEGORY_OPTIONS) {
+    byCode.set(item.code, { label: item.label, code: item.code });
+  }
+  for (const item of HOD_FH_WORK_CATEGORY_OPTIONS) {
+    if (!byCode.has(item.code)) {
+      byCode.set(item.code, { label: item.label, code: item.code });
+    }
+  }
+  return [...byCode.values()].sort((a, b) => a.label.localeCompare(b.label));
+}
+
 function isKnownWorkCategoryCode(code: string, subTechnicalUnitCode?: string | null) {
   if (subTechnicalUnitCode === "FH") {
     return HOD_FH_WORK_CATEGORY_OPTIONS.some((item) => item.code === code);

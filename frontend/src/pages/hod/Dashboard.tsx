@@ -19,6 +19,7 @@ import {
   getProjectCompanyCode,
   getProjectFinancialYearShort,
   getProjectLifecycle,
+  getAllHodWorkCategoryOptions,
   getHodWorkCategoryOptions,
   getProjectSubTechnicalUnitCode,
   getProjectTechnicalUnitCode,
@@ -85,10 +86,10 @@ export default function HodDashboard() {
   }, [technicalUnitFilter]);
 
   const workCategoryOptions = useMemo(() => {
-    if (subTechnicalUnitFilter === "ALL") {
-      return [];
+    if (subTechnicalUnitFilter !== "ALL") {
+      return getHodWorkCategoryOptions(subTechnicalUnitFilter);
     }
-    return getHodWorkCategoryOptions(subTechnicalUnitFilter);
+    return getAllHodWorkCategoryOptions();
   }, [subTechnicalUnitFilter]);
 
   const financialYearOptions = useMemo(() => collectHodFinancialYearOptions(projects), [projects]);
@@ -225,7 +226,6 @@ export default function HodDashboard() {
               onValueChange={(value) => {
                 setTechnicalUnitFilter(value);
                 setSubTechnicalUnitFilter("ALL");
-                setWorkCategoryFilter("ALL");
               }}
             >
               <SelectTrigger>
@@ -245,10 +245,7 @@ export default function HodDashboard() {
           <FilterField label="Sub Technical Unit">
             <Select
               value={subTechnicalUnitFilter}
-              onValueChange={(value) => {
-                setSubTechnicalUnitFilter(value);
-                setWorkCategoryFilter("ALL");
-              }}
+              onValueChange={setSubTechnicalUnitFilter}
               disabled={technicalUnitFilter === "ALL"}
             >
               <SelectTrigger>
@@ -270,17 +267,9 @@ export default function HodDashboard() {
           </FilterField>
 
           <FilterField label="Work Category">
-            <Select
-              value={workCategoryFilter}
-              onValueChange={setWorkCategoryFilter}
-              disabled={subTechnicalUnitFilter === "ALL"}
-            >
+            <Select value={workCategoryFilter} onValueChange={setWorkCategoryFilter}>
               <SelectTrigger>
-                <SelectValue
-                  placeholder={
-                    subTechnicalUnitFilter === "ALL" ? "Select sub technical unit first" : "All work categories"
-                  }
-                />
+                <SelectValue placeholder="All work categories" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="ALL">All work categories</SelectItem>
