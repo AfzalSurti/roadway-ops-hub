@@ -344,19 +344,50 @@ export const expenseRepository = {
       });
     }
 
+    const expenseByCategory = byCategory.map((row) => ({
+      categoryId: row.categoryId,
+      categoryName: categoryMap.get(row.categoryId) ?? "Unknown",
+      total: row._sum.amount ?? 0
+    }));
+
+    const categoryTotal = expenseByCategory.reduce((sum, row) => sum + row.total, 0);
+    const monthTotal = monthAgg._sum.amount ?? 0;
+    const todayTotal = todayAgg._sum.amount ?? 0;
+
+    let totalExpensesAllTime = allTimeAgg._sum.amount ?? 0;
+    if (totalExpensesAllTime <= 0 && categoryTotal > 0) {
+      totalExpensesAllTime = categoryTotal;
+    }
+    if (totalExpensesAllTime <= 0) {
+      totalExpensesAllTime = Math.max(monthTotal, todayTotal, categoryTotal);
+    }
+
+    let totalExpenseSheetsResolved = sheetCount;
+    if (totalExpenseSheetsResolved <= 0 && recentSheets.length > 0) {
+      totalExpenseSheetsResolved = await prisma.expenseSheet.count({ where: sheetWhere });
+    }
+
+    let employeesWithExpensesResolved = employeesWithExpenses;
+    if (!filters.employeeId && employeesWithExpensesResolved <= 0 && expenseByEmployee.length > 0) {
+      employeesWithExpensesResolved = new Set(
+        expenseByEmployee.map((row) => row.employeeId).filter(Boolean)
+      ).size;
+    }
+    if (!filters.employeeId && employeesWithExpensesResolved <= 0 && recentSheets.length > 0) {
+      employeesWithExpensesResolved = new Set(
+        recentSheets.map((sheet) => sheet.employeeId).filter(Boolean)
+      ).size;
+    }
+
     return {
-      totalExpensesThisMonth: monthAgg._sum.amount ?? 0,
-      totalExpensesToday: todayAgg._sum.amount ?? 0,
-      totalExpensesAllTime: allTimeAgg._sum.amount ?? 0,
-      totalExpenseSheets: sheetCount,
+      totalExpensesThisMonth: monthTotal,
+      totalExpensesToday: todayTotal,
+      totalExpensesAllTime,
+      totalExpenseSheets: totalExpenseSheetsResolved,
       totalExpenseEntries: entryCount,
-      employeesWithExpenses: employeesWithExpenses,
+      employeesWithExpenses: employeesWithExpensesResolved,
       totalVoucherEntries: voucherCount,
-      expenseByCategory: byCategory.map((row) => ({
-        categoryId: row.categoryId,
-        categoryName: categoryMap.get(row.categoryId) ?? "Unknown",
-        total: row._sum.amount ?? 0
-      })),
+      expenseByCategory,
       monthlyExpenseTrend: aggregateMonthlyTrend(monthlyEntries),
       expenseByEmployee,
       recentSheets

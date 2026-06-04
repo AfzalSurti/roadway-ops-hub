@@ -1,4 +1,6 @@
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import type { ExpenseDashboardStats } from "@/lib/domain";
 import { Link } from "react-router-dom";
 import { PageWrapper } from "@/components/PageWrapper";
 import { ExpenseStatusBadge } from "@/components/expense/ExpenseStatusBadge";
@@ -7,19 +9,68 @@ import { api } from "@/lib/api";
 import { ExpenseEmployeeCategoryCharts } from "@/components/expense/ExpenseEmployeeCategoryCharts";
 import { BarChart3, FileSpreadsheet, Layers, Plus, Receipt, TrendingUp, Users, Wallet } from "lucide-react";
 
+function resolveDashboardMetrics(stats?: ExpenseDashboardStats, sheetListTotal?: number) {
+  const categoryTotal = (stats?.expenseByCategory ?? []).reduce((sum, row) => sum + row.total, 0);
+  const month = stats?.totalExpensesThisMonth ?? 0;
+  const today = stats?.totalExpensesToday ?? 0;
+
+  const totalExpensesAllTime =
+    stats?.totalExpensesAllTime && stats.totalExpensesAllTime > 0
+      ? stats.totalExpensesAllTime
+      : Math.max(categoryTotal, month, today);
+
+  const employeeIds = new Set<string>();
+  for (const row of stats?.expenseByEmployee ?? []) {
+    if (row.employeeId) employeeIds.add(row.employeeId);
+  }
+  for (const sheet of stats?.recentSheets ?? []) {
+    if (sheet.employeeId) employeeIds.add(sheet.employeeId);
+  }
+
+  const employeesWithExpenses =
+    stats?.employeesWithExpenses && stats.employeesWithExpenses > 0
+      ? stats.employeesWithExpenses
+      : employeeIds.size;
+
+  const totalExpenseSheets =
+    stats?.totalExpenseSheets && stats.totalExpenseSheets > 0
+      ? stats.totalExpenseSheets
+      : sheetListTotal ?? stats?.recentSheets?.length ?? 0;
+
+  return {
+    month,
+    today,
+    totalExpensesAllTime,
+    totalExpenseSheets,
+    employeesWithExpenses,
+    voucherEntries: stats?.totalVoucherEntries ?? 0
+  };
+}
+
 export default function ExpenseDashboard() {
   const { data: stats, isLoading } = useQuery({
     queryKey: ["expense-dashboard"],
     queryFn: () => api.getExpenseDashboard()
   });
 
+  const { data: sheetListMeta } = useQuery({
+    queryKey: ["expense-sheets", "count"],
+    queryFn: () => api.getExpenseSheets({ limit: 1, page: 1 }),
+    staleTime: 60_000
+  });
+
+  const metrics = useMemo(
+    () => resolveDashboardMetrics(stats, sheetListMeta?.total),
+    [stats, sheetListMeta?.total]
+  );
+
   const kpis = [
-    { label: "Expenses This Month", value: stats?.totalExpensesThisMonth ?? 0, format: "currency" as const, icon: Wallet, tone: "text-primary bg-primary/10" },
-    { label: "Expenses Today", value: stats?.totalExpensesToday ?? 0, format: "currency" as const, icon: Receipt, tone: "text-sky-600 bg-sky-500/10" },
-    { label: "Total Expenses (All Time)", value: stats?.totalExpensesAllTime ?? 0, format: "currency" as const, icon: TrendingUp, tone: "text-violet-600 bg-violet-500/10" },
-    { label: "Expense Sheets", value: stats?.totalExpenseSheets ?? 0, format: "count" as const, icon: Layers, tone: "text-amber-700 bg-amber-500/10" },
-    { label: "Employees with Expenses", value: stats?.employeesWithExpenses ?? 0, format: "count" as const, icon: Users, tone: "text-emerald-600 bg-emerald-500/10" },
-    { label: "Voucher Entries", value: stats?.totalVoucherEntries ?? 0, format: "count" as const, icon: FileSpreadsheet, tone: "text-indigo-600 bg-indigo-500/10" }
+    { label: "Expenses This Month", value: metrics.month, format: "currency" as const, icon: Wallet, tone: "text-primary bg-primary/10" },
+    { label: "Expenses Today", value: metrics.today, format: "currency" as const, icon: Receipt, tone: "text-sky-600 bg-sky-500/10" },
+    { label: "Total Expenses (All Time)", value: metrics.totalExpensesAllTime, format: "currency" as const, icon: TrendingUp, tone: "text-violet-600 bg-violet-500/10" },
+    { label: "Expense Sheets", value: metrics.totalExpenseSheets, format: "count" as const, icon: Layers, tone: "text-amber-700 bg-amber-500/10" },
+    { label: "Employees with Expenses", value: metrics.employeesWithExpenses, format: "count" as const, icon: Users, tone: "text-emerald-600 bg-emerald-500/10" },
+    { label: "Voucher Entries", value: metrics.voucherEntries, format: "count" as const, icon: FileSpreadsheet, tone: "text-indigo-600 bg-indigo-500/10" }
   ];
 
   const formatKpiValue = (value: number, format: "currency" | "count") =>
