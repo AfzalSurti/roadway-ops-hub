@@ -259,9 +259,10 @@ export const expenseRepository = {
     const [
       monthAgg,
       todayAgg,
-      pendingCount,
-      approvedCount,
-      rejectedCount,
+      allTimeAgg,
+      sheetCount,
+      entryCount,
+      employeesWithExpenses,
       voucherCount,
       byCategory,
       monthlyEntries,
@@ -276,9 +277,17 @@ export const expenseRepository = {
         where: { ...entryWhereBase, entryDate: { gte: startOfDay, lte: endOfDay } },
         _sum: { amount: true }
       }),
-      prisma.expenseSheet.count({ where: { ...sheetWhere, status: "SUBMITTED" } }),
-      prisma.expenseSheet.count({ where: { ...sheetWhere, status: "APPROVED" } }),
-      prisma.expenseSheet.count({ where: { ...sheetWhere, status: "REJECTED" } }),
+      prisma.expenseEntry.aggregate({
+        where: entryWhereBase,
+        _sum: { amount: true }
+      }),
+      prisma.expenseSheet.count({ where: sheetWhere }),
+      prisma.expenseEntry.count({ where: entryWhereBase }),
+      filters.employeeId
+        ? Promise.resolve(1)
+        : prisma.user.count({
+            where: { expenseSheets: { some: { entries: { some: {} } } } }
+          }),
       prisma.voucher.count({
         where: { entry: { sheet: sheetWhere, billAvailable: false } }
       }),
@@ -338,9 +347,10 @@ export const expenseRepository = {
     return {
       totalExpensesThisMonth: monthAgg._sum.amount ?? 0,
       totalExpensesToday: todayAgg._sum.amount ?? 0,
-      pendingApprovals: pendingCount,
-      approvedExpenses: approvedCount,
-      rejectedExpenses: rejectedCount,
+      totalExpensesAllTime: allTimeAgg._sum.amount ?? 0,
+      totalExpenseSheets: sheetCount,
+      totalExpenseEntries: entryCount,
+      employeesWithExpenses: employeesWithExpenses,
       totalVoucherEntries: voucherCount,
       expenseByCategory: byCategory.map((row) => ({
         categoryId: row.categoryId,

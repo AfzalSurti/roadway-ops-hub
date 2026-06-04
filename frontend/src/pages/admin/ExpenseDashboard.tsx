@@ -5,7 +5,7 @@ import { ExpenseStatusBadge } from "@/components/expense/ExpenseStatusBadge";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { ExpenseEmployeeCategoryCharts } from "@/components/expense/ExpenseEmployeeCategoryCharts";
-import { BarChart3, CheckCircle2, Clock3, FileSpreadsheet, Plus, Receipt, Wallet, XCircle } from "lucide-react";
+import { BarChart3, FileSpreadsheet, Layers, Plus, Receipt, TrendingUp, Users, Wallet } from "lucide-react";
 
 export default function ExpenseDashboard() {
   const { data: stats, isLoading } = useQuery({
@@ -14,20 +14,23 @@ export default function ExpenseDashboard() {
   });
 
   const kpis = [
-    { label: "Expenses This Month", value: stats?.totalExpensesThisMonth ?? 0, icon: Wallet, tone: "text-primary bg-primary/10" },
-    { label: "Expenses Today", value: stats?.totalExpensesToday ?? 0, icon: Receipt, tone: "text-sky-600 bg-sky-500/10" },
-    { label: "Pending Approvals", value: stats?.pendingApprovals ?? 0, icon: Clock3, tone: "text-amber-700 bg-amber-500/10" },
-    { label: "Approved", value: stats?.approvedExpenses ?? 0, icon: CheckCircle2, tone: "text-emerald-600 bg-emerald-500/10" },
-    { label: "Rejected", value: stats?.rejectedExpenses ?? 0, icon: XCircle, tone: "text-rose-600 bg-rose-500/10" },
-    { label: "Voucher Entries", value: stats?.totalVoucherEntries ?? 0, icon: FileSpreadsheet, tone: "text-indigo-600 bg-indigo-500/10" }
+    { label: "Expenses This Month", value: stats?.totalExpensesThisMonth ?? 0, format: "currency" as const, icon: Wallet, tone: "text-primary bg-primary/10" },
+    { label: "Expenses Today", value: stats?.totalExpensesToday ?? 0, format: "currency" as const, icon: Receipt, tone: "text-sky-600 bg-sky-500/10" },
+    { label: "Total Expenses (All Time)", value: stats?.totalExpensesAllTime ?? 0, format: "currency" as const, icon: TrendingUp, tone: "text-violet-600 bg-violet-500/10" },
+    { label: "Expense Sheets", value: stats?.totalExpenseSheets ?? 0, format: "count" as const, icon: Layers, tone: "text-amber-700 bg-amber-500/10" },
+    { label: "Employees with Expenses", value: stats?.employeesWithExpenses ?? 0, format: "count" as const, icon: Users, tone: "text-emerald-600 bg-emerald-500/10" },
+    { label: "Voucher Entries", value: stats?.totalVoucherEntries ?? 0, format: "count" as const, icon: FileSpreadsheet, tone: "text-indigo-600 bg-indigo-500/10" }
   ];
+
+  const formatKpiValue = (value: number, format: "currency" | "count") =>
+    format === "currency" ? `₹${value.toLocaleString("en-IN")}` : value.toLocaleString("en-IN");
 
   return (
     <PageWrapper>
       <div className="page-header flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="page-title">Expense Dashboard</h1>
-          <p className="page-subtitle">Track site expenses, approvals, and voucher entries across the organization.</p>
+          <p className="page-subtitle">Track site expenses, sheets, entries, and vouchers across the organization.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button asChild className="gap-2">
@@ -49,7 +52,7 @@ export default function ExpenseDashboard() {
             <div className={`p-2.5 rounded-xl ${kpi.tone} w-fit mb-3`}>
               <kpi.icon className="h-5 w-5" />
             </div>
-            <p className="text-3xl font-bold">{isLoading ? "…" : `₹${kpi.value.toLocaleString("en-IN")}`}</p>
+            <p className="text-3xl font-bold">{isLoading ? "…" : formatKpiValue(kpi.value, kpi.format)}</p>
             <p className="text-sm text-muted-foreground mt-1">{kpi.label}</p>
           </div>
         ))}

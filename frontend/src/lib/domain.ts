@@ -558,9 +558,10 @@ export type ExpenseEmployeeCategoryAnalytics = {
 export type ExpenseDashboardStats = {
   totalExpensesThisMonth: number;
   totalExpensesToday: number;
-  pendingApprovals: number;
-  approvedExpenses: number;
-  rejectedExpenses: number;
+  totalExpensesAllTime: number;
+  totalExpenseSheets: number;
+  totalExpenseEntries: number;
+  employeesWithExpenses: number;
   totalVoucherEntries: number;
   expenseByCategory: Array<{ categoryId: string; categoryName: string; total: number }>;
   monthlyExpenseTrend: Array<{ month: string; total: number }>;
