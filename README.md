@@ -15,7 +15,7 @@ This project is designed to replace manual tracking (spreadsheets/messages) with
 
 ## Tech Stack
 
-Full-stack HighwayOps application with:
+Full-stack HighwayOps application :
 
 - **Frontend**: React + Vite + Tailwind (now under `frontend/`)
 - **Backend**: Node.js + Express + Prisma + PostgreSQL (Neon) (under `backend/`)
