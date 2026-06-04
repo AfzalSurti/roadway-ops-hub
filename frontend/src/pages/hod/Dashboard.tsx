@@ -10,11 +10,14 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { FinancialProjectBillStatusRow, ProjectItem } from "@/lib/domain";
 import {
+  compareHodProjectsByNumber,
   formatHodCurrency,
   formatHodPercent,
   getCompanyLabel,
   getProjectCompanyCode,
   getProjectLifecycle,
+  getProjectSubTechnicalUnitCode,
+  getProjectTechnicalUnitCode,
   getTasksForProject,
   HOD_COMPANY_OPTIONS,
   HOD_SUB_TECHNICAL_UNIT_OPTIONS,
@@ -69,7 +72,7 @@ export default function HodDashboard() {
 
   const subTechnicalOptions = useMemo(() => {
     if (technicalUnitFilter === "ALL") {
-      return Object.values(HOD_SUB_TECHNICAL_UNIT_OPTIONS).flat();
+      return [];
     }
     return HOD_SUB_TECHNICAL_UNIT_OPTIONS[technicalUnitFilter] ?? [];
   }, [technicalUnitFilter]);
@@ -79,9 +82,11 @@ export default function HodDashboard() {
 
     return projects.filter((project) => {
       const companyCode = getProjectCompanyCode(project);
+      const technicalUnitCode = getProjectTechnicalUnitCode(project);
+      const subTechnicalUnitCode = getProjectSubTechnicalUnitCode(project);
       const orgOk = organizationFilter === "ALL" || companyCode === organizationFilter;
-      const unitOk = technicalUnitFilter === "ALL" || project.technicalUnitCode === technicalUnitFilter;
-      const subOk = subTechnicalUnitFilter === "ALL" || project.subTechnicalUnitCode === subTechnicalUnitFilter;
+      const unitOk = technicalUnitFilter === "ALL" || technicalUnitCode === technicalUnitFilter;
+      const subOk = subTechnicalUnitFilter === "ALL" || subTechnicalUnitCode === subTechnicalUnitFilter;
 
       if (!orgOk || !unitOk || !subOk) {
         return false;
@@ -121,11 +126,7 @@ export default function HodDashboard() {
           billingAmount: financial?.raBillRaisedClaim ?? null
         };
       })
-      .sort((a, b) => {
-        const numberCompare = (a.project.projectNumber ?? "").localeCompare(b.project.projectNumber ?? "");
-        if (numberCompare !== 0) return numberCompare;
-        return a.project.name.localeCompare(b.project.name);
-      });
+      .sort((a, b) => compareHodProjectsByNumber(a.project, b.project));
   }, [filteredProjects, financialByProjectId, financialByProjectNumber, tasks]);
 
   const totals = useMemo(() => {
@@ -187,7 +188,7 @@ export default function HodDashboard() {
                 <SelectItem value="ALL">All organizations</SelectItem>
                 {HOD_COMPANY_OPTIONS.map((item) => (
                   <SelectItem key={item.code} value={item.code}>
-                    {item.label}
+                    {item.label} ({item.code})
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -209,7 +210,7 @@ export default function HodDashboard() {
                 <SelectItem value="ALL">All technical units</SelectItem>
                 {HOD_TECHNICAL_UNIT_OPTIONS.map((item) => (
                   <SelectItem key={item.code} value={item.code}>
-                    {item.label}
+                    {item.label} ({item.code})
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -217,15 +218,23 @@ export default function HodDashboard() {
           </FilterField>
 
           <FilterField label="Sub Technical Unit">
-            <Select value={subTechnicalUnitFilter} onValueChange={setSubTechnicalUnitFilter}>
+            <Select
+              value={subTechnicalUnitFilter}
+              onValueChange={setSubTechnicalUnitFilter}
+              disabled={technicalUnitFilter === "ALL"}
+            >
               <SelectTrigger>
-                <SelectValue placeholder="All sub units" />
+                <SelectValue
+                  placeholder={
+                    technicalUnitFilter === "ALL" ? "Select technical unit first" : "All sub technical units"
+                  }
+                />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="ALL">All sub technical units</SelectItem>
                 {subTechnicalOptions.map((item) => (
                   <SelectItem key={item.code} value={item.code}>
-                    {item.label}
+                    {item.label} ({item.code})
                   </SelectItem>
                 ))}
               </SelectContent>

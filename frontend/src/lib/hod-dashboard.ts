@@ -8,6 +8,84 @@ export const HOD_COMPANY_OPTIONS = [
 ] as const;
 
 const HOD_COMPANY_CODES = new Set(HOD_COMPANY_OPTIONS.map((item) => item.code));
+const HOD_TECHNICAL_UNIT_CODES = new Set(HOD_TECHNICAL_UNIT_OPTIONS.map((item) => item.code));
+
+/** Parsed from assigned project number: [Company][TechUnit][SubUnit2][FY2][Serial2][WorkCat1] e.g. SDST2601R */
+export function parseCodesFromProjectNumber(projectNumber?: string | null) {
+  const number = projectNumber?.trim().toUpperCase();
+  if (!number || number.length < 4) {
+    return {
+      companyCode: null as string | null,
+      technicalUnitCode: null as string | null,
+      subTechnicalUnitCode: null as string | null
+    };
+  }
+
+  const companyCode = number.charAt(0);
+  const technicalUnitCode = number.charAt(1);
+  const subTechnicalUnitCode = number.slice(2, 4);
+
+  if (!HOD_COMPANY_CODES.has(companyCode)) {
+    return { companyCode: null, technicalUnitCode: null, subTechnicalUnitCode: null };
+  }
+
+  if (!HOD_TECHNICAL_UNIT_CODES.has(technicalUnitCode)) {
+    return { companyCode, technicalUnitCode: null, subTechnicalUnitCode: null };
+  }
+
+  const subOptions = HOD_SUB_TECHNICAL_UNIT_OPTIONS[technicalUnitCode] ?? [];
+  const subOk = subOptions.some((item) => item.code === subTechnicalUnitCode);
+
+  return {
+    companyCode,
+    technicalUnitCode,
+    subTechnicalUnitCode: subOk ? subTechnicalUnitCode : null
+  };
+}
+
+export function getProjectTechnicalUnitCode(
+  project: Pick<ProjectItem, "technicalUnitCode" | "projectNumber">
+): string | null {
+  const stored = project.technicalUnitCode?.trim().toUpperCase();
+  if (stored && HOD_TECHNICAL_UNIT_CODES.has(stored)) {
+    return stored;
+  }
+  return parseCodesFromProjectNumber(project.projectNumber).technicalUnitCode;
+}
+
+export function getProjectSubTechnicalUnitCode(
+  project: Pick<ProjectItem, "technicalUnitCode" | "subTechnicalUnitCode" | "projectNumber">
+): string | null {
+  const technicalUnitCode = getProjectTechnicalUnitCode(project);
+  const stored = project.subTechnicalUnitCode?.trim().toUpperCase();
+  if (stored && technicalUnitCode) {
+    const options = HOD_SUB_TECHNICAL_UNIT_OPTIONS[technicalUnitCode] ?? [];
+    if (options.some((item) => item.code === stored)) {
+      return stored;
+    }
+  }
+  return parseCodesFromProjectNumber(project.projectNumber).subTechnicalUnitCode;
+}
+
+export function compareHodProjectsByNumber(
+  a: Pick<ProjectItem, "name" | "projectNumber">,
+  b: Pick<ProjectItem, "name" | "projectNumber">
+) {
+  const numberA = a.projectNumber?.trim() ?? "";
+  const numberB = b.projectNumber?.trim() ?? "";
+  const hasA = Boolean(numberA);
+  const hasB = Boolean(numberB);
+
+  if (hasA && !hasB) return -1;
+  if (!hasA && hasB) return 1;
+  if (!hasA && !hasB) {
+    return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+  }
+
+  const byNumber = numberA.localeCompare(numberB, undefined, { numeric: true, sensitivity: "base" });
+  if (byNumber !== 0) return byNumber;
+  return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+}
 
 /** Company initial is encoded as the first character of the assigned project number (e.g. GSAE2601R → G). */
 export function getProjectCompanyCode(project: Pick<ProjectItem, "companyCode" | "projectNumber">): string | null {
