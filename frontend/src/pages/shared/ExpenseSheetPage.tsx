@@ -21,7 +21,7 @@ import {
   downloadVoucherReportPdf,
   getSheetVouchers
 } from "@/lib/expense-reports";
-import { Loader2, Plus, RefreshCcw, Trash2 } from "lucide-react";
+import { ArrowLeft, Loader2, Plus, RefreshCcw, Trash2 } from "lucide-react";
 
 type ExpenseSheetPageProps = {
   basePath: "/admin/expenses" | "/admin/expenses/my" | "/app/expenses";
@@ -261,12 +261,23 @@ export default function ExpenseSheetPage({ basePath, selfService = false }: Expe
     isValidMobile10(createMobile) &&
     isValidBank12(createBank);
 
+  const selfServiceBackLabel =
+    basePath === "/admin/expenses/my" ? "Back to My Expense Sheets" : "Back to My Expenses";
+
   if (isNew && selfService) {
     return (
       <PageWrapper>
-        <div className="page-header">
-          <h1 className="page-title">Create Expense Sheet</h1>
-          <p className="page-subtitle">Enter site details before adding daily expense entries.</p>
+        <div className="page-header flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h1 className="page-title">Create Expense Sheet</h1>
+            <p className="page-subtitle">Enter site details before adding daily expense entries.</p>
+          </div>
+          <Button asChild variant="outline" className="gap-2">
+            <Link to={basePath}>
+              <ArrowLeft className="h-4 w-4" />
+              {selfServiceBackLabel}
+            </Link>
+          </Button>
         </div>
         <div className="glass-panel p-6 grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl">
           <Field label="Full Name of Employee">
@@ -377,8 +388,11 @@ export default function ExpenseSheetPage({ basePath, selfService = false }: Expe
               <RefreshCcw className="h-4 w-4 mr-1" />
               Retry
             </Button>
-            <Button asChild variant="outline">
-              <Link to={basePath}>Back to list</Link>
+            <Button asChild variant="outline" className="gap-2">
+              <Link to={basePath}>
+                <ArrowLeft className="h-4 w-4" />
+                {selfService ? selfServiceBackLabel : "Back to list"}
+              </Link>
             </Button>
           </div>
         </div>
@@ -390,8 +404,11 @@ export default function ExpenseSheetPage({ basePath, selfService = false }: Expe
     return (
       <PageWrapper>
         <p className="text-muted-foreground mb-4">Expense sheet not found.</p>
-        <Button asChild variant="outline">
-          <Link to={basePath}>Back to list</Link>
+        <Button asChild variant="outline" className="gap-2">
+          <Link to={basePath}>
+            <ArrowLeft className="h-4 w-4" />
+            {selfService ? selfServiceBackLabel : "Back to list"}
+          </Link>
         </Button>
       </PageWrapper>
     );
@@ -416,7 +433,12 @@ export default function ExpenseSheetPage({ basePath, selfService = false }: Expe
             )}
           </p>
         </div>
-        <Button asChild variant="outline"><Link to={basePath}>Back</Link></Button>
+        <Button asChild variant="outline" className="gap-2">
+          <Link to={basePath}>
+            <ArrowLeft className="h-4 w-4" />
+            {selfService ? selfServiceBackLabel : "Back to list"}
+          </Link>
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">

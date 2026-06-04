@@ -6,6 +6,8 @@ export default function AdminMyExpenses() {
       basePath="/admin/expenses/my"
       title="My Expense Bills"
       subtitle="Create your own expense sheets, vouchers, and reports — same as the employee expense workspace."
+      backTo="/admin/expenses"
+      backLabel="Back to Expense Dashboard"
     />
   );
 }

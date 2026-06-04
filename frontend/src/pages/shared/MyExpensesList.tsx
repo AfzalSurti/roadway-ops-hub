@@ -4,18 +4,22 @@ import { PageWrapper } from "@/components/PageWrapper";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { Loader2, Plus, RefreshCcw } from "lucide-react";
+import { ArrowLeft, Loader2, Plus, RefreshCcw } from "lucide-react";
 
 type MyExpensesListProps = {
   basePath: "/app/expenses" | "/admin/expenses/my";
   title?: string;
   subtitle?: string;
+  backTo?: string;
+  backLabel?: string;
 };
 
 export default function MyExpensesList({
   basePath,
   title = "My Expense Bills",
-  subtitle = "Create expense sheets, entries, vouchers, and download summary or detailed reports."
+  subtitle = "Create expense sheets, entries, vouchers, and download summary or detailed reports.",
+  backTo,
+  backLabel = "Back"
 }: MyExpensesListProps) {
   const { user } = useAuth();
   const { data, isPending, isError, error, refetch, isFetching } = useQuery({
@@ -40,11 +44,21 @@ export default function MyExpensesList({
           <h1 className="page-title">{title}</h1>
           <p className="page-subtitle">{subtitle}</p>
         </div>
-        <Button asChild className="gap-2">
-          <Link to={`${basePath}/new`}>
-            <Plus className="h-4 w-4" /> New Expense Sheet
-          </Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          {backTo ? (
+            <Button asChild variant="outline" className="gap-2">
+              <Link to={backTo}>
+                <ArrowLeft className="h-4 w-4" />
+                {backLabel}
+              </Link>
+            </Button>
+          ) : null}
+          <Button asChild className="gap-2">
+            <Link to={`${basePath}/new`}>
+              <Plus className="h-4 w-4" /> New Expense Sheet
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <div className="glass-panel p-6 overflow-x-auto">
