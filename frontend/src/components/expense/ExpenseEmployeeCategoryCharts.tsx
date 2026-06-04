@@ -15,8 +15,33 @@ const breakdownChartConfig = {
   amount: { label: "Amount (Rs.)", color: "hsl(220 60% 55%)" }
 };
 
+/** High-contrast axis styling for dark dashboard panels */
+const CHART_AXIS_TICK = {
+  fill: "hsl(210 25% 94%)",
+  fontSize: 11,
+  fontWeight: 600
+} as const;
+
+const CHART_AXIS_TICK_SMALL = {
+  fill: "hsl(210 25% 94%)",
+  fontSize: 10,
+  fontWeight: 600
+} as const;
+
+const CHART_AXIS_LINE = { stroke: "hsl(220 14% 42%)", strokeWidth: 1 };
+const CHART_GRID_STROKE = "hsl(220 14% 32%)";
+
+const chartSurfaceClass =
+  "[&_.recharts-cartesian-axis-tick_text]:fill-[hsl(210_25%_94%)] [&_.recharts-cartesian-axis-tick_text]:font-semibold [&_.recharts-cartesian-grid_line]:stroke-[hsl(220_14%_32%)]";
+
 function formatRs(value: number) {
   return `Rs. ${value.toLocaleString("en-IN")}`;
+}
+
+function formatYAxisTick(value: number) {
+  if (value >= 100000) return `${(value / 100000).toFixed(1)}L`;
+  if (value >= 1000) return `${Math.round(value / 1000)}k`;
+  return value.toLocaleString("en-IN");
 }
 
 export function ExpenseEmployeeCategoryCharts() {
@@ -98,24 +123,36 @@ export function ExpenseEmployeeCategoryCharts() {
 
       {!loading && employees.length > 0 ? (
         <>
-          <ChartContainer config={mainChartConfig} className="h-[320px] w-full aspect-auto">
-            <BarChart data={mainChartData} margin={{ top: 8, right: 8, left: 4, bottom: 56 }}>
-              <CartesianGrid vertical={false} strokeDasharray="3 3" />
+          <ChartContainer
+            config={mainChartConfig}
+            className={`h-[340px] w-full aspect-auto ${chartSurfaceClass}`}
+          >
+            <BarChart data={mainChartData} margin={{ top: 12, right: 12, left: 8, bottom: 64 }}>
+              <CartesianGrid vertical={false} stroke={CHART_GRID_STROKE} strokeDasharray="4 4" />
               <XAxis
                 dataKey="shortLabel"
-                tickLine={false}
-                axisLine={false}
+                tickLine={CHART_AXIS_LINE}
+                axisLine={CHART_AXIS_LINE}
                 interval={0}
-                angle={-40}
+                angle={-38}
                 textAnchor="end"
-                height={72}
-                tick={{ fontSize: 9 }}
+                height={80}
+                tick={CHART_AXIS_TICK}
               />
               <YAxis
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(v) => (v >= 1000 ? `${Math.round(v / 1000)}k` : String(v))}
-                width={48}
+                tickLine={CHART_AXIS_LINE}
+                axisLine={CHART_AXIS_LINE}
+                tickFormatter={formatYAxisTick}
+                tick={CHART_AXIS_TICK}
+                width={52}
+                label={{
+                  value: "Amount (Rs.)",
+                  angle: -90,
+                  position: "insideLeft",
+                  fill: "hsl(210 25% 94%)",
+                  fontSize: 11,
+                  fontWeight: 600
+                }}
               />
               <ChartTooltip
                 content={
@@ -160,20 +197,29 @@ export function ExpenseEmployeeCategoryCharts() {
                         <p className="text-sm font-medium leading-tight">{category.categoryName}</p>
                         <p className="text-sm font-semibold tabular-nums shrink-0">{formatRs(category.total)}</p>
                       </div>
-                      <ChartContainer config={breakdownChartConfig} className="h-[200px] w-full aspect-auto">
-                        <BarChart data={breakdownData} margin={{ top: 4, right: 4, left: 0, bottom: 48 }}>
-                          <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                      <ChartContainer
+                        config={breakdownChartConfig}
+                        className={`h-[220px] w-full aspect-auto ${chartSurfaceClass}`}
+                      >
+                        <BarChart data={breakdownData} margin={{ top: 8, right: 8, left: 4, bottom: 56 }}>
+                          <CartesianGrid vertical={false} stroke={CHART_GRID_STROKE} strokeDasharray="4 4" />
                           <XAxis
                             dataKey="label"
-                            tickLine={false}
-                            axisLine={false}
+                            tickLine={CHART_AXIS_LINE}
+                            axisLine={CHART_AXIS_LINE}
                             interval={0}
-                            angle={-35}
+                            angle={-32}
                             textAnchor="end"
-                            height={56}
-                            tick={{ fontSize: 8 }}
+                            height={64}
+                            tick={CHART_AXIS_TICK_SMALL}
                           />
-                          <YAxis tickLine={false} axisLine={false} width={40} tick={{ fontSize: 9 }} />
+                          <YAxis
+                            tickLine={CHART_AXIS_LINE}
+                            axisLine={CHART_AXIS_LINE}
+                            width={44}
+                            tick={CHART_AXIS_TICK_SMALL}
+                            tickFormatter={formatYAxisTick}
+                          />
                           <ChartTooltip
                             content={
                               <ChartTooltipContent
