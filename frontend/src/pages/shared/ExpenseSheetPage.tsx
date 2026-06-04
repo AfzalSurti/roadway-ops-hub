@@ -21,7 +21,7 @@ import {
   downloadVoucherReportPdf,
   getSheetVouchers
 } from "@/lib/expense-reports";
-import { Loader2, Plus, Send, Trash2 } from "lucide-react";
+import { Loader2, Plus, RefreshCcw, Send, Trash2 } from "lucide-react";
 
 type ExpenseSheetPageProps = {
   basePath: "/admin/expenses" | "/app/expenses";
@@ -46,9 +46,25 @@ export default function ExpenseSheetPage({ basePath }: ExpenseSheetPageProps) {
     billFile: null as File | null
   });
 
-  const { data: categories = [] } = useQuery({ queryKey: ["expense-categories"], queryFn: () => api.getExpenseCategories() });
-  const { data: projects = [] } = useQuery({ queryKey: ["projects"], queryFn: () => api.getProjects(), enabled: canEdit || isAdmin });
-  const { data: profile } = useQuery({ queryKey: ["profile", "me"], queryFn: () => api.getProfile(), enabled: canEdit && isNew });
+  const expenseQueryOptions = { staleTime: 60_000, refetchInterval: false as const, retry: 1 };
+
+  const { data: categories = [] } = useQuery({
+    queryKey: ["expense-categories"],
+    queryFn: () => api.getExpenseCategories(),
+    ...expenseQueryOptions
+  });
+  const { data: projects = [] } = useQuery({
+    queryKey: ["projects"],
+    queryFn: () => api.getProjects(),
+    enabled: canEdit || isAdmin,
+    staleTime: 5 * 60_000
+  });
+  const { data: profile } = useQuery({
+    queryKey: ["profile", "me"],
+    queryFn: () => api.getProfile(),
+    enabled: canEdit && isNew,
+    staleTime: 5 * 60_000
+  });
 
   const [headerForm, setHeaderForm] = useState({
     projectId: "",
@@ -61,10 +77,17 @@ export default function ExpenseSheetPage({ basePath }: ExpenseSheetPageProps) {
     sheetNumber: ""
   });
 
-  const { data: sheet, isLoading } = useQuery({
+  const {
+    data: sheet,
+    isPending: sheetLoading,
+    isError: sheetError,
+    error: sheetLoadError,
+    refetch: refetchSheet
+  } = useQuery({
     queryKey: ["expense-sheet", id],
     queryFn: () => api.getExpenseSheet(id!),
-    enabled: Boolean(id) && !isNew
+    enabled: Boolean(id) && !isNew,
+    ...expenseQueryOptions
   });
 
   const invalidate = () => {
@@ -198,8 +221,52 @@ export default function ExpenseSheetPage({ basePath }: ExpenseSheetPageProps) {
     );
   }
 
-  if (isLoading || !sheet) {
-    return <PageWrapper><p className="text-muted-foreground">Loading expense sheet…</p></PageWrapper>;
+  if (sheetLoading) {
+    return (
+      <PageWrapper>
+        <p className="text-muted-foreground inline-flex items-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading expense sheet…
+        </p>
+      </PageWrapper>
+    );
+  }
+
+  if (sheetError) {
+    return (
+      <PageWrapper>
+        <div className="glass-panel p-6 max-w-lg">
+          <h2 className="font-semibold text-rose-500 mb-2">Could not load expense sheet</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            {sheetLoadError instanceof Error ? sheetLoadError.message : "Request failed"}
+          </p>
+          <p className="text-xs text-muted-foreground mb-4">
+            If you see &quot;Route not found&quot;, the expense API is not on the server yet — redeploy backend and run{" "}
+            <code className="text-foreground">npm run prisma:migrate</code>.
+          </p>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => void refetchSheet()}>
+              <RefreshCcw className="h-4 w-4 mr-1" />
+              Retry
+            </Button>
+            <Button asChild variant="outline">
+              <Link to={basePath}>Back to list</Link>
+            </Button>
+          </div>
+        </div>
+      </PageWrapper>
+    );
+  }
+
+  if (!sheet) {
+    return (
+      <PageWrapper>
+        <p className="text-muted-foreground mb-4">Expense sheet not found.</p>
+        <Button asChild variant="outline">
+          <Link to={basePath}>Back to list</Link>
+        </Button>
+      </PageWrapper>
+    );
   }
 
   const vouchers = getSheetVouchers(sheet);

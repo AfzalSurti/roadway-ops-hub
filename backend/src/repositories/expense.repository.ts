@@ -29,6 +29,18 @@ const sheetInclude = {
   }
 } satisfies Prisma.ExpenseSheetInclude;
 
+/** Lighter shape for list screens — avoids loading every entry/voucher/approval row. */
+const sheetListInclude = {
+  employee: { select: { id: true, name: true, email: true } },
+  project: { select: { id: true, name: true, projectNumber: true } },
+  entries: { select: { amount: true } },
+  approvals: {
+    take: 1,
+    orderBy: { reviewedAt: "desc" as const },
+    include: { reviewer: { select: { id: true, name: true, email: true } } }
+  }
+} satisfies Prisma.ExpenseSheetInclude;
+
 export type ExpenseSheetFilters = {
   employeeId?: string;
   projectId?: string;
@@ -95,7 +107,7 @@ export const expenseRepository = {
     const [items, total] = await Promise.all([
       prisma.expenseSheet.findMany({
         where,
-        include: sheetInclude,
+        include: sheetListInclude,
         orderBy: [{ expenseDate: "desc" }, { createdAt: "desc" }],
         skip,
         take: limit

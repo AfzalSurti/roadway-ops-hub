@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { api } from "@/lib/api";
 import type { ExpenseSheetStatus } from "@/lib/domain";
-import { Eye, Search } from "lucide-react";
+import { Eye, Loader2, RefreshCcw, Search } from "lucide-react";
 
 export default function ExpenseList() {
   const [search, setSearch] = useState("");
@@ -33,10 +33,15 @@ export default function ExpenseList() {
     [billAvailable, employeeId, projectId, search, status]
   );
 
-  const { data, isLoading } = useQuery({
+  const { data, isPending, isError, error, refetch, isFetching } = useQuery({
     queryKey: ["expense-sheets", queryParams],
-    queryFn: () => api.getExpenseSheets(queryParams)
+    queryFn: () => api.getExpenseSheets(queryParams),
+    staleTime: 60_000,
+    refetchInterval: false,
+    retry: 1
   });
+
+  const showLoading = isPending && !data;
 
   return (
     <PageWrapper>
@@ -105,10 +110,29 @@ export default function ExpenseList() {
             </tr>
           </thead>
           <tbody>
-            {isLoading ? (
-              <tr><td colSpan={7} className="py-8 text-center text-muted-foreground">Loading…</td></tr>
+            {showLoading ? (
+              <tr>
+                <td colSpan={7} className="py-10 text-center text-muted-foreground">
+                  <span className="inline-flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading expense sheets…
+                  </span>
+                </td>
+              </tr>
             ) : null}
-            {(data?.items ?? []).map((sheet) => (
+            {isError ? (
+              <tr>
+                <td colSpan={7} className="py-10 text-center">
+                  <p className="text-sm text-rose-500 mb-3">{error instanceof Error ? error.message : "Failed to load expenses"}</p>
+                  <Button size="sm" variant="outline" onClick={() => void refetch()}>
+                    <RefreshCcw className="h-3.5 w-3.5 mr-1" />
+                    Retry
+                  </Button>
+                </td>
+              </tr>
+            ) : null}
+            {!showLoading && !isError
+              ? (data?.items ?? []).map((sheet) => (
               <tr key={sheet.id} className="border-b border-border/20">
                 <td className="py-3 pr-4">{sheet.employeeName}</td>
                 <td className="py-3 px-4">{sheet.projectNumber ?? "-"}</td>
@@ -122,14 +146,18 @@ export default function ExpenseList() {
                   </Button>
                 </td>
               </tr>
-            ))}
+                ))
+              : null}
           </tbody>
         </table>
-        {!isLoading && (data?.items.length ?? 0) === 0 ? (
+        {!showLoading && !isError && (data?.items.length ?? 0) === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8">No expense sheets found.</p>
         ) : null}
       </div>
-      <p className="text-xs text-muted-foreground mt-2">{categories.length} expense categories configured.</p>
+      <p className="text-xs text-muted-foreground mt-2">
+        {categories.length} expense categories configured.
+        {isFetching && !showLoading ? " · Refreshing…" : ""}
+      </p>
     </PageWrapper>
   );
 }
