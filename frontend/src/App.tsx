@@ -130,7 +130,6 @@ function AppRoutes() {
         <Route path="reports" element={<EmployeeReports />} />
         <Route path="profile" element={<EmployeeProfile />} />
         <Route path="expenses" element={<EmployeeExpenses />} />
-        <Route path="expenses/new" element={<EmployeeExpenseDetail />} />
         <Route path="expenses/:id" element={<EmployeeExpenseDetail />} />
       </Route>
 

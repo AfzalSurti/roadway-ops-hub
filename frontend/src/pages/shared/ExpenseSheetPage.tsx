@@ -77,16 +77,18 @@ export default function ExpenseSheetPage({ basePath }: ExpenseSheetPageProps) {
     sheetNumber: ""
   });
 
+  const sheetQueryEnabled = Boolean(id) && !isNew;
+
   const {
     data: sheet,
-    isPending: sheetLoading,
+    isLoading: sheetLoading,
     isError: sheetError,
     error: sheetLoadError,
     refetch: refetchSheet
   } = useQuery({
     queryKey: ["expense-sheet", id],
     queryFn: () => api.getExpenseSheet(id!),
-    enabled: Boolean(id) && !isNew,
+    enabled: sheetQueryEnabled,
     ...expenseQueryOptions
   });
 
@@ -221,7 +223,7 @@ export default function ExpenseSheetPage({ basePath }: ExpenseSheetPageProps) {
     );
   }
 
-  if (sheetLoading) {
+  if (sheetQueryEnabled && sheetLoading) {
     return (
       <PageWrapper>
         <p className="text-muted-foreground inline-flex items-center gap-2">

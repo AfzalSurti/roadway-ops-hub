@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PageWrapper } from "@/components/PageWrapper";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
@@ -352,7 +352,6 @@ export default function AssetDetail() {
   const [form, setForm] = useState<AssetFormState>(EMPTY_FORM);
   const [soldAmountInput, setSoldAmountInput] = useState("");
   const [soldRemarkInput, setSoldRemarkInput] = useState("");
-  const syncedSoldAssetId = useRef<string | null>(null);
 
   const { data: asset, isLoading } = useQuery({
     queryKey: ["assets", id],
@@ -378,14 +377,12 @@ export default function AssetDetail() {
     }
   }, [asset, classOptions, getTypesForClass]);
 
-  // Only load sold fields when opening a different asset — not on background refetch (was resetting typed values to 0).
+  // Seed sold inputs only when navigating to a different asset (not on 10s background refetch).
   useEffect(() => {
     if (!asset?.id) return;
-    if (syncedSoldAssetId.current === asset.id) return;
-    syncedSoldAssetId.current = asset.id;
     setSoldAmountInput(asset.soldAmount && asset.soldAmount > 0 ? String(asset.soldAmount) : "");
     setSoldRemarkInput(asset.soldRemark ?? "");
-  }, [asset?.id, asset?.soldAmount, asset?.soldRemark]);
+  }, [asset?.id]);
 
   const updateMutation = useMutation({
     mutationFn: () => {
@@ -437,8 +434,7 @@ export default function AssetDetail() {
       }
       return api.updateAsset(id, {
         soldAmount,
-        soldRemark: soldRemarkInput.trim(),
-        status: "DISPOSED"
+        soldRemark: soldRemarkInput.trim()
       });
     },
     onSuccess: async (updated) => {
@@ -447,7 +443,7 @@ export default function AssetDetail() {
       await queryClient.invalidateQueries({ queryKey: ["assets", id] });
       await queryClient.invalidateQueries({ queryKey: ["assets"] });
       await queryClient.invalidateQueries({ queryKey: ["assets", "stats"] });
-      toast.success("Asset marked as sold");
+      toast.success("Sold information saved");
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to save sold information")
   });
@@ -501,7 +497,9 @@ export default function AssetDetail() {
     );
   }
 
-  const isSold = asset.status === "DISPOSED";
+  const hasSoldInfo = (asset.soldAmount ?? 0) > 0 && Boolean(asset.soldRemark?.trim());
+  const isSoldLocked = hasSoldInfo || asset.status === "DISPOSED";
+  const canEnterSoldInfo = asset.status === "IN_USE" && !hasSoldInfo;
 
   return (
     <PageWrapper>
@@ -525,8 +523,8 @@ export default function AssetDetail() {
             <FileText className="h-4 w-4" />
             Download PDF
           </button>
-          <Button variant="outline" onClick={() => setMovementOpen(true)} className="gap-2" disabled={isSold}><CalendarPlus className="h-4 w-4" /> Log Movement</Button>
-          <Button variant="outline" onClick={() => setMaintenanceOpen(true)} className="gap-2" disabled={isSold}><Plus className="h-4 w-4" /> Log Maintenance</Button>
+          <Button variant="outline" onClick={() => setMovementOpen(true)} className="gap-2" disabled={isSoldLocked}><CalendarPlus className="h-4 w-4" /> Log Movement</Button>
+          <Button variant="outline" onClick={() => setMaintenanceOpen(true)} className="gap-2" disabled={isSoldLocked}><Plus className="h-4 w-4" /> Log Maintenance</Button>
           <Button onClick={() => setIsEditing((current) => !current)} className="gap-2"><Pencil className="h-4 w-4" /> {isEditing ? "Cancel Edit" : "Edit Asset"}</Button>
         </div>
 
@@ -655,6 +653,9 @@ export default function AssetDetail() {
               />
               <Field label="Assigned User" value={asset.assignedUser ?? "-"} />
               <Field label="Assigned Date" value={asset.assignedDate ? new Date(asset.assignedDate).toLocaleDateString("en-IN") : "-"} />
+              <Field label="Status" value={getStatusLabel(asset.status)} />
+              <Field label="Sold Amount" value={hasSoldInfo ? formatCurrency(asset.soldAmount!) : "-"} />
+              <div className="md:col-span-2"><Field label="Sold Remark" value={hasSoldInfo ? asset.soldRemark! : "-"} /></div>
               <div className="md:col-span-2"><Field label="Remarks" value={asset.remarks ?? "-"} /></div>
             </div>
           )}
@@ -668,7 +669,7 @@ export default function AssetDetail() {
             </TabsList>
             <TabsContent value="movements">
               <div className="flex justify-end mb-3">
-                <Button onClick={() => setMovementOpen(true)} className="gap-2" disabled={isSold}><CalendarPlus className="h-4 w-4" /> Log Movement</Button>
+                <Button onClick={() => setMovementOpen(true)} className="gap-2" disabled={isSoldLocked}><CalendarPlus className="h-4 w-4" /> Log Movement</Button>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -705,7 +706,7 @@ export default function AssetDetail() {
             </TabsContent>
             <TabsContent value="maintenance">
               <div className="flex justify-end mb-3">
-                <Button onClick={() => setMaintenanceOpen(true)} className="gap-2" disabled={isSold}><Plus className="h-4 w-4" /> Log Maintenance</Button>
+                <Button onClick={() => setMaintenanceOpen(true)} className="gap-2" disabled={isSoldLocked}><Plus className="h-4 w-4" /> Log Maintenance</Button>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -738,11 +739,11 @@ export default function AssetDetail() {
         </div>
       </div>
 
-      {!isSold ? (
+      {canEnterSoldInfo ? (
         <div className="glass-panel p-6 mt-6">
           <h3 className="font-semibold mb-2">Sold Information</h3>
           <p className="text-sm text-muted-foreground mb-4">
-            Asset is currently in use. Enter sold amount and remark below, then submit to mark it as sold.
+            This asset is IN USE. Enter sold amount and remark, then submit. Fields will be locked after saving.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -780,15 +781,16 @@ export default function AssetDetail() {
             </div>
           </div>
         </div>
-      ) : (
+      ) : hasSoldInfo || asset.status === "DISPOSED" ? (
         <div className="glass-panel p-6 mt-6">
           <h3 className="font-semibold mb-4">Sold Information</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <Field label="Sold Amount" value={asset.soldAmount ? formatCurrency(asset.soldAmount) : "-"} />
             <div className="md:col-span-2"><Field label="Sold Remark" value={asset.soldRemark ?? "-"} /></div>
           </div>
+          <p className="text-xs text-muted-foreground mt-3">Sold fields are locked. Change status to SOLD (DISPOSED) in Edit Asset when the asset is fully disposed.</p>
         </div>
-      )}
+      ) : null}
 
       <MovementDialog asset={asset} open={movementOpen} onOpenChange={setMovementOpen} />
       <MaintenanceDialog asset={asset} open={maintenanceOpen} onOpenChange={setMaintenanceOpen} />
