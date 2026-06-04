@@ -6,7 +6,7 @@ import type { AssetItem, AssetStatus, ProjectItem } from "@/lib/domain";
 import { ASSET_CLASS_GROUP_OPTIONS, ASSET_CLASS_OPTIONS, getAssetClassGroup } from "@/lib/asset-catalog";
 import { AssetCatalogManager } from "@/components/AssetCatalogManager";
 import { AssetImportDialog } from "@/components/AssetImportDialog";
-import { IN_STORE_PROJECT_LABEL, useAssetCatalog } from "@/hooks/useAssetCatalog";
+import { IN_STORE_PROJECT_LABEL, SURVEY_EQUIPMENT_CLASS, useAssetCatalog } from "@/hooks/useAssetCatalog";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { Download, Eye, FileUp, Pencil, Plus, RefreshCcw, Search, Settings2, Trash2 } from "lucide-react";
@@ -97,6 +97,14 @@ function toDateInputValue(value?: string | null) {
 function isDateBefore(value: string, minimum: string) {
   if (!value || !minimum) return false;
   return new Date(value).getTime() < new Date(minimum).getTime();
+}
+
+function resolveAssetClass(form: AssetFormState) {
+  return form.assetClass === "Other" ? form.customAssetClass.trim() : form.assetClass;
+}
+
+function isSurveyEquipmentClass(form: AssetFormState) {
+  return resolveAssetClass(form) === SURVEY_EQUIPMENT_CLASS;
 }
 
 function formatWarrantyEndDate(value?: string | null) {
@@ -275,6 +283,20 @@ function AssetEditorDialog({
     }
   }, [asset, open, projectOptions, userOptions, classOptions, getTypesForClass]);
 
+  const surveyEquipment = isSurveyEquipmentClass(form);
+  const effectiveStatus: AssetStatus = surveyEquipment ? form.status : "IN_USE";
+
+  useEffect(() => {
+    if (!surveyEquipment && form.status !== "IN_USE") {
+      setForm((prev) => ({
+        ...prev,
+        status: "IN_USE",
+        projectNumber: prev.projectNumber,
+        projectName: prev.projectName
+      }));
+    }
+  }, [surveyEquipment, form.status]);
+
   const mutation = useMutation({
     mutationFn: async () => {
       if (form.warrantyPeriod && form.dateOfPurchase && isDateBefore(form.warrantyPeriod, form.dateOfPurchase)) {
@@ -282,7 +304,7 @@ function AssetEditorDialog({
       }
 
       const payload = {
-        assetClass: form.assetClass === "Other" ? form.customAssetClass.trim() : form.assetClass,
+        assetClass: resolveAssetClass(form),
         assetType: form.assetType === "Other" ? form.customAssetType.trim() : form.assetType,
         markModel: form.markModel.trim() || null,
         dateOfPurchase: form.dateOfPurchase ? new Date(form.dateOfPurchase).toISOString() : null,
@@ -290,16 +312,16 @@ function AssetEditorDialog({
         purchaseAmount: toNumber(form.purchaseAmount),
         gst: toNumber(form.gst),
         assignedDate: form.assignedDate ? new Date(form.assignedDate).toISOString() : null,
-        status: form.status,
-        projectNumber: form.status === "IN_USE" ? ((projectInputMode === "other" ? form.customProjectNumber : form.projectNumber).trim() || null) : null,
-        projectName: form.status === "IN_USE" ? ((projectInputMode === "other" ? form.customProjectName : selectedProjectName).trim() || null) : null,
-        assignedUser: form.status === "IN_USE" ? form.assignedUser.trim() || null : null,
+        status: effectiveStatus,
+        projectNumber: effectiveStatus === "IN_USE" ? ((projectInputMode === "other" ? form.customProjectNumber : form.projectNumber).trim() || null) : null,
+        projectName: effectiveStatus === "IN_USE" ? ((projectInputMode === "other" ? form.customProjectName : selectedProjectName).trim() || null) : null,
+        assignedUser: effectiveStatus === "IN_USE" ? form.assignedUser.trim() || null : null,
         remarks: form.remarks.trim() || null,
         itAssetId: form.itAssetId.trim() || null
       };
 
       return asset
-        ? api.updateAsset(asset.id, { ...payload, status: form.status })
+        ? api.updateAsset(asset.id, { ...payload, status: effectiveStatus })
         : api.createAsset(payload);
     },
     onSuccess: async (result) => {
@@ -327,7 +349,27 @@ function AssetEditorDialog({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <Label>Asset Class</Label>
-            <Select value={form.assetClass} onValueChange={(value) => setForm((prev) => ({ ...prev, assetClass: value, assetType: "", customAssetClass: value === "Other" ? prev.customAssetClass : "", customAssetType: "" }))}>
+            <Select
+              value={form.assetClass}
+              onValueChange={(value) => {
+                const nextClass = value === "Other" ? "" : value;
+                const isSurvey = nextClass === SURVEY_EQUIPMENT_CLASS;
+                setForm((prev) => ({
+                  ...prev,
+                  assetClass: value,
+                  assetType: "",
+                  customAssetClass: value === "Other" ? prev.customAssetClass : "",
+                  customAssetType: "",
+                  status: isSurvey ? prev.status : "IN_USE",
+                  ...(isSurvey
+                    ? {}
+                    : {
+                        projectNumber: prev.projectNumber,
+                        projectName: prev.projectName
+                      })
+                }));
+              }}
+            >
               <SelectTrigger className="mt-1">
                 <SelectValue placeholder="Select asset class" />
               </SelectTrigger>
@@ -419,32 +461,37 @@ function AssetEditorDialog({
           {!asset ? (
             <div>
               <Label>Status</Label>
-              <Select
-                value={form.status}
-                onValueChange={(value) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    status: value as AssetStatus,
-                    projectNumber: value === "IN_STORE" ? "" : prev.projectNumber,
-                    projectName: value === "IN_STORE" ? "" : prev.projectName,
-                    customProjectNumber: value === "IN_STORE" ? "" : prev.customProjectNumber,
-                    customProjectName: value === "IN_STORE" ? "" : prev.customProjectName,
-                    assignedUser: value === "IN_STORE" ? "" : prev.assignedUser
-                  }))
-                }
-              >
-                <SelectTrigger className="mt-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="IN_USE">IN USE</SelectItem>
-                  <SelectItem value="IN_STORE">IN STORE</SelectItem>
-                </SelectContent>
-              </Select>
+              {surveyEquipment ? (
+                <Select
+                  value={form.status}
+                  onValueChange={(value) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      status: value as AssetStatus,
+                      projectNumber: value === "IN_STORE" ? "" : prev.projectNumber,
+                      projectName: value === "IN_STORE" ? "" : prev.projectName,
+                      customProjectNumber: value === "IN_STORE" ? "" : prev.customProjectNumber,
+                      customProjectName: value === "IN_STORE" ? "" : prev.customProjectName,
+                      assignedUser: value === "IN_STORE" ? "" : prev.assignedUser,
+                      assignedDate: value === "IN_STORE" ? "" : prev.assignedDate
+                    }))
+                  }
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="IN_USE">IN USE</SelectItem>
+                    <SelectItem value="IN_STORE">IN STORE</SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input value="IN USE" readOnly className="mt-1 bg-secondary/40" />
+              )}
             </div>
           ) : null}
 
-          {form.status === "IN_USE" ? (
+          {effectiveStatus === "IN_USE" ? (
             <>
           <div>
             <Label>Project Number</Label>
@@ -547,7 +594,11 @@ function AssetEditorDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {STATUS_OPTIONS.filter((item) => item.value !== "ALL").map((option) => (
+                  {STATUS_OPTIONS.filter((item) => {
+                    if (item.value === "ALL") return false;
+                    if (item.value === "IN_STORE" && !surveyEquipment) return false;
+                    return true;
+                  }).map((option) => (
                     <SelectItem key={option.value} value={option.value as AssetStatus}>
                       {option.label === "DISPOSED" ? "SOLD" : option.label}
                     </SelectItem>
@@ -578,9 +629,10 @@ function AssetEditorDialog({
               mutation.isPending ||
               !form.assetClass ||
               !form.assetType ||
-              (!asset && !form.assignedDate) ||
-              (form.status === "IN_USE" && projectInputMode !== "other" && !form.projectNumber.trim()) ||
-              (form.status === "IN_USE" && projectInputMode === "other" && (!form.customProjectNumber.trim() || !form.customProjectName.trim())) ||
+              (effectiveStatus === "IN_USE" && projectInputMode !== "other" && !form.projectNumber.trim()) ||
+              (effectiveStatus === "IN_USE" &&
+                projectInputMode === "other" &&
+                (!form.customProjectNumber.trim() || !form.customProjectName.trim())) ||
               (form.assetClass === "Other" && !form.customAssetClass.trim()) ||
               (form.assetType === "Other" && !form.customAssetType.trim())
             }

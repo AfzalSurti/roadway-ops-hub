@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SURVEY_EQUIPMENT_CLASS } from "../data/default-asset-catalog.js";
 
 export const assetStatusSchema = z.enum(["IN_USE", "IN_STORE", "UNDER_REPAIR", "DISPOSED"]);
 
@@ -28,6 +29,13 @@ export const createAssetSchema = z
         code: z.ZodIssueCode.custom,
         message: "Project number is required when status is IN_USE",
         path: ["projectNumber"]
+      });
+    }
+    if (payload.status === "IN_STORE" && payload.assetClass !== SURVEY_EQUIPMENT_CLASS) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "IN_STORE status is only allowed for Survey Equipment",
+        path: ["status"]
       });
     }
   });
