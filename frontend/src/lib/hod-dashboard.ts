@@ -207,18 +207,25 @@ export function getProjectWorkCategoryCode(
 export function getProjectFinancialYearShort(
   project: Pick<ProjectItem, "financialYearShort" | "projectNumber">
 ): number | null {
+  // Prefer digits from assigned project number (e.g. GSIR2507R → 25), not stale DB field.
+  const parsed = parseCodesFromProjectNumber(project.projectNumber).financialYearShort;
+  if (parsed != null) {
+    return parsed;
+  }
+
   const stored = project.financialYearShort;
   if (stored != null && Number.isInteger(stored) && stored >= 0 && stored <= 99) {
     return stored;
   }
-  return parseCodesFromProjectNumber(project.projectNumber).financialYearShort;
+
+  return null;
 }
 
-/** Unique FY values present in project numbers (newest first). */
+/** Unique FY values from assigned project numbers only (newest first). */
 export function collectHodFinancialYearOptions(projects: ProjectItem[]): number[] {
   const years = new Set<number>();
   for (const project of projects) {
-    const fy = getProjectFinancialYearShort(project);
+    const fy = parseCodesFromProjectNumber(project.projectNumber).financialYearShort;
     if (fy != null) {
       years.add(fy);
     }
