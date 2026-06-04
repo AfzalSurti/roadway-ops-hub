@@ -1,7 +1,8 @@
 import type { ProjectItem } from "@/lib/domain";
 import type { TaskItem } from "@/lib/domain";
-import { buildProjectDprReportStatuses, getDprReportStatusTone, HOD_DPR_REPORTS } from "@/lib/hod-dpr-reports";
-import { getTasksForProject } from "@/lib/hod-dashboard";
+import { buildProjectDprReportStatuses, getDprReportDisplayDate, getDprReportStatusTone, HOD_DPR_REPORTS } from "@/lib/hod-dpr-reports";
+import { getHodTaskActivityLabel, getTasksForProject } from "@/lib/hod-dashboard";
+import { HodActivityStatusDisplay } from "@/components/hod/HodActivityStatusDisplay";
 import { Badge } from "@/components/ui/badge";
 import { Loader2 } from "lucide-react";
 
@@ -80,13 +81,12 @@ export function HodDprOverviewSection({ projects, tasks, isLoading = false }: Ho
                           className={`rounded-md border px-1 py-1.5 min-h-[52px] flex flex-col items-center justify-center gap-0.5 ${getDprReportStatusTone(report.status)}`}
                           title={`${report.label}: ${report.statusLabel}${report.taskCount ? ` (${report.taskCount} tasks)` : ""}`}
                         >
-                          <span className="font-semibold text-[10px] leading-tight">{report.statusLabel}</span>
-                          {report.status === "TASK_COMPLETED" && report.submissionDate !== "-" ? (
-                            <span className="text-[9px] opacity-90">{report.submissionDate}</span>
-                          ) : null}
-                          {report.status === "APPROVED" && report.approvalDate !== "-" ? (
-                            <span className="text-[9px] opacity-90">{report.approvalDate}</span>
-                          ) : null}
+                          <HodActivityStatusDisplay
+                            status={report.status}
+                            label={report.statusLabel}
+                            date={getDprReportDisplayDate(report)}
+                            labelClassName="font-semibold text-[10px] leading-tight"
+                          />
                         </div>
                       </td>
                     ))}
@@ -104,8 +104,8 @@ function DprStatusLegend() {
   return (
     <div className="flex flex-wrap gap-2 text-xs">
       <LegendItem label="Not started" tone="bg-muted/80 text-muted-foreground border-border/50" />
-      <LegendItem label="Task pending" tone="bg-amber-500/20 text-amber-800 border-amber-500/30" />
-      <LegendItem label="Task completed" tone="bg-sky-500/20 text-sky-700 border-sky-500/30" />
+      <LegendItem label={getHodTaskActivityLabel("TASK_PENDING")} tone="bg-amber-500/20 text-amber-800 border-amber-500/30" />
+      <LegendItem label={getHodTaskActivityLabel("TASK_COMPLETED")} tone="bg-sky-500/20 text-sky-700 border-sky-500/30" />
       <LegendItem label="Approved" tone="bg-emerald-500/20 text-emerald-700 border-emerald-500/30" />
     </div>
   );

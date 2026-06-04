@@ -76,6 +76,7 @@ export type HodDprReportStatusSnapshot = {
   status: HodTaskActivityStatus;
   statusLabel: string;
   taskCount: number;
+  assignmentDate: string | null;
   submissionDate: string | null;
   approvalDate: string | null;
 };
@@ -157,6 +158,7 @@ export function aggregateDprReportStatus(reportTasks: TaskItem[]): Omit<HodDprRe
       status: "NOT_STARTED",
       statusLabel: getHodTaskActivityLabel("NOT_STARTED"),
       taskCount: 0,
+      assignmentDate: null,
       submissionDate: null,
       approvalDate: null
     };
@@ -180,6 +182,7 @@ export function aggregateDprReportStatus(reportTasks: TaskItem[]): Omit<HodDprRe
     status,
     statusLabel: getHodTaskActivityLabel(status),
     taskCount: reportTasks.length,
+    assignmentDate: formatHodDate(maxDate(reportTasks.map((task) => task.allocatedAt ?? task.createdAt))),
     submissionDate: formatHodDate(
       maxDate(reportTasks.map((task) => task.submittedForReviewAt ?? task.actualCompletedAt))
     ),
@@ -203,6 +206,19 @@ export function buildProjectDprReportStatuses(projectTasks: TaskItem[]): HodDprR
     shortLabel: report.shortLabel,
     ...aggregateDprReportStatus(buckets.get(report.key) ?? [])
   }));
+}
+
+export function getDprReportDisplayDate(report: Pick<HodDprReportStatusSnapshot, "status" | "assignmentDate" | "submissionDate" | "approvalDate">): string | null {
+  switch (report.status) {
+    case "TASK_PENDING":
+      return report.assignmentDate;
+    case "TASK_COMPLETED":
+      return report.submissionDate;
+    case "APPROVED":
+      return report.approvalDate;
+    default:
+      return null;
+  }
 }
 
 export function getDprReportStatusTone(status: HodTaskActivityStatus): string {

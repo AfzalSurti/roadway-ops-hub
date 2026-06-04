@@ -103,12 +103,29 @@ export function getHodTaskActivityLabel(status: HodTaskActivityStatus): string {
     case "APPROVED":
       return "Approved";
     case "TASK_COMPLETED":
-      return "Task Completed";
+      return "Draft Submitted";
     case "TASK_PENDING":
-      return "Task Pending";
+      return "Under Preparation";
     default:
       return "Not Started";
   }
+}
+
+export function getHodTaskActivityDate(status: HodTaskActivityStatus, task: TaskItem): string | null {
+  switch (status) {
+    case "TASK_PENDING":
+      return formatHodDate(task.allocatedAt ?? task.createdAt);
+    case "TASK_COMPLETED":
+      return formatHodDate(task.submittedForReviewAt ?? task.actualCompletedAt);
+    case "APPROVED":
+      return formatHodDate(task.reviewCompletedAt);
+    default:
+      return null;
+  }
+}
+
+export function shouldShowHodActivityDate(status: HodTaskActivityStatus, date: string | null | undefined): date is string {
+  return status !== "NOT_STARTED" && Boolean(date) && date !== "-";
 }
 
 export function getHodTaskActivityTone(status: HodTaskActivityStatus): string {
@@ -153,7 +170,7 @@ export function formatHodDate(value?: string | null) {
   if (!value) return "-";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  return date.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
 export function formatHodPercent(value?: number | null) {

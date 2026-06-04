@@ -283,8 +283,8 @@ export default function HodDashboard() {
                 <th className="py-3 px-4 text-right font-medium">Billing Amount</th>
                 <th className="py-3 px-4 text-left font-medium">Lifecycle</th>
                 <th className="py-3 px-4 text-right font-medium">Tasks</th>
-                <th className="py-3 px-4 text-right font-medium">Pending</th>
-                <th className="py-3 px-4 text-right font-medium">Submitted</th>
+                <th className="py-3 px-4 text-right font-medium">Under Preparation</th>
+                <th className="py-3 px-4 text-right font-medium">Draft Submitted</th>
                 <th className="py-3 px-4 text-right font-medium">Approved</th>
                 <th className="py-3 pl-4 text-right font-medium">Action</th>
               </tr>

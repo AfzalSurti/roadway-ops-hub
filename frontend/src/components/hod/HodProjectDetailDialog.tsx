@@ -5,16 +5,19 @@ import {
   formatHodDate,
   getCompanyLabel,
   getProjectCompanyCode,
+  getHodTaskActivityDate,
   getHodTaskActivityLabel,
   getHodTaskActivityStatus,
   getHodTaskActivityTone,
+  shouldShowHodActivityDate,
   getProjectLifecycle,
   getSubTechnicalUnitLabel,
   getTechnicalUnitLabel
 } from "@/lib/hod-dashboard";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { buildProjectDprReportStatuses, getDprReportStatusTone } from "@/lib/hod-dpr-reports";
+import { buildProjectDprReportStatuses, getDprReportDisplayDate, getDprReportStatusTone } from "@/lib/hod-dpr-reports";
+import { HodActivityStatusDisplay } from "@/components/hod/HodActivityStatusDisplay";
 import { Loader2 } from "lucide-react";
 
 type HodProjectDetailDialogProps = {
@@ -76,13 +79,14 @@ export function HodProjectDetailDialog({ open, onOpenChange, project, projectTas
                 title={report.taskCount ? `${report.taskCount} linked task(s)` : "No linked tasks"}
               >
                 <p className="font-medium leading-tight">{report.shortLabel}</p>
-                <p className="mt-1 font-semibold">{report.statusLabel}</p>
-                {report.status === "TASK_COMPLETED" && report.submissionDate && report.submissionDate !== "-" ? (
-                  <p className="text-[10px] mt-0.5 opacity-90">Submitted {report.submissionDate}</p>
-                ) : null}
-                {report.status === "APPROVED" && report.approvalDate && report.approvalDate !== "-" ? (
-                  <p className="text-[10px] mt-0.5 opacity-90">Approved {report.approvalDate}</p>
-                ) : null}
+                <HodActivityStatusDisplay
+                  status={report.status}
+                  label={report.statusLabel}
+                  date={getDprReportDisplayDate(report)}
+                  className="mt-1 items-start"
+                  labelClassName="font-semibold"
+                  dateClassName="text-[10px] opacity-90"
+                />
               </div>
             ))}
           </div>
@@ -110,15 +114,21 @@ export function HodProjectDetailDialog({ open, onOpenChange, project, projectTas
                 <tbody>
                   {projectTasks.map((task) => {
                     const activityStatus = getHodTaskActivityStatus(task);
+                    const activityDate = getHodTaskActivityDate(activityStatus, task);
                     const comments = commentsByTaskId[task.id] ?? [];
                     return (
                       <tr key={task.id} className="border-b border-border/20">
                         <td className="py-2.5 px-3 font-medium max-w-[220px]">{task.title}</td>
                         <td className="py-2.5 px-3">{task.assignedTo?.name ?? "-"}</td>
                         <td className="py-2.5 px-3">
-                          <Badge variant="secondary" className={`rounded-full ${getHodTaskActivityTone(activityStatus)}`}>
-                            {getHodTaskActivityLabel(activityStatus)}
-                          </Badge>
+                          <div className="flex flex-col items-start gap-1">
+                            <Badge variant="secondary" className={`rounded-full ${getHodTaskActivityTone(activityStatus)}`}>
+                              {getHodTaskActivityLabel(activityStatus)}
+                            </Badge>
+                            {shouldShowHodActivityDate(activityStatus, activityDate) ? (
+                              <span className="text-xs text-muted-foreground">{activityDate}</span>
+                            ) : null}
+                          </div>
                         </td>
                         <td className="py-2.5 px-3 text-muted-foreground">
                           {formatHodDate(task.submittedForReviewAt ?? task.actualCompletedAt)}
