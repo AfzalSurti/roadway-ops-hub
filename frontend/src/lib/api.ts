@@ -1,4 +1,39 @@
-import type { ApiUser, AppNotification, AssetItem, AssetMaintenanceItem, AssetMovementItem, AssetStatsResponse, AssetStatus, AssistantChatResponse, AssistantConversationMessage, AssistantDraft, CreateEmployeeResponse, DprReportStatus, FinancialAllProjectsBillStatusSummary, FinancialBillItem, FinancialBillStatus, FinancialPlan, FinancialProjectDetail, FinancialProjectSummary, FinancialRaBill, ProjectDprOverviewItem, ProjectItem, ProjectRequisitionFormItem, ReportItem, ReportStatus, ReportTemplate, TaskComment, TaskItem, TaskStatus } from "./domain";
+import type {
+  ApiUser,
+  AppNotification,
+  AssetItem,
+  AssetMaintenanceItem,
+  AssetMovementItem,
+  AssetStatsResponse,
+  AssetStatus,
+  AssistantChatResponse,
+  AssistantConversationMessage,
+  AssistantDraft,
+  CreateEmployeeResponse,
+  DprReportStatus,
+  ExpenseCategoryItem,
+  ExpenseDashboardStats,
+  ExpenseEntryItem,
+  ExpenseSheetItem,
+  ExpenseSheetStatus,
+  ExpenseVoucherItem,
+  FinancialAllProjectsBillStatusSummary,
+  FinancialBillItem,
+  FinancialBillStatus,
+  FinancialPlan,
+  FinancialProjectDetail,
+  FinancialProjectSummary,
+  FinancialRaBill,
+  ProjectDprOverviewItem,
+  ProjectItem,
+  ProjectRequisitionFormItem,
+  ReportItem,
+  ReportStatus,
+  ReportTemplate,
+  TaskComment,
+  TaskItem,
+  TaskStatus
+} from "./domain";
 
   const API_BASE_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:4000").replace(/\/+$/, "");
 
@@ -946,5 +981,133 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload)
     });
+  },
+
+  async uploadFile(file: File) {
+    const form = new FormData();
+    form.append("file", file);
+    const headers = new Headers();
+    const token = authStorage.getAccessToken();
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+
+    const response = await fetchWithApiFallback("/uploads", { method: "POST", headers, body: form });
+    const json = (await response.json()) as ApiResponse<{ url: string; attachmentId: string }>;
+    if (!response.ok || !json.success || !json.data?.url) {
+      throw new Error(json.error?.message ?? `Upload failed (${response.status})`);
+    }
+    return json.data;
+  },
+
+  getExpenseCategories() {
+    return request<ExpenseCategoryItem[]>("/expenses/categories");
+  },
+
+  getExpenseDashboard() {
+    return request<ExpenseDashboardStats>("/expenses/dashboard");
+  },
+
+  getExpenseSheets(params?: Record<string, string | number | boolean | undefined>) {
+    const query = new URLSearchParams();
+    if (params) {
+      for (const [key, value] of Object.entries(params)) {
+        if (value !== undefined && value !== "") query.set(key, String(value));
+      }
+    }
+    const suffix = query.toString() ? `?${query.toString()}` : "";
+    return request<{ items: ExpenseSheetItem[]; page: number; limit: number; total: number; totalPages: number }>(
+      `/expenses/sheets${suffix}`
+    );
+  },
+
+  getExpenseSheet(id: string) {
+    return request<ExpenseSheetItem>(`/expenses/sheets/${id}`);
+  },
+
+  createExpenseSheet(payload: {
+    projectId?: string | null;
+    siteName: string;
+    siteIncharge: string;
+    totalPersons: number;
+    expenseDate: string;
+    mobileNumber?: string | null;
+    bankAccount?: string | null;
+    sheetNumber?: number | null;
+  }) {
+    return request<ExpenseSheetItem>("/expenses/sheets", { method: "POST", body: JSON.stringify(payload) });
+  },
+
+  updateExpenseSheet(
+    id: string,
+    payload: Partial<{
+      projectId: string | null;
+      siteName: string;
+      siteIncharge: string;
+      totalPersons: number;
+      expenseDate: string;
+      mobileNumber: string | null;
+      bankAccount: string | null;
+      sheetNumber: number | null;
+    }>
+  ) {
+    return request<ExpenseSheetItem>(`/expenses/sheets/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+  },
+
+  deleteExpenseSheet(id: string) {
+    return request<{ deleted: boolean }>(`/expenses/sheets/${id}`, { method: "DELETE" });
+  },
+
+  submitExpenseSheet(id: string) {
+    return request<ExpenseSheetItem>(`/expenses/sheets/${id}/submit`, { method: "POST" });
+  },
+
+  reviewExpenseSheet(id: string, payload: { status: "APPROVED" | "REJECTED"; comments?: string | null }) {
+    return request<ExpenseSheetItem>(`/expenses/sheets/${id}/review`, { method: "POST", body: JSON.stringify(payload) });
+  },
+
+  addExpenseEntry(
+    sheetId: string,
+    payload: {
+      categoryId: string;
+      entryDate: string;
+      amount: number;
+      description: string;
+      billAvailable: boolean;
+      billNumber?: string | null;
+      billAttachmentUrl?: string | null;
+    }
+  ) {
+    return request<ExpenseSheetItem>(`/expenses/sheets/${sheetId}/entries`, { method: "POST", body: JSON.stringify(payload) });
+  },
+
+  updateExpenseEntry(
+    entryId: string,
+    payload: Partial<{
+      categoryId: string;
+      entryDate: string;
+      amount: number;
+      description: string;
+      billAvailable: boolean;
+      billNumber: string | null;
+      billAttachmentUrl: string | null;
+    }>
+  ) {
+    return request<ExpenseSheetItem>(`/expenses/entries/${entryId}`, { method: "PATCH", body: JSON.stringify(payload) });
+  },
+
+  deleteExpenseEntry(entryId: string) {
+    return request<ExpenseSheetItem>(`/expenses/entries/${entryId}`, { method: "DELETE" });
+  },
+
+  getExpenseVouchers(params?: Record<string, string | undefined>) {
+    const query = new URLSearchParams();
+    if (params) {
+      for (const [key, value] of Object.entries(params)) {
+        if (value) query.set(key, value);
+      }
+    }
+    const suffix = query.toString() ? `?${query.toString()}` : "";
+    return request<{ items: ExpenseVoucherItem[]; page: number; limit: number; total: number; totalPages: number }>(
+      `/expenses/vouchers${suffix}`
+    );
   }
 };

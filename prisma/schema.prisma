@@ -94,6 +94,8 @@ model User {
   refreshTokens RefreshToken[]
   audits        AuditLog[]
   notifications Notification[]
+  expenseSheets   ExpenseSheet[]
+  expenseReviews  ExpenseApproval[] @relation("ExpenseReviewer")
 }
 
 model RefreshToken {
@@ -150,6 +152,7 @@ model Project {
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
   dprOverview           ProjectDprOverview?
+  expenseSheets         ExpenseSheet[]
 
   @@index([name])
   @@index([projectCodePrefix, financialYearShort])
@@ -531,4 +534,94 @@ model ProjectDprOverview {
   project    Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
+}
+
+enum ExpenseSheetStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+model ExpenseCategory {
+  id        String         @id @default(cuid())
+  name      String         @unique
+  sortOrder Int            @default(0)
+  isActive  Boolean        @default(true)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  entries   ExpenseEntry[]
+
+  @@index([sortOrder])
+}
+
+model ExpenseSheet {
+  id            String             @id @default(cuid())
+  employeeId    String
+  projectId     String?
+  siteName      String
+  siteIncharge  String
+  totalPersons  Int
+  expenseDate   DateTime
+  mobileNumber  String?
+  bankAccount   String?
+  sheetNumber   Int?
+  status        ExpenseSheetStatus @default(DRAFT)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  employee      User               @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  project       Project?           @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  entries       ExpenseEntry[]
+  approvals     ExpenseApproval[]
+
+  @@index([employeeId])
+  @@index([projectId])
+  @@index([status])
+  @@index([expenseDate])
+}
+
+model ExpenseEntry {
+  id                String          @id @default(cuid())
+  expenseSheetId    String
+  categoryId        String
+  entryDate         DateTime
+  amount            Float
+  description       String
+  billAvailable     Boolean         @default(false)
+  billNumber        String?
+  billAttachmentUrl String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  sheet             ExpenseSheet    @relation(fields: [expenseSheetId], references: [id], onDelete: Cascade)
+  category          ExpenseCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  voucher           Voucher?
+
+  @@index([expenseSheetId])
+  @@index([categoryId])
+  @@index([entryDate])
+  @@index([billAvailable])
+}
+
+model Voucher {
+  id             String       @id @default(cuid())
+  voucherNumber  String       @unique
+  expenseEntryId String       @unique
+  generatedAt    DateTime     @default(now())
+  entry          ExpenseEntry @relation(fields: [expenseEntryId], references: [id], onDelete: Cascade)
+
+  @@index([generatedAt])
+}
+
+model ExpenseApproval {
+  id             String             @id @default(cuid())
+  expenseSheetId String
+  reviewerId     String
+  status         ExpenseSheetStatus
+  comments       String?
+  reviewedAt     DateTime           @default(now())
+  sheet          ExpenseSheet       @relation(fields: [expenseSheetId], references: [id], onDelete: Cascade)
+  reviewer       User               @relation("ExpenseReviewer", fields: [reviewerId], references: [id], onDelete: Restrict)
+
+  @@index([expenseSheetId])
+  @@index([reviewerId])
 }

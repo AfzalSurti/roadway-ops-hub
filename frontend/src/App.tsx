@@ -25,6 +25,13 @@ import AdministrativeDashboard from "./pages/administrative/Dashboard";
 import AssetManagement from "./pages/administrative/AssetManagement";
 import AssetDetail from "./pages/administrative/AssetDetail";
 import HodDashboard from "./pages/hod/Dashboard";
+import ExpenseDashboard from "./pages/admin/ExpenseDashboard";
+import ExpenseList from "./pages/admin/ExpenseList";
+import AdminExpenseDetail from "./pages/admin/ExpenseDetail";
+import ExpenseVouchers from "./pages/admin/ExpenseVouchers";
+import ExpenseReports from "./pages/admin/ExpenseReports";
+import EmployeeExpenses from "./pages/employee/Expenses";
+import EmployeeExpenseDetail from "./pages/employee/ExpenseDetail";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -97,6 +104,11 @@ function AppRoutes() {
         <Route path="financial" element={<AdminFinancial />} />
         <Route path="team" element={<AdminTeam />} />
         <Route path="projects" element={<AdminProjects />} />
+        <Route path="expenses" element={<ExpenseDashboard />} />
+        <Route path="expenses/list" element={<ExpenseList />} />
+        <Route path="expenses/vouchers" element={<ExpenseVouchers />} />
+        <Route path="expenses/reports" element={<ExpenseReports />} />
+        <Route path="expenses/:id" element={<AdminExpenseDetail />} />
       </Route>
 
       <Route path="/administrative" element={<PmoRoute><AppLayout /></PmoRoute>}>
@@ -117,6 +129,8 @@ function AppRoutes() {
         <Route path="task/:id" element={<TaskDetail />} />
         <Route path="reports" element={<EmployeeReports />} />
         <Route path="profile" element={<EmployeeProfile />} />
+        <Route path="expenses" element={<EmployeeExpenses />} />
+        <Route path="expenses/:id" element={<EmployeeExpenseDetail />} />
       </Route>
 
       <Route path="*" element={<NotFound />} />

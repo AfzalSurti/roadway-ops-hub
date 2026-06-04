@@ -8,6 +8,7 @@ import {
   FolderKanban,
   FileCheck,
   Landmark,
+  Receipt,
   Package,
   ChevronLeft,
   ChevronRight,
@@ -22,6 +23,7 @@ const adminNav = [
   { to: "/admin/tasks", icon: ListTodo, label: "Tasks" },
   { to: "/admin/reports", icon: FileCheck, label: "Reports" },
   { to: "/admin/financial", icon: Landmark, label: "Financial" },
+  { to: "/admin/expenses", icon: Receipt, label: "Expenses" },
   { to: "/admin/team", icon: Users, label: "Team" },
   { to: "/admin/projects", icon: FolderKanban, label: "Projects" },
 ];
@@ -40,6 +42,7 @@ const employeeNav = [
   { to: "/app/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/app/tasks", icon: ListTodo, label: "My Tasks" },
   { to: "/app/reports", icon: FileCheck, label: "My Reports" },
+  { to: "/app/expenses", icon: Receipt, label: "Expenses" },
   { to: "/app/profile", icon: UserCircle, label: "My Profile" },
 ];
 

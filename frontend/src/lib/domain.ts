@@ -482,3 +482,96 @@ export const toAvatarUrl = (name: string) =>
 
 export const isTaskOverdue = (task: Pick<TaskItem, "dueDate" | "status">) =>
   new Date(task.dueDate) < new Date() && task.status !== "DONE" && task.status !== "IN_PROGRESS";
+
+export type ExpenseSheetStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
+
+export type ExpenseCategoryItem = {
+  id: string;
+  name: string;
+  sortOrder: number;
+  isActive: boolean;
+};
+
+export type ExpenseEntryItem = {
+  id: string;
+  expenseSheetId: string;
+  categoryId: string;
+  entryDate: string;
+  amount: number;
+  description: string;
+  billAvailable: boolean;
+  billNumber?: string | null;
+  billAttachmentUrl?: string | null;
+  category?: ExpenseCategoryItem;
+  voucher?: { id: string; voucherNumber: string; generatedAt: string } | null;
+};
+
+export type ExpenseApprovalItem = {
+  id: string;
+  expenseSheetId: string;
+  reviewerId: string;
+  status: ExpenseSheetStatus;
+  comments?: string | null;
+  reviewedAt: string;
+  reviewer?: { id: string; name: string; email: string };
+};
+
+export type ExpenseSheetItem = {
+  id: string;
+  employeeId: string;
+  projectId?: string | null;
+  siteName: string;
+  siteIncharge: string;
+  totalPersons: number;
+  expenseDate: string;
+  mobileNumber?: string | null;
+  bankAccount?: string | null;
+  sheetNumber?: number | null;
+  status: ExpenseSheetStatus;
+  createdAt: string;
+  updatedAt: string;
+  employee?: { id: string; name: string; email: string; contactNumber?: string | null };
+  project?: { id: string; name: string; projectNumber?: string | null } | null;
+  entries: ExpenseEntryItem[];
+  approvals?: ExpenseApprovalItem[];
+  totalAmount?: number;
+  employeeName?: string;
+  employeeEmail?: string;
+  projectName?: string | null;
+  projectNumber?: string | null;
+  latestApproval?: ExpenseApprovalItem | null;
+};
+
+export type ExpenseDashboardStats = {
+  totalExpensesThisMonth: number;
+  totalExpensesToday: number;
+  pendingApprovals: number;
+  approvedExpenses: number;
+  rejectedExpenses: number;
+  totalVoucherEntries: number;
+  expenseByCategory: Array<{ categoryId: string; categoryName: string; total: number }>;
+  monthlyExpenseTrend: Array<{ month: string; total: number }>;
+  expenseByEmployee: Array<{ employeeId: string; employeeName: string; total: number }>;
+  recentSheets: ExpenseSheetItem[];
+};
+
+export type ExpenseVoucherItem = {
+  id: string;
+  voucherNumber: string;
+  generatedAt: string;
+  date: string;
+  employeeName: string;
+  projectName: string;
+  projectNumber?: string | null;
+  expenseCategory: string;
+  description: string;
+  amount: number;
+  approvalStatus: ExpenseSheetStatus;
+};
+
+export const expenseSheetStatusConfig: Record<ExpenseSheetStatus, { label: string; className: string }> = {
+  DRAFT: { label: "Draft", className: "bg-muted text-muted-foreground" },
+  SUBMITTED: { label: "Submitted", className: "bg-amber-500/15 text-amber-700" },
+  APPROVED: { label: "Approved", className: "bg-emerald-500/15 text-emerald-600" },
+  REJECTED: { label: "Rejected", className: "bg-rose-500/15 text-rose-600" }
+};
