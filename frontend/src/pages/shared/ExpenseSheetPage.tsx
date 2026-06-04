@@ -41,6 +41,22 @@ function isValidBank12(value: string) {
   return /^\d{12}$/.test(value);
 }
 
+const NUMERIC_INPUT_KEYS = new Set([
+  "Backspace",
+  "Delete",
+  "Tab",
+  "ArrowLeft",
+  "ArrowRight",
+  "Home",
+  "End"
+]);
+
+function blockNonDigitKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+  if (event.ctrlKey || event.metaKey || event.altKey) return;
+  if (NUMERIC_INPUT_KEYS.has(event.key)) return;
+  if (!/^\d$/.test(event.key)) event.preventDefault();
+}
+
 export default function ExpenseSheetPage({ basePath, selfService = false }: ExpenseSheetPageProps) {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -83,19 +99,12 @@ export default function ExpenseSheetPage({ basePath, selfService = false }: Expe
   const { data: profile } = useQuery({
     queryKey: ["profile", "me"],
     queryFn: () => api.getProfile(),
-    enabled: selfService && isNew,
+    enabled: isNew,
     staleTime: 5 * 60_000
   });
 
-  useEffect(() => {
-    if (!isNew || !profile?.contactNumber) return;
-    setHeaderForm((prev) => {
-      if (prev.mobileNumber) return prev;
-      return { ...prev, mobileNumber: digitsOnly(profile.contactNumber ?? "", 10) };
-    });
-  }, [isNew, profile?.contactNumber]);
-
   const [headerForm, setHeaderForm] = useState({
+    employeeName: "",
     projectId: "",
     siteName: "",
     siteIncharge: "",
@@ -105,6 +114,17 @@ export default function ExpenseSheetPage({ basePath, selfService = false }: Expe
     bankAccount: "",
     sheetNumber: ""
   });
+
+  useEffect(() => {
+    if (!isNew) return;
+    const defaultName = (profile?.name ?? user?.name ?? "").trim();
+    const defaultMobile = digitsOnly(profile?.contactNumber ?? user?.contactNumber ?? "", 10);
+    setHeaderForm((prev) => ({
+      ...prev,
+      employeeName: prev.employeeName || defaultName,
+      mobileNumber: prev.mobileNumber || defaultMobile
+    }));
+  }, [isNew, profile?.name, profile?.contactNumber, user?.name, user?.contactNumber]);
 
   const sheetQueryEnabled = Boolean(id) && !isNew;
 
@@ -148,6 +168,7 @@ export default function ExpenseSheetPage({ basePath, selfService = false }: Expe
       }
       return api.createExpenseSheet({
         projectId: headerForm.projectId || null,
+        employeeName: headerForm.employeeName.trim(),
         siteName: headerForm.siteName.trim(),
         siteIncharge: headerForm.siteIncharge.trim(),
         totalPersons: Number(headerForm.totalPersons),
@@ -234,7 +255,7 @@ export default function ExpenseSheetPage({ basePath, selfService = false }: Expe
   const createMobile = digitsOnly(headerForm.mobileNumber || profile?.contactNumber || "", 10);
   const createBank = digitsOnly(headerForm.bankAccount, 12);
   const canCreateSheet =
-    Boolean(headerForm.siteName.trim() && headerForm.siteIncharge.trim()) &&
+    Boolean(headerForm.employeeName.trim() && headerForm.siteName.trim() && headerForm.siteIncharge.trim()) &&
     isValidMobile10(createMobile) &&
     isValidBank12(createBank);
 
@@ -246,6 +267,13 @@ export default function ExpenseSheetPage({ basePath, selfService = false }: Expe
           <p className="page-subtitle">Enter site details before adding daily expense entries.</p>
         </div>
         <div className="glass-panel p-6 grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl">
+          <Field label="Full Name of Employee">
+            <Input
+              value={headerForm.employeeName}
+              onChange={(e) => setHeaderForm((p) => ({ ...p, employeeName: e.target.value }))}
+              placeholder="From your profile; you can edit"
+            />
+          </Field>
           <Field label="Project">
             <Select value={headerForm.projectId} onValueChange={handleProjectSelect}>
               <SelectTrigger><SelectValue placeholder="Select project" /></SelectTrigger>
@@ -270,11 +298,19 @@ export default function ExpenseSheetPage({ basePath, selfService = false }: Expe
           <Field label="Total Persons at Site"><Input type="number" min={1} value={headerForm.totalPersons} onChange={(e) => setHeaderForm((p) => ({ ...p, totalPersons: e.target.value }))} /></Field>
           <Field label="Mobile Number">
             <Input
-              type="text"
+              type="tel"
               inputMode="numeric"
+              pattern="[0-9]*"
+              autoComplete="tel"
               maxLength={10}
               value={headerForm.mobileNumber}
+              onKeyDown={blockNonDigitKeyDown}
               onChange={(e) => setHeaderForm((p) => ({ ...p, mobileNumber: digitsOnly(e.target.value, 10) }))}
+              onPaste={(e) => {
+                e.preventDefault();
+                const pasted = digitsOnly(e.clipboardData.getData("text"), 10);
+                setHeaderForm((p) => ({ ...p, mobileNumber: pasted }));
+              }}
               placeholder="10-digit mobile number"
             />
             {createMobile.length > 0 && !isValidMobile10(createMobile) ? (
@@ -283,11 +319,18 @@ export default function ExpenseSheetPage({ basePath, selfService = false }: Expe
           </Field>
           <Field label="Bank Account">
             <Input
-              type="text"
+              type="tel"
               inputMode="numeric"
+              pattern="[0-9]*"
               maxLength={12}
               value={headerForm.bankAccount}
+              onKeyDown={blockNonDigitKeyDown}
               onChange={(e) => setHeaderForm((p) => ({ ...p, bankAccount: digitsOnly(e.target.value, 12) }))}
+              onPaste={(e) => {
+                e.preventDefault();
+                const pasted = digitsOnly(e.clipboardData.getData("text"), 12);
+                setHeaderForm((p) => ({ ...p, bankAccount: pasted }));
+              }}
               placeholder="12-digit account number"
             />
             {createBank.length > 0 && !isValidBank12(createBank) ? (

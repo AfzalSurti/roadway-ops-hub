@@ -556,16 +556,17 @@ model ExpenseCategory {
 }
 
 model ExpenseSheet {
-  id            String             @id @default(cuid())
-  employeeId    String
-  projectId     String?
-  siteName      String
-  siteIncharge  String
-  totalPersons  Int
-  expenseDate   DateTime
-  mobileNumber  String?
-  bankAccount   String?
-  sheetNumber   Int?
+  id                  String             @id @default(cuid())
+  employeeId          String
+  projectId           String?
+  employeeDisplayName String?
+  siteName            String
+  siteIncharge        String
+  totalPersons        Int
+  expenseDate         DateTime
+  mobileNumber        String?
+  bankAccount         String?
+  sheetNumber         Int?
   status        ExpenseSheetStatus @default(DRAFT)
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt

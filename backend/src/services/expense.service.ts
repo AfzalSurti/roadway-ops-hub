@@ -16,7 +16,7 @@ function mapSheet(sheet: ExpenseSheetDetail | ExpenseSheetListItem) {
   return {
     ...sheet,
     totalAmount,
-    employeeName: sheet.employee.name,
+    employeeName: sheet.employeeDisplayName ?? sheet.employee.name,
     employeeEmail: sheet.employee.email,
     employeeId: sheet.employee.id,
     projectName: sheet.project?.name ?? null,
@@ -100,6 +100,7 @@ export const expenseService = {
 
   async createSheet(user: AuthUser, payload: {
     projectId?: string | null;
+    employeeName: string;
     siteName: string;
     siteIncharge: string;
     totalPersons: number;
@@ -116,6 +117,7 @@ export const expenseService = {
     const sheet = await expenseRepository.createSheet({
       employee: { connect: { id: employeeId } },
       ...(payload.projectId ? { project: { connect: { id: payload.projectId } } } : {}),
+      employeeDisplayName: payload.employeeName.trim(),
       siteName: payload.siteName,
       siteIncharge: payload.siteIncharge,
       totalPersons: payload.totalPersons,
@@ -131,6 +133,7 @@ export const expenseService = {
 
   async updateSheet(id: string, user: AuthUser, payload: Partial<{
     projectId: string | null;
+    employeeName: string;
     siteName: string;
     siteIncharge: string;
     totalPersons: number;
@@ -149,6 +152,9 @@ export const expenseService = {
         ? payload.projectId
           ? { project: { connect: { id: payload.projectId } } }
           : { project: { disconnect: true } }
+        : {}),
+      ...(payload.employeeName !== undefined
+        ? { employeeDisplayName: payload.employeeName.trim() }
         : {}),
       ...(payload.siteName !== undefined ? { siteName: payload.siteName } : {}),
       ...(payload.siteIncharge !== undefined ? { siteIncharge: payload.siteIncharge } : {}),
@@ -317,7 +323,7 @@ export const expenseService = {
         voucherNumber: voucher.voucherNumber,
         generatedAt: voucher.generatedAt,
         date: voucher.entry.entryDate,
-        employeeName: voucher.entry.sheet.employee.name,
+        employeeName: voucher.entry.sheet.employeeDisplayName ?? voucher.entry.sheet.employee.name,
         projectName: voucher.entry.sheet.project?.name ?? voucher.entry.sheet.siteName,
         projectNumber: voucher.entry.sheet.project?.projectNumber ?? null,
         expenseCategory: voucher.entry.category.name,

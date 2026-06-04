@@ -520,6 +520,7 @@ export type ExpenseSheetItem = {
   id: string;
   employeeId: string;
   projectId?: string | null;
+  employeeDisplayName?: string | null;
   siteName: string;
   siteIncharge: string;
   totalPersons: number;

@@ -4,6 +4,7 @@ const expenseSheetStatusSchema = z.enum(["DRAFT", "SUBMITTED", "APPROVED", "REJE
 
 export const createExpenseSheetSchema = z.object({
   projectId: z.string().trim().optional().nullable(),
+  employeeName: z.string().trim().min(1),
   siteName: z.string().trim().min(1),
   siteIncharge: z.string().trim().min(1),
   totalPersons: z.coerce.number().int().min(1),
