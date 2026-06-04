@@ -4,7 +4,7 @@ import { PageWrapper } from "@/components/PageWrapper";
 import { ExpenseStatusBadge } from "@/components/expense/ExpenseStatusBadge";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
-import { BarChart3, CheckCircle2, Clock3, FileSpreadsheet, Receipt, Wallet, XCircle } from "lucide-react";
+import { BarChart3, CheckCircle2, Clock3, FileSpreadsheet, Plus, Receipt, Wallet, XCircle } from "lucide-react";
 
 export default function ExpenseDashboard() {
   const { data: stats, isLoading } = useQuery({
@@ -29,9 +29,16 @@ export default function ExpenseDashboard() {
           <p className="page-subtitle">Track site expenses, approvals, and voucher entries across the organization.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button asChild variant="outline"><Link to="/admin/expenses/list">Expense List</Link></Button>
+          <Button asChild className="gap-2">
+            <Link to="/admin/expenses/my/new">
+              <Plus className="h-4 w-4" />
+              Create Expense Bill
+            </Link>
+          </Button>
+          <Button asChild variant="outline"><Link to="/admin/expenses/my">My Expense Sheets</Link></Button>
+          <Button asChild variant="outline"><Link to="/admin/expenses/list">All Expenses</Link></Button>
           <Button asChild variant="outline"><Link to="/admin/expenses/vouchers">Voucher Register</Link></Button>
-          <Button asChild><Link to="/admin/expenses/reports">Reports</Link></Button>
+          <Button asChild variant="outline"><Link to="/admin/expenses/reports">Reports</Link></Button>
         </div>
       </div>
 

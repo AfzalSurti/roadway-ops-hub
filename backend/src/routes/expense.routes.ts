@@ -23,7 +23,7 @@ expenseRouter.get("/sheets", asyncHandler(expenseController.listSheets));
 expenseRouter.get("/sheets/:id", asyncHandler(expenseController.getSheet));
 expenseRouter.post(
   "/sheets",
-  requireRole("EMPLOYEE"),
+  requireRole("EMPLOYEE", "ADMIN"),
   validate(createExpenseSheetSchema),
   asyncHandler(expenseController.createSheet)
 );
@@ -33,7 +33,7 @@ expenseRouter.patch(
   validate(updateExpenseSheetSchema),
   asyncHandler(expenseController.updateSheet)
 );
-expenseRouter.delete("/sheets/:id", requireRole("EMPLOYEE"), asyncHandler(expenseController.deleteSheet));
+expenseRouter.delete("/sheets/:id", requireRole("EMPLOYEE", "ADMIN"), asyncHandler(expenseController.deleteSheet));
 expenseRouter.post("/sheets/:id/submit", requireRole("EMPLOYEE"), asyncHandler(expenseController.submitSheet));
 expenseRouter.post(
   "/sheets/:id/review",
@@ -44,16 +44,16 @@ expenseRouter.post(
 
 expenseRouter.post(
   "/sheets/:sheetId/entries",
-  requireRole("EMPLOYEE"),
+  requireRole("EMPLOYEE", "ADMIN"),
   validate(createExpenseEntrySchema),
   asyncHandler(expenseController.addEntry)
 );
 expenseRouter.patch(
   "/entries/:entryId",
-  requireRole("EMPLOYEE"),
+  requireRole("EMPLOYEE", "ADMIN"),
   validate(updateExpenseEntrySchema),
   asyncHandler(expenseController.updateEntry)
 );
-expenseRouter.delete("/entries/:entryId", requireRole("EMPLOYEE"), asyncHandler(expenseController.deleteEntry));
+expenseRouter.delete("/entries/:entryId", requireRole("EMPLOYEE", "ADMIN"), asyncHandler(expenseController.deleteEntry));
 
 expenseRouter.get("/vouchers", asyncHandler(expenseController.listVouchers));

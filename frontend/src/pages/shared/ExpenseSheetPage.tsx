@@ -21,10 +21,12 @@ import {
   downloadVoucherReportPdf,
   getSheetVouchers
 } from "@/lib/expense-reports";
-import { Loader2, Plus, RefreshCcw, Send, Trash2 } from "lucide-react";
+import { Loader2, Plus, RefreshCcw, Trash2 } from "lucide-react";
 
 type ExpenseSheetPageProps = {
-  basePath: "/admin/expenses" | "/app/expenses";
+  basePath: "/admin/expenses" | "/admin/expenses/my" | "/app/expenses";
+  /** Employee-style workspace: create entries, vouchers, reports — no submit/approval. */
+  selfService?: boolean;
 };
 
 function digitsOnly(value: string, maxLength: number) {
@@ -39,13 +41,12 @@ function isValidBank12(value: string) {
   return /^\d{12}$/.test(value);
 }
 
-export default function ExpenseSheetPage({ basePath }: ExpenseSheetPageProps) {
+export default function ExpenseSheetPage({ basePath, selfService = false }: ExpenseSheetPageProps) {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isAdmin, user } = useAuth();
   const isNew = id === "new";
-  const canEdit = !isAdmin;
 
   const [reviewComments, setReviewComments] = useState("");
   const [entryForm, setEntryForm] = useState({
@@ -76,13 +77,13 @@ export default function ExpenseSheetPage({ basePath }: ExpenseSheetPageProps) {
   const { data: projects = [] } = useQuery({
     queryKey: ["projects"],
     queryFn: () => api.getProjects(),
-    enabled: canEdit || isAdmin,
+    enabled: selfService || isAdmin,
     staleTime: 5 * 60_000
   });
   const { data: profile } = useQuery({
     queryKey: ["profile", "me"],
     queryFn: () => api.getProfile(),
-    enabled: canEdit && isNew,
+    enabled: selfService && isNew,
     staleTime: 5 * 60_000
   });
 
@@ -163,15 +164,6 @@ export default function ExpenseSheetPage({ basePath }: ExpenseSheetPageProps) {
     onError: (error: Error) => toast.error(error.message)
   });
 
-  const submitMutation = useMutation({
-    mutationFn: () => api.submitExpenseSheet(id!),
-    onSuccess: () => {
-      toast.success("Expense sheet submitted");
-      invalidate();
-    },
-    onError: (error: Error) => toast.error(error.message)
-  });
-
   const reviewMutation = useMutation({
     mutationFn: (status: "APPROVED" | "REJECTED") => api.reviewExpenseSheet(id!, { status, comments: reviewComments || null }),
     onSuccess: () => {
@@ -224,7 +216,13 @@ export default function ExpenseSheetPage({ basePath }: ExpenseSheetPageProps) {
     onError: (error: Error) => toast.error(error.message)
   });
 
-  const editable = sheet && (sheet.status === "DRAFT" || sheet.status === "REJECTED") && sheet.employeeId === user?.id;
+  const ownsSheet = Boolean(sheet && user?.id && sheet.employeeId === user.id);
+  const editable =
+    selfService && ownsSheet && sheet && (sheet.status === "DRAFT" || sheet.status === "REJECTED");
+  const canReview =
+    isAdmin &&
+    !selfService &&
+    Boolean(sheet && sheet.status === "SUBMITTED" && sheet.employeeId !== user?.id);
 
   const canAddEntry =
     Boolean(entryForm.categoryId) &&
@@ -240,7 +238,7 @@ export default function ExpenseSheetPage({ basePath }: ExpenseSheetPageProps) {
     isValidMobile10(createMobile) &&
     isValidBank12(createBank);
 
-  if (isNew && canEdit) {
+  if (isNew && selfService) {
     return (
       <PageWrapper>
         <div className="page-header">
@@ -362,7 +360,15 @@ export default function ExpenseSheetPage({ basePath }: ExpenseSheetPageProps) {
         <div>
           <h1 className="page-title">{sheet.siteName}</h1>
           <p className="page-subtitle">
-            {sheet.employeeName} · {sheet.projectNumber ?? "No project"} · <ExpenseStatusBadge status={sheet.status} />
+            {selfService ? (
+              <>
+                {sheet.projectNumber ?? "No project"} · Expense sheet
+              </>
+            ) : (
+              <>
+                {sheet.employeeName} · {sheet.projectNumber ?? "No project"} · <ExpenseStatusBadge status={sheet.status} />
+              </>
+            )}
           </p>
         </div>
         <Button asChild variant="outline"><Link to={basePath}>Back</Link></Button>
@@ -377,7 +383,7 @@ export default function ExpenseSheetPage({ basePath }: ExpenseSheetPageProps) {
         <Info label="Expense Date" value={new Date(sheet.expenseDate).toLocaleDateString("en-IN")} />
       </div>
 
-      {isAdmin && sheet.status === "SUBMITTED" ? (
+      {canReview ? (
         <div className="glass-panel p-4 mb-6 space-y-3">
           <h3 className="font-semibold">Review Expense Sheet</h3>
           <Textarea value={reviewComments} onChange={(e) => setReviewComments(e.target.value)} placeholder="Comments (optional)" />
@@ -388,7 +394,7 @@ export default function ExpenseSheetPage({ basePath }: ExpenseSheetPageProps) {
         </div>
       ) : null}
 
-      {sheet.latestApproval ? (
+      {!selfService && sheet.latestApproval ? (
         <div className="glass-panel p-4 mb-6 text-sm">
           <p><strong>Reviewed by:</strong> {sheet.latestApproval.reviewer?.name ?? "Admin"}</p>
           <p><strong>Date:</strong> {new Date(sheet.latestApproval.reviewedAt).toLocaleString("en-IN")}</p>
@@ -511,11 +517,6 @@ export default function ExpenseSheetPage({ basePath }: ExpenseSheetPageProps) {
           </table>
         </div>
 
-        {editable ? (
-          <Button className="mt-4 gap-2" onClick={() => submitMutation.mutate()} disabled={submitMutation.isPending || sheet.entries.length === 0}>
-            <Send className="h-4 w-4" /> Submit for Approval
-          </Button>
-        ) : null}
       </div>
 
       <div className="glass-panel p-6">

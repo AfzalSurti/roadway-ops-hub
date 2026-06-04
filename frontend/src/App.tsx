@@ -28,6 +28,7 @@ import HodDashboard from "./pages/hod/Dashboard";
 import ExpenseDashboard from "./pages/admin/ExpenseDashboard";
 import ExpenseList from "./pages/admin/ExpenseList";
 import AdminExpenseDetail from "./pages/admin/ExpenseDetail";
+import AdminMyExpenses from "./pages/admin/AdminMyExpenses";
 import ExpenseVouchers from "./pages/admin/ExpenseVouchers";
 import ExpenseReports from "./pages/admin/ExpenseReports";
 import EmployeeExpenses from "./pages/employee/Expenses";
@@ -105,6 +106,9 @@ function AppRoutes() {
         <Route path="team" element={<AdminTeam />} />
         <Route path="projects" element={<AdminProjects />} />
         <Route path="expenses" element={<ExpenseDashboard />} />
+        <Route path="expenses/my" element={<AdminMyExpenses />} />
+        <Route path="expenses/my/new" element={<AdminExpenseDetail />} />
+        <Route path="expenses/my/:id" element={<AdminExpenseDetail />} />
         <Route path="expenses/list" element={<ExpenseList />} />
         <Route path="expenses/vouchers" element={<ExpenseVouchers />} />
         <Route path="expenses/reports" element={<ExpenseReports />} />

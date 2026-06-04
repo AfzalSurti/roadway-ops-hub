@@ -45,9 +45,16 @@ async function syncVoucherForEntry(entryId: string, billAvailable: boolean) {
   return null;
 }
 
-function assertEmployeeOwnsSheet(sheet: { employeeId: string }, user: AuthUser) {
-  if (user.role !== "ADMIN" && sheet.employeeId !== user.id) {
+function assertCanViewSheet(sheet: { employeeId: string }, user: AuthUser) {
+  if (user.role === "ADMIN") return;
+  if (sheet.employeeId !== user.id) {
     throw forbidden("You can only access your own expense sheets");
+  }
+}
+
+function assertSheetOwner(sheet: { employeeId: string }, user: AuthUser) {
+  if (sheet.employeeId !== user.id) {
+    throw forbidden("You can only manage your own expense sheets");
   }
 }
 
@@ -87,7 +94,7 @@ export const expenseService = {
   async getSheetById(id: string, user: AuthUser) {
     const sheet = await expenseRepository.findSheetById(id);
     if (!sheet) throw notFound("Expense sheet not found");
-    assertEmployeeOwnsSheet(sheet, user);
+    assertCanViewSheet(sheet, user);
     return mapSheet(sheet);
   },
 
@@ -101,8 +108,8 @@ export const expenseService = {
     bankAccount?: string | null;
     sheetNumber?: number | null;
   }) {
-    if (user.role !== "EMPLOYEE") {
-      throw forbidden("Only employees can create expense sheets");
+    if (user.role !== "EMPLOYEE" && user.role !== "ADMIN") {
+      throw forbidden("Only employees and admins can create expense sheets");
     }
 
     const employeeId = user.id;
@@ -134,7 +141,7 @@ export const expenseService = {
   }>) {
     const sheet = await expenseRepository.findSheetById(id);
     if (!sheet) throw notFound("Expense sheet not found");
-    assertEmployeeOwnsSheet(sheet, user);
+    assertSheetOwner(sheet, user);
     assertEditable(sheet.status);
 
     const updated = await expenseRepository.updateSheet(id, {
@@ -158,7 +165,7 @@ export const expenseService = {
   async deleteSheet(id: string, user: AuthUser) {
     const sheet = await expenseRepository.findSheetById(id);
     if (!sheet) throw notFound("Expense sheet not found");
-    assertEmployeeOwnsSheet(sheet, user);
+    assertSheetOwner(sheet, user);
     assertEditable(sheet.status);
     await expenseRepository.deleteSheet(id);
     return { deleted: true };
@@ -167,7 +174,7 @@ export const expenseService = {
   async submitSheet(id: string, user: AuthUser) {
     const sheet = await expenseRepository.findSheetById(id);
     if (!sheet) throw notFound("Expense sheet not found");
-    assertEmployeeOwnsSheet(sheet, user);
+    assertSheetOwner(sheet, user);
     if (sheet.status !== "DRAFT" && sheet.status !== "REJECTED") {
       throw badRequest("Only draft or rejected sheets can be submitted");
     }
@@ -209,7 +216,7 @@ export const expenseService = {
   }) {
     const sheet = await expenseRepository.findSheetById(sheetId);
     if (!sheet) throw notFound("Expense sheet not found");
-    assertEmployeeOwnsSheet(sheet, user);
+    assertSheetOwner(sheet, user);
     assertEditable(sheet.status);
 
     const category = await expenseRepository.findCategoryById(payload.categoryId);
@@ -250,7 +257,7 @@ export const expenseService = {
     if (!entry) throw notFound("Expense entry not found");
     const sheet = await expenseRepository.findSheetById(entry.expenseSheetId);
     if (!sheet) throw notFound("Expense sheet not found");
-    assertEmployeeOwnsSheet(sheet, user);
+    assertSheetOwner(sheet, user);
     assertEditable(sheet.status);
 
     const billAvailable = payload.billAvailable ?? entry.billAvailable;
@@ -279,7 +286,7 @@ export const expenseService = {
     if (!entry) throw notFound("Expense entry not found");
     const sheet = await expenseRepository.findSheetById(entry.expenseSheetId);
     if (!sheet) throw notFound("Expense sheet not found");
-    assertEmployeeOwnsSheet(sheet, user);
+    assertSheetOwner(sheet, user);
     assertEditable(sheet.status);
 
     await expenseRepository.deleteVoucherByEntryId(entryId);
