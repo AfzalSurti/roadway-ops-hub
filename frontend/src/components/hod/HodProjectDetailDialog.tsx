@@ -4,6 +4,7 @@ import type { ProjectItem, TaskItem } from "@/lib/domain";
 import {
   formatHodDate,
   getCompanyLabel,
+  getProjectCompanyCode,
   getHodTaskActivityLabel,
   getHodTaskActivityStatus,
   getHodTaskActivityTone,
@@ -57,7 +58,7 @@ export function HodProjectDetailDialog({ open, onOpenChange, project, projectTas
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
           <InfoField label="Project Number" value={project.projectNumber ?? "-"} />
-          <InfoField label="Organization" value={getCompanyLabel(project.companyCode)} />
+          <InfoField label="Organization" value={getCompanyLabel(getProjectCompanyCode(project))} />
           <InfoField label="Technical Unit" value={getTechnicalUnitLabel(project.technicalUnitCode)} />
           <InfoField
             label="Sub Technical Unit"

@@ -8,9 +8,12 @@ import { HodDprOverviewSection } from "@/components/hod/HodDprOverviewSection";
 import { HodProjectDetailDialog } from "@/components/hod/HodProjectDetailDialog";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import type { ProjectItem } from "@/lib/domain";
+import type { FinancialProjectBillStatusRow, ProjectItem } from "@/lib/domain";
 import {
+  formatHodCurrency,
+  formatHodPercent,
   getCompanyLabel,
+  getProjectCompanyCode,
   getProjectLifecycle,
   getTasksForProject,
   HOD_COMPANY_OPTIONS,
@@ -39,7 +42,30 @@ export default function HodDashboard() {
     staleTime: 2 * 60 * 1000
   });
 
+  const { data: financialBillStatus, isLoading: loadingFinancial, refetch: refetchFinancial } = useQuery({
+    queryKey: ["hod-financial-bill-status"],
+    queryFn: () => api.getAllProjectsBillStatus(),
+    staleTime: 5 * 60 * 1000
+  });
+
   const tasks = tasksResponse?.items ?? [];
+
+  const financialByProjectId = useMemo(() => {
+    const map = new Map<string, FinancialProjectBillStatusRow>();
+    for (const row of financialBillStatus?.rows ?? []) {
+      map.set(row.projectId, row);
+    }
+    return map;
+  }, [financialBillStatus]);
+
+  const financialByProjectNumber = useMemo(() => {
+    const map = new Map<string, FinancialProjectBillStatusRow>();
+    for (const row of financialBillStatus?.rows ?? []) {
+      const key = row.projectNo?.trim();
+      if (key) map.set(key, row);
+    }
+    return map;
+  }, [financialBillStatus]);
 
   const subTechnicalOptions = useMemo(() => {
     if (technicalUnitFilter === "ALL") {
@@ -52,7 +78,8 @@ export default function HodDashboard() {
     const query = search.trim().toLowerCase();
 
     return projects.filter((project) => {
-      const orgOk = organizationFilter === "ALL" || project.companyCode === organizationFilter;
+      const companyCode = getProjectCompanyCode(project);
+      const orgOk = organizationFilter === "ALL" || companyCode === organizationFilter;
       const unitOk = technicalUnitFilter === "ALL" || project.technicalUnitCode === technicalUnitFilter;
       const subOk = subTechnicalUnitFilter === "ALL" || project.subTechnicalUnitCode === subTechnicalUnitFilter;
 
@@ -64,7 +91,7 @@ export default function HodDashboard() {
         return true;
       }
 
-      const haystack = [project.name, project.projectNumber, project.description, getCompanyLabel(project.companyCode)]
+      const haystack = [project.name, project.projectNumber, project.description, getCompanyLabel(getProjectCompanyCode(project))]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
@@ -79,12 +106,19 @@ export default function HodDashboard() {
         const projectTasks = getTasksForProject(project, tasks);
         const summary = summarizeProjectTasks(projectTasks);
         const lifecycle = getProjectLifecycle(projectTasks);
+        const financial =
+          financialByProjectId.get(project.id) ??
+          (project.projectNumber ? financialByProjectNumber.get(project.projectNumber.trim()) : undefined);
 
         return {
           project,
           projectTasks,
           summary,
-          lifecycle
+          lifecycle,
+          woAmountExclGst: financial?.workOrderAmountExclGst ?? null,
+          receivedAmountExclGst: financial?.receivedAmountExclGst ?? null,
+          financialProgressPct: financial?.financialProgressPct ?? null,
+          billingAmount: financial?.raBillRaisedClaim ?? null
         };
       })
       .sort((a, b) => {
@@ -92,7 +126,7 @@ export default function HodDashboard() {
         if (numberCompare !== 0) return numberCompare;
         return a.project.name.localeCompare(b.project.name);
       });
-  }, [filteredProjects, tasks]);
+  }, [filteredProjects, financialByProjectId, financialByProjectNumber, tasks]);
 
   const totals = useMemo(() => {
     let completed = 0;
@@ -123,10 +157,11 @@ export default function HodDashboard() {
   };
 
   const refreshAll = async () => {
-    await Promise.all([refetchProjects(), refetchTasks()]);
+    await Promise.all([refetchProjects(), refetchTasks(), refetchFinancial()]);
   };
 
-  const isLoading = loadingProjects || loadingTasks;
+  const isLoading = loadingProjects || loadingTasks || loadingFinancial;
+  const projectTableColSpan = 12;
 
   return (
     <PageWrapper>
@@ -227,7 +262,9 @@ export default function HodDashboard() {
         <div className="flex items-center justify-between gap-3 mb-4">
           <div>
             <h3 className="font-semibold text-lg">Project monitoring</h3>
-            <p className="text-sm text-muted-foreground">Task activity synced from DPR Admin assignments.</p>
+            <p className="text-sm text-muted-foreground">
+              Task activity from DPR Admin assignments; financial progress and billing from DPR Admin Financial.
+            </p>
           </div>
           <Badge variant="secondary" className="rounded-full">
             {projectRows.length} project(s)
@@ -235,12 +272,15 @@ export default function HodDashboard() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[900px]">
+          <table className="w-full text-sm min-w-[1280px]">
             <thead>
               <tr className="border-b border-border/40 text-muted-foreground">
                 <th className="py-3 pr-4 text-left font-medium">Project Number</th>
                 <th className="py-3 px-4 text-left font-medium">Project Name</th>
-                <th className="py-3 px-4 text-left font-medium">Organization</th>
+                <th className="py-3 px-4 text-right font-medium">WO Amt (Excl. GST)</th>
+                <th className="py-3 px-4 text-right font-medium">Received Amount</th>
+                <th className="py-3 px-4 text-right font-medium">Financial Progress (%)</th>
+                <th className="py-3 px-4 text-right font-medium">Billing Amount</th>
                 <th className="py-3 px-4 text-left font-medium">Lifecycle</th>
                 <th className="py-3 px-4 text-right font-medium">Tasks</th>
                 <th className="py-3 px-4 text-right font-medium">Pending</th>
@@ -252,10 +292,10 @@ export default function HodDashboard() {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={9} className="py-10 text-center text-muted-foreground">
+                  <td colSpan={projectTableColSpan} className="py-10 text-center text-muted-foreground">
                     <span className="inline-flex items-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Loading projects and tasks...
+                      Loading projects, tasks, and financial data...
                     </span>
                   </td>
                 </tr>
@@ -263,7 +303,7 @@ export default function HodDashboard() {
 
               {!isLoading && projectRows.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-10 text-center text-muted-foreground">
+                  <td colSpan={projectTableColSpan} className="py-10 text-center text-muted-foreground">
                     No projects match the selected filters.
                   </td>
                 </tr>
@@ -274,8 +314,17 @@ export default function HodDashboard() {
                     <tr key={row.project.id} className="border-b border-border/20 hover:bg-secondary/20 transition-colors">
                       <td className="py-3 pr-4 font-medium">{row.project.projectNumber || "-"}</td>
                       <td className="py-3 px-4 max-w-[240px] truncate">{row.project.name}</td>
-                      <td className="py-3 px-4 text-muted-foreground max-w-[180px] truncate">
-                        {getCompanyLabel(row.project.companyCode)}
+                      <td className="py-3 px-4 text-right tabular-nums text-muted-foreground">
+                        {formatHodCurrency(row.woAmountExclGst)}
+                      </td>
+                      <td className="py-3 px-4 text-right tabular-nums text-muted-foreground">
+                        {formatHodCurrency(row.receivedAmountExclGst)}
+                      </td>
+                      <td className="py-3 px-4 text-right tabular-nums text-muted-foreground">
+                        {formatHodPercent(row.financialProgressPct)}
+                      </td>
+                      <td className="py-3 px-4 text-right tabular-nums text-muted-foreground">
+                        {formatHodCurrency(row.billingAmount)}
                       </td>
                       <td className="py-3 px-4">
                         <Badge

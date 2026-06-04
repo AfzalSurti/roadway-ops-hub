@@ -7,6 +7,23 @@ export const HOD_COMPANY_OPTIONS = [
   { label: "Shree Hari Testing Lab", code: "H" }
 ] as const;
 
+const HOD_COMPANY_CODES = new Set(HOD_COMPANY_OPTIONS.map((item) => item.code));
+
+/** Company initial is encoded as the first character of the assigned project number (e.g. GSAE2601R → G). */
+export function getProjectCompanyCode(project: Pick<ProjectItem, "companyCode" | "projectNumber">): string | null {
+  const stored = project.companyCode?.trim();
+  if (stored && HOD_COMPANY_CODES.has(stored)) {
+    return stored;
+  }
+
+  const initial = project.projectNumber?.trim().charAt(0).toUpperCase();
+  if (initial && HOD_COMPANY_CODES.has(initial)) {
+    return initial;
+  }
+
+  return stored || null;
+}
+
 export const HOD_TECHNICAL_UNIT_OPTIONS = [
   { label: "Testing Consultancy", code: "T" },
   { label: "Supervision Consultancy", code: "S" },
@@ -137,6 +154,16 @@ export function formatHodDate(value?: string | null) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
   return date.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+export function formatHodPercent(value?: number | null) {
+  if (value == null || Number.isNaN(value)) return "-";
+  return `${value.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}%`;
+}
+
+export function formatHodCurrency(value?: number | null) {
+  if (value == null || Number.isNaN(value)) return "-";
+  return `₹${value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 export function getCompanyLabel(code?: string | null) {
