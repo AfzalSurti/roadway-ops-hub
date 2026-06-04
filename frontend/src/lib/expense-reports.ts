@@ -43,7 +43,9 @@ const VOUCHER_SIGNATURE_LABELS = ["Prepared by", "Accountant", "Manager", "Recei
 
 const MIN_SUMMARY_DATA_ROWS = 14;
 const MIN_DETAILED_DATA_ROWS = 28;
-const MIN_VOUCHER_ROWS = 10;
+const VOUCHERS_PER_PAGE = 2;
+const COMPACT_VOUCHER_EMPTY_ROWS = 3;
+const COMPACT_SIGNATURE_H = 12;
 
 const GRID = {
   lineColor: [0, 0, 0] as [number, number, number],
@@ -72,8 +74,9 @@ function fmtMoney(value: number, blankIfZero = false) {
   return value.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 
+/** jsPDF standard fonts cannot render ₹ — use Rs. for correct PDF output */
 function fmtMoneyRs(value: number) {
-  return `₹ ${fmtMoney(value)}`;
+  return `Rs. ${fmtMoney(value)}`;
 }
 
 function financialYearLabel(value: string) {
@@ -536,17 +539,17 @@ export function downloadVoucherReportExcel(vouchers: ExpenseVoucherItem[], sheet
   XLSX.writeFile(workbook, `voucher-report-${sheetLabel}.xlsx`);
 }
 
-function drawVoucherPage(
+/** Draw one cash voucher block; returns Y position after the block. */
+function drawCompactVoucher(
   doc: jsPDF,
   items: ExpenseVoucherItem[],
   meta: { projectNumber?: string | null; projectName?: string },
-  pageIndex: number
-) {
-  if (pageIndex > 0) doc.addPage();
+  startY: number
+): number {
   const marginX = 12;
   const pageW = doc.internal.pageSize.getWidth();
   const tableW = pageW - marginX * 2;
-  let y = 14;
+  let y = startY;
   const first = items[0];
   const voucherNo = voucherDisplayNumber(first.voucherNumber);
   const voucherDate = fmtDateSlash(first.date);
@@ -555,75 +558,77 @@ function drawVoucherPage(
     : meta.projectName ?? first.projectName;
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(13);
+  doc.setFontSize(11);
   doc.text(COMPANY_NAME_VOUCHER, marginX, y);
-  y += 5.5;
+  y += 4.5;
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(7.5);
+  doc.setFontSize(6.5);
   doc.text(COMPANY_ADDRESS, marginX, y);
-  y += 5;
+  y += 4;
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
+  doc.setFontSize(7);
   doc.text(`Proj no / Site: ${siteLabel}`, marginX, y);
-  y += 6;
+  y += 4.5;
 
-  const metaH = 7;
+  const metaH = 6;
   const metaLeftW = tableW * 0.55;
-  drawCell(doc, marginX, y, metaLeftW, metaH, "Debit / Credit", { bold: true, fontSize: 8 });
+  drawCell(doc, marginX, y, metaLeftW, metaH, "Debit / Credit", { bold: true, fontSize: 7 });
   drawCell(doc, marginX + metaLeftW, y, tableW - metaLeftW, metaH, "");
   y += metaH;
-  const half = (tableW - 0) / 2;
-  drawCell(doc, marginX, y, half, metaH, "Cash Voucher no", { bold: true, fontSize: 8 });
-  drawCell(doc, marginX + half, y, half, metaH, voucherNo, { align: "center", fontSize: 9 });
+  const half = tableW / 2;
+  drawCell(doc, marginX, y, half, metaH, "Cash Voucher no", { bold: true, fontSize: 7 });
+  drawCell(doc, marginX + half, y, half, metaH, voucherNo, { align: "center", fontSize: 8 });
   y += metaH;
-  drawCell(doc, marginX, y, half, metaH, "Date", { bold: true, fontSize: 8 });
-  drawCell(doc, marginX + half, y, half, metaH, voucherDate, { align: "center", fontSize: 9 });
-  y += metaH + 2;
+  drawCell(doc, marginX, y, half, metaH, "Date", { bold: true, fontSize: 7 });
+  drawCell(doc, marginX + half, y, half, metaH, voucherDate, { align: "center", fontSize: 8 });
+  y += metaH + 1;
 
   const total = items.reduce((sum, item) => sum + item.amount, 0);
+  const amountColW = 32;
+  const dateColW = 24;
   const tableBody: RowInput[] = items.map((item, idx) => [
     idx === 0 ? fmtDateSlash(item.date) : "",
     item.description,
-    fmtMoneyRs(item.amount)
+    { content: fmtMoneyRs(item.amount), styles: { halign: "right" as const } }
   ]);
-  const emptyRows = Math.max(0, MIN_VOUCHER_ROWS - tableBody.length);
+  const emptyRows = Math.max(0, COMPACT_VOUCHER_EMPTY_ROWS - tableBody.length);
   for (let i = 0; i < emptyRows; i += 1) tableBody.push(["", "", ""]);
 
   autoTable(doc, {
     startY: y,
     margin: { left: marginX, right: marginX },
     tableWidth: tableW,
-    head: [["Date", "Particulars", "Amount (₹)"]],
+    head: [["Date", "Particulars", "Amount (Rs.)"]],
     body: tableBody,
     foot: [
       [
         { content: "Total", styles: { fontStyle: "bold", halign: "left" } },
-        { content: amountInWordsIndian(total), styles: { fontStyle: "bold", halign: "center" } },
+        { content: amountInWordsIndian(total), styles: { fontStyle: "bold", halign: "center", fontSize: 7 } },
         { content: fmtMoneyRs(total), styles: { fontStyle: "bold", halign: "right" } }
       ]
     ],
     theme: "grid",
-    styles: gridTableStyles(8.5),
-    headStyles: { ...gridTableStyles(8.5), fontStyle: "bold" },
-    footStyles: { ...gridTableStyles(8.5), fontStyle: "bold", fillColor: GRID.fillColor },
+    styles: gridTableStyles(7.5),
+    headStyles: { ...gridTableStyles(7.5), fontStyle: "bold" },
+    footStyles: { ...gridTableStyles(7.5), fontStyle: "bold", fillColor: GRID.fillColor },
     columnStyles: {
-      0: { cellWidth: 28, halign: "center" },
-      1: { cellWidth: tableW - 28 - 36, halign: "left" },
-      2: { cellWidth: 36, halign: "right" }
+      0: { cellWidth: dateColW, halign: "center" },
+      1: { cellWidth: tableW - dateColW - amountColW, halign: "left" },
+      2: { cellWidth: amountColW, halign: "right" }
     },
     didParseCell: (data) => {
       data.cell.styles.fillColor = GRID.fillColor;
       data.cell.styles.lineColor = GRID.lineColor;
       data.cell.styles.textColor = GRID.textColor;
+      if (data.column.index === 2 && data.section !== "head") {
+        data.cell.styles.halign = "right";
+      }
     }
   });
 
-  y = lastTableY(doc, y + 70) + 8;
-  drawSignatureBoxes(doc, marginX, y, tableW, VOUCHER_SIGNATURE_LABELS, 22);
-  y += 24;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  doc.text(COMPANY_NAME_VOUCHER, pageW / 2, y, { align: "center" });
+  y = lastTableY(doc, y + 45) + 4;
+  drawSignatureBoxes(doc, marginX, y, tableW, VOUCHER_SIGNATURE_LABELS, COMPACT_SIGNATURE_H);
+  return y + COMPACT_SIGNATURE_H + 2;
 }
 
 export function downloadVoucherReportPdf(
@@ -634,10 +639,27 @@ export function downloadVoucherReportPdf(
   if (vouchers.length === 0) return;
 
   const groups = groupVouchersByDate(vouchers);
-  let pageIndex = 0;
-  for (const [, items] of groups) {
-    drawVoucherPage(doc, items, meta, pageIndex);
-    pageIndex += 1;
+  const pageH = doc.internal.pageSize.getHeight();
+  const pageW = doc.internal.pageSize.getWidth();
+  const topSlotY = 8;
+  const bottomSlotY = pageH / 2 + 4;
+
+  for (let i = 0; i < groups.length; i += VOUCHERS_PER_PAGE) {
+    if (i > 0) doc.addPage();
+
+    if (i + 1 < groups.length) {
+      doc.setDrawColor(180);
+      doc.setLineWidth(0.2);
+      doc.line(10, pageH / 2, pageW - 10, pageH / 2);
+    }
+
+    const [, topItems] = groups[i];
+    drawCompactVoucher(doc, topItems, meta, topSlotY);
+
+    if (i + 1 < groups.length) {
+      const [, bottomItems] = groups[i + 1];
+      drawCompactVoucher(doc, bottomItems, meta, bottomSlotY);
+    }
   }
 
   doc.save(`voucher-report-${meta.projectNumber ?? "sheet"}.pdf`);
