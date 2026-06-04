@@ -10,11 +10,14 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { FinancialProjectBillStatusRow, ProjectItem } from "@/lib/domain";
 import {
+  collectHodFinancialYearOptions,
   compareHodProjectsByNumber,
   formatHodCurrency,
+  formatHodFinancialYearLabel,
   formatHodPercent,
   getCompanyLabel,
   getProjectCompanyCode,
+  getProjectFinancialYearShort,
   getProjectLifecycle,
   getHodWorkCategoryOptions,
   getProjectSubTechnicalUnitCode,
@@ -34,6 +37,7 @@ export default function HodDashboard() {
   const [technicalUnitFilter, setTechnicalUnitFilter] = useState("ALL");
   const [subTechnicalUnitFilter, setSubTechnicalUnitFilter] = useState("ALL");
   const [workCategoryFilter, setWorkCategoryFilter] = useState("ALL");
+  const [financialYearFilter, setFinancialYearFilter] = useState("ALL");
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
 
   const { data: projects = [], isLoading: loadingProjects, refetch: refetchProjects } = useQuery({
@@ -87,6 +91,8 @@ export default function HodDashboard() {
     return getHodWorkCategoryOptions(subTechnicalUnitFilter);
   }, [subTechnicalUnitFilter]);
 
+  const financialYearOptions = useMemo(() => collectHodFinancialYearOptions(projects), [projects]);
+
   const filteredProjects = useMemo(() => {
     const query = search.trim().toLowerCase();
 
@@ -95,12 +101,16 @@ export default function HodDashboard() {
       const technicalUnitCode = getProjectTechnicalUnitCode(project);
       const subTechnicalUnitCode = getProjectSubTechnicalUnitCode(project);
       const workCategoryCode = getProjectWorkCategoryCode(project);
+      const financialYearShort = getProjectFinancialYearShort(project);
       const orgOk = organizationFilter === "ALL" || companyCode === organizationFilter;
       const unitOk = technicalUnitFilter === "ALL" || technicalUnitCode === technicalUnitFilter;
       const subOk = subTechnicalUnitFilter === "ALL" || subTechnicalUnitCode === subTechnicalUnitFilter;
       const workOk = workCategoryFilter === "ALL" || workCategoryCode === workCategoryFilter;
+      const fyOk =
+        financialYearFilter === "ALL" ||
+        (financialYearShort != null && String(financialYearShort) === financialYearFilter);
 
-      if (!orgOk || !unitOk || !subOk || !workOk) {
+      if (!orgOk || !unitOk || !subOk || !workOk || !fyOk) {
         return false;
       }
 
@@ -115,7 +125,7 @@ export default function HodDashboard() {
 
       return haystack.includes(query);
     });
-  }, [organizationFilter, projects, search, subTechnicalUnitFilter, technicalUnitFilter, workCategoryFilter]);
+  }, [financialYearFilter, organizationFilter, projects, search, subTechnicalUnitFilter, technicalUnitFilter, workCategoryFilter]);
 
   const projectRows = useMemo(() => {
     return filteredProjects
@@ -168,6 +178,7 @@ export default function HodDashboard() {
     setTechnicalUnitFilter("ALL");
     setSubTechnicalUnitFilter("ALL");
     setWorkCategoryFilter("ALL");
+    setFinancialYearFilter("ALL");
   };
 
   const refreshAll = async () => {
@@ -191,7 +202,7 @@ export default function HodDashboard() {
       </div>
 
       <div className="glass-panel p-4 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6 gap-3">
           <FilterField label="Organization">
             <Select value={organizationFilter} onValueChange={setOrganizationFilter}>
               <SelectTrigger>
@@ -282,7 +293,31 @@ export default function HodDashboard() {
             </Select>
           </FilterField>
 
-          <FilterField label="Search">
+          <FilterField label="Financial Year">
+            <Select
+              value={financialYearFilter}
+              onValueChange={setFinancialYearFilter}
+              disabled={financialYearOptions.length === 0}
+            >
+              <SelectTrigger>
+                <SelectValue
+                  placeholder={
+                    financialYearOptions.length === 0 ? "No financial years in projects" : "All financial years"
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All financial years</SelectItem>
+                {financialYearOptions.map((fy) => (
+                  <SelectItem key={fy} value={String(fy)}>
+                    {formatHodFinancialYearLabel(fy)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FilterField>
+
+          <FilterField label="Search" className="2xl:col-span-1 md:col-span-2">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -412,9 +447,17 @@ export default function HodDashboard() {
   );
 }
 
-function FilterField({ label, children }: { label: string; children: React.ReactNode }) {
+function FilterField({
+  label,
+  children,
+  className
+}: {
+  label: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <div>
+    <div className={className}>
       <p className="text-xs text-muted-foreground mb-1.5">{label}</p>
       {children}
     </div>

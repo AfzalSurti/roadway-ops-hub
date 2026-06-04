@@ -11,6 +11,8 @@ import {
   getHodTaskActivityTone,
   shouldShowHodActivityDate,
   getProjectLifecycle,
+  formatHodFinancialYearLabel,
+  getProjectFinancialYearShort,
   getProjectSubTechnicalUnitCode,
   getProjectTechnicalUnitCode,
   getProjectWorkCategoryCode,
@@ -77,6 +79,14 @@ export function HodProjectDetailDialog({ open, onOpenChange, project, projectTas
           <InfoField
             label="Work Category"
             value={getWorkCategoryLabel(getProjectSubTechnicalUnitCode(project), getProjectWorkCategoryCode(project))}
+          />
+          <InfoField
+            label="Financial Year"
+            value={
+              getProjectFinancialYearShort(project) != null
+                ? formatHodFinancialYearLabel(getProjectFinancialYearShort(project)!)
+                : "-"
+            }
           />
         </div>
 

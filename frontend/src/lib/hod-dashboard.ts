@@ -104,7 +104,8 @@ export function parseCodesFromProjectNumber(projectNumber?: string | null) {
       companyCode: null as string | null,
       technicalUnitCode: null as string | null,
       subTechnicalUnitCode: null as string | null,
-      workCategoryCode: null as string | null
+      workCategoryCode: null as string | null,
+      financialYearShort: null as number | null
     };
   }
 
@@ -113,11 +114,23 @@ export function parseCodesFromProjectNumber(projectNumber?: string | null) {
   const subTechnicalUnitCode = number.slice(2, 4);
 
   if (!HOD_COMPANY_CODES.has(companyCode)) {
-    return { companyCode: null, technicalUnitCode: null, subTechnicalUnitCode: null, workCategoryCode: null };
+    return {
+      companyCode: null,
+      technicalUnitCode: null,
+      subTechnicalUnitCode: null,
+      workCategoryCode: null,
+      financialYearShort: null
+    };
   }
 
   if (!HOD_TECHNICAL_UNIT_CODES.has(technicalUnitCode)) {
-    return { companyCode, technicalUnitCode: null, subTechnicalUnitCode: null, workCategoryCode: null };
+    return {
+      companyCode,
+      technicalUnitCode: null,
+      subTechnicalUnitCode: null,
+      workCategoryCode: null,
+      financialYearShort: null
+    };
   }
 
   const subOptions = HOD_SUB_TECHNICAL_UNIT_OPTIONS[technicalUnitCode] ?? [];
@@ -126,7 +139,12 @@ export function parseCodesFromProjectNumber(projectNumber?: string | null) {
 
   const fullMatch = number.match(/^([A-Z]{4})(\d{2})(\d{2})([A-Z])$/);
   let workCategoryCode: string | null = null;
+  let financialYearShort: number | null = null;
   if (fullMatch && fullMatch[1] === `${companyCode}${technicalUnitCode}${resolvedSub ?? subTechnicalUnitCode}`) {
+    const fy = Number(fullMatch[2]);
+    if (Number.isInteger(fy) && fy >= 0 && fy <= 99) {
+      financialYearShort = fy;
+    }
     const candidate = fullMatch[4];
     if (resolvedSub && isKnownWorkCategoryCode(candidate, resolvedSub)) {
       workCategoryCode = candidate;
@@ -141,7 +159,8 @@ export function parseCodesFromProjectNumber(projectNumber?: string | null) {
     companyCode,
     technicalUnitCode,
     subTechnicalUnitCode: resolvedSub,
-    workCategoryCode
+    workCategoryCode,
+    financialYearShort
   };
 }
 
@@ -183,6 +202,32 @@ export function getProjectWorkCategoryCode(
     }
   }
   return parseCodesFromProjectNumber(project.projectNumber).workCategoryCode;
+}
+
+export function getProjectFinancialYearShort(
+  project: Pick<ProjectItem, "financialYearShort" | "projectNumber">
+): number | null {
+  const stored = project.financialYearShort;
+  if (stored != null && Number.isInteger(stored) && stored >= 0 && stored <= 99) {
+    return stored;
+  }
+  return parseCodesFromProjectNumber(project.projectNumber).financialYearShort;
+}
+
+/** Unique FY values present in project numbers (newest first). */
+export function collectHodFinancialYearOptions(projects: ProjectItem[]): number[] {
+  const years = new Set<number>();
+  for (const project of projects) {
+    const fy = getProjectFinancialYearShort(project);
+    if (fy != null) {
+      years.add(fy);
+    }
+  }
+  return [...years].sort((a, b) => b - a);
+}
+
+export function formatHodFinancialYearLabel(financialYearShort: number) {
+  return `FY ${String(financialYearShort).padStart(2, "0")}`;
 }
 
 export function compareHodProjectsByNumber(
