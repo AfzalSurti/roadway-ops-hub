@@ -351,5 +351,80 @@ export const expenseRepository = {
       expenseByEmployee,
       recentSheets
     };
+  },
+
+  async getEmployeeCategoryAnalytics(employeeId?: string) {
+    const employees = await prisma.user.findMany({
+      where: {
+        expenseSheets: { some: { entries: { some: {} } } }
+      },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" }
+    });
+
+    const categoryOrder = await this.findCategories();
+
+    if (!employeeId) {
+      return {
+        employees,
+        selectedEmployeeId: null,
+        categories: categoryOrder.map((cat) => ({
+          categoryId: cat.id,
+          categoryName: cat.name,
+          total: 0,
+          breakdown: [] as Array<{ label: string; amount: number }>
+        })),
+        totalAmount: 0
+      };
+    }
+
+    const entries = await prisma.expenseEntry.findMany({
+      where: { sheet: { employeeId } },
+      select: {
+        amount: true,
+        entryDate: true,
+        description: true,
+        categoryId: true,
+        category: { select: { id: true, name: true, sortOrder: true } }
+      },
+      orderBy: [{ entryDate: "asc" }, { createdAt: "asc" }]
+    });
+
+    const byCategory = new Map<
+      string,
+      { categoryId: string; categoryName: string; total: number; breakdown: Array<{ label: string; amount: number }> }
+    >();
+
+    for (const cat of categoryOrder) {
+      byCategory.set(cat.id, {
+        categoryId: cat.id,
+        categoryName: cat.name,
+        total: 0,
+        breakdown: []
+      });
+    }
+
+    for (const entry of entries) {
+      const bucket = byCategory.get(entry.categoryId);
+      if (!bucket) continue;
+      bucket.total += entry.amount;
+      const dateLabel = entry.entryDate.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric"
+      });
+      const label = `${dateLabel} — ${entry.description.slice(0, 40)}`;
+      bucket.breakdown.push({ label, amount: entry.amount });
+    }
+
+    const categoryTotals = categoryOrder.map((cat) => byCategory.get(cat.id)!);
+    const totalAmount = categoryTotals.reduce((sum, row) => sum + row.total, 0);
+
+    return {
+      employees,
+      selectedEmployeeId: employeeId,
+      categories: categoryTotals,
+      totalAmount
+    };
   }
 };

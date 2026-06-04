@@ -19,6 +19,12 @@ export const expenseController = {
     return sendSuccess(res, result);
   },
 
+  async employeeCategoryAnalytics(req: Request, res: Response) {
+    const employeeId = (req.query.employeeId as string | undefined)?.trim() || undefined;
+    const result = await expenseService.getEmployeeCategoryAnalytics(req.user!, employeeId);
+    return sendSuccess(res, result);
+  },
+
   async listSheets(req: Request, res: Response) {
     const result = await expenseService.listSheets(
       req.user!,

@@ -18,6 +18,11 @@ expenseRouter.use(requireAuth);
 
 expenseRouter.get("/categories", asyncHandler(expenseController.listCategories));
 expenseRouter.get("/dashboard", asyncHandler(expenseController.dashboard));
+expenseRouter.get(
+  "/analytics/employee-categories",
+  requireRole("ADMIN"),
+  asyncHandler(expenseController.employeeCategoryAnalytics)
+);
 
 expenseRouter.get("/sheets", asyncHandler(expenseController.listSheets));
 expenseRouter.get("/sheets/:id", asyncHandler(expenseController.getSheet));

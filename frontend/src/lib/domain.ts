@@ -543,6 +543,18 @@ export type ExpenseSheetItem = {
   latestApproval?: ExpenseApprovalItem | null;
 };
 
+export type ExpenseEmployeeCategoryAnalytics = {
+  employees: Array<{ id: string; name: string }>;
+  selectedEmployeeId: string | null;
+  categories: Array<{
+    categoryId: string;
+    categoryName: string;
+    total: number;
+    breakdown: Array<{ label: string; amount: number }>;
+  }>;
+  totalAmount: number;
+};
+
 export type ExpenseDashboardStats = {
   totalExpensesThisMonth: number;
   totalExpensesToday: number;

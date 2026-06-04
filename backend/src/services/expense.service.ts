@@ -79,6 +79,13 @@ export const expenseService = {
     return expenseRepository.getDashboardStats({ employeeId });
   },
 
+  async getEmployeeCategoryAnalytics(user: AuthUser, employeeId?: string) {
+    if (user.role !== "ADMIN") {
+      throw forbidden("Only admins can view employee expense analytics");
+    }
+    return expenseRepository.getEmployeeCategoryAnalytics(employeeId);
+  },
+
   async listSheets(user: AuthUser, filters: ExpenseSheetFilters, page?: number, limit?: number) {
     const scoped = { ...filters };
     if (user.role === "EMPLOYEE") {

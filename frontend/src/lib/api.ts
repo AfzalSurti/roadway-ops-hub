@@ -13,6 +13,7 @@ import type {
   DprReportStatus,
   ExpenseCategoryItem,
   ExpenseDashboardStats,
+  ExpenseEmployeeCategoryAnalytics,
   ExpenseEntryItem,
   ExpenseSheetItem,
   ExpenseSheetStatus,
@@ -1004,6 +1005,11 @@ export const api = {
 
   getExpenseDashboard() {
     return request<ExpenseDashboardStats>("/expenses/dashboard");
+  },
+
+  getExpenseEmployeeCategoryAnalytics(employeeId?: string) {
+    const suffix = employeeId ? `?employeeId=${encodeURIComponent(employeeId)}` : "";
+    return request<ExpenseEmployeeCategoryAnalytics>(`/expenses/analytics/employee-categories${suffix}`);
   },
 
   getExpenseSheets(params?: Record<string, string | number | boolean | undefined>) {

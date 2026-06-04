@@ -4,6 +4,7 @@ import { PageWrapper } from "@/components/PageWrapper";
 import { ExpenseStatusBadge } from "@/components/expense/ExpenseStatusBadge";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
+import { ExpenseEmployeeCategoryCharts } from "@/components/expense/ExpenseEmployeeCategoryCharts";
 import { BarChart3, CheckCircle2, Clock3, FileSpreadsheet, Plus, Receipt, Wallet, XCircle } from "lucide-react";
 
 export default function ExpenseDashboard() {
@@ -52,6 +53,10 @@ export default function ExpenseDashboard() {
             <p className="text-sm text-muted-foreground mt-1">{kpi.label}</p>
           </div>
         ))}
+      </div>
+
+      <div className="mb-6">
+        <ExpenseEmployeeCategoryCharts />
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
