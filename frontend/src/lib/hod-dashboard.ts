@@ -50,17 +50,61 @@ export const HOD_SUB_TECHNICAL_UNIT_OPTIONS: Record<string, Array<{ label: strin
   ]
 };
 
+export const HOD_DEFAULT_WORK_CATEGORY_OPTIONS = [
+  { label: "Road", code: "R" },
+  { label: "Building", code: "B" },
+  { label: "Canal", code: "C" },
+  { label: "Irrigation", code: "I" },
+  { label: "Bridge", code: "G" },
+  { label: "Pre Bid", code: "P" },
+  { label: "Drainage", code: "D" }
+] as const;
+
+export const HOD_FH_WORK_CATEGORY_OPTIONS = [
+  { label: "NSV Test", code: "N" },
+  { label: "FWD Test", code: "F" },
+  { label: "BBD Test", code: "B" },
+  { label: "Roughness Index (BI/IRI) Test", code: "I" },
+  { label: "Pavement Design", code: "P" },
+  { label: "Retro Reflectometer Test", code: "R" },
+  { label: "Topography / LiDAR Survey", code: "S" },
+  { label: "Traffic Survey (Incl. ATCC / TMC / Videography / Axel load etc.)", code: "T" },
+  { label: "Bridge Load Test", code: "L" },
+  { label: "Mobile Bridge Inspection Unit", code: "M" }
+] as const;
+
 const HOD_COMPANY_CODES = new Set(HOD_COMPANY_OPTIONS.map((item) => item.code));
 const HOD_TECHNICAL_UNIT_CODES = new Set(HOD_TECHNICAL_UNIT_OPTIONS.map((item) => item.code));
 
-/** Parsed from assigned project number: [Company][TechUnit][SubUnit2][FY2][Serial2][WorkCat1] e.g. SDST2601R */
+export function getHodWorkCategoryOptions(subTechnicalUnitCode?: string | null) {
+  if (subTechnicalUnitCode === "FH") {
+    return [...HOD_FH_WORK_CATEGORY_OPTIONS];
+  }
+  return [...HOD_DEFAULT_WORK_CATEGORY_OPTIONS];
+}
+
+function isKnownWorkCategoryCode(code: string, subTechnicalUnitCode?: string | null) {
+  if (subTechnicalUnitCode === "FH") {
+    return HOD_FH_WORK_CATEGORY_OPTIONS.some((item) => item.code === code);
+  }
+  if (subTechnicalUnitCode) {
+    return HOD_DEFAULT_WORK_CATEGORY_OPTIONS.some((item) => item.code === code);
+  }
+  return (
+    HOD_DEFAULT_WORK_CATEGORY_OPTIONS.some((item) => item.code === code) ||
+    HOD_FH_WORK_CATEGORY_OPTIONS.some((item) => item.code === code)
+  );
+}
+
+/** Parsed from assigned project number: [Company][TechUnit][SubUnit2][FY2][Serial2][WorkCat1] e.g. SDST2601B */
 export function parseCodesFromProjectNumber(projectNumber?: string | null) {
   const number = projectNumber?.trim().toUpperCase();
   if (!number || number.length < 4) {
     return {
       companyCode: null as string | null,
       technicalUnitCode: null as string | null,
-      subTechnicalUnitCode: null as string | null
+      subTechnicalUnitCode: null as string | null,
+      workCategoryCode: null as string | null
     };
   }
 
@@ -69,20 +113,35 @@ export function parseCodesFromProjectNumber(projectNumber?: string | null) {
   const subTechnicalUnitCode = number.slice(2, 4);
 
   if (!HOD_COMPANY_CODES.has(companyCode)) {
-    return { companyCode: null, technicalUnitCode: null, subTechnicalUnitCode: null };
+    return { companyCode: null, technicalUnitCode: null, subTechnicalUnitCode: null, workCategoryCode: null };
   }
 
   if (!HOD_TECHNICAL_UNIT_CODES.has(technicalUnitCode)) {
-    return { companyCode, technicalUnitCode: null, subTechnicalUnitCode: null };
+    return { companyCode, technicalUnitCode: null, subTechnicalUnitCode: null, workCategoryCode: null };
   }
 
   const subOptions = HOD_SUB_TECHNICAL_UNIT_OPTIONS[technicalUnitCode] ?? [];
   const subOk = subOptions.some((item) => item.code === subTechnicalUnitCode);
+  const resolvedSub = subOk ? subTechnicalUnitCode : null;
+
+  const fullMatch = number.match(/^([A-Z]{4})(\d{2})(\d{2})([A-Z])$/);
+  let workCategoryCode: string | null = null;
+  if (fullMatch && fullMatch[1] === `${companyCode}${technicalUnitCode}${resolvedSub ?? subTechnicalUnitCode}`) {
+    const candidate = fullMatch[4];
+    if (resolvedSub && isKnownWorkCategoryCode(candidate, resolvedSub)) {
+      workCategoryCode = candidate;
+    } else if (!resolvedSub) {
+      if (isKnownWorkCategoryCode(candidate, "FH") || isKnownWorkCategoryCode(candidate, null)) {
+        workCategoryCode = candidate;
+      }
+    }
+  }
 
   return {
     companyCode,
     technicalUnitCode,
-    subTechnicalUnitCode: subOk ? subTechnicalUnitCode : null
+    subTechnicalUnitCode: resolvedSub,
+    workCategoryCode
   };
 }
 
@@ -108,6 +167,22 @@ export function getProjectSubTechnicalUnitCode(
     }
   }
   return parseCodesFromProjectNumber(project.projectNumber).subTechnicalUnitCode;
+}
+
+export function getProjectWorkCategoryCode(
+  project: Pick<ProjectItem, "workCategoryCode" | "projectNumber" | "technicalUnitCode" | "subTechnicalUnitCode">
+): string | null {
+  const subTechnicalUnitCode = getProjectSubTechnicalUnitCode(project);
+  const stored = project.workCategoryCode?.trim().toUpperCase();
+  if (stored) {
+    if (isKnownWorkCategoryCode(stored, subTechnicalUnitCode)) {
+      return stored;
+    }
+    if (isKnownWorkCategoryCode(stored, "FH") || isKnownWorkCategoryCode(stored, null)) {
+      return stored;
+    }
+  }
+  return parseCodesFromProjectNumber(project.projectNumber).workCategoryCode;
 }
 
 export function compareHodProjectsByNumber(
@@ -275,4 +350,10 @@ export function getSubTechnicalUnitLabel(technicalUnitCode?: string | null, subC
   if (!technicalUnitCode || !subCode) return "-";
   const options = HOD_SUB_TECHNICAL_UNIT_OPTIONS[technicalUnitCode] ?? [];
   return options.find((item) => item.code === subCode)?.label ?? subCode;
+}
+
+export function getWorkCategoryLabel(subTechnicalUnitCode?: string | null, code?: string | null) {
+  if (!code) return "-";
+  const options = getHodWorkCategoryOptions(subTechnicalUnitCode);
+  return options.find((item) => item.code === code)?.label ?? code;
 }

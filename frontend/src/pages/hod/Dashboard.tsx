@@ -16,8 +16,10 @@ import {
   getCompanyLabel,
   getProjectCompanyCode,
   getProjectLifecycle,
+  getHodWorkCategoryOptions,
   getProjectSubTechnicalUnitCode,
   getProjectTechnicalUnitCode,
+  getProjectWorkCategoryCode,
   getTasksForProject,
   HOD_COMPANY_OPTIONS,
   HOD_SUB_TECHNICAL_UNIT_OPTIONS,
@@ -31,6 +33,7 @@ export default function HodDashboard() {
   const [organizationFilter, setOrganizationFilter] = useState("ALL");
   const [technicalUnitFilter, setTechnicalUnitFilter] = useState("ALL");
   const [subTechnicalUnitFilter, setSubTechnicalUnitFilter] = useState("ALL");
+  const [workCategoryFilter, setWorkCategoryFilter] = useState("ALL");
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
 
   const { data: projects = [], isLoading: loadingProjects, refetch: refetchProjects } = useQuery({
@@ -77,6 +80,13 @@ export default function HodDashboard() {
     return HOD_SUB_TECHNICAL_UNIT_OPTIONS[technicalUnitFilter] ?? [];
   }, [technicalUnitFilter]);
 
+  const workCategoryOptions = useMemo(() => {
+    if (subTechnicalUnitFilter === "ALL") {
+      return [];
+    }
+    return getHodWorkCategoryOptions(subTechnicalUnitFilter);
+  }, [subTechnicalUnitFilter]);
+
   const filteredProjects = useMemo(() => {
     const query = search.trim().toLowerCase();
 
@@ -84,11 +94,13 @@ export default function HodDashboard() {
       const companyCode = getProjectCompanyCode(project);
       const technicalUnitCode = getProjectTechnicalUnitCode(project);
       const subTechnicalUnitCode = getProjectSubTechnicalUnitCode(project);
+      const workCategoryCode = getProjectWorkCategoryCode(project);
       const orgOk = organizationFilter === "ALL" || companyCode === organizationFilter;
       const unitOk = technicalUnitFilter === "ALL" || technicalUnitCode === technicalUnitFilter;
       const subOk = subTechnicalUnitFilter === "ALL" || subTechnicalUnitCode === subTechnicalUnitFilter;
+      const workOk = workCategoryFilter === "ALL" || workCategoryCode === workCategoryFilter;
 
-      if (!orgOk || !unitOk || !subOk) {
+      if (!orgOk || !unitOk || !subOk || !workOk) {
         return false;
       }
 
@@ -103,7 +115,7 @@ export default function HodDashboard() {
 
       return haystack.includes(query);
     });
-  }, [organizationFilter, projects, search, subTechnicalUnitFilter, technicalUnitFilter]);
+  }, [organizationFilter, projects, search, subTechnicalUnitFilter, technicalUnitFilter, workCategoryFilter]);
 
   const projectRows = useMemo(() => {
     return filteredProjects
@@ -155,6 +167,7 @@ export default function HodDashboard() {
     setOrganizationFilter("ALL");
     setTechnicalUnitFilter("ALL");
     setSubTechnicalUnitFilter("ALL");
+    setWorkCategoryFilter("ALL");
   };
 
   const refreshAll = async () => {
@@ -178,7 +191,7 @@ export default function HodDashboard() {
       </div>
 
       <div className="glass-panel p-4 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
           <FilterField label="Organization">
             <Select value={organizationFilter} onValueChange={setOrganizationFilter}>
               <SelectTrigger>
@@ -201,6 +214,7 @@ export default function HodDashboard() {
               onValueChange={(value) => {
                 setTechnicalUnitFilter(value);
                 setSubTechnicalUnitFilter("ALL");
+                setWorkCategoryFilter("ALL");
               }}
             >
               <SelectTrigger>
@@ -220,7 +234,10 @@ export default function HodDashboard() {
           <FilterField label="Sub Technical Unit">
             <Select
               value={subTechnicalUnitFilter}
-              onValueChange={setSubTechnicalUnitFilter}
+              onValueChange={(value) => {
+                setSubTechnicalUnitFilter(value);
+                setWorkCategoryFilter("ALL");
+              }}
               disabled={technicalUnitFilter === "ALL"}
             >
               <SelectTrigger>
@@ -233,6 +250,30 @@ export default function HodDashboard() {
               <SelectContent>
                 <SelectItem value="ALL">All sub technical units</SelectItem>
                 {subTechnicalOptions.map((item) => (
+                  <SelectItem key={item.code} value={item.code}>
+                    {item.label} ({item.code})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FilterField>
+
+          <FilterField label="Work Category">
+            <Select
+              value={workCategoryFilter}
+              onValueChange={setWorkCategoryFilter}
+              disabled={subTechnicalUnitFilter === "ALL"}
+            >
+              <SelectTrigger>
+                <SelectValue
+                  placeholder={
+                    subTechnicalUnitFilter === "ALL" ? "Select sub technical unit first" : "All work categories"
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All work categories</SelectItem>
+                {workCategoryOptions.map((item) => (
                   <SelectItem key={item.code} value={item.code}>
                     {item.label} ({item.code})
                   </SelectItem>

@@ -11,8 +11,12 @@ import {
   getHodTaskActivityTone,
   shouldShowHodActivityDate,
   getProjectLifecycle,
+  getProjectSubTechnicalUnitCode,
+  getProjectTechnicalUnitCode,
+  getProjectWorkCategoryCode,
   getSubTechnicalUnitLabel,
-  getTechnicalUnitLabel
+  getTechnicalUnitLabel,
+  getWorkCategoryLabel
 } from "@/lib/hod-dashboard";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
@@ -62,10 +66,17 @@ export function HodProjectDetailDialog({ open, onOpenChange, project, projectTas
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
           <InfoField label="Project Number" value={project.projectNumber ?? "-"} />
           <InfoField label="Organization" value={getCompanyLabel(getProjectCompanyCode(project))} />
-          <InfoField label="Technical Unit" value={getTechnicalUnitLabel(project.technicalUnitCode)} />
+          <InfoField label="Technical Unit" value={getTechnicalUnitLabel(getProjectTechnicalUnitCode(project))} />
           <InfoField
             label="Sub Technical Unit"
-            value={getSubTechnicalUnitLabel(project.technicalUnitCode, project.subTechnicalUnitCode)}
+            value={getSubTechnicalUnitLabel(
+              getProjectTechnicalUnitCode(project),
+              getProjectSubTechnicalUnitCode(project)
+            )}
+          />
+          <InfoField
+            label="Work Category"
+            value={getWorkCategoryLabel(getProjectSubTechnicalUnitCode(project), getProjectWorkCategoryCode(project))}
           />
         </div>
 
