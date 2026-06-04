@@ -7,6 +7,49 @@ export const HOD_COMPANY_OPTIONS = [
   { label: "Shree Hari Testing Lab", code: "H" }
 ] as const;
 
+export const HOD_TECHNICAL_UNIT_OPTIONS = [
+  { label: "Testing Consultancy", code: "T" },
+  { label: "Supervision Consultancy", code: "S" },
+  { label: "Building Designs Consultancy", code: "D" }
+] as const;
+
+export const HOD_SUB_TECHNICAL_UNIT_OPTIONS: Record<string, Array<{ label: string; code: string }>> = {
+  T: [
+    { label: "Geotechnical Exploration", code: "GE" },
+    { label: "Laboratory Testing", code: "MT" },
+    { label: "Load Testing Services (Bridge/Pile)", code: "LT" },
+    { label: "Chemical Environment Testing", code: "CE" },
+    { label: "NDT", code: "ND" }
+  ],
+  S: [
+    { label: "Authority Engineer", code: "AE" },
+    { label: "Independent Engineer", code: "IE" },
+    { label: "Project Management Consultant", code: "PM" },
+    { label: "Third Party Inspection", code: "TP" },
+    { label: "Proof Checking", code: "PC" },
+    { label: "Field Highway Testing", code: "FH" },
+    { label: "Road Safety Audit", code: "RS" },
+    { label: "Environment Audit", code: "EA" },
+    { label: "Road Infrastructure Designs", code: "IR" },
+    { label: "Bridge Infrastructure Designs", code: "IB" },
+    { label: "Industrial Infrastructure & Park", code: "IS" },
+    { label: "Marine Infrastructure", code: "MS" },
+    { label: "Detail Design Infrastructure", code: "DD" },
+    { label: "Hydro Engineering", code: "HE" },
+    { label: "Tunnel Engineering", code: "TE" }
+  ],
+  D: [
+    { label: "Architectural Design", code: "AR" },
+    { label: "Structural Design", code: "ST" },
+    { label: "BIM Services", code: "BM" },
+    { label: "Utilities Design Services", code: "UD" },
+    { label: "Quantity Survey & Estimation", code: "QS" },
+    { label: "Energy Audit Services", code: "EN" },
+    { label: "Green Building Services", code: "GB" },
+    { label: "Building Infrastructure Designs", code: "BU" }
+  ]
+};
+
 const HOD_COMPANY_CODES = new Set(HOD_COMPANY_OPTIONS.map((item) => item.code));
 const HOD_TECHNICAL_UNIT_CODES = new Set(HOD_TECHNICAL_UNIT_OPTIONS.map((item) => item.code));
 
@@ -101,49 +144,6 @@ export function getProjectCompanyCode(project: Pick<ProjectItem, "companyCode" |
 
   return stored || null;
 }
-
-export const HOD_TECHNICAL_UNIT_OPTIONS = [
-  { label: "Testing Consultancy", code: "T" },
-  { label: "Supervision Consultancy", code: "S" },
-  { label: "Building Designs Consultancy", code: "D" }
-] as const;
-
-export const HOD_SUB_TECHNICAL_UNIT_OPTIONS: Record<string, Array<{ label: string; code: string }>> = {
-  T: [
-    { label: "Geotechnical Exploration", code: "GE" },
-    { label: "Laboratory Testing", code: "MT" },
-    { label: "Load Testing Services (Bridge/Pile)", code: "LT" },
-    { label: "Chemical Environment Testing", code: "CE" },
-    { label: "NDT", code: "ND" }
-  ],
-  S: [
-    { label: "Authority Engineer", code: "AE" },
-    { label: "Independent Engineer", code: "IE" },
-    { label: "Project Management Consultant", code: "PM" },
-    { label: "Third Party Inspection", code: "TP" },
-    { label: "Proof Checking", code: "PC" },
-    { label: "Field Highway Testing", code: "FH" },
-    { label: "Road Safety Audit", code: "RS" },
-    { label: "Environment Audit", code: "EA" },
-    { label: "Road Infrastructure Designs", code: "IR" },
-    { label: "Bridge Infrastructure Designs", code: "IB" },
-    { label: "Industrial Infrastructure & Park", code: "IS" },
-    { label: "Marine Infrastructure", code: "MS" },
-    { label: "Detail Design Infrastructure", code: "DD" },
-    { label: "Hydro Engineering", code: "HE" },
-    { label: "Tunnel Engineering", code: "TE" }
-  ],
-  D: [
-    { label: "Architectural Design", code: "AR" },
-    { label: "Structural Design", code: "ST" },
-    { label: "BIM Services", code: "BM" },
-    { label: "Utilities Design Services", code: "UD" },
-    { label: "Quantity Survey & Estimation", code: "QS" },
-    { label: "Energy Audit Services", code: "EN" },
-    { label: "Green Building Services", code: "GB" },
-    { label: "Building Infrastructure Designs", code: "BU" }
-  ]
-};
 
 export type HodTaskActivityStatus = "NOT_STARTED" | "TASK_PENDING" | "TASK_COMPLETED" | "APPROVED";
 
