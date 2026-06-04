@@ -73,21 +73,30 @@ export default function ExpenseSheetPage({ basePath }: ExpenseSheetPageProps) {
     void queryClient.invalidateQueries({ queryKey: ["expense-dashboard"] });
   };
 
+  const handleProjectSelect = (projectId: string) => {
+    const project = projects.find((item) => item.id === projectId);
+    setHeaderForm((prev) => ({
+      ...prev,
+      projectId,
+      siteName: project?.name ?? prev.siteName
+    }));
+  };
+
   const createMutation = useMutation({
     mutationFn: () =>
       api.createExpenseSheet({
         projectId: headerForm.projectId || null,
-        siteName: headerForm.siteName,
-        siteIncharge: headerForm.siteIncharge,
+        siteName: headerForm.siteName.trim(),
+        siteIncharge: headerForm.siteIncharge.trim(),
         totalPersons: Number(headerForm.totalPersons),
-        expenseDate: headerForm.expenseDate,
+        expenseDate: new Date(headerForm.expenseDate).toISOString(),
         mobileNumber: headerForm.mobileNumber || profile?.contactNumber || null,
         bankAccount: headerForm.bankAccount || null,
         sheetNumber: headerForm.sheetNumber ? Number(headerForm.sheetNumber) : null
       }),
     onSuccess: (created) => {
       toast.success("Expense sheet created");
-      navigate(`${basePath}/${created.id}`);
+      navigate(`${basePath}/${created.id}`, { replace: true });
     },
     onError: (error: Error) => toast.error(error.message)
   });
@@ -156,17 +165,25 @@ export default function ExpenseSheetPage({ basePath }: ExpenseSheetPageProps) {
         </div>
         <div className="glass-panel p-6 grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl">
           <Field label="Project">
-            <Select value={headerForm.projectId} onValueChange={(v) => setHeaderForm((p) => ({ ...p, projectId: v }))}>
+            <Select value={headerForm.projectId} onValueChange={handleProjectSelect}>
               <SelectTrigger><SelectValue placeholder="Select project" /></SelectTrigger>
               <SelectContent>
                 {projects.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>{p.projectNumber ?? p.name}</SelectItem>
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.projectNumber ? `${p.projectNumber} — ${p.name}` : p.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </Field>
           <Field label="Expense Date"><Input type="date" value={headerForm.expenseDate} onChange={(e) => setHeaderForm((p) => ({ ...p, expenseDate: e.target.value }))} /></Field>
-          <Field label="Site Name"><Input value={headerForm.siteName} onChange={(e) => setHeaderForm((p) => ({ ...p, siteName: e.target.value }))} /></Field>
+          <Field label="Site Name">
+            <Input
+              value={headerForm.siteName}
+              onChange={(e) => setHeaderForm((p) => ({ ...p, siteName: e.target.value }))}
+              placeholder="Filled from project name; you can edit"
+            />
+          </Field>
           <Field label="Site Incharge"><Input value={headerForm.siteIncharge} onChange={(e) => setHeaderForm((p) => ({ ...p, siteIncharge: e.target.value }))} /></Field>
           <Field label="Total Persons at Site"><Input type="number" min={1} value={headerForm.totalPersons} onChange={(e) => setHeaderForm((p) => ({ ...p, totalPersons: e.target.value }))} /></Field>
           <Field label="Mobile Number"><Input value={headerForm.mobileNumber || profile?.contactNumber || ""} onChange={(e) => setHeaderForm((p) => ({ ...p, mobileNumber: e.target.value }))} /></Field>

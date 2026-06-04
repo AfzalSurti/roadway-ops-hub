@@ -55,6 +55,7 @@ app.post("/send-mail", async (req, res) => {
 
 app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
 app.use("/", apiRouter);
+app.use("/api", apiRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
