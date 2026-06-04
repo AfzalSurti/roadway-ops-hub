@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { PageWrapper } from "@/components/PageWrapper";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
@@ -350,8 +350,9 @@ export default function AssetDetail() {
   const [movementOpen, setMovementOpen] = useState(false);
   const [maintenanceOpen, setMaintenanceOpen] = useState(false);
   const [form, setForm] = useState<AssetFormState>(EMPTY_FORM);
-  const [soldAmountInput, setSoldAmountInput] = useState("0");
+  const [soldAmountInput, setSoldAmountInput] = useState("");
   const [soldRemarkInput, setSoldRemarkInput] = useState("");
+  const syncedSoldAssetId = useRef<string | null>(null);
 
   const { data: asset, isLoading } = useQuery({
     queryKey: ["assets", id],
@@ -374,10 +375,17 @@ export default function AssetDetail() {
   useEffect(() => {
     if (asset) {
       setForm(toFormState(asset, classOptions, getTypesForClass));
-      setSoldAmountInput(String(asset.soldAmount ?? 0));
-      setSoldRemarkInput(asset.soldRemark ?? "");
     }
   }, [asset, classOptions, getTypesForClass]);
+
+  // Only load sold fields when opening a different asset — not on background refetch (was resetting typed values to 0).
+  useEffect(() => {
+    if (!asset?.id) return;
+    if (syncedSoldAssetId.current === asset.id) return;
+    syncedSoldAssetId.current = asset.id;
+    setSoldAmountInput(asset.soldAmount && asset.soldAmount > 0 ? String(asset.soldAmount) : "");
+    setSoldRemarkInput(asset.soldRemark ?? "");
+  }, [asset?.id, asset?.soldAmount, asset?.soldRemark]);
 
   const updateMutation = useMutation({
     mutationFn: () => {
@@ -433,7 +441,9 @@ export default function AssetDetail() {
         status: "DISPOSED"
       });
     },
-    onSuccess: async () => {
+    onSuccess: async (updated) => {
+      setSoldAmountInput(updated.soldAmount && updated.soldAmount > 0 ? String(updated.soldAmount) : "");
+      setSoldRemarkInput(updated.soldRemark ?? "");
       await queryClient.invalidateQueries({ queryKey: ["assets", id] });
       await queryClient.invalidateQueries({ queryKey: ["assets"] });
       await queryClient.invalidateQueries({ queryKey: ["assets", "stats"] });
@@ -728,40 +738,57 @@ export default function AssetDetail() {
         </div>
       </div>
 
-      <div className="glass-panel p-6 mt-6">
-        <h3 className="font-semibold mb-4">Sold Information</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <Label>Sold Amount</Label>
-            <Input
-              type="number"
-              min="0"
-              value={soldAmountInput}
-              onChange={(event) => setSoldAmountInput(event.target.value)}
-              className="mt-1"
-              disabled={isSold}
-            />
-          </div>
-          <div className="md:col-span-2">
-            <Label>Remark</Label>
-            <Textarea
-              value={soldRemarkInput}
-              onChange={(event) => setSoldRemarkInput(event.target.value)}
-              className="mt-1 min-h-24"
-              placeholder="Enter sale remark"
-              disabled={isSold}
-            />
-          </div>
-          <div className="md:col-span-2 flex justify-end">
-            <Button
-              onClick={() => soldMutation.mutate()}
-              disabled={isSold || soldMutation.isPending || toNumber(soldAmountInput) <= 0 || !soldRemarkInput.trim()}
-            >
-              {isSold ? "Already Sold" : soldMutation.isPending ? "Saving..." : "Submit Sold Information"}
-            </Button>
+      {!isSold ? (
+        <div className="glass-panel p-6 mt-6">
+          <h3 className="font-semibold mb-2">Sold Information</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            Asset is currently in use. Enter sold amount and remark below, then submit to mark it as sold.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label>Sold Amount</Label>
+              <Input
+                type="text"
+                inputMode="decimal"
+                value={soldAmountInput}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                    setSoldAmountInput(value);
+                  }
+                }}
+                className="mt-1"
+                placeholder="Enter amount"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <Label>Remark</Label>
+              <Textarea
+                value={soldRemarkInput}
+                onChange={(event) => setSoldRemarkInput(event.target.value)}
+                className="mt-1 min-h-24"
+                placeholder="Enter sale remark (required)"
+              />
+            </div>
+            <div className="md:col-span-2 flex justify-end">
+              <Button
+                onClick={() => soldMutation.mutate()}
+                disabled={soldMutation.isPending || toNumber(soldAmountInput) <= 0 || !soldRemarkInput.trim()}
+              >
+                {soldMutation.isPending ? "Saving..." : "Submit Sold Information"}
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="glass-panel p-6 mt-6">
+          <h3 className="font-semibold mb-4">Sold Information</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Field label="Sold Amount" value={asset.soldAmount ? formatCurrency(asset.soldAmount) : "-"} />
+            <div className="md:col-span-2"><Field label="Sold Remark" value={asset.soldRemark ?? "-"} /></div>
+          </div>
+        </div>
+      )}
 
       <MovementDialog asset={asset} open={movementOpen} onOpenChange={setMovementOpen} />
       <MaintenanceDialog asset={asset} open={maintenanceOpen} onOpenChange={setMaintenanceOpen} />
