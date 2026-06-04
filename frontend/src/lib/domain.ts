@@ -46,6 +46,18 @@ export type ProjectItem = {
   financialYearShort?: number | null;
   serialNumber?: number | null;
   projectNumberAssignedAt?: string | null;
+  woAmount?: string;
+  woGstAmount?: string;
+  woTotalAmount?: string;
+  excessAmount?: string;
+  excessGstAmount?: string;
+  excessTotalAmount?: string;
+  bgAmount?: string;
+  bgIssueDate?: string | null;
+  bgExpiryDate?: string | null;
+  emdAmount?: string;
+  emdIssueDate?: string | null;
+  emdExpiryDate?: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -379,6 +391,9 @@ export type FinancialProjectSummary = {
   contractValue: number;
   taxAmount: number;
   totalAmount: number;
+  excessAmount?: string;
+  excessGstAmount?: string;
+  excessTotalAmount?: string;
 };
 
 export type FinancialItemTemplate = {

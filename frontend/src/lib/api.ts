@@ -681,8 +681,25 @@ export const api = {
         | "financialYearShort"
         | "serialNumber"
         | "projectNumberAssignedAt"
+        | "woAmount"
+        | "woGstAmount"
+        | "woTotalAmount"
+        | "excessAmount"
+        | "excessGstAmount"
+        | "excessTotalAmount"
+        | "bgAmount"
+        | "bgIssueDate"
+        | "bgExpiryDate"
+        | "emdAmount"
+        | "emdIssueDate"
+        | "emdExpiryDate"
       >
-    >
+    > & {
+      bgIssueDate?: string | null;
+      bgExpiryDate?: string | null;
+      emdIssueDate?: string | null;
+      emdExpiryDate?: string | null;
+    }
   ) {
     const candidates: Array<{ path: string; method: "PATCH" | "POST" }> = [
       { path: `/projects/${id}`, method: "PATCH" },

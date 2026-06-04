@@ -6,6 +6,23 @@ export const createProjectSchema = z.object({
   projectNumber: z.string().trim().min(1).optional()
 });
 
+const optionalMoney = z.preprocess(
+  (value) => {
+    if (value === undefined || value === null) return undefined;
+    const trimmed = String(value).trim();
+    return trimmed === "" ? "" : trimmed;
+  },
+  z.union([
+    z.literal(""),
+    z.string().regex(/^\d+(\.\d{1,2})?$/, "Amount must be a valid number with up to 2 decimal places")
+  ]).optional()
+);
+
+const optionalDateField = z.preprocess(
+  (value) => (value === "" || value === null || value === undefined ? null : value),
+  z.coerce.date().nullable().optional()
+);
+
 export const updateProjectSchema = z
   .object({
     name: z.string().min(2).optional(),
@@ -18,9 +35,29 @@ export const updateProjectSchema = z
     workCategoryCode: z.string().trim().min(1).optional(),
     financialYearShort: z.coerce.number().int().min(0).max(99).optional(),
     serialNumber: z.coerce.number().int().min(1).optional(),
-    projectNumberAssignedAt: z.coerce.date().optional()
+    projectNumberAssignedAt: z.coerce.date().optional(),
+    woAmount: optionalMoney,
+    woGstAmount: optionalMoney,
+    woTotalAmount: optionalMoney,
+    excessAmount: optionalMoney,
+    excessGstAmount: optionalMoney,
+    excessTotalAmount: optionalMoney,
+    bgAmount: optionalMoney,
+    bgIssueDate: optionalDateField,
+    bgExpiryDate: optionalDateField,
+    emdAmount: optionalMoney,
+    emdIssueDate: optionalDateField,
+    emdExpiryDate: optionalDateField
   })
-  .refine((payload) => Object.keys(payload).length > 0, "At least one field is required");
+  .refine((payload) => Object.keys(payload).length > 0, "At least one field is required")
+  .superRefine((payload, ctx) => {
+    if (payload.bgIssueDate && payload.bgExpiryDate && payload.bgExpiryDate < payload.bgIssueDate) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "BG expiry date cannot be before issue date", path: ["bgExpiryDate"] });
+    }
+    if (payload.emdIssueDate && payload.emdExpiryDate && payload.emdExpiryDate < payload.emdIssueDate) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "EMD expiry date cannot be before issue date", path: ["emdExpiryDate"] });
+    }
+  });
 
 const companyCodeSchema = z.enum(["G", "S", "I", "H"]);
 const technicalUnitCodeSchema = z.enum(["T", "S", "D"]);

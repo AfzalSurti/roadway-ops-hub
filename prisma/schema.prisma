@@ -133,6 +133,18 @@ model Project {
   financialYearShort    Int?
   serialNumber          Int?
   projectNumberAssignedAt DateTime?
+  woAmount              String   @default("")
+  woGstAmount           String   @default("")
+  woTotalAmount         String   @default("")
+  excessAmount          String   @default("")
+  excessGstAmount       String   @default("")
+  excessTotalAmount     String   @default("")
+  bgAmount              String   @default("")
+  bgIssueDate           DateTime?
+  bgExpiryDate          DateTime?
+  emdAmount             String   @default("")
+  emdIssueDate          DateTime?
+  emdExpiryDate         DateTime?
   requisitionForm       ProjectRequisitionForm?
   financialPlan         ProjectFinancialPlan?
   createdAt             DateTime @default(now())

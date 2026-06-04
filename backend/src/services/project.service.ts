@@ -201,6 +201,18 @@ export const projectService = {
       financialYearShort?: number;
       serialNumber?: number;
       projectNumberAssignedAt?: Date;
+      woAmount?: string;
+      woGstAmount?: string;
+      woTotalAmount?: string;
+      excessAmount?: string;
+      excessGstAmount?: string;
+      excessTotalAmount?: string;
+      bgAmount?: string;
+      bgIssueDate?: Date | null;
+      bgExpiryDate?: Date | null;
+      emdAmount?: string;
+      emdIssueDate?: Date | null;
+      emdExpiryDate?: Date | null;
     }
   ) {
     const existing = await projectRepository.findById(id);

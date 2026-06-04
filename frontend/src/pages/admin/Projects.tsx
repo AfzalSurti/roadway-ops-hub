@@ -8,7 +8,7 @@ import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { downloadProjectRequisitionPdf } from "@/lib/project-requisition-pdf";
 import { downloadProjectReport } from "@/lib/reports-pdf";
-import { isTaskOverdue, statusConfig, type ProjectRequisitionFormItem } from "@/lib/domain";
+import { isTaskOverdue, statusConfig, type ProjectItem, type ProjectRequisitionFormItem } from "@/lib/domain";
 import { PROJECT_PLAN_TEMPLATE } from "@/lib/project-plan-template";
 import {
   buildProjectBaseCode,
@@ -16,6 +16,17 @@ import {
   getFinancialYearShort,
   parseManualFinancialYearShort
 } from "@/lib/project-numbering";
+import { ProjectFinancialDetailsFields } from "@/components/admin/ProjectFinancialDetailsFields";
+import {
+  applyProjectFinancialToRequisitionDraft,
+  EMPTY_PROJECT_FINANCIAL_DETAILS,
+  financialDetailsDirty,
+  normalizeProjectFinancialDetails,
+  projectFinancialDetailsToUpdatePayload,
+  projectToFinancialDetailsForm,
+  validateProjectFinancialDetails,
+  type ProjectFinancialDetailsForm
+} from "@/lib/project-financial-details";
 
 type WizardStep = 1 | 2 | 3 | 4 | 5;
 type RequisitionStep = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
@@ -36,7 +47,30 @@ type ProjectPlanStoreItem = {
   entries: ProjectPlanEntry[];
 };
 
+type SelectedProjectForm = {
+  name: string;
+  description: string;
+  projectNumber: string;
+} & ProjectFinancialDetailsForm;
+
 type ProjectPlansStore = Record<string, ProjectPlanStoreItem>;
+
+function createSelectedProjectForm(project: ProjectItem | null | undefined): SelectedProjectForm {
+  if (!project) {
+    return {
+      name: "",
+      description: "",
+      projectNumber: "",
+      ...EMPTY_PROJECT_FINANCIAL_DETAILS
+    };
+  }
+  return {
+    name: project.name,
+    description: project.description ?? "",
+    projectNumber: project.projectNumber ?? "",
+    ...projectToFinancialDetailsForm(project)
+  };
+}
 
 const PROJECT_PLAN_STORAGE_KEY = "roadway.ops.projectPlans.v1";
 
@@ -468,7 +502,7 @@ export default function AdminProjects() {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [isEditingSelectedProject, setIsEditingSelectedProject] = useState(false);
   const [savingSelectedProject, setSavingSelectedProject] = useState(false);
-  const [selectedProjectForm, setSelectedProjectForm] = useState({ name: "", description: "", projectNumber: "" });
+  const [selectedProjectForm, setSelectedProjectForm] = useState<SelectedProjectForm>(() => createSelectedProjectForm(null));
   const [showGeneratedModal, setShowGeneratedModal] = useState(false);
   const [generatedProjectNumber, setGeneratedProjectNumber] = useState("");
   const [generatedProjectName, setGeneratedProjectName] = useState("");
@@ -561,9 +595,11 @@ export default function AdminProjects() {
   const planChartProject = useMemo(() => projectRows.find((row) => row.id === planChartProjectId) ?? null, [projectRows, planChartProjectId]);
   const selectedProjectFormDirty = useMemo(() => {
     if (!selectedProjectRecord) return false;
-    return selectedProjectForm.name.trim() !== selectedProjectRecord.name
-      || selectedProjectForm.description.trim() !== (selectedProjectRecord.description ?? "")
-      || selectedProjectForm.projectNumber.trim() !== (selectedProjectRecord.projectNumber ?? "");
+    const baseline = createSelectedProjectForm(selectedProjectRecord);
+    return selectedProjectForm.name.trim() !== baseline.name
+      || selectedProjectForm.description.trim() !== baseline.description
+      || selectedProjectForm.projectNumber.trim() !== baseline.projectNumber
+      || financialDetailsDirty(selectedProjectForm, baseline);
   }, [selectedProjectForm, selectedProjectRecord]);
 
   const subTechnicalOptions = useMemo(() => {
@@ -598,11 +634,7 @@ export default function AdminProjects() {
     }
 
     setIsEditingSelectedProject(false);
-    setSelectedProjectForm({
-      name: selectedProjectRecord.name,
-      description: selectedProjectRecord.description ?? "",
-      projectNumber: selectedProjectRecord.projectNumber ?? ""
-    });
+    setSelectedProjectForm(createSelectedProjectForm(selectedProjectRecord));
   }, [selectedProjectRecord]);
 
   const resetWizard = () => {
@@ -614,9 +646,10 @@ export default function AdminProjects() {
   const openRequisitionWizard = (projectId: string) => {
     const existing = requisitionFormsByProjectId.get(projectId);
     const project = projects.find((item) => item.id === projectId);
-    const nextDraft = existing
+    const baseDraft = existing
       ? fromFormItem(existing)
       : { ...DEFAULT_REQUISITION_DRAFT, newProjectNumber: project?.projectNumber ?? "", approvedProjectNumber: project?.projectNumber ?? "" };
+    const nextDraft = project ? applyProjectFinancialToRequisitionDraft(baseDraft, project) : baseDraft;
     setRequisitionProjectId(projectId);
     setRequisitionDraft(nextDraft);
     setShowRequisitionWizard(true);
@@ -645,16 +678,31 @@ export default function AdminProjects() {
     const nextName = selectedProjectForm.name.trim();
     const nextDescription = selectedProjectForm.description.trim();
     const nextProjectNumber = selectedProjectForm.projectNumber.trim();
+    const normalizedFinancial = normalizeProjectFinancialDetails(selectedProjectForm);
+    const financialError = validateProjectFinancialDetails(normalizedFinancial);
 
     if (!nextName) {
       toast.error("Project name is required");
       return;
     }
+    if (financialError) {
+      toast.error(financialError);
+      return;
+    }
 
-    const payload: Record<string, string> = {};
-    if (nextName !== selectedProjectRecord.name) payload.name = nextName;
-    if (nextDescription !== (selectedProjectRecord.description ?? "")) payload.description = nextDescription;
-    if (nextProjectNumber && nextProjectNumber !== (selectedProjectRecord.projectNumber ?? "")) payload.projectNumber = nextProjectNumber;
+    const baseline = createSelectedProjectForm(selectedProjectRecord);
+    const payload: Record<string, string | null> = {};
+    if (nextName !== baseline.name) payload.name = nextName;
+    if (nextDescription !== baseline.description) payload.description = nextDescription;
+    if (nextProjectNumber && nextProjectNumber !== baseline.projectNumber) payload.projectNumber = nextProjectNumber;
+
+    const financialPayload = projectFinancialDetailsToUpdatePayload(normalizedFinancial);
+    const baselineFinancial = projectFinancialDetailsToUpdatePayload(baseline);
+    (Object.keys(financialPayload) as Array<keyof typeof financialPayload>).forEach((key) => {
+      if (financialPayload[key] !== baselineFinancial[key]) {
+        payload[key] = financialPayload[key] as string | null;
+      }
+    });
 
     if (Object.keys(payload).length === 0) {
       setIsEditingSelectedProject(false);
@@ -985,7 +1033,7 @@ export default function AdminProjects() {
 
       {selectedProject && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm" onClick={() => setSelectedProjectId(null)}>
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} onClick={(event) => event.stopPropagation()} className="glass-panel-strong p-6 w-full max-w-3xl mx-4 max-h-[85vh] overflow-y-auto">
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} onClick={(event) => event.stopPropagation()} className="glass-panel-strong p-6 w-full max-w-4xl mx-4 max-h-[85vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">Project Details</h3>
               <div className="flex items-center gap-2">
@@ -1003,11 +1051,7 @@ export default function AdminProjects() {
                     <button
                       onClick={() => {
                         setIsEditingSelectedProject(false);
-                        setSelectedProjectForm({
-                          name: selectedProjectRecord?.name ?? "",
-                          description: selectedProjectRecord?.description ?? "",
-                          projectNumber: selectedProjectRecord?.projectNumber ?? ""
-                        });
+                        setSelectedProjectForm(createSelectedProjectForm(selectedProjectRecord));
                       }}
                       className="px-3 py-1.5 rounded-lg border border-border/50 text-sm"
                     >
@@ -1071,6 +1115,14 @@ export default function AdminProjects() {
                   <p className="mt-1 text-sm">{selectedProject.description.trim() || "No description added."}</p>
                 )}
               </div>
+
+              <ProjectFinancialDetailsFields
+                form={selectedProjectForm}
+                isEditing={isEditingSelectedProject}
+                onChange={(patch) => setSelectedProjectForm((prev) => ({ ...prev, ...patch }))}
+              />
+
+              <div className="sm:col-span-2 border-t border-border/30 pt-4 mt-1" />
               <div><p className="text-xs text-muted-foreground">Total Tasks</p><p className="font-medium mt-1">{selectedProject.totalTasks}</p></div>
               <div><p className="text-xs text-muted-foreground">Pending</p><p className="font-medium mt-1">{selectedProject.pendingTasks}</p></div>
               <div><p className="text-xs text-muted-foreground">Overdue</p><p className="font-medium mt-1">{selectedProject.overdueTasks}</p></div>

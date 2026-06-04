@@ -150,7 +150,12 @@ export default function AdminFinancial() {
     setPlanningRows(source);
     if (planningType === "EXCESS") {
       const existingExcessAmount = round2(sourceItems.reduce((sum, item) => sum + Number(item.amount || 0), 0));
-      setExcessBaseAmount(existingExcessAmount > 0 ? String(existingExcessAmount) : "");
+      const projectExcess = detail.project.excessAmount?.trim() ?? "";
+      setExcessBaseAmount(
+        existingExcessAmount > 0
+          ? String(existingExcessAmount)
+          : projectExcess || ""
+      );
     } else {
       setExcessBaseAmount("");
     }

@@ -186,7 +186,10 @@ export const financialService = {
         gstNumber: project.requisitionForm!.gstNumber,
         contractValue,
         taxAmount,
-        totalAmount
+        totalAmount,
+        excessAmount: project.excessAmount ?? "",
+        excessGstAmount: project.excessGstAmount ?? "",
+        excessTotalAmount: project.excessTotalAmount ?? ""
       },
       itemTemplates: FINANCIAL_ITEM_TEMPLATES,
       plan
