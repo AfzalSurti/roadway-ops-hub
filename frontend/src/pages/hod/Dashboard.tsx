@@ -161,7 +161,7 @@ export default function HodDashboard() {
   };
 
   const isLoading = loadingProjects || loadingTasks || loadingFinancial;
-  const projectTableColSpan = 12;
+  const projectTableColSpan = 11;
 
   return (
     <PageWrapper>
@@ -281,7 +281,6 @@ export default function HodDashboard() {
                 <th className="py-3 px-4 text-right font-medium">Received Amount</th>
                 <th className="py-3 px-4 text-right font-medium">Financial Progress (%)</th>
                 <th className="py-3 px-4 text-right font-medium">Billing Amount</th>
-                <th className="py-3 px-4 text-left font-medium">Lifecycle</th>
                 <th className="py-3 px-4 text-right font-medium">Tasks</th>
                 <th className="py-3 px-4 text-right font-medium">Under Preparation</th>
                 <th className="py-3 px-4 text-right font-medium">Draft Submitted</th>
@@ -325,18 +324,6 @@ export default function HodDashboard() {
                       </td>
                       <td className="py-3 px-4 text-right tabular-nums text-muted-foreground">
                         {formatHodCurrency(row.billingAmount)}
-                      </td>
-                      <td className="py-3 px-4">
-                        <Badge
-                          variant="secondary"
-                          className={`rounded-full ${
-                            row.lifecycle === "COMPLETED"
-                              ? "bg-emerald-500/15 text-emerald-600"
-                              : "bg-amber-500/15 text-amber-700"
-                          }`}
-                        >
-                          {row.lifecycle === "COMPLETED" ? "Completed" : "Ongoing"}
-                        </Badge>
                       </td>
                       <td className="py-3 px-4 text-right tabular-nums">{row.summary.total}</td>
                       <td className="py-3 px-4 text-right tabular-nums text-amber-700">{row.summary.pending}</td>
