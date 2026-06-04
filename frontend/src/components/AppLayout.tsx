@@ -45,14 +45,15 @@ function ProfileIncompletePrompt() {
 }
 
 export function AppLayout() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, isPmo, isHod } = useAuth();
+  const showProfileIncompletePrompt = !isAdmin && !isPmo && !isHod;
 
   return (
     <div className="flex min-h-screen w-full">
       <AppSidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <TopBar />
-        {!isAdmin && <ProfileIncompletePrompt />}
+        {showProfileIncompletePrompt ? <ProfileIncompletePrompt /> : null}
         <main className="flex-1 p-6 overflow-auto">
           <Outlet />
         </main>
