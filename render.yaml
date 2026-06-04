@@ -42,3 +42,5 @@ services:
         value: Administrative
       - key: FORCE_BOOTSTRAP_ADMINISTRATIVE
         value: "false"
+      - key: DEMO_EXPENSE_SEED_EMAIL
+        value: ypatil1999@gmail.com
