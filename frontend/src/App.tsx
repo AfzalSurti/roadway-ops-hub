@@ -105,14 +105,17 @@ function AppRoutes() {
         <Route path="financial" element={<AdminFinancial />} />
         <Route path="team" element={<AdminTeam />} />
         <Route path="projects" element={<AdminProjects />} />
-        <Route path="expenses" element={<ExpenseDashboard />} />
-        <Route path="expenses/my" element={<AdminMyExpenses />} />
-        <Route path="expenses/my/new" element={<AdminExpenseDetail />} />
-        <Route path="expenses/my/:id" element={<AdminExpenseDetail />} />
-        <Route path="expenses/list" element={<ExpenseList />} />
-        <Route path="expenses/vouchers" element={<ExpenseVouchers />} />
-        <Route path="expenses/reports" element={<ExpenseReports />} />
-        <Route path="expenses/:id" element={<AdminExpenseDetail />} />
+        <Route path="expenses">
+          <Route index element={<ExpenseDashboard />} />
+          <Route path="my">
+            <Route index element={<AdminMyExpenses />} />
+            <Route path=":sheetId" element={<AdminExpenseDetail />} />
+          </Route>
+          <Route path="list" element={<ExpenseList />} />
+          <Route path="vouchers" element={<ExpenseVouchers />} />
+          <Route path="reports" element={<ExpenseReports />} />
+          <Route path=":sheetId" element={<AdminExpenseDetail />} />
+        </Route>
       </Route>
 
       <Route path="/administrative" element={<PmoRoute><AppLayout /></PmoRoute>}>

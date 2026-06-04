@@ -58,11 +58,12 @@ function blockNonDigitKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
 }
 
 export default function ExpenseSheetPage({ basePath, selfService = false }: ExpenseSheetPageProps) {
-  const { id } = useParams();
+  const { id, sheetId } = useParams();
+  const sheetRouteId = sheetId ?? id;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isAdmin, user } = useAuth();
-  const isNew = id === "new";
+  const isNew = sheetRouteId === "new";
 
   const [reviewComments, setReviewComments] = useState("");
   const [entryForm, setEntryForm] = useState({
@@ -126,7 +127,7 @@ export default function ExpenseSheetPage({ basePath, selfService = false }: Expe
     }));
   }, [isNew, profile?.name, profile?.contactNumber, user?.name, user?.contactNumber]);
 
-  const sheetQueryEnabled = Boolean(id) && !isNew;
+  const sheetQueryEnabled = Boolean(sheetRouteId) && !isNew;
 
   const {
     data: sheet,
@@ -135,14 +136,14 @@ export default function ExpenseSheetPage({ basePath, selfService = false }: Expe
     error: sheetLoadError,
     refetch: refetchSheet
   } = useQuery({
-    queryKey: ["expense-sheet", id],
-    queryFn: () => api.getExpenseSheet(id!),
+    queryKey: ["expense-sheet", sheetRouteId],
+    queryFn: () => api.getExpenseSheet(sheetRouteId!),
     enabled: sheetQueryEnabled,
     ...expenseQueryOptions
   });
 
   const invalidate = () => {
-    void queryClient.invalidateQueries({ queryKey: ["expense-sheet", id] });
+    void queryClient.invalidateQueries({ queryKey: ["expense-sheet", sheetRouteId] });
     void queryClient.invalidateQueries({ queryKey: ["expense-sheets"] });
     void queryClient.invalidateQueries({ queryKey: ["expense-dashboard"] });
   };
@@ -186,7 +187,8 @@ export default function ExpenseSheetPage({ basePath, selfService = false }: Expe
   });
 
   const reviewMutation = useMutation({
-    mutationFn: (status: "APPROVED" | "REJECTED") => api.reviewExpenseSheet(id!, { status, comments: reviewComments || null }),
+    mutationFn: (status: "APPROVED" | "REJECTED") =>
+      api.reviewExpenseSheet(sheetRouteId!, { status, comments: reviewComments || null }),
     onSuccess: () => {
       toast.success("Review saved");
       invalidate();
@@ -210,7 +212,7 @@ export default function ExpenseSheetPage({ basePath, selfService = false }: Expe
       if (!Number.isFinite(amount) || amount <= 0) {
         throw new Error("Amount must be greater than 0");
       }
-      return api.addExpenseEntry(id!, {
+      return api.addExpenseEntry(sheetRouteId!, {
         categoryId: entryForm.categoryId,
         entryDate: new Date(entryForm.entryDate).toISOString(),
         amount,
