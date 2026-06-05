@@ -506,6 +506,9 @@ export const api = {
     remarks?: string | null;
     forMonth?: string | null;
     itAssetId?: string | null;
+    billFileUrl?: string | null;
+    billFileName?: string | null;
+    billMimeType?: string | null;
   }) {
     return request<AssetItem>("/assets", {
       method: "POST",
@@ -563,11 +566,69 @@ export const api = {
     remarks: string | null;
     forMonth: string | null;
     itAssetId: string | null;
+    billFileUrl: string | null;
+    billFileName: string | null;
+    billMimeType: string | null;
   }>) {
     return request<AssetItem>(`/assets/${id}`, {
       method: "PATCH",
       body: JSON.stringify(payload)
     });
+  },
+
+  uploadFile(file: File) {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const uploadOnce = async (path: string, retryOnUnauthorized = true): Promise<{
+      attachmentId: string;
+      url: string;
+      meta: { fileName: string; originalName: string; mimeType: string; size: number };
+    }> => {
+      const headers = new Headers();
+      const token = authStorage.getAccessToken();
+      if (token) {
+        headers.set("Authorization", `Bearer ${token}`);
+      }
+
+      let response = await fetch(`${API_BASE_URL}${path}`, {
+        method: "POST",
+        headers,
+        body: formData
+      });
+
+      if (response.status === 404 && !path.startsWith("/api/")) {
+        response = await fetch(`${API_BASE_URL}/api${path}`, {
+          method: "POST",
+          headers,
+          body: formData
+        });
+      }
+
+      if (response.status === 401 && retryOnUnauthorized) {
+        if (!refreshPromise) {
+          refreshPromise = refreshAccessToken().finally(() => {
+            refreshPromise = null;
+          });
+        }
+        await refreshPromise;
+        return uploadOnce(path, false);
+      }
+
+      const json = (await response.json()) as ApiResponse<{
+        attachmentId: string;
+        url: string;
+        meta: { fileName: string; originalName: string; mimeType: string; size: number };
+      }>;
+
+      if (!response.ok || !json.success || !json.data) {
+        throw new Error(buildErrorMessage(response, json));
+      }
+
+      return json.data;
+    };
+
+    return uploadOnce("/uploads");
   },
 
   deleteAsset(id: string) {

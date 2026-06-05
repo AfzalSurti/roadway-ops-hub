@@ -129,6 +129,9 @@ export type AssetItem = {
   soldRemark?: string | null;
   remarks?: string | null;
   forMonth?: string | null;
+  billFileUrl?: string | null;
+  billFileName?: string | null;
+  billMimeType?: string | null;
   createdAt: string;
   updatedAt: string;
   movements?: AssetMovementItem[];

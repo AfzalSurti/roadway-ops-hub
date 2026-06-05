@@ -183,6 +183,9 @@ export const assetService = {
     remarks?: string | null;
     forMonth?: string | null;
     itAssetId?: string | null;
+    billFileUrl?: string | null;
+    billFileName?: string | null;
+    billMimeType?: string | null;
   }) {
     validateWarrantyEndDate(payload.dateOfPurchase ?? null, payload.warrantyPeriod ?? null);
 
@@ -225,7 +228,10 @@ export const assetService = {
       soldAmount: payload.soldAmount ?? 0,
       soldRemark: payload.soldRemark ?? null,
       remarks: payload.remarks ?? null,
-      forMonth: payload.forMonth ?? null
+      forMonth: payload.forMonth ?? null,
+      billFileUrl: payload.billFileUrl ?? null,
+      billFileName: payload.billFileName ?? null,
+      billMimeType: payload.billMimeType ?? null
     });
 
     return enrichAsset(created);
@@ -326,6 +332,9 @@ export const assetService = {
       remarks?: string | null;
       forMonth?: string | null;
       itAssetId?: string | null;
+      billFileUrl?: string | null;
+      billFileName?: string | null;
+      billMimeType?: string | null;
     }
   ) {
     const existing = await this.getById(id);

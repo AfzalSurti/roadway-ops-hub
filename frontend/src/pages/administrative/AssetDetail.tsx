@@ -21,6 +21,7 @@ import { ArrowLeft, CalendarPlus, FileText, Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { downloadAssetPdf } from "@/lib/asset-pdf";
+import { resolveAssetBillUrl } from "@/lib/asset-bill";
 
 const STATUS_COLORS: Record<AssetStatus, string> = {
   IN_USE: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
@@ -652,6 +653,21 @@ export default function AssetDetail() {
               <Field label="Purchase Amount" value={`₹${asset.purchaseAmount.toLocaleString("en-IN")}`} />
               <Field label="GST" value={`₹${asset.gst.toLocaleString("en-IN")}`} />
               <Field label="Total Amount with GST" value={`₹${asset.totalAmountWithGst.toLocaleString("en-IN")}`} />
+              <div>
+                <p className="text-xs text-muted-foreground">Asset Bill</p>
+                {asset.billFileUrl ? (
+                  <a
+                    href={resolveAssetBillUrl(asset.billFileUrl) ?? "#"}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-1 inline-flex text-sm font-medium text-primary hover:underline"
+                  >
+                    {asset.billFileName || "View bill"}
+                  </a>
+                ) : (
+                  <p className="mt-1 text-sm font-medium">-</p>
+                )}
+              </div>
               <Field label="Current Value" value={formatCurrency(asset.currentValue)} />
               <Field label="Days Since Purchase" value={daysSincePurchase === null ? "-" : String(daysSincePurchase)} />
               <Field

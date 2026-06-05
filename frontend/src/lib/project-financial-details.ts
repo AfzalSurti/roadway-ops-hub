@@ -1,4 +1,4 @@
-import type { ProjectItem } from "./domain";
+import type { ProjectItem, ProjectRequisitionFormItem } from "./domain";
 
 export type ProjectFinancialDetailsForm = {
   woAmount: string;

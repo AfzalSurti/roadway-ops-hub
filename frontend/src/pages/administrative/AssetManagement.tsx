@@ -27,7 +27,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { downloadAssetPdf } from "@/lib/asset-pdf";
-import { FileText, Loader2 } from "lucide-react";
+import { ASSET_BILL_ACCEPT, resolveAssetBillUrl, validateAssetBillFile } from "@/lib/asset-bill";
+import { FileText, Loader2, Paperclip, X } from "lucide-react";
 import * as XLSX from "xlsx";
 
 const STATUS_OPTIONS: Array<{ label: string; value: AssetStatus | "ALL" }> = [
@@ -227,6 +228,11 @@ function AssetEditorDialog({
   const [form, setForm] = useState<AssetFormState>(EMPTY_FORM);
   const [projectInputMode, setProjectInputMode] = useState<"select" | "other">("select");
   const [userInputMode, setUserInputMode] = useState<"select" | "other">("select");
+  const [pendingBillFile, setPendingBillFile] = useState<File | null>(null);
+  const [billFileUrl, setBillFileUrl] = useState<string | null>(null);
+  const [billFileName, setBillFileName] = useState<string | null>(null);
+  const [billMimeType, setBillMimeType] = useState<string | null>(null);
+  const [removeBill, setRemoveBill] = useState(false);
 
   const typeOptions = useMemo(() => {
     const builtIn = getTypesForClass(form.assetClass);
@@ -280,6 +286,11 @@ function AssetEditorDialog({
         setProjectInputMode("select");
       }
       setUserInputMode(asset?.assignedUser && !userOptions.includes(asset.assignedUser) ? "other" : "select");
+      setPendingBillFile(null);
+      setRemoveBill(false);
+      setBillFileUrl(asset?.billFileUrl ?? null);
+      setBillFileName(asset?.billFileName ?? null);
+      setBillMimeType(asset?.billMimeType ?? null);
     }
   }, [asset, open, projectOptions, userOptions, classOptions, getTypesForClass]);
 
@@ -303,6 +314,25 @@ function AssetEditorDialog({
         throw new Error("Warranty end date cannot be before the date of purchase");
       }
 
+      let nextBillFileUrl = billFileUrl;
+      let nextBillFileName = billFileName;
+      let nextBillMimeType = billMimeType;
+
+      if (pendingBillFile) {
+        const validationError = validateAssetBillFile(pendingBillFile);
+        if (validationError) {
+          throw new Error(validationError);
+        }
+        const uploaded = await api.uploadFile(pendingBillFile);
+        nextBillFileUrl = uploaded.url;
+        nextBillFileName = uploaded.meta.originalName;
+        nextBillMimeType = uploaded.meta.mimeType;
+      } else if (removeBill) {
+        nextBillFileUrl = null;
+        nextBillFileName = null;
+        nextBillMimeType = null;
+      }
+
       const payload = {
         assetClass: resolveAssetClass(form),
         assetType: form.assetType === "Other" ? form.customAssetType.trim() : form.assetType,
@@ -317,7 +347,10 @@ function AssetEditorDialog({
         projectName: effectiveStatus === "IN_USE" ? ((projectInputMode === "other" ? form.customProjectName : selectedProjectName).trim() || null) : null,
         assignedUser: effectiveStatus === "IN_USE" ? form.assignedUser.trim() || null : null,
         remarks: form.remarks.trim() || null,
-        itAssetId: form.itAssetId.trim() || null
+        itAssetId: form.itAssetId.trim() || null,
+        billFileUrl: nextBillFileUrl,
+        billFileName: nextBillFileName,
+        billMimeType: nextBillMimeType
       };
 
       return asset
@@ -456,6 +489,72 @@ function AssetEditorDialog({
           <div>
             <Label>Total Amount with GST</Label>
             <Input value={totalAmount} readOnly className="mt-1 bg-secondary/40" />
+          </div>
+
+          <div className="md:col-span-2 rounded-xl border border-border/40 bg-secondary/15 p-4">
+            <Label>Asset Bill (Invoice)</Label>
+            <p className="text-xs text-muted-foreground mt-1 mb-3">
+              Upload purchase bill in PDF, PNG, JPG, or other supported document/image format (max 10 MB).
+            </p>
+            <Input
+              type="file"
+              accept={ASSET_BILL_ACCEPT}
+              className="mt-1"
+              onChange={(event) => {
+                const file = event.target.files?.[0] ?? null;
+                if (!file) return;
+                const validationError = validateAssetBillFile(file);
+                if (validationError) {
+                  toast.error(validationError);
+                  event.target.value = "";
+                  return;
+                }
+                setPendingBillFile(file);
+                setRemoveBill(false);
+              }}
+            />
+            {pendingBillFile ? (
+              <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-sm">
+                <span className="inline-flex items-center gap-2 truncate">
+                  <Paperclip className="h-4 w-4 shrink-0" />
+                  {pendingBillFile.name}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setPendingBillFile(null)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : null}
+            {!pendingBillFile && billFileUrl && !removeBill ? (
+              <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-border/40 px-3 py-2 text-sm">
+                <a
+                  href={resolveAssetBillUrl(billFileUrl) ?? "#"}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 text-primary hover:underline truncate"
+                >
+                  <Paperclip className="h-4 w-4 shrink-0" />
+                  {billFileName || "View asset bill"}
+                </a>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setRemoveBill(true);
+                    setBillFileUrl(null);
+                    setBillFileName(null);
+                    setBillMimeType(null);
+                  }}
+                >
+                  Remove
+                </Button>
+              </div>
+            ) : null}
           </div>
 
           {!asset ? (

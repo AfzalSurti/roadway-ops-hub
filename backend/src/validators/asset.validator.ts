@@ -21,7 +21,10 @@ export const createAssetSchema = z
     soldRemark: z.string().trim().optional().nullable(),
     remarks: z.string().trim().optional().nullable(),
     forMonth: z.string().trim().optional().nullable(),
-    itAssetId: z.string().trim().optional().nullable()
+    itAssetId: z.string().trim().optional().nullable(),
+    billFileUrl: z.string().trim().optional().nullable(),
+    billFileName: z.string().trim().optional().nullable(),
+    billMimeType: z.string().trim().optional().nullable()
   })
   .superRefine((payload, ctx) => {
     if (payload.status === "IN_USE" && !payload.projectNumber?.trim()) {
@@ -58,7 +61,10 @@ export const updateAssetSchema = z
     soldRemark: z.string().trim().optional().nullable(),
     remarks: z.string().trim().optional().nullable(),
     forMonth: z.string().trim().optional().nullable(),
-    itAssetId: z.string().trim().optional().nullable()
+    itAssetId: z.string().trim().optional().nullable(),
+    billFileUrl: z.string().trim().optional().nullable(),
+    billFileName: z.string().trim().optional().nullable(),
+    billMimeType: z.string().trim().optional().nullable()
   })
   .refine((payload) => Object.keys(payload).length > 0, "At least one field is required");
 

@@ -183,6 +183,9 @@ model Asset {
   soldRemark         String?
   remarks            String?
   forMonth           String?
+  billFileUrl        String?
+  billFileName       String?
+  billMimeType       String?
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
   movements          AssetMovement[]
