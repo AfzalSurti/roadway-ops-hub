@@ -24,16 +24,24 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Badge } from "@/components/ui/badge";
 import { buildProjectDprReportStatuses, getDprReportDisplayDate, getDprReportStatusTone } from "@/lib/hod-dpr-reports";
 import { HodActivityStatusDisplay } from "@/components/hod/HodActivityStatusDisplay";
-import { Loader2 } from "lucide-react";
+import { BarChart3, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 type HodProjectDetailDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   project: ProjectItem | null;
   projectTasks: TaskItem[];
+  onOpenActivityChart?: () => void;
 };
 
-export function HodProjectDetailDialog({ open, onOpenChange, project, projectTasks }: HodProjectDetailDialogProps) {
+export function HodProjectDetailDialog({
+  open,
+  onOpenChange,
+  project,
+  projectTasks,
+  onOpenActivityChart
+}: HodProjectDetailDialogProps) {
   const lifecycle = getProjectLifecycle(projectTasks);
   const dprReports = buildProjectDprReportStatuses(projectTasks);
 
@@ -114,7 +122,21 @@ export function HodProjectDetailDialog({ open, onOpenChange, project, projectTas
         </div>
 
         <div className="mt-4">
-          <h3 className="font-semibold mb-2">Task activity</h3>
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <h3 className="font-semibold">Task activity</h3>
+            {onOpenActivityChart ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5"
+                onClick={onOpenActivityChart}
+                disabled={projectTasks.length === 0}
+              >
+                <BarChart3 className="h-3.5 w-3.5" />
+                Activity Chart
+              </Button>
+            ) : null}
+          </div>
           {projectTasks.length === 0 ? (
             <p className="text-sm text-muted-foreground rounded-xl border border-dashed border-border/60 p-6 text-center">
               No tasks assigned to this project yet.
@@ -127,6 +149,7 @@ export function HodProjectDetailDialog({ open, onOpenChange, project, projectTas
                     <th className="py-2.5 px-3 text-left font-medium">Task</th>
                     <th className="py-2.5 px-3 text-left font-medium">Assigned To</th>
                     <th className="py-2.5 px-3 text-left font-medium">Status</th>
+                    <th className="py-2.5 px-3 text-left font-medium">Start</th>
                     <th className="py-2.5 px-3 text-left font-medium">Submission</th>
                     <th className="py-2.5 px-3 text-left font-medium">Approval</th>
                     <th className="py-2.5 px-3 text-left font-medium">Comments</th>
@@ -150,6 +173,9 @@ export function HodProjectDetailDialog({ open, onOpenChange, project, projectTas
                               <span className="text-xs text-muted-foreground">{activityDate}</span>
                             ) : null}
                           </div>
+                        </td>
+                        <td className="py-2.5 px-3 text-muted-foreground">
+                          {formatHodDate(task.allocatedAt ?? task.createdAt)}
                         </td>
                         <td className="py-2.5 px-3 text-muted-foreground">
                           {formatHodDate(task.submittedForReviewAt ?? task.actualCompletedAt)}

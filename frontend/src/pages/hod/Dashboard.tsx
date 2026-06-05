@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { HodActivityChartDialog } from "@/components/hod/HodActivityChartDialog";
 import { HodDprOverviewSection } from "@/components/hod/HodDprOverviewSection";
 import { HodProjectDetailDialog } from "@/components/hod/HodProjectDetailDialog";
 import { useQuery } from "@tanstack/react-query";
@@ -30,7 +31,7 @@ import {
   HOD_TECHNICAL_UNIT_OPTIONS,
   summarizeProjectTasks
 } from "@/lib/hod-dashboard";
-import { CheckCircle2, ClipboardList, Eye, FolderKanban, Loader2, RefreshCcw, Search, Timer } from "lucide-react";
+import { BarChart3, CheckCircle2, ClipboardList, Eye, FolderKanban, Loader2, RefreshCcw, Search, Timer } from "lucide-react";
 
 export default function HodDashboard() {
   const [search, setSearch] = useState("");
@@ -40,6 +41,7 @@ export default function HodDashboard() {
   const [workCategoryFilter, setWorkCategoryFilter] = useState("ALL");
   const [financialYearFilter, setFinancialYearFilter] = useState("ALL");
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [chartProjectId, setChartProjectId] = useState<string | null>(null);
 
   const { data: projects = [], isLoading: loadingProjects, refetch: refetchProjects } = useQuery({
     queryKey: ["hod-projects"],
@@ -172,6 +174,7 @@ export default function HodDashboard() {
   }, [projectRows]);
 
   const selectedRow = selectedProjectId ? projectRows.find((row) => row.project.id === selectedProjectId) ?? null : null;
+  const chartRow = chartProjectId ? projectRows.find((row) => row.project.id === chartProjectId) ?? null : null;
 
   const resetFilters = () => {
     setSearch("");
@@ -404,10 +407,22 @@ export default function HodDashboard() {
                       <td className="py-3 px-4 text-right tabular-nums text-sky-600">{row.summary.completed}</td>
                       <td className="py-3 px-4 text-right tabular-nums text-emerald-600">{row.summary.approved}</td>
                       <td className="py-3 pl-4 text-right">
-                        <Button size="sm" variant="outline" className="gap-1" onClick={() => setSelectedProjectId(row.project.id)}>
-                          <Eye className="h-3.5 w-3.5" />
-                          View
-                        </Button>
+                        <div className="inline-flex items-center gap-2 justify-end">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1"
+                            onClick={() => setChartProjectId(row.project.id)}
+                            disabled={row.projectTasks.length === 0}
+                          >
+                            <BarChart3 className="h-3.5 w-3.5" />
+                            Chart
+                          </Button>
+                          <Button size="sm" variant="outline" className="gap-1" onClick={() => setSelectedProjectId(row.project.id)}>
+                            <Eye className="h-3.5 w-3.5" />
+                            View
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -431,6 +446,20 @@ export default function HodDashboard() {
         }}
         project={selectedRow?.project ?? null}
         projectTasks={selectedRow?.projectTasks ?? []}
+        onOpenActivityChart={() => {
+          if (selectedRow) {
+            setChartProjectId(selectedRow.project.id);
+          }
+        }}
+      />
+
+      <HodActivityChartDialog
+        open={Boolean(chartRow)}
+        onOpenChange={(open) => {
+          if (!open) setChartProjectId(null);
+        }}
+        project={chartRow?.project ?? null}
+        projectTasks={chartRow?.projectTasks ?? []}
       />
     </PageWrapper>
   );

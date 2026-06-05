@@ -1045,21 +1045,6 @@ export const api = {
     });
   },
 
-  async uploadFile(file: File) {
-    const form = new FormData();
-    form.append("file", file);
-    const headers = new Headers();
-    const token = authStorage.getAccessToken();
-    if (token) headers.set("Authorization", `Bearer ${token}`);
-
-    const response = await fetchWithApiFallback("/uploads", { method: "POST", headers, body: form });
-    const json = (await response.json()) as ApiResponse<{ url: string; attachmentId: string }>;
-    if (!response.ok || !json.success || !json.data?.url) {
-      throw new Error(json.error?.message ?? `Upload failed (${response.status})`);
-    }
-    return json.data;
-  },
-
   getExpenseCategories() {
     return request<ExpenseCategoryItem[]>("/expenses/categories");
   },
