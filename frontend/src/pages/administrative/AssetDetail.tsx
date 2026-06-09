@@ -357,7 +357,8 @@ export default function AssetDetail() {
   const { data: asset, isLoading } = useQuery({
     queryKey: ["assets", id],
     queryFn: () => api.getAsset(id as string),
-    enabled: Boolean(id)
+    enabled: Boolean(id),
+    refetchInterval: isEditing ? false : undefined
   });
 
   const { data: projects = [] } = useQuery({
@@ -373,10 +374,10 @@ export default function AssetDetail() {
   const { classOptions, getTypesForClass } = useAssetCatalog();
 
   useEffect(() => {
-    if (asset) {
+    if (asset && !isEditing) {
       setForm(toFormState(asset, classOptions, getTypesForClass));
     }
-  }, [asset, classOptions, getTypesForClass]);
+  }, [asset, classOptions, getTypesForClass, isEditing]);
 
   // Seed sold inputs only when navigating to a different asset (not on 10s background refetch).
   useEffect(() => {
@@ -496,6 +497,18 @@ export default function AssetDetail() {
   }, [form.assetClass, form.dateOfPurchase, form.purchaseAmount]);
   const daysSincePurchase = useMemo(() => getDaysSincePurchase(form.dateOfPurchase), [form.dateOfPurchase]);
 
+  const isSoldLocked = useMemo(() => {
+    if (!asset) return false;
+    const hasSoldInfo = (asset.soldAmount ?? 0) > 0 && Boolean(asset.soldRemark?.trim());
+    return asset.status === "DISPOSED" || hasSoldInfo;
+  }, [asset]);
+
+  useEffect(() => {
+    if (isSoldLocked && isEditing) {
+      setIsEditing(false);
+    }
+  }, [isSoldLocked, isEditing]);
+
   if (isLoading || !id) {
     return <PageWrapper><div className="page-header"><h1 className="page-title">Asset Detail</h1><p className="page-subtitle">Loading asset...</p></div></PageWrapper>;
   }
@@ -514,7 +527,6 @@ export default function AssetDetail() {
 
   const hasSoldInfo = (asset.soldAmount ?? 0) > 0 && Boolean(asset.soldRemark?.trim());
   const effectiveStatus: AssetStatus = asset.status === "DISPOSED" || hasSoldInfo ? "DISPOSED" : asset.status;
-  const isSoldLocked = effectiveStatus === "DISPOSED";
   const canEnterSoldInfo = asset.status === "IN_USE" && !hasSoldInfo;
 
   return (
@@ -541,7 +553,14 @@ export default function AssetDetail() {
           </button>
           <Button variant="outline" onClick={() => setMovementOpen(true)} className="gap-2" disabled={isSoldLocked}><CalendarPlus className="h-4 w-4" /> Log Movement</Button>
           <Button variant="outline" onClick={() => setMaintenanceOpen(true)} className="gap-2" disabled={isSoldLocked}><Plus className="h-4 w-4" /> Log Maintenance</Button>
-          <Button onClick={() => setIsEditing((current) => !current)} className="gap-2"><Pencil className="h-4 w-4" /> {isEditing ? "Cancel Edit" : "Edit Asset"}</Button>
+          <Button
+            onClick={() => setIsEditing((current) => !current)}
+            className="gap-2"
+            disabled={isSoldLocked}
+            title={isSoldLocked ? "Sold assets cannot be edited" : undefined}
+          >
+            <Pencil className="h-4 w-4" /> {isEditing ? "Cancel Edit" : "Edit Asset"}
+          </Button>
         </div>
 
       </div>
@@ -550,6 +569,15 @@ export default function AssetDetail() {
         <div className="glass-panel-strong p-6">
           <div className="mb-4">
             <h3 className="font-semibold">Asset Information</h3>
+            {isSoldLocked ? (
+              <p className="text-xs text-muted-foreground mt-1">
+                This asset is marked as SOLD. Details are read-only.
+              </p>
+            ) : !isEditing ? (
+              <p className="text-xs text-muted-foreground mt-1">
+                Click <span className="font-medium text-foreground">Edit Asset</span> above to change fields.
+              </p>
+            ) : null}
           </div>
 
           {isEditing ? (
