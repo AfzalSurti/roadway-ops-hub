@@ -17,7 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, CalendarPlus, FileText, Pencil, Plus } from "lucide-react";
+import { ArrowLeft, CalendarPlus, FileText, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { downloadAssetPdf } from "@/lib/asset-pdf";
@@ -347,7 +347,6 @@ export default function AssetDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [isEditing, setIsEditing] = useState(false);
   const [movementOpen, setMovementOpen] = useState(false);
   const [maintenanceOpen, setMaintenanceOpen] = useState(false);
   const [form, setForm] = useState<AssetFormState>(EMPTY_FORM);
@@ -358,7 +357,7 @@ export default function AssetDetail() {
     queryKey: ["assets", id],
     queryFn: () => api.getAsset(id as string),
     enabled: Boolean(id),
-    refetchInterval: isEditing ? false : undefined
+    refetchInterval: false
   });
 
   const { data: projects = [] } = useQuery({
@@ -374,10 +373,10 @@ export default function AssetDetail() {
   const { classOptions, getTypesForClass } = useAssetCatalog();
 
   useEffect(() => {
-    if (asset && !isEditing) {
+    if (asset) {
       setForm(toFormState(asset, classOptions, getTypesForClass));
     }
-  }, [asset, classOptions, getTypesForClass, isEditing]);
+  }, [asset?.id, classOptions, getTypesForClass]);
 
   // Seed sold inputs only when navigating to a different asset (not on 10s background refetch).
   useEffect(() => {
@@ -426,12 +425,15 @@ export default function AssetDetail() {
         itAssetId: form.itAssetId.trim() || null
       });
     },
-    onSuccess: async () => {
+    onSuccess: async (updated) => {
       await queryClient.invalidateQueries({ queryKey: ["assets", id] });
       await queryClient.invalidateQueries({ queryKey: ["assets"] });
       await queryClient.invalidateQueries({ queryKey: ["assets", "stats"] });
-      toast.success("Asset updated");
-      setIsEditing(false);
+      if (updated.assetId !== asset?.assetId) {
+        toast.success(`Asset updated. New Asset ID: ${updated.assetId}`);
+      } else {
+        toast.success("Asset updated");
+      }
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to update asset")
   });
@@ -503,12 +505,6 @@ export default function AssetDetail() {
     return asset.status === "DISPOSED" || hasSoldInfo;
   }, [asset]);
 
-  useEffect(() => {
-    if (isSoldLocked && isEditing) {
-      setIsEditing(false);
-    }
-  }, [isSoldLocked, isEditing]);
-
   if (isLoading || !id) {
     return <PageWrapper><div className="page-header"><h1 className="page-title">Asset Detail</h1><p className="page-subtitle">Loading asset...</p></div></PageWrapper>;
   }
@@ -553,14 +549,6 @@ export default function AssetDetail() {
           </button>
           <Button variant="outline" onClick={() => setMovementOpen(true)} className="gap-2" disabled={isSoldLocked}><CalendarPlus className="h-4 w-4" /> Log Movement</Button>
           <Button variant="outline" onClick={() => setMaintenanceOpen(true)} className="gap-2" disabled={isSoldLocked}><Plus className="h-4 w-4" /> Log Maintenance</Button>
-          <Button
-            onClick={() => setIsEditing((current) => !current)}
-            className="gap-2"
-            disabled={isSoldLocked}
-            title={isSoldLocked ? "Sold assets cannot be edited" : undefined}
-          >
-            <Pencil className="h-4 w-4" /> {isEditing ? "Cancel Edit" : "Edit Asset"}
-          </Button>
         </div>
 
       </div>
@@ -573,15 +561,20 @@ export default function AssetDetail() {
               <p className="text-xs text-muted-foreground mt-1">
                 This asset is marked as SOLD. Details are read-only.
               </p>
-            ) : !isEditing ? (
-              <p className="text-xs text-muted-foreground mt-1">
-                Click <span className="font-medium text-foreground">Edit Asset</span> above to change fields.
-              </p>
             ) : null}
           </div>
 
-          {isEditing ? (
+          {!isSoldLocked ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label>Asset ID</Label>
+                <Input readOnly value={asset.assetId} className="mt-1 bg-secondary/40" />
+                {form.assetType && form.assetType !== asset.assetType ? (
+                  <p className="text-xs text-amber-600 mt-1">
+                    Asset type changed — a new Asset ID will be assigned when you save.
+                  </p>
+                ) : null}
+              </div>
               <div className="md:col-span-2">
                 <Label>Asset Class</Label>
                 <Select value={form.assetClass} onValueChange={(value) => setForm((prev) => ({ ...prev, assetClass: value, assetType: "", customAssetClass: value === "Other" ? prev.customAssetClass : "", customAssetType: "" }))}>
@@ -658,14 +651,20 @@ export default function AssetDetail() {
                 <Select value={form.status} onValueChange={(value) => setForm((prev) => ({ ...prev, status: value as AssetStatus }))}>
                   <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {(["IN_USE", "DISPOSED"] as AssetStatus[]).map((value) => <SelectItem key={value} value={value}>{getStatusLabel(value)}</SelectItem>)}
+                    {(["IN_USE", "IN_STORE", "UNDER_REPAIR", "DISPOSED"] as AssetStatus[])
+                      .filter((value) => value !== "IN_STORE" || form.assetClass === SURVEY_EQUIPMENT_CLASS || asset.status === "IN_STORE")
+                      .map((value) => (
+                        <SelectItem key={value} value={value}>
+                          {getStatusLabel(value)}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
               <div><Label>For Month</Label><Input value={form.forMonth} onChange={(event) => setForm((prev) => ({ ...prev, forMonth: event.target.value }))} className="mt-1" /></div>
               <div className="md:col-span-2"><Label>Remarks</Label><Textarea value={form.remarks} onChange={(event) => setForm((prev) => ({ ...prev, remarks: event.target.value }))} className="mt-1 min-h-24" /></div>
               <div className="md:col-span-2 flex justify-end gap-2">
-                <Button variant="outline" onClick={() => { setIsEditing(false); setForm(toFormState(asset, classOptions, getTypesForClass)); }}>Cancel</Button>
+                <Button variant="outline" onClick={() => setForm(toFormState(asset, classOptions, getTypesForClass))}>Reset</Button>
                 <Button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending || !form.assetType || (form.assetClass === "Other" && !form.customAssetClass.trim()) || (form.assetType === "Other" && !form.customAssetType.trim())}>Save Changes</Button>
               </div>
             </div>

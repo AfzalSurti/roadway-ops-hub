@@ -349,6 +349,10 @@ export const assetService = {
     const nextPurchaseAmount = payload.purchaseAmount ?? existing.purchaseAmount;
     const nextGst = payload.gst ?? existing.gst;
     const nextAssetType = payload.assetType ?? existing.assetType;
+    const nextAssetId =
+      payload.assetType !== undefined && payload.assetType !== existing.assetType
+        ? await generateAssetId(nextAssetType)
+        : existing.assetId;
     const depreciation = calculateAssetDepreciation(
       {
         assetType: nextAssetType,
@@ -367,6 +371,7 @@ export const assetService = {
 
     const data: Prisma.AssetUncheckedUpdateInput = {
       ...payload,
+      ...(nextAssetId !== existing.assetId ? { assetId: nextAssetId } : {}),
       soldAmount: payload.soldAmount ?? undefined,
       soldRemark: payload.soldRemark ?? undefined,
       ...(shouldMarkSold ? { status: "DISPOSED" as const } : {}),

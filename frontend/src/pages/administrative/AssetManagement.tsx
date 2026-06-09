@@ -359,7 +359,13 @@ function AssetEditorDialog({
     },
     onSuccess: async (result) => {
       await Promise.all([queryClient.invalidateQueries({ queryKey: ["assets"] }), queryClient.invalidateQueries({ queryKey: ["assets", "stats"] })]);
-      toast.success(asset ? "Asset updated" : `Asset created: ${result.assetId}`);
+      if (!asset) {
+        toast.success(`Asset created: ${result.assetId}`);
+      } else if (result.assetId !== asset.assetId) {
+        toast.success(`Asset updated. New Asset ID: ${result.assetId}`);
+      } else {
+        toast.success("Asset updated");
+      }
       onOpenChange(false);
       onSaved();
     },
