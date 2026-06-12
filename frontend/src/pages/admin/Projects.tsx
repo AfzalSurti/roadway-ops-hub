@@ -537,10 +537,16 @@ export default function AdminProjects() {
     queryFn: () => api.getProjects()
   });
 
-  const { data: requisitionForms = [], refetch: refetchRequisitionForms } = useQuery({
+  const { data: requisitionForms = [], refetch: refetchRequisitionForms, error: requisitionFormsError } = useQuery({
     queryKey: ["project-requisition-forms"],
     queryFn: () => api.getProjectRequisitionForms()
   });
+
+  useEffect(() => {
+    if (requisitionFormsError) {
+      toast.error(requisitionFormsError instanceof Error ? requisitionFormsError.message : "Failed to load project requisition forms");
+    }
+  }, [requisitionFormsError]);
 
   const { data: numberingOptions } = useQuery({
     queryKey: ["project-numbering-options"],

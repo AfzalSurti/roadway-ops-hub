@@ -9,6 +9,6 @@ import { upsertProjectRequisitionFormSchema } from "../validators/project-requis
 export const projectRequisitionFormsRouter = Router();
 
 projectRequisitionFormsRouter.use(requireAuth);
-projectRequisitionFormsRouter.get("/", requireRole("ADMIN"), asyncHandler(projectRequisitionFormController.list));
-projectRequisitionFormsRouter.get("/:projectId", requireRole("ADMIN"), asyncHandler(projectRequisitionFormController.getByProjectId));
-projectRequisitionFormsRouter.post("/:projectId", requireRole("ADMIN"), validate(upsertProjectRequisitionFormSchema), asyncHandler(projectRequisitionFormController.upsert));
+projectRequisitionFormsRouter.get("/", requireRole("ADMIN", "PMO"), asyncHandler(projectRequisitionFormController.list));
+projectRequisitionFormsRouter.get("/:projectId", requireRole("ADMIN", "PMO"), asyncHandler(projectRequisitionFormController.getByProjectId));
+projectRequisitionFormsRouter.post("/:projectId", requireRole("ADMIN", "PMO"), validate(upsertProjectRequisitionFormSchema), asyncHandler(projectRequisitionFormController.upsert));
