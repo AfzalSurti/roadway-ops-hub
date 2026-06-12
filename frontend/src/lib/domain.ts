@@ -176,6 +176,7 @@ export type ProjectRequisitionFormItem = {
   newProjectNumber: string;
   amountOfWorkOrder: string;
   gstAmount: string;
+  totalAmount: string;
   emdAmount: string;
   pgSdAmount: string;
   pgDate?: string | null;

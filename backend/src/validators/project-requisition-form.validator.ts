@@ -42,6 +42,7 @@ export const upsertProjectRequisitionFormSchema = z.object({
   newProjectNumber: optionalText,
   amountOfWorkOrder: optionalText,
   gstAmount: optionalText,
+  totalAmount: optionalText,
   emdAmount: optionalText,
   pgSdAmount: optionalText,
   pgDate: optionalDate,

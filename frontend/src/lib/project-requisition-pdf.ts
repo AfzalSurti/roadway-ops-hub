@@ -27,6 +27,14 @@ function toDisplay(value?: string | number | null) {
   return text.length ? text : "";
 }
 
+function computeRequisitionTotal(amountOfWorkOrder?: string, gstAmount?: string) {
+  const base = Number(String(amountOfWorkOrder ?? "").replace(/,/g, "").trim());
+  const tax = Number(String(gstAmount ?? "").replace(/,/g, "").trim());
+  if (!Number.isFinite(base) || !Number.isFinite(tax)) return "";
+  if (!String(amountOfWorkOrder ?? "").trim() && !String(gstAmount ?? "").trim()) return "";
+  return (base + tax).toFixed(2);
+}
+
 function resolveCompanyTitle(form: ProjectRequisitionFormItem, projectNumber?: string) {
   const candidates = [projectNumber, form.approvedProjectNumber, form.newProjectNumber];
   for (const candidate of candidates) {
@@ -203,6 +211,11 @@ export function downloadProjectRequisitionPdf(form: ProjectRequisitionFormItem, 
       kind: "pair",
       left: { label: "GST Amount", value: money(form.gstAmount) },
       right: { label: "Project Starting Date", value: fmtDate(form.projectStartingDate), valueAlign: "center" }
+    },
+    {
+      kind: "pair",
+      left: { label: "Total Amount", value: money(form.totalAmount || computeRequisitionTotal(form.amountOfWorkOrder, form.gstAmount)) },
+      right: { label: "Project Duration", value: form.projectDurationDays ? `${form.projectDurationDays} Days` : "", valueAlign: "center" }
     },
     {
       kind: "pair",

@@ -40,6 +40,7 @@ export const projectRequisitionFormService = {
     newProjectNumber?: string;
     amountOfWorkOrder?: string;
     gstAmount?: string;
+    totalAmount?: string;
     emdAmount?: string;
     pgSdAmount?: string;
     pgDate?: Date;
@@ -83,6 +84,7 @@ export const projectRequisitionFormService = {
       newProjectNumber: payload.newProjectNumber ?? "",
       amountOfWorkOrder: payload.amountOfWorkOrder ?? "",
       gstAmount: payload.gstAmount ?? "",
+      totalAmount: payload.totalAmount ?? "",
       emdAmount: payload.emdAmount ?? "",
       pgSdAmount: payload.pgSdAmount ?? "",
       pgDate: payload.pgDate ?? null,

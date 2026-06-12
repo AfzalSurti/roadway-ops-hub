@@ -193,6 +193,7 @@ type RequisitionFinancialDraft = {
   workOrderValue: string;
   amountOfWorkOrder: string;
   gstAmount: string;
+  totalAmount: string;
   emdAmount: string;
   pgSdAmount: string;
   pgDate: string;
@@ -216,6 +217,12 @@ export function applyProjectFinancialToRequisitionDraft<T extends RequisitionFin
     workOrderValue: hasSaved(draft.workOrderValue) ? draft.workOrderValue : financial.woTotalAmount || financial.woAmount || draft.workOrderValue,
     amountOfWorkOrder: hasSaved(draft.amountOfWorkOrder) ? draft.amountOfWorkOrder : financial.woAmount || draft.amountOfWorkOrder,
     gstAmount: hasSaved(draft.gstAmount) ? draft.gstAmount : financial.woGstAmount || draft.gstAmount,
+    totalAmount: hasSaved(draft.totalAmount)
+      ? draft.totalAmount
+      : financial.woTotalAmount || computePairTotal(
+          hasSaved(draft.amountOfWorkOrder) ? draft.amountOfWorkOrder : financial.woAmount,
+          hasSaved(draft.gstAmount) ? draft.gstAmount : financial.woGstAmount
+        ) || draft.totalAmount,
     emdAmount: hasSaved(draft.emdAmount, true) ? draft.emdAmount : financial.emdAmount || draft.emdAmount,
     pgSdAmount: hasSaved(draft.pgSdAmount, true) ? draft.pgSdAmount : financial.bgAmount || draft.pgSdAmount,
     pgDate: draft.pgDate || financial.bgIssueDate || draft.pgDate,

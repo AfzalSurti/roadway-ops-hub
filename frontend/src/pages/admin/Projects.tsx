@@ -19,10 +19,12 @@ import {
 import { ProjectFinancialDetailsFields } from "@/components/admin/ProjectFinancialDetailsFields";
 import {
   applyProjectFinancialToRequisitionDraft,
+  computePairTotal,
   EMPTY_PROJECT_FINANCIAL_DETAILS,
   financialDetailsDirty,
   normalizeProjectFinancialDetails,
   projectFinancialDetailsToUpdatePayload,
+  sanitizeMoneyInput,
   projectToFinancialDetailsForm,
   validateProjectFinancialDetails,
   type ProjectFinancialDetailsForm
@@ -114,6 +116,7 @@ type RequisitionFormDraft = {
   newProjectNumber: string;
   amountOfWorkOrder: string;
   gstAmount: string;
+  totalAmount: string;
   emdAmount: string;
   pgSdAmount: string;
   pgDate: string;
@@ -236,6 +239,7 @@ const DEFAULT_REQUISITION_DRAFT: RequisitionFormDraft = {
   newProjectNumber: "",
   amountOfWorkOrder: "",
   gstAmount: "",
+  totalAmount: "",
   emdAmount: "0.00",
   pgSdAmount: "0.00",
   pgDate: "",
@@ -305,6 +309,7 @@ function parseProjectPlansStore(raw: string | null): ProjectPlansStore {
 function toPayload(draft: RequisitionFormDraft) {
   return {
     ...draft,
+    totalAmount: draft.totalAmount.trim() || computePairTotal(draft.amountOfWorkOrder, draft.gstAmount) || "",
     projectDurationDays: Number(draft.projectDurationDays),
     workOrderDate: draft.workOrderDate || undefined,
     agreementNumber: draft.agreementNumber || undefined,
@@ -312,6 +317,20 @@ function toPayload(draft: RequisitionFormDraft) {
     pgDate: draft.pgDate || undefined,
     pgExpiryDate: draft.pgExpiryDate || undefined
   };
+}
+
+function patchRequisitionFinancialAmounts(
+  draft: RequisitionFormDraft,
+  patch: Partial<Pick<RequisitionFormDraft, "amountOfWorkOrder" | "gstAmount" | "totalAmount">>
+): RequisitionFormDraft {
+  const next = { ...draft, ...patch };
+  if ("amountOfWorkOrder" in patch || "gstAmount" in patch) {
+    const computed = computePairTotal(next.amountOfWorkOrder, next.gstAmount);
+    if (computed) {
+      next.totalAmount = computed;
+    }
+  }
+  return next;
 }
 
 function fromFormItem(item: ProjectRequisitionFormItem): RequisitionFormDraft {
@@ -342,6 +361,7 @@ function fromFormItem(item: ProjectRequisitionFormItem): RequisitionFormDraft {
     newProjectNumber: item.newProjectNumber,
     amountOfWorkOrder: item.amountOfWorkOrder,
     gstAmount: item.gstAmount,
+    totalAmount: item.totalAmount ?? "",
     emdAmount: item.emdAmount,
     pgSdAmount: item.pgSdAmount,
     pgDate: item.pgDate?.slice(0, 10) ?? "",
@@ -375,8 +395,11 @@ function validateRequisitionStep(step: RequisitionStep, draft: RequisitionFormDr
   if (step === 5 && (!draft.projectStartingDate || !draft.projectDurationDays || !draft.projectCompletionDate || !draft.workOrderNumber.trim() || !draft.newProjectNumber.trim())) {
     return "Please complete project details";
   }
-  if (step === 6 && (!draft.amountOfWorkOrder.trim() || !draft.gstAmount.trim() || !draft.emdAmount.trim() || !draft.pgSdAmount.trim())) {
-    return "Please complete financial details";
+  if (step === 6) {
+    const totalAmount = draft.totalAmount.trim() || computePairTotal(draft.amountOfWorkOrder, draft.gstAmount);
+    if (!draft.amountOfWorkOrder.trim() || !draft.gstAmount.trim() || !totalAmount || !draft.emdAmount.trim() || !draft.pgSdAmount.trim()) {
+      return "Please complete financial details";
+    }
   }
   if (step === 7 && (!draft.nameOfWork.trim() || !draft.locationDistrict.trim() || !draft.state.trim())) {
     return "Please complete work description";
@@ -458,10 +481,11 @@ function ProjectRequisitionStepContent({
     case 6:
       return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <StepField label="Amount of Work Order"><input value={draft.amountOfWorkOrder} onChange={(e) => setDraft((p) => ({ ...p, amountOfWorkOrder: e.target.value }))} className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50" title="Amount of Work Order" /></StepField>
-          <StepField label="GST Amount"><input value={draft.gstAmount} onChange={(e) => setDraft((p) => ({ ...p, gstAmount: e.target.value }))} className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50" title="GST Amount" /></StepField>
-          <StepField label="EMD Amount"><input value={draft.emdAmount} onChange={(e) => setDraft((p) => ({ ...p, emdAmount: e.target.value }))} className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50" title="EMD Amount" /></StepField>
-          <StepField label="PG / SD Amount"><input value={draft.pgSdAmount} onChange={(e) => setDraft((p) => ({ ...p, pgSdAmount: e.target.value }))} className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50" title="PG / SD Amount" /></StepField>
+          <StepField label="Amount of Work Order"><input value={draft.amountOfWorkOrder} onChange={(e) => setDraft((p) => patchRequisitionFinancialAmounts(p, { amountOfWorkOrder: sanitizeMoneyInput(e.target.value) }))} className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50" title="Amount of Work Order" /></StepField>
+          <StepField label="GST Amount"><input value={draft.gstAmount} onChange={(e) => setDraft((p) => patchRequisitionFinancialAmounts(p, { gstAmount: sanitizeMoneyInput(e.target.value) }))} className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50" title="GST Amount" /></StepField>
+          <StepField label="Total Amount"><input value={draft.totalAmount} onChange={(e) => setDraft((p) => patchRequisitionFinancialAmounts(p, { totalAmount: sanitizeMoneyInput(e.target.value) }))} className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50" title="Total Amount" /></StepField>
+          <StepField label="EMD Amount"><input value={draft.emdAmount} onChange={(e) => setDraft((p) => ({ ...p, emdAmount: sanitizeMoneyInput(e.target.value) }))} className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50" title="EMD Amount" /></StepField>
+          <StepField label="PG / SD Amount"><input value={draft.pgSdAmount} onChange={(e) => setDraft((p) => ({ ...p, pgSdAmount: sanitizeMoneyInput(e.target.value) }))} className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50" title="PG / SD Amount" /></StepField>
           <StepField label="PG Date"><input type="date" value={draft.pgDate} onChange={(e) => setDraft((p) => ({ ...p, pgDate: e.target.value }))} className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50" title="PG Date" /></StepField>
           <StepField label="PG Expiry Date"><input type="date" value={draft.pgExpiryDate} onChange={(e) => setDraft((p) => ({ ...p, pgExpiryDate: e.target.value }))} className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/50" title="PG Expiry Date" /></StepField>
         </div>

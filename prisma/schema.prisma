@@ -269,6 +269,7 @@ model ProjectRequisitionForm {
   newProjectNumber     String
   amountOfWorkOrder    String
   gstAmount            String
+  totalAmount          String   @default("")
   emdAmount            String
   pgSdAmount           String
   pgDate               DateTime?
