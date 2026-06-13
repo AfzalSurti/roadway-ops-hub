@@ -189,16 +189,18 @@ export const assetService = {
   }) {
     validateWarrantyEndDate(payload.dateOfPurchase ?? null, payload.warrantyPeriod ?? null);
 
+    const assetClass = payload.assetClass?.trim() || "Unclassified";
+    const assetType = payload.assetType?.trim() || "Other";
     const status = payload.status ?? "IN_USE";
     const projectNumber = status === "IN_STORE" ? IN_STORE_PROJECT_LABEL : payload.projectNumber ?? null;
     const projectName = status === "IN_STORE" ? IN_STORE_PROJECT_LABEL : payload.projectName ?? null;
 
-    const assetId = await generateAssetId(payload.assetType);
+    const assetId = await generateAssetId(assetType);
     const purchaseAmount = payload.purchaseAmount ?? 0;
     const gst = payload.gst ?? 0;
     const depreciation = calculateAssetDepreciation(
       {
-        assetType: payload.assetType,
+        assetType,
         purchaseAmount,
         dateOfPurchase: payload.dateOfPurchase ?? null
       },
@@ -208,8 +210,8 @@ export const assetService = {
     const created = await assetRepository.create({
       assetId,
       itAssetId: payload.itAssetId ?? null,
-      assetClass: payload.assetClass,
-      assetType: payload.assetType,
+      assetClass,
+      assetType,
       markModel: payload.markModel ?? null,
       dateOfPurchase: payload.dateOfPurchase ?? null,
       warrantyPeriod: payload.warrantyPeriod ?? null,

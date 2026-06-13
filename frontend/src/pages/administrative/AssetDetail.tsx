@@ -94,6 +94,20 @@ function formatWarrantyEndDate(value?: string | null) {
   return date.toLocaleDateString("en-IN");
 }
 
+function resolveAssetClass(form: AssetFormState) {
+  if (form.assetClass === "Other") {
+    return form.customAssetClass.trim() || "Unclassified";
+  }
+  return form.assetClass.trim() || "Unclassified";
+}
+
+function resolveAssetType(form: AssetFormState) {
+  if (form.assetType === "Other") {
+    return form.customAssetType.trim() || "Other";
+  }
+  return form.assetType.trim() || "Other";
+}
+
 function toFormState(asset: AssetItem | null | undefined, classOptions: string[], getTypesForClass: (assetClass: string) => string[]): AssetFormState {
   if (!asset) return EMPTY_FORM;
   const normalizedClass = classOptions.includes(asset.assetClass) ? asset.assetClass : "Other";
@@ -408,8 +422,8 @@ export default function AssetDetail() {
       }
 
       return api.updateAsset(id, {
-        assetClass: form.assetClass === "Other" ? form.customAssetClass.trim() : form.assetClass,
-        assetType: form.assetType === "Other" ? form.customAssetType.trim() : form.assetType,
+        assetClass: resolveAssetClass(form),
+        assetType: resolveAssetType(form),
         markModel: form.markModel.trim() || null,
         dateOfPurchase: form.dateOfPurchase ? new Date(form.dateOfPurchase).toISOString() : null,
         warrantyPeriod: form.warrantyPeriod.trim() || null,
@@ -665,7 +679,7 @@ export default function AssetDetail() {
               <div className="md:col-span-2"><Label>Remarks</Label><Textarea value={form.remarks} onChange={(event) => setForm((prev) => ({ ...prev, remarks: event.target.value }))} className="mt-1 min-h-24" /></div>
               <div className="md:col-span-2 flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setForm(toFormState(asset, classOptions, getTypesForClass))}>Reset</Button>
-                <Button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending || !form.assetType || (form.assetClass === "Other" && !form.customAssetClass.trim()) || (form.assetType === "Other" && !form.customAssetType.trim())}>Save Changes</Button>
+                <Button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending}>Save Changes</Button>
               </div>
             </div>
           ) : (

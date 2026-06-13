@@ -101,7 +101,17 @@ function isDateBefore(value: string, minimum: string) {
 }
 
 function resolveAssetClass(form: AssetFormState) {
-  return form.assetClass === "Other" ? form.customAssetClass.trim() : form.assetClass;
+  if (form.assetClass === "Other") {
+    return form.customAssetClass.trim() || "Unclassified";
+  }
+  return form.assetClass.trim() || "Unclassified";
+}
+
+function resolveAssetType(form: AssetFormState) {
+  if (form.assetType === "Other") {
+    return form.customAssetType.trim() || "Other";
+  }
+  return form.assetType.trim() || "Other";
 }
 
 function isSurveyEquipmentClass(form: AssetFormState) {
@@ -335,7 +345,7 @@ function AssetEditorDialog({
 
       const payload = {
         assetClass: resolveAssetClass(form),
-        assetType: form.assetType === "Other" ? form.customAssetType.trim() : form.assetType,
+        assetType: resolveAssetType(form),
         markModel: form.markModel.trim() || null,
         dateOfPurchase: form.dateOfPurchase ? new Date(form.dateOfPurchase).toISOString() : null,
         warrantyPeriod: form.warrantyPeriod.trim() || null,
@@ -730,17 +740,7 @@ function AssetEditorDialog({
           <Button
             type="button"
             onClick={() => mutation.mutate()}
-            disabled={
-              mutation.isPending ||
-              !form.assetClass ||
-              !form.assetType ||
-              (effectiveStatus === "IN_USE" && projectInputMode !== "other" && !form.projectNumber.trim()) ||
-              (effectiveStatus === "IN_USE" &&
-                projectInputMode === "other" &&
-                (!form.customProjectNumber.trim() || !form.customProjectName.trim())) ||
-              (form.assetClass === "Other" && !form.customAssetClass.trim()) ||
-              (form.assetType === "Other" && !form.customAssetType.trim())
-            }
+            disabled={mutation.isPending}
           >
             {mutation.isPending ? "Saving..." : asset ? "Update Asset" : "Create Asset"}
           </Button>
