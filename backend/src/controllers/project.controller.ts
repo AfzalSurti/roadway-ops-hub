@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import { projectImportService } from "../services/project-import.service.js";
 import { projectService } from "../services/project.service.js";
 import { sendSuccess } from "../utils/response.js";
 
@@ -33,6 +34,10 @@ export const projectController = {
   },
   async remove(req: Request, res: Response) {
     const result = await projectService.remove(req.params.id);
+    return sendSuccess(res, result);
+  },
+  async bulkImport(req: Request, res: Response) {
+    const result = await projectImportService.bulkImport(req.body.rows);
     return sendSuccess(res, result);
   }
 };

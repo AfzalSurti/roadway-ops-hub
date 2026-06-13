@@ -17,6 +17,12 @@ export const projectRepository = {
   findByName(name: string) {
     return prisma.project.findUnique({ where: { name } });
   },
+  findFirstByProjectNumber(projectNumber: string) {
+    return prisma.project.findFirst({
+      where: { projectNumber },
+      orderBy: { createdAt: "desc" }
+    });
+  },
   create(data: Prisma.ProjectCreateInput) {
     return prisma.project.create({ data });
   },

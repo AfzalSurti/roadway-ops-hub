@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { PageWrapper } from "@/components/PageWrapper";
 import { motion } from "framer-motion";
-import { BarChart3, Download, FileText, Hash, Pencil, Plus, Search, X } from "lucide-react";
+import { BarChart3, Download, FileText, FileUp, Hash, Pencil, Plus, Search, X } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
+import { downloadProjectExport } from "@/lib/project-import";
 import { downloadProjectRequisitionPdf } from "@/lib/project-requisition-pdf";
 import { downloadProjectReport } from "@/lib/reports-pdf";
 import { isTaskOverdue, statusConfig, type ProjectItem, type ProjectRequisitionFormItem } from "@/lib/domain";
@@ -17,6 +18,7 @@ import {
   parseManualFinancialYearShort
 } from "@/lib/project-numbering";
 import { ProjectFinancialDetailsFields } from "@/components/admin/ProjectFinancialDetailsFields";
+import { ProjectImportDialog } from "@/components/admin/ProjectImportDialog";
 import {
   applyProjectFinancialToRequisitionDraft,
   computePairTotal,
@@ -538,6 +540,7 @@ export default function AdminProjects() {
   const [planEditorProjectId, setPlanEditorProjectId] = useState<string | null>(null);
   const [planEditorEntries, setPlanEditorEntries] = useState<ProjectPlanEntry[]>([]);
   const [planChartProjectId, setPlanChartProjectId] = useState<string | null>(null);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -922,6 +925,17 @@ export default function AdminProjects() {
     return { rows, totalDays };
   }, [planChartProject]);
 
+  const handleExportProjects = () => {
+    const projectIds = new Set(filteredRows.map((row) => row.id));
+    const exportProjects = projects.filter((project) => projectIds.has(project.id));
+    if (exportProjects.length === 0) {
+      toast.error("No projects to export");
+      return;
+    }
+    downloadProjectExport(exportProjects, requisitionFormsByProjectId);
+    toast.success(`Exported ${exportProjects.length} project(s) with requisition data`);
+  };
+
   return (
     <PageWrapper>
       <div className="page-header flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -930,6 +944,22 @@ export default function AdminProjects() {
           <p className="page-subtitle">Project-wise task status summary</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setImportDialogOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border/50 text-sm font-medium hover:bg-secondary/40 transition-colors"
+          >
+            <FileUp className="h-4 w-4" />
+            Import Excel
+          </button>
+          <button
+            type="button"
+            onClick={handleExportProjects}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border/50 text-sm font-medium hover:bg-secondary/40 transition-colors"
+          >
+            <Download className="h-4 w-4" />
+            Export Excel
+          </button>
           <button onClick={() => { setShowNumberWizard(true); setWizardStep(1); setWizard(DEFAULT_WIZARD); }} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-primary/40 text-primary font-medium text-sm hover:bg-primary/10 transition-colors"><Hash className="h-4 w-4" />Add Project Number</button>
           <button onClick={() => setShowCreate(true)} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-primary to-accent text-primary-foreground font-medium text-sm hover:opacity-90 transition-opacity"><Plus className="h-4 w-4" />Add Project</button>
         </div>
@@ -1460,6 +1490,8 @@ export default function AdminProjects() {
           </motion.div>
         </div>
       )}
+
+      <ProjectImportDialog open={importDialogOpen} onOpenChange={setImportDialogOpen} />
     </PageWrapper>
   );
 }

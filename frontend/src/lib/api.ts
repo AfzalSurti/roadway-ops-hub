@@ -435,6 +435,60 @@ export const api = {
     });
   },
 
+  bulkImportProjects(
+    rows: Array<{
+      projectName: string;
+      projectNumber: string;
+      projectDescription?: string | null;
+      costCentreDepartment: string;
+      hodDirectorName: string;
+      applicationDate: string;
+      clientName: string;
+      billingName: string;
+      addressWithPincode?: string | null;
+      pincode?: string | null;
+      gstNumber?: string | null;
+      gstType?: "REGISTERED" | "UNREGISTERED";
+      contactName?: string | null;
+      contactNumber?: string | null;
+      designation?: string | null;
+      department?: string | null;
+      panTanNumber?: string | null;
+      email?: string | null;
+      workOrderValue?: string | null;
+      workOrderDate?: string | null;
+      agreementNumber?: string | null;
+      agreementDate?: string | null;
+      projectStartingDate: string;
+      projectDurationDays: number;
+      projectCompletionDate: string;
+      workOrderNumber?: string | null;
+      newProjectNumber?: string | null;
+      amountOfWorkOrder: string;
+      gstAmount: string;
+      totalAmount?: string;
+      emdAmount?: string | null;
+      pgSdAmount?: string | null;
+      pgDate?: string | null;
+      pgExpiryDate?: string | null;
+      nameOfWork: string;
+      locationDistrict?: string | null;
+      state?: string | null;
+      approvedProjectNumber: string;
+      approvedBy: string;
+    }>
+  ) {
+    return request<{
+      createdCount: number;
+      failedCount: number;
+      created: Array<{ row: number; projectId: string; projectNumber: string; action: "created" | "updated" }>;
+      errors: Array<{ row: number; message: string }>;
+    }>("/projects/import", {
+      method: "POST",
+      body: JSON.stringify({ rows })
+    });
+  },
+
   getProjectsWithoutNumber() {
     return request<ProjectItem[]>("/projects/without-number");
   },
