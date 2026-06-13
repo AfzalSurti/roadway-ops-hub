@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { PageWrapper } from "@/components/PageWrapper";
 import { motion } from "framer-motion";
-import { BarChart3, Download, FileText, FileUp, Hash, Pencil, Plus, Search, X } from "lucide-react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { BarChart3, Download, FileText, FileUp, Hash, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
@@ -19,6 +19,16 @@ import {
 } from "@/lib/project-numbering";
 import { ProjectFinancialDetailsFields } from "@/components/admin/ProjectFinancialDetailsFields";
 import { ProjectImportDialog } from "@/components/admin/ProjectImportDialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from "@/components/ui/alert-dialog";
 import {
   applyProjectFinancialToRequisitionDraft,
   computePairTotal,
@@ -541,6 +551,7 @@ export default function AdminProjects() {
   const [planEditorEntries, setPlanEditorEntries] = useState<ProjectPlanEntry[]>([]);
   const [planChartProjectId, setPlanChartProjectId] = useState<string | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState<{ id: string; name: string; projectNumber: string } | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -567,6 +578,35 @@ export default function AdminProjects() {
   const { data: requisitionForms = [], refetch: refetchRequisitionForms, error: requisitionFormsError } = useQuery({
     queryKey: ["project-requisition-forms"],
     queryFn: () => api.getProjectRequisitionForms()
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.deleteProject(id),
+    onSuccess: async (_result, deletedId) => {
+      if (selectedProjectId === deletedId) {
+        setSelectedProjectId(null);
+      }
+      setProjectToDelete(null);
+      setProjectPlans((prev) => {
+        if (!prev[deletedId]) return prev;
+        const next = { ...prev };
+        delete next[deletedId];
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem(PROJECT_PLAN_STORAGE_KEY, JSON.stringify(next));
+        }
+        return next;
+      });
+      await Promise.all([
+        refetchProjects(),
+        refetchTasks(),
+        refetchRequisitionForms(),
+        queryClient.invalidateQueries({ queryKey: ["projects"] }),
+        queryClient.invalidateQueries({ queryKey: ["project-requisition-forms"] }),
+        queryClient.invalidateQueries({ queryKey: ["tasks", "projects-summary"] })
+      ]);
+      toast.success("Project deleted");
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to delete project")
   });
 
   useEffect(() => {
@@ -1001,7 +1041,7 @@ export default function AdminProjects() {
 
       <div className="glass-panel overflow-hidden">
         <div className="overflow-x-auto">
-          <table className={`w-full text-sm ${showPlanAndReportColumns ? "min-w-[1040px]" : "min-w-[760px]"}`}>
+          <table className={`w-full text-sm ${showPlanAndReportColumns ? "min-w-[1120px]" : "min-w-[860px]"}`}>
             <thead>
               <tr className="border-b border-border/50 text-muted-foreground">
                 <th className="text-left p-4 font-medium">Project Name</th>
@@ -1013,6 +1053,7 @@ export default function AdminProjects() {
                   </>
                 ) : null}
                 <th className="text-left p-4 font-medium">Project No. Requisition Form</th>
+                <th className="text-left p-4 font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -1077,15 +1118,32 @@ export default function AdminProjects() {
                       <button onClick={() => openRequisitionWizard(row.id)} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/15 text-primary font-medium hover:bg-primary/20"><FileText className="h-4 w-4" />Generate</button>
                     )}
                   </td>
+                  <td className="p-4" onClick={(event) => event.stopPropagation()}>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setProjectToDelete({
+                          id: row.id,
+                          name: row.projectName,
+                          projectNumber: row.projectNumber
+                        })
+                      }
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-red-500/40 text-red-500 text-sm font-medium hover:bg-red-500/10 transition-colors"
+                      title="Delete project"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Delete
+                    </button>
+                  </td>
                 </motion.tr>
               ))}
-              {filteredRows.length === 0 && (
+              {filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan={showPlanAndReportColumns ? 5 : 3} className="p-6 text-muted-foreground">
+                  <td colSpan={showPlanAndReportColumns ? 6 : 4} className="p-6 text-muted-foreground">
                     No projects found.
                   </td>
                 </tr>
-              )}
+              ) : null}
             </tbody>
           </table>
         </div>
@@ -1127,6 +1185,20 @@ export default function AdminProjects() {
                     Edit
                   </button>
                 )}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setProjectToDelete({
+                      id: selectedProject.id,
+                      name: selectedProject.projectName,
+                      projectNumber: selectedProject.projectNumber
+                    })
+                  }
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-red-500/40 text-red-500 text-sm font-medium hover:bg-red-500/10 transition-colors"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete
+                </button>
                 <button onClick={() => setSelectedProjectId(null)} className="p-1 rounded-lg hover:bg-secondary/50" title="Close" aria-label="Close"><X className="h-4 w-4" /></button>
               </div>
             </div>
@@ -1492,6 +1564,40 @@ export default function AdminProjects() {
       )}
 
       <ProjectImportDialog open={importDialogOpen} onOpenChange={setImportDialogOpen} />
+
+      <AlertDialog open={Boolean(projectToDelete)} onOpenChange={(open) => !open && setProjectToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete project</AlertDialogTitle>
+            <AlertDialogDescription>
+              {projectToDelete ? (
+                <>
+                  Delete <span className="font-medium text-foreground">{projectToDelete.name}</span>
+                  {projectToDelete.projectNumber && projectToDelete.projectNumber !== "-"
+                    ? ` (${projectToDelete.projectNumber})`
+                    : ""}
+                  ? This removes the project, requisition form, and related financial/DPR records. Tasks linked by name are not deleted.
+                </>
+              ) : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 text-white hover:bg-red-700"
+              disabled={deleteMutation.isPending}
+              onClick={(event) => {
+                event.preventDefault();
+                if (projectToDelete) {
+                  deleteMutation.mutate(projectToDelete.id);
+                }
+              }}
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Yes, delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PageWrapper>
   );
 }
