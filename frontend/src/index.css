@@ -152,4 +152,93 @@
   .glow-accent {
     box-shadow: 0 0 20px hsl(var(--accent) / 0.15), 0 0 60px hsl(var(--accent) / 0.05);
   }
+
+  .geo-earth-scene {
+    position: relative;
+    width: 220px;
+    height: 220px;
+    perspective: 900px;
+  }
+
+  .geo-earth-globe-wrap {
+    position: absolute;
+    inset: 24px;
+    transform-style: preserve-3d;
+    animation: geo-earth-spin 20s linear infinite;
+  }
+
+  .geo-earth-globe {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    box-shadow:
+      inset -18px -14px 32px hsl(220 40% 8% / 0.55),
+      0 0 40px hsl(var(--primary) / 0.25),
+      0 0 80px hsl(var(--accent) / 0.12);
+  }
+
+  .geo-earth-orbit {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 1px solid hsl(var(--primary) / 0.22);
+  }
+
+  .geo-earth-orbit-outer {
+    animation: geo-orbit-spin 26s linear infinite;
+    box-shadow: 0 0 24px hsl(var(--primary) / 0.08);
+  }
+
+  .geo-earth-orbit-inner {
+    inset: 10px;
+    border-color: hsl(var(--accent) / 0.28);
+    animation: geo-orbit-spin 18s linear infinite reverse;
+  }
+
+  .geo-earth-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: hsl(var(--primary));
+    animation: geo-dot-pulse 1.2s ease-in-out infinite;
+  }
+
+  .geo-earth-dot-delay-1 {
+    animation-delay: 0.2s;
+  }
+
+  .geo-earth-dot-delay-2 {
+    animation-delay: 0.4s;
+  }
+
+  @keyframes geo-earth-spin {
+    from {
+      transform: rotateY(0deg);
+    }
+    to {
+      transform: rotateY(360deg);
+    }
+  }
+
+  @keyframes geo-orbit-spin {
+    from {
+      transform: rotateZ(0deg);
+    }
+    to {
+      transform: rotateZ(360deg);
+    }
+  }
+
+  @keyframes geo-dot-pulse {
+    0%,
+    80%,
+    100% {
+      opacity: 0.25;
+      transform: scale(0.85);
+    }
+    40% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
 }

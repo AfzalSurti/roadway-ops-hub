@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { AppLayout } from "@/components/AppLayout";
+import { BackendReadyGate } from "@/components/BackendReadyGate";
 
 import Login from "./pages/Login";
 import Index from "./pages/Index";
@@ -150,11 +151,13 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <AuthProvider>
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
-      </AuthProvider>
+      <BackendReadyGate>
+        <AuthProvider>
+          <BrowserRouter>
+            <AppRoutes />
+          </BrowserRouter>
+        </AuthProvider>
+      </BackendReadyGate>
     </TooltipProvider>
   </QueryClientProvider>
 );
