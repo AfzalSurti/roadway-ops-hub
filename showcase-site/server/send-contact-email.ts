@@ -3,7 +3,7 @@ import { Resend } from "resend";
 export type ContactPayload = {
   name: string;
   email: string;
-  phone?: string;
+  phone: string;
   message: string;
 };
 
@@ -26,9 +26,7 @@ export async function sendContactEmail(payload: ContactPayload) {
   }
 
   const resend = new Resend(apiKey);
-  const phoneLine = payload.phone?.trim()
-    ? `<p><strong>Phone:</strong> ${escapeHtml(payload.phone.trim())}</p>`
-    : "";
+  const phoneLine = `<p><strong>Phone:</strong> ${escapeHtml(payload.phone)}</p>`;
 
   const html = `
     <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #0f172a; max-width: 640px;">
@@ -50,7 +48,7 @@ export async function sendContactEmail(payload: ContactPayload) {
     "",
     `Name: ${payload.name}`,
     `Email: ${payload.email}`,
-    payload.phone?.trim() ? `Phone: ${payload.phone.trim()}` : null,
+    payload.phone ? `Phone: ${payload.phone}` : null,
     "",
     "Message:",
     payload.message
@@ -97,5 +95,16 @@ export function validateContactPayload(body: unknown): ContactPayload {
     throw new Error("Please describe your project or message (at least 10 characters)");
   }
 
-  return { name, email, phone: phone || undefined, message };
+  const phoneDigits = phone.replace(/\D/g, "");
+  if (!phoneDigits) {
+    throw new Error("Mobile number is required");
+  }
+  if (phoneDigits.length !== 10) {
+    throw new Error("Mobile number must be exactly 10 digits");
+  }
+  if (!/^[6-9]\d{9}$/.test(phoneDigits)) {
+    throw new Error("Enter a valid 10-digit mobile number (no +91)");
+  }
+
+  return { name, email: email.toLowerCase(), phone: phoneDigits, message };
 }

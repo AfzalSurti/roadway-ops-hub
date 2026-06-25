@@ -1,6 +1,8 @@
 import { FormEvent, useState } from "react";
 import { motion } from "framer-motion";
-import { CheckCircle2, Loader2, Mail, Send } from "lucide-react";
+import { ArrowUpRight, CheckCircle2, Linkedin, Loader2, Mail, Send } from "lucide-react";
+import { SITE } from "@/lib/site-config";
+import { normalizePhoneInput, validateContactForm } from "@/lib/validation";
 
 type FormState = {
   name: string;
@@ -22,24 +24,11 @@ export function CTA() {
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [statusMessage, setStatusMessage] = useState("");
 
-  const validate = () => {
-    const next: Partial<Record<keyof FormState, string>> = {};
-    if (!form.name.trim() || form.name.trim().length < 2) {
-      next.name = "Please enter your full name";
-    }
-    if (!form.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
-      next.email = "Please enter a valid email address";
-    }
-    if (!form.message.trim() || form.message.trim().length < 10) {
-      next.message = "Tell me about your project (at least 10 characters)";
-    }
-    setErrors(next);
-    return Object.keys(next).length === 0;
-  };
-
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!validate()) return;
+    const nextErrors = validateContactForm(form);
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
 
     setStatus("loading");
     setStatusMessage("");
@@ -50,8 +39,8 @@ export function CTA() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: form.name.trim(),
-          email: form.email.trim(),
-          phone: form.phone.trim() || undefined,
+          email: form.email.trim().toLowerCase(),
+          phone: normalizePhoneInput(form.phone),
           message: form.message.trim()
         })
       });
@@ -95,7 +84,7 @@ export function CTA() {
                 billing, asset management, expense tracking, and executive dashboards. Share your idea and
                 let&apos;s discuss how I can help your team.
               </p>
-              <ul className="space-y-2 text-sm text-muted-foreground">
+              <ul className="space-y-2 text-sm text-muted-foreground mb-8">
                 <li className="flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-accent" />
                   Custom enterprise web applications
@@ -109,6 +98,17 @@ export function CTA() {
                   Full deployment &amp; production setup
                 </li>
               </ul>
+
+              <a
+                href={SITE.linkedInUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl border border-[#0A66C2]/40 bg-[#0A66C2]/10 text-[#6eb5ff] font-semibold text-sm hover:bg-[#0A66C2]/20 transition-colors"
+              >
+                <Linkedin className="h-5 w-5" />
+                Connect on LinkedIn
+                <ArrowUpRight className="h-4 w-4" />
+              </a>
             </div>
 
             <form onSubmit={(e) => void handleSubmit(e)} className="glass p-6 space-y-4" noValidate>
@@ -136,6 +136,8 @@ export function CTA() {
                 <input
                   id="contact-email"
                   type="email"
+                  inputMode="email"
+                  autoComplete="email"
                   value={form.email}
                   onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
                   placeholder="you@company.com"
@@ -148,16 +150,25 @@ export function CTA() {
 
               <div>
                 <label htmlFor="contact-phone" className="block text-sm font-medium mb-1.5">
-                  Phone number <span className="text-muted-foreground font-normal">(optional)</span>
+                  Mobile number <span className="text-red-400">*</span>
                 </label>
                 <input
                   id="contact-phone"
                   type="tel"
+                  inputMode="numeric"
+                  autoComplete="tel-national"
+                  maxLength={10}
                   value={form.phone}
-                  onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))}
-                  placeholder="+91 98765 43210"
-                  className="w-full px-4 py-2.5 rounded-xl bg-background/60 border border-border/60 text-sm outline-none focus:border-primary/50 transition-colors"
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, phone: normalizePhoneInput(e.target.value) }))
+                  }
+                  placeholder="9876543210"
+                  className={`w-full px-4 py-2.5 rounded-xl bg-background/60 border text-sm outline-none focus:border-primary/50 transition-colors ${
+                    errors.phone ? "border-red-500/50" : "border-border/60"
+                  }`}
                 />
+                <p className="text-[11px] text-muted-foreground mt-1">10 digits only — no +91 or spaces</p>
+                {errors.phone ? <p className="text-xs text-red-400 mt-1">{errors.phone}</p> : null}
               </div>
 
               <div>
