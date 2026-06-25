@@ -1,46 +1,58 @@
 # OpsForge Showcase Site
 
-A **standalone portfolio / marketing website** for LinkedIn and freelance outreach. It showcases the capabilities of a full-stack enterprise operations platform **without any client name, dates, or confidential data**.
+Portfolio / marketing website for LinkedIn and freelance outreach. No client names or dates.
 
-## What it includes
+## Features
 
-- Hero with animated product mockup
-- **6 switchable UI screenshots** (dashboard, projects, financial, assets, expenses, HOD view) — screenshot-ready for LinkedIn
-- 9 module cards (DPR, projects, finance, assets, expenses, HOD, AI, auth, exports)
-- 4 user role breakdowns (Admin, PMO, HOD, Employee)
-- Technical capabilities & stack sections
-- Contact CTA (update LinkedIn URL in `src/components/CTA.tsx`)
+- **Problem → Solution** section (Excel pain points vs platform)
+- **4 role-based UI mocks** (DPR Admin, PMO, HOD, Employee) — screenshot-ready
+- **Contact form** → emails you via Resend when someone submits
+- Module cards, tech stack, capabilities
 
-## Run locally
+## Setup
 
 ```bash
 cd showcase-site
 npm install
+cp .env.example .env
+```
+
+Edit `.env`:
+
+```env
+RESEND_API_KEY=re_your_key_here
+CONTACT_EMAIL_TO=your@gmail.com
+CONTACT_EMAIL_FROM=OpsForge Portfolio <onboarding@resend.dev>
+CONTACT_SERVER_PORT=3098
+```
+
+> **Resend note:** Free tier sends from `onboarding@resend.dev`. Replies go to the visitor's email via `replyTo`. Verify your domain in Resend to use a custom `from` address.
+
+## Run locally
+
+```bash
 npm run dev
 ```
 
-Opens at **http://localhost:3099**
+- Website: **http://localhost:3099**
+- Contact API: **http://localhost:3098** (proxied via Vite)
 
-## Build for deploy
+## Deploy to Vercel
 
-```bash
-npm run build
-npm run preview
-```
+1. Create a new Vercel project with **Root Directory** = `showcase-site`
+2. Add environment variables in Vercel dashboard:
+   - `RESEND_API_KEY`
+   - `CONTACT_EMAIL_TO`
+   - `CONTACT_EMAIL_FROM` (optional)
+3. Deploy — the `/api/contact` serverless function handles form submissions
 
-Deploy `showcase-site/dist` to Vercel, Netlify, or GitHub Pages.
+## LinkedIn workflow
 
-## LinkedIn tips
+1. Open **The Problem** section — screenshot the before/after comparison
+2. Open **Product Screens** — click each of the 4 roles and screenshot
+3. Share your live Vercel URL in the post
 
-1. Open the site → go to **Product Screens** section
-2. Click each tab (Dashboard, Projects, etc.)
-3. Take screenshots — they look like real app UI in browser frames
-4. Post with caption: *"Built a full-stack ops platform for engineering consultancies — DPR, finance, assets, expenses, executive dashboards. Need something similar? Let's connect."*
+## Security
 
-## Customize
-
-| File | What to change |
-|------|----------------|
-| `src/components/CTA.tsx` | Your LinkedIn profile URL |
-| `src/components/Navbar.tsx` | Brand name "OpsForge" if desired |
-| `index.html` | Page title & meta description |
+- Never commit `.env` (already in `.gitignore`)
+- If your API key was shared publicly, rotate it in the [Resend dashboard](https://resend.com/api-keys)

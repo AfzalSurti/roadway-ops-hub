@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Layers, Menu, X } from "lucide-react";
 
 const links = [
+  { href: "#problem", label: "The Problem" },
   { href: "#screenshots", label: "Screens" },
   { href: "#modules", label: "Modules" },
   { href: "#roles", label: "Roles" },

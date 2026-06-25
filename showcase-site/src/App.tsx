@@ -1,6 +1,7 @@
 import { Navbar } from "@/components/Navbar";
 import { Hero } from "@/components/Hero";
 import { StatsBar } from "@/components/StatsBar";
+import { ProblemSolution } from "@/components/ProblemSolution";
 import { Modules } from "@/components/Modules";
 import { Roles } from "@/components/Roles";
 import { Screenshots } from "@/components/Screenshots";
@@ -20,6 +21,7 @@ export default function App() {
       <main className="relative z-10">
         <Hero />
         <StatsBar />
+        <ProblemSolution />
         <Screenshots />
         <Modules />
         <Roles />

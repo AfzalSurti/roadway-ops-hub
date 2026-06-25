@@ -2,11 +2,14 @@ import {
   BarChart3,
   FileCheck,
   FolderKanban,
+  HardHat,
   Landmark,
   LayoutDashboard,
   ListTodo,
   Package,
   Receipt,
+  Settings2,
+  UserCircle,
   Users
 } from "lucide-react";
 
@@ -249,6 +252,120 @@ export function MockFinancial() {
       <span className="inline-block mt-3 px-2 py-1 rounded border border-border/40 text-[9px] text-muted-foreground">
         Download RA Bill PDF
       </span>
+    </div>
+  );
+}
+
+export function MockPmoPortal() {
+  const pmoNav = [
+    { icon: LayoutDashboard, label: "Dashboard", active: false },
+    { icon: FolderKanban, label: "Projects", active: true },
+    { icon: Package, label: "Assets", active: false }
+  ];
+
+  return (
+    <div className="flex min-h-[280px]">
+      <aside className="w-[72px] shrink-0 border-r border-border/40 bg-[hsl(222,24%,6%)] py-3 flex flex-col items-center gap-2">
+        {pmoNav.map((item) => (
+          <div
+            key={item.label}
+            className={`p-2 rounded-lg ${item.active ? "bg-accent/15 text-accent" : "text-muted-foreground"}`}
+          >
+            <item.icon className="h-4 w-4" />
+          </div>
+        ))}
+      </aside>
+      <div className="flex-1 p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Settings2 className="h-4 w-4 text-accent" />
+          <div>
+            <p className="text-sm font-semibold">PMO — Project &amp; Asset Admin</p>
+            <p className="text-[10px] text-muted-foreground">Numbering, requisition forms &amp; asset lifecycle</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          <div className="rounded-lg border border-accent/30 bg-accent/5 p-2">
+            <p className="text-[9px] text-muted-foreground">Projects</p>
+            <p className="text-lg font-bold text-accent">28</p>
+          </div>
+          <div className="rounded-lg border border-primary/30 bg-primary/5 p-2">
+            <p className="text-[9px] text-muted-foreground">Assets tracked</p>
+            <p className="text-lg font-bold text-primary">187</p>
+          </div>
+        </div>
+        <div className="rounded-lg border border-border/40 overflow-hidden mb-2">
+          {[
+            { id: "PRJ-002", name: "Highway Bridge Phase 2", req: "PDF Ready" },
+            { id: "PRJ-005", name: "Urban Road DPR", req: "Draft" }
+          ].map((p) => (
+            <div key={p.id} className="flex justify-between px-3 py-2 border-t border-border/30 first:border-t-0 text-[10px]">
+              <span>
+                <span className="font-mono text-primary">{p.id}</span> — {p.name}
+              </span>
+              <span className="text-accent">{p.req}</span>
+            </div>
+          ))}
+        </div>
+        <div className="flex gap-1.5">
+          <span className="px-2 py-0.5 rounded border border-border/40 text-[9px]">Assign Number</span>
+          <span className="px-2 py-0.5 rounded border border-border/40 text-[9px]">Asset Import</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function MockEmployeePortal() {
+  const empNav = [
+    { icon: LayoutDashboard, label: "Dashboard", active: false },
+    { icon: ListTodo, label: "Tasks", active: true },
+    { icon: FileCheck, label: "Reports", active: false },
+    { icon: Receipt, label: "Expenses", active: false },
+    { icon: UserCircle, label: "Profile", active: false }
+  ];
+
+  return (
+    <div className="flex min-h-[280px]">
+      <aside className="w-[72px] shrink-0 border-r border-border/40 bg-[hsl(222,24%,6%)] py-3 flex flex-col items-center gap-2">
+        {empNav.map((item) => (
+          <div
+            key={item.label}
+            className={`p-2 rounded-lg ${item.active ? "bg-violet-500/15 text-violet-400" : "text-muted-foreground"}`}
+          >
+            <item.icon className="h-4 w-4" />
+          </div>
+        ))}
+      </aside>
+      <div className="flex-1 p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <HardHat className="h-4 w-4 text-violet-400" />
+          <div>
+            <p className="text-sm font-semibold">Employee — My Tasks</p>
+            <p className="text-[10px] text-muted-foreground">Assigned work, reports &amp; expense sheets</p>
+          </div>
+        </div>
+        <div className="space-y-2">
+          {[
+            { title: "Geometric Design — Alignment Review", project: "PRJ-002", due: "3 days", status: "In Progress" },
+            { title: "Soil Investigation Report", project: "PRJ-001", due: "Overdue", status: "Blocked" },
+            { title: "DPR Draft Submission", project: "PRJ-003", due: "7 days", status: "To Do" }
+          ].map((task) => (
+            <div key={task.title} className="rounded-lg border border-border/40 px-3 py-2">
+              <p className="text-[10px] font-medium truncate">{task.title}</p>
+              <div className="flex justify-between mt-1 text-[9px] text-muted-foreground">
+                <span>{task.project}</span>
+                <span className={task.due === "Overdue" ? "text-red-400" : "text-primary"}>{task.due}</span>
+              </div>
+              <span className="inline-block mt-1 px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400 text-[8px]">
+                {task.status}
+              </span>
+            </div>
+          ))}
+        </div>
+        <span className="inline-block mt-3 px-2 py-1 rounded-md bg-gradient-to-r from-primary/20 to-accent/20 text-[9px] text-primary">
+          Submit Report →
+        </span>
+      </div>
     </div>
   );
 }
