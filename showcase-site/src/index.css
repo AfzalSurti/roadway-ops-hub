@@ -1,0 +1,47 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 222 28% 5%;
+    --foreground: 210 25% 96%;
+    --card: 222 22% 9%;
+    --primary: 186 72% 48%;
+    --primary-foreground: 222 28% 5%;
+    --accent: 158 68% 42%;
+    --accent-foreground: 222 28% 5%;
+    --muted: 222 18% 14%;
+    --muted-foreground: 215 14% 58%;
+    --border: 222 16% 18%;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+}
+
+@layer components {
+  .section-pad {
+    @apply px-5 sm:px-8 lg:px-16 py-20 sm:py-28;
+  }
+
+  .glass {
+    @apply bg-card/70 backdrop-blur-xl border border-border/60 rounded-2xl;
+  }
+
+  .gradient-text {
+    @apply bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent;
+  }
+
+  .grid-bg {
+    background-image:
+      linear-gradient(hsl(var(--border) / 0.35) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--border) / 0.35) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+}
