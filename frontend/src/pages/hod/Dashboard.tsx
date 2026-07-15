@@ -61,6 +61,12 @@ export default function HodDashboard() {
     staleTime: 5 * 60 * 1000
   });
 
+  const { data: infraOverview } = useQuery({
+    queryKey: ["infra-overview"],
+    queryFn: () => api.getInfraOverview(),
+    staleTime: 5 * 60 * 1000
+  });
+
   const tasks = tasksResponse?.items ?? [];
 
   const financialByProjectId = useMemo(() => {
@@ -335,6 +341,32 @@ export default function HodDashboard() {
         <KpiCard label="Ongoing Projects" value={totals.ongoing} icon={Timer} tone="text-amber-600 bg-amber-500/10" />
       </div>
 
+      <div className="glass-panel p-6 mb-6">
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <div>
+            <h3 className="font-semibold text-lg">Infra Snapshot</h3>
+            <p className="text-sm text-muted-foreground">Read-only visibility into infra project and team status.</p>
+          </div>
+          <Badge variant="secondary" className="rounded-full">
+            {infraOverview?.teamMembers ?? 0} team members
+          </Badge>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+          <MiniStat label="Infra Projects" value={infraOverview?.totalProjects ?? 0} />
+          <MiniStat label="Ongoing" value={infraOverview?.ongoingProjects ?? 0} />
+          <MiniStat label="Completed" value={infraOverview?.completedProjects ?? 0} />
+          <MiniStat label="Mobilized" value={infraOverview?.mobilizedTeamMembers ?? 0} />
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {(infraOverview?.byUnit ?? []).map((unit) => (
+            <div key={unit.code} className="rounded-2xl border border-border/40 bg-secondary/20 p-4">
+              <p className="text-xs text-muted-foreground">{unit.code}</p>
+              <p className="text-2xl font-bold mt-1">{unit.count}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <div className="glass-panel p-6">
         <div className="flex items-center justify-between gap-3 mb-4">
           <div>
@@ -500,6 +532,15 @@ function KpiCard({
       </div>
       <p className="text-3xl font-bold text-foreground">{value}</p>
       <p className="text-sm text-muted-foreground mt-1">{label}</p>
+    </div>
+  );
+}
+
+function MiniStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-2xl border border-border/40 bg-secondary/20 p-4">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="text-2xl font-bold mt-1">{value}</p>
     </div>
   );
 }

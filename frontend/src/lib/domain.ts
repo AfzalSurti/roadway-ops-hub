@@ -1,4 +1,4 @@
-export type Role = "ADMIN" | "PMO" | "HOD" | "EMPLOYEE";
+export type Role = "ADMIN" | "PMO" | "HOD" | "INFRA" | "EMPLOYEE";
 export type Priority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 export type TaskStatus = "TODO" | "IN_PROGRESS" | "BLOCKED" | "DONE";
 export type ReportStatus = "SUBMITTED" | "APPROVED" | "CHANGES_REQUESTED" | "REJECTED";
@@ -60,6 +60,53 @@ export type ProjectItem = {
   emdExpiryDate?: string | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type InfraTeamMemberItem = {
+  id: string;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  manpowerGroup: "Key Personnel" | "Sub Professional Staff" | "Support Staff";
+  manpowerRole: string;
+  currentProject?: string | null;
+  mobilizedAt?: string | null;
+  demobilizedAt?: string | null;
+  notes?: string | null;
+  projectAssignments?: Array<
+    ProjectAssignmentItem & {
+      project: Pick<ProjectItem, "id" | "name" | "projectNumber">;
+    }
+  >;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ProjectAssignmentItem = {
+  id: string;
+  projectId: string;
+  teamMemberId: string;
+  mobilizedAt?: string | null;
+  demobilizedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  teamMember?: InfraTeamMemberItem;
+};
+
+export type InfraProjectItem = ProjectItem & {
+  subTechnicalUnitCode?: string | null;
+  lifecycle: "ONGOING" | "COMPLETED";
+  activeAssignments: number;
+  assignments: Array<ProjectAssignmentItem & { teamMember: InfraTeamMemberItem }>;
+};
+
+export type InfraOverviewItem = {
+  totalProjects: number;
+  ongoingProjects: number;
+  completedProjects: number;
+  byUnit: Array<{ code: string; count: number }>;
+  teamMembers: number;
+  mobilizedTeamMembers: number;
 };
 
 export type ProjectDprOverviewItem = {

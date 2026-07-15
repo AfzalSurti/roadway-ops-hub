@@ -13,6 +13,7 @@ import { assistantRouter } from "./assistant.routes.js";
 import { assetRouter } from "./asset.routes.js";
 import { dprOverviewRouter } from "./dpr-overview.routes.js";
 import { expenseRouter } from "./expense.routes.js";
+import { infraRouter } from "./infra.routes.js";
 
 export const apiRouter = Router();
 
@@ -30,3 +31,4 @@ apiRouter.use("/assistant", assistantRouter);
 apiRouter.use("/assets", assetRouter);
 apiRouter.use("/dpr-overviews", dprOverviewRouter);
 apiRouter.use("/expenses", expenseRouter);
+apiRouter.use("/infra", infraRouter);

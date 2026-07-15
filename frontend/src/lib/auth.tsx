@@ -12,6 +12,7 @@ interface AuthContextType {
   isAdmin: boolean;
   isPmo: boolean;
   isHod: boolean;
+  isInfra: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -22,7 +23,8 @@ const AuthContext = createContext<AuthContextType>({
   logout: async () => undefined,
   isAdmin: false,
   isPmo: false,
-  isHod: false
+  isHod: false,
+  isInfra: false
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -81,7 +83,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       logout,
       isAdmin: user?.role === "ADMIN",
       isPmo: user?.role === "PMO",
-      isHod: user?.role === "HOD"
+      isHod: user?.role === "HOD",
+      isInfra: user?.role === "INFRA"
     }),
     [user]
   );

@@ -9,6 +9,7 @@ function getLandingPath(role: string) {
   if (role === "ADMIN") return "/admin/dashboard";
   if (role === "PMO") return "/administrative/dashboard";
   if (role === "HOD") return "/hod/dashboard";
+  if (role === "INFRA") return "/infra/dashboard";
   return "/app/dashboard";
 }
 

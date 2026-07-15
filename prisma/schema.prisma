@@ -12,6 +12,7 @@ enum Role {
   ADMIN
   PMO
   HOD
+  INFRA
   EMPLOYEE
 }
 
@@ -153,9 +154,44 @@ model Project {
   updatedAt             DateTime @updatedAt
   dprOverview           ProjectDprOverview?
   expenseSheets         ExpenseSheet[]
+  assignments           ProjectAssignment[]
 
   @@index([name])
   @@index([projectCodePrefix, financialYearShort])
+}
+
+model ProjectAssignment {
+  id          String   @id @default(cuid())
+  projectId    String
+  teamMemberId String
+  mobilizedAt  DateTime?
+  demobilizedAt DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  teamMember   InfraTeamMember @relation(fields: [teamMemberId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([teamMemberId])
+}
+
+model InfraTeamMember {
+  id              String              @id @default(cuid())
+  name            String
+  email           String?
+  phone           String?
+  manpowerGroup   String
+  manpowerRole    String
+  currentProject  String?
+  mobilizedAt     DateTime?
+  demobilizedAt   DateTime?
+  notes           String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  projectAssignments ProjectAssignment[]
+
+  @@index([manpowerGroup])
+  @@index([manpowerRole])
 }
 
 model Asset {

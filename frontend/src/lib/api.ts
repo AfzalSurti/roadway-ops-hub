@@ -26,6 +26,9 @@ import type {
   FinancialProjectSummary,
   FinancialRaBill,
   ProjectDprOverviewItem,
+  InfraOverviewItem,
+  InfraProjectItem,
+  InfraTeamMemberItem,
   ProjectItem,
   ProjectRequisitionFormItem,
   ReportItem,
@@ -415,6 +418,83 @@ export const api = {
 
   getProjects() {
     return request<ProjectItem[]>("/projects");
+  },
+
+  getInfraOverview() {
+    return request<InfraOverviewItem>("/infra/overview");
+  },
+
+  getInfraProjects() {
+    return request<InfraProjectItem[]>("/infra/projects");
+  },
+
+  getInfraProject(id: string) {
+    return request<InfraProjectItem>(`/infra/projects/${id}`);
+  },
+
+  getInfraTeamMembers() {
+    return request<InfraTeamMemberItem[]>("/infra/team");
+  },
+
+  createInfraTeamMember(payload: {
+    name: string;
+    email?: string | null;
+    phone?: string | null;
+    manpowerGroup: "Key Personnel" | "Sub Professional Staff" | "Support Staff";
+    manpowerRole: string;
+    notes?: string | null;
+  }) {
+    return request<InfraTeamMemberItem>("/infra/team", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+  },
+
+  updateInfraTeamMember(
+    id: string,
+    payload: Partial<{
+      name: string;
+      email: string | null;
+      phone: string | null;
+      manpowerGroup: "Key Personnel" | "Sub Professional Staff" | "Support Staff";
+      manpowerRole: string;
+      notes: string | null;
+    }>
+  ) {
+    return request<InfraTeamMemberItem>(`/infra/team/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    });
+  },
+
+  deleteInfraTeamMember(id: string) {
+    return request<{ deleted: boolean }>(`/infra/team/${id}`, {
+      method: "DELETE"
+    });
+  },
+
+  assignInfraProject(
+    projectId: string,
+    payload: {
+      teamMemberId: string;
+      mobilizedAt?: string | null;
+    }
+  ) {
+    return request(`/infra/projects/${projectId}/assignments`, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+  },
+
+  updateInfraProjectAssignment(
+    projectId: string,
+    assignmentId: string,
+    payload: { mobilizedAt?: string | null; demobilizedAt?: string | null }
+  ) {
+    return request(`/infra/projects/${projectId}/assignments/${assignmentId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    });
   },
 
   getProjectRequisitionForms() {
