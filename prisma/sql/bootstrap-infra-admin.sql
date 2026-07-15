@@ -1,5 +1,6 @@
 -- Infra Admin: role + tables + login user
 -- Run this in Neon SQL Editor
+-- User table has NO avatar column in this schema.
 
 -- 1) Add INFRA role (safe if already exists)
 DO $$
@@ -40,12 +41,27 @@ CREATE TABLE IF NOT EXISTS "ProjectAssignment" (
   "mobilizedAt" TIMESTAMP(3),
   "demobilizedAt" TIMESTAMP(3),
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT "ProjectAssignment_projectId_fkey"
-    FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT "ProjectAssignment_teamMemberId_fkey"
-    FOREIGN KEY ("teamMemberId") REFERENCES "InfraTeamMember"("id") ON DELETE CASCADE ON UPDATE CASCADE
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'ProjectAssignment_projectId_fkey'
+  ) THEN
+    ALTER TABLE "ProjectAssignment"
+      ADD CONSTRAINT "ProjectAssignment_projectId_fkey"
+      FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'ProjectAssignment_teamMemberId_fkey'
+  ) THEN
+    ALTER TABLE "ProjectAssignment"
+      ADD CONSTRAINT "ProjectAssignment_teamMemberId_fkey"
+      FOREIGN KEY ("teamMemberId") REFERENCES "InfraTeamMember"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS "ProjectAssignment_projectId_idx" ON "ProjectAssignment"("projectId");
 CREATE INDEX IF NOT EXISTS "ProjectAssignment_teamMemberId_idx" ON "ProjectAssignment"("teamMemberId");
@@ -59,7 +75,6 @@ INSERT INTO "User" (
   "email",
   "passwordHash",
   "role",
-  "avatar",
   "createdAt",
   "updatedAt"
 )
@@ -69,7 +84,6 @@ VALUES (
   'infra@highwayops.com',
   '$2b$10$4O6i63YYR/1hvj0LtyuvF.emXNCp8ZtmtHaqq181oWrBu0guqc6iO',
   'INFRA',
-  'https://api.dicebear.com/9.x/initials/svg?seed=Infra%20Admin',
   CURRENT_TIMESTAMP,
   CURRENT_TIMESTAMP
 )
