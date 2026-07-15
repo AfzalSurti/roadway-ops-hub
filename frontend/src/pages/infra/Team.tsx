@@ -38,9 +38,34 @@ const roleOptions: Record<(typeof manpowerGroups)[number], string[]> = {
   "Support Staff": ["Office Manager", "Computer Operator", "Accountant", "Office Boy"]
 };
 
-type Draft = { name: string; email: string; phone: string; manpowerGroup: (typeof manpowerGroups)[number]; manpowerRole: string; notes: string };
+type Draft = {
+  name: string;
+  email: string;
+  phone: string;
+  manpowerGroup: (typeof manpowerGroups)[number];
+  manpowerRole: string;
+  monthlyCost: string;
+  notes: string;
+};
 
-const EMPTY_DRAFT: Draft = { name: "", email: "", phone: "", manpowerGroup: "Key Personnel", manpowerRole: roleOptions["Key Personnel"][0], notes: "" };
+const EMPTY_DRAFT: Draft = {
+  name: "",
+  email: "",
+  phone: "",
+  manpowerGroup: "Key Personnel",
+  manpowerRole: roleOptions["Key Personnel"][0],
+  monthlyCost: "",
+  notes: ""
+};
+
+function parseMonthlyCost(value: string): number | null | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const num = Number(trimmed);
+  if (!Number.isFinite(num)) return undefined;
+  if (num < 0 || num > 10_000_000) return undefined;
+  return Number(num.toFixed(2));
+}
 
 export default function InfraTeam() {
   const queryClient = useQueryClient();
@@ -59,15 +84,19 @@ export default function InfraTeam() {
   }, [search, team]);
 
   const createMutation = useMutation({
-    mutationFn: () =>
-      api.createInfraTeamMember({
+    mutationFn: () => {
+      const monthlyCost = parseMonthlyCost(draft.monthlyCost);
+      if (monthlyCost === undefined) throw new Error("Enter a valid monthly cost (optional, must be ≥ 0)");
+      return api.createInfraTeamMember({
         name: draft.name.trim(),
         email: draft.email.trim() || null,
         phone: draft.phone.trim() || null,
         manpowerGroup: draft.manpowerGroup,
         manpowerRole: draft.manpowerRole.trim(),
+        monthlyCost,
         notes: draft.notes.trim() || null
-      }),
+      });
+    },
     onSuccess: async () => {
       toast.success("Team member created");
       setOpen(false);
@@ -78,15 +107,19 @@ export default function InfraTeam() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: () =>
-      api.updateInfraTeamMember(selectedId!, {
+    mutationFn: () => {
+      const monthlyCost = parseMonthlyCost(draft.monthlyCost);
+      if (monthlyCost === undefined) throw new Error("Enter a valid monthly cost (optional, must be ≥ 0)");
+      return api.updateInfraTeamMember(selectedId!, {
         name: draft.name.trim(),
         email: draft.email.trim() || null,
         phone: draft.phone.trim() || null,
         manpowerGroup: draft.manpowerGroup,
         manpowerRole: draft.manpowerRole.trim(),
+        monthlyCost,
         notes: draft.notes.trim() || null
-      }),
+      });
+    },
     onSuccess: async () => {
       toast.success("Team member updated");
       setOpen(false);
@@ -122,6 +155,7 @@ export default function InfraTeam() {
       phone: member.phone ?? "",
       manpowerGroup: member.manpowerGroup,
       manpowerRole: member.manpowerRole,
+      monthlyCost: member.monthlyCost != null ? String(member.monthlyCost) : "",
       notes: member.notes ?? ""
     });
     setOpen(true);
@@ -153,7 +187,10 @@ export default function InfraTeam() {
               <Badge variant="secondary">{member.manpowerGroup}</Badge>
             </div>
             <p className="text-sm mt-3">{member.manpowerRole}</p>
-            <p className="text-xs text-muted-foreground mt-2">{member.currentProject ? `Mobilized on ${member.currentProject}` : "Not mobilized"}</p>
+            <p className="text-xs text-muted-foreground mt-2">
+              Monthly cost: {member.monthlyCost != null ? `₹${Number(member.monthlyCost).toLocaleString("en-IN")}` : "Not set"}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">{member.currentProject ? `Mobilized on ${member.currentProject}` : "Not mobilized"}</p>
           </button>
         ))}
       </div>
@@ -170,6 +207,9 @@ export default function InfraTeam() {
               <p className="font-semibold text-lg">{selected.name}</p>
               <p className="text-sm text-muted-foreground">{selected.email || "No email"}</p>
               <p className="text-sm">{selected.manpowerGroup} · {selected.manpowerRole}</p>
+              <p className="text-sm text-muted-foreground">
+                Monthly Cost: {selected.monthlyCost != null ? `₹${Number(selected.monthlyCost).toLocaleString("en-IN")}` : "Not set"}
+              </p>
               <p className="text-sm text-muted-foreground">Current Project: {selected.currentProject || "None"}</p>
               <p className="text-sm text-muted-foreground">Mobilized: {selected.mobilizedAt ? new Date(selected.mobilizedAt).toLocaleDateString("en-IN") : "-"}</p>
               <p className="text-sm text-muted-foreground">Demobilized: {selected.demobilizedAt ? new Date(selected.demobilizedAt).toLocaleDateString("en-IN") : "-"}</p>
@@ -220,6 +260,22 @@ export default function InfraTeam() {
               <Input placeholder="Name" value={draft.name} onChange={(e) => setDraft((prev) => ({ ...prev, name: e.target.value }))} />
               <Input placeholder="Email" type="email" value={draft.email} onChange={(e) => setDraft((prev) => ({ ...prev, email: e.target.value }))} />
               <Input placeholder="Phone" value={draft.phone} onChange={(e) => setDraft((prev) => ({ ...prev, phone: e.target.value }))} />
+
+              <div>
+                <label htmlFor="monthly-cost" className="text-xs text-muted-foreground mb-1.5 block">
+                  Per month cost (optional)
+                </label>
+                <Input
+                  id="monthly-cost"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  placeholder="e.g. 75000"
+                  value={draft.monthlyCost}
+                  onChange={(e) => setDraft((prev) => ({ ...prev, monthlyCost: e.target.value }))}
+                />
+                <p className="text-[11px] text-muted-foreground mt-1">Leave blank if not applicable. Used for project staff billing (30-day month).</p>
+              </div>
 
               <Select value={draft.manpowerGroup} onValueChange={(value) => setDraft((prev) => ({ ...prev, manpowerGroup: value as Draft["manpowerGroup"], manpowerRole: roleOptions[value as Draft["manpowerGroup"]][0] }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>

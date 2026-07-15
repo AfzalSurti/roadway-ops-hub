@@ -15,6 +15,21 @@ function getProjectLifecycle(assignments: Array<{ demobilizedAt: Date | null }>)
   return assignments.every((assignment) => assignment.demobilizedAt !== null) ? ("COMPLETED" as const) : ("ONGOING" as const);
 }
 
+function calcAssignmentAmount(monthlyCost?: number | null, daysWorked?: number | null) {
+  const month = typeof monthlyCost === "number" && Number.isFinite(monthlyCost) ? monthlyCost : 0;
+  const days = typeof daysWorked === "number" && Number.isFinite(daysWorked) ? daysWorked : 0;
+  return Number(((month / 30) * days).toFixed(2));
+}
+
+function withFinancials<T extends { assignments: Array<{ daysWorked: number | null; teamMember: { monthlyCost: number | null } }> }>(project: T) {
+  const assignments = project.assignments.map((assignment) => ({
+    ...assignment,
+    amount: calcAssignmentAmount(assignment.teamMember.monthlyCost, assignment.daysWorked)
+  }));
+  const totalCost = Number(assignments.reduce((sum, item) => sum + item.amount, 0).toFixed(2));
+  return { ...project, assignments, totalCost };
+}
+
 export const infraService = {
   async overview() {
     const projects = await infraRepository.findProjects();
@@ -23,6 +38,8 @@ export const infraService = {
     const filtered = projects.filter((project) => getProjectSubTechnicalUnitCode(project.projectNumber));
     const ongoingProjects = filtered.filter((project) => getProjectLifecycle(project.assignments) === "ONGOING").length;
     const completedProjects = filtered.filter((project) => getProjectLifecycle(project.assignments) === "COMPLETED").length;
+    const withCosts = filtered.map((project) => withFinancials(project));
+    const totalStaffCost = Number(withCosts.reduce((sum, project) => sum + project.totalCost, 0).toFixed(2));
 
     const byUnit = ["IE", "AE", "PM", "TP"].map((code) => ({
       code,
@@ -35,25 +52,30 @@ export const infraService = {
       completedProjects,
       byUnit,
       teamMembers: teamMembers.length,
-      mobilizedTeamMembers: teamMembers.filter((member) => member.mobilizedAt && !member.demobilizedAt).length
+      mobilizedTeamMembers: teamMembers.filter((member) => member.mobilizedAt && !member.demobilizedAt).length,
+      totalStaffCost
     };
   },
   async listProjects() {
     const projects = await infraRepository.findProjects();
     return projects
       .filter((project) => getProjectSubTechnicalUnitCode(project.projectNumber))
-      .map((project) => ({
-        ...project,
-        subTechnicalUnitCode: getProjectSubTechnicalUnitCode(project.projectNumber),
-        lifecycle: getProjectLifecycle(project.assignments),
-        activeAssignments: project.assignments.filter((assignment) => assignment.demobilizedAt === null).length
-      }));
+      .map((project) => {
+        const enriched = withFinancials(project);
+        return {
+          ...enriched,
+          subTechnicalUnitCode: getProjectSubTechnicalUnitCode(project.projectNumber),
+          lifecycle: getProjectLifecycle(project.assignments),
+          activeAssignments: project.assignments.filter((assignment) => assignment.demobilizedAt === null).length
+        };
+      });
   },
   async getProject(id: string) {
     const project = await infraRepository.findProjectById(id);
     if (!project) throw notFound("Project not found");
+    const enriched = withFinancials(project);
     return {
-      ...project,
+      ...enriched,
       subTechnicalUnitCode: getProjectSubTechnicalUnitCode(project.projectNumber),
       lifecycle: getProjectLifecycle(project.assignments),
       activeAssignments: project.assignments.filter((assignment) => assignment.demobilizedAt === null).length
@@ -62,7 +84,15 @@ export const infraService = {
   listTeamMembers() {
     return infraRepository.findTeamMembers();
   },
-  async createTeamMember(payload: { name: string; email?: string | null; phone?: string | null; manpowerGroup: string; manpowerRole: string; notes?: string | null }) {
+  async createTeamMember(payload: {
+    name: string;
+    email?: string | null;
+    phone?: string | null;
+    manpowerGroup: string;
+    manpowerRole: string;
+    monthlyCost?: number | null;
+    notes?: string | null;
+  }) {
     if (!payload.name.trim()) throw badRequest("Name is required");
     return infraRepository.createTeamMember({
       name: payload.name.trim(),
@@ -70,10 +100,22 @@ export const infraService = {
       phone: payload.phone?.trim() || null,
       manpowerGroup: payload.manpowerGroup,
       manpowerRole: payload.manpowerRole.trim(),
+      monthlyCost: payload.monthlyCost ?? null,
       notes: payload.notes?.trim() || null
     });
   },
-  async updateTeamMember(id: string, payload: { name?: string; email?: string | null; phone?: string | null; manpowerGroup?: string; manpowerRole?: string; notes?: string | null }) {
+  async updateTeamMember(
+    id: string,
+    payload: {
+      name?: string;
+      email?: string | null;
+      phone?: string | null;
+      manpowerGroup?: string;
+      manpowerRole?: string;
+      monthlyCost?: number | null;
+      notes?: string | null;
+    }
+  ) {
     const member = await infraRepository.findTeamMemberById(id);
     if (!member) throw notFound("Team member not found");
     return infraRepository.updateTeamMember(id, {
@@ -82,6 +124,7 @@ export const infraService = {
       phone: payload.phone === undefined ? undefined : payload.phone?.trim() || null,
       manpowerGroup: payload.manpowerGroup,
       manpowerRole: payload.manpowerRole?.trim(),
+      monthlyCost: payload.monthlyCost === undefined ? undefined : payload.monthlyCost,
       notes: payload.notes === undefined ? undefined : payload.notes?.trim() || null
     });
   },
@@ -90,7 +133,7 @@ export const infraService = {
     if (!member) throw notFound("Team member not found");
     return infraRepository.deleteTeamMember(id);
   },
-  async assignProject(projectId: string, payload: { teamMemberId: string; mobilizedAt?: string | null }) {
+  async assignProject(projectId: string, payload: { teamMemberId: string; mobilizedAt?: string | null; daysWorked?: number | null }) {
     const project = await infraRepository.findProjectById(projectId);
     if (!project) throw notFound("Project not found");
     if (!getProjectSubTechnicalUnitCode(project.projectNumber)) {
@@ -114,7 +157,8 @@ export const infraService = {
     const assignment = await infraRepository.createAssignment({
       projectId,
       teamMemberId: payload.teamMemberId,
-      mobilizedAt
+      mobilizedAt,
+      daysWorked: payload.daysWorked ?? null
     });
     await infraRepository.updateTeamMember(teamMember.id, {
       currentProject: project.name,
@@ -123,7 +167,10 @@ export const infraService = {
     });
     return assignment;
   },
-  async updateAssignment(id: string, payload: { mobilizedAt?: string | null; demobilizedAt?: string | null }) {
+  async updateAssignment(
+    id: string,
+    payload: { mobilizedAt?: string | null; demobilizedAt?: string | null; daysWorked?: number | null }
+  ) {
     const assignment = await infraRepository.findAssignmentById(id);
     if (!assignment) throw notFound("Assignment not found");
 
@@ -146,7 +193,8 @@ export const infraService = {
 
     const updated = await infraRepository.updateAssignment(id, {
       mobilizedAt: nextMobilizedAt,
-      demobilizedAt: nextDemobilizedAt
+      demobilizedAt: nextDemobilizedAt,
+      daysWorked: payload.daysWorked === undefined ? undefined : payload.daysWorked
     });
 
     if (payload.demobilizedAt !== undefined) {

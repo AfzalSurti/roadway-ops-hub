@@ -69,6 +69,7 @@ export type InfraTeamMemberItem = {
   phone?: string | null;
   manpowerGroup: "Key Personnel" | "Sub Professional Staff" | "Support Staff";
   manpowerRole: string;
+  monthlyCost?: number | null;
   currentProject?: string | null;
   mobilizedAt?: string | null;
   demobilizedAt?: string | null;
@@ -88,6 +89,8 @@ export type ProjectAssignmentItem = {
   teamMemberId: string;
   mobilizedAt?: string | null;
   demobilizedAt?: string | null;
+  daysWorked?: number | null;
+  amount?: number;
   createdAt: string;
   updatedAt: string;
   teamMember?: InfraTeamMemberItem;
@@ -97,6 +100,7 @@ export type InfraProjectItem = ProjectItem & {
   subTechnicalUnitCode?: string | null;
   lifecycle: "ONGOING" | "COMPLETED";
   activeAssignments: number;
+  totalCost?: number;
   assignments: Array<ProjectAssignmentItem & { teamMember: InfraTeamMemberItem }>;
 };
 
@@ -107,6 +111,7 @@ export type InfraOverviewItem = {
   byUnit: Array<{ code: string; count: number }>;
   teamMembers: number;
   mobilizedTeamMembers: number;
+  totalStaffCost?: number;
 };
 
 export type ProjectDprOverviewItem = {

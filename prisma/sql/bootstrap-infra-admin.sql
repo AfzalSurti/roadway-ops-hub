@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS "InfraTeamMember" (
   "phone" TEXT,
   "manpowerGroup" TEXT NOT NULL,
   "manpowerRole" TEXT NOT NULL,
+  "monthlyCost" DOUBLE PRECISION,
   "currentProject" TEXT,
   "mobilizedAt" TIMESTAMP(3),
   "demobilizedAt" TIMESTAMP(3),
@@ -40,6 +41,7 @@ CREATE TABLE IF NOT EXISTS "ProjectAssignment" (
   "teamMemberId" TEXT NOT NULL,
   "mobilizedAt" TIMESTAMP(3),
   "demobilizedAt" TIMESTAMP(3),
+  "daysWorked" DOUBLE PRECISION,
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -92,3 +94,7 @@ ON CONFLICT ("email") DO UPDATE SET
   "passwordHash" = EXCLUDED."passwordHash",
   "role" = EXCLUDED."role",
   "updatedAt" = CURRENT_TIMESTAMP;
+
+-- Cost columns (safe if tables already exist)
+ALTER TABLE "InfraTeamMember" ADD COLUMN IF NOT EXISTS "monthlyCost" DOUBLE PRECISION;
+ALTER TABLE "ProjectAssignment" ADD COLUMN IF NOT EXISTS "daysWorked" DOUBLE PRECISION;

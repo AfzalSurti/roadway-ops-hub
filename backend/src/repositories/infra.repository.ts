@@ -45,7 +45,15 @@ export const infraRepository = {
       }
     });
   },
-  createTeamMember(data: { name: string; email?: string | null; phone?: string | null; manpowerGroup: string; manpowerRole: string; notes?: string | null }) {
+  createTeamMember(data: {
+    name: string;
+    email?: string | null;
+    phone?: string | null;
+    manpowerGroup: string;
+    manpowerRole: string;
+    monthlyCost?: number | null;
+    notes?: string | null;
+  }) {
     return prisma.infraTeamMember.create({ data });
   },
   updateTeamMember(
@@ -56,6 +64,7 @@ export const infraRepository = {
       phone: string | null;
       manpowerGroup: string;
       manpowerRole: string;
+      monthlyCost: number | null;
       currentProject: string | null;
       mobilizedAt: Date | null;
       demobilizedAt: Date | null;
@@ -67,10 +76,18 @@ export const infraRepository = {
   deleteTeamMember(id: string) {
     return prisma.infraTeamMember.delete({ where: { id } });
   },
-  createAssignment(data: { projectId: string; teamMemberId: string; mobilizedAt?: Date | null }) {
+  createAssignment(data: {
+    projectId: string;
+    teamMemberId: string;
+    mobilizedAt?: Date | null;
+    daysWorked?: number | null;
+  }) {
     return prisma.projectAssignment.create({ data });
   },
-  updateAssignment(id: string, data: { mobilizedAt?: Date | null; demobilizedAt?: Date | null }) {
+  updateAssignment(
+    id: string,
+    data: { mobilizedAt?: Date | null; demobilizedAt?: Date | null; daysWorked?: number | null }
+  ) {
     return prisma.projectAssignment.update({ where: { id }, data });
   },
   findAssignmentById(id: string) {

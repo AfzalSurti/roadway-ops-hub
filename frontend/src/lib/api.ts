@@ -442,6 +442,7 @@ export const api = {
     phone?: string | null;
     manpowerGroup: "Key Personnel" | "Sub Professional Staff" | "Support Staff";
     manpowerRole: string;
+    monthlyCost?: number | null;
     notes?: string | null;
   }) {
     return request<InfraTeamMemberItem>("/infra/team", {
@@ -458,6 +459,7 @@ export const api = {
       phone: string | null;
       manpowerGroup: "Key Personnel" | "Sub Professional Staff" | "Support Staff";
       manpowerRole: string;
+      monthlyCost: number | null;
       notes: string | null;
     }>
   ) {
@@ -478,6 +480,7 @@ export const api = {
     payload: {
       teamMemberId: string;
       mobilizedAt?: string | null;
+      daysWorked?: number | null;
     }
   ) {
     return request(`/infra/projects/${projectId}/assignments`, {
@@ -489,7 +492,11 @@ export const api = {
   updateInfraProjectAssignment(
     projectId: string,
     assignmentId: string,
-    payload: { mobilizedAt?: string | null; demobilizedAt?: string | null }
+    payload: {
+      mobilizedAt?: string | null;
+      demobilizedAt?: string | null;
+      daysWorked?: number | null;
+    }
   ) {
     return request(`/infra/projects/${projectId}/assignments/${assignmentId}`, {
       method: "PATCH",
