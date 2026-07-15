@@ -32,7 +32,13 @@ import {
   HOD_TECHNICAL_UNIT_OPTIONS,
   summarizeProjectTasks
 } from "@/lib/hod-dashboard";
-import { BarChart3, CheckCircle2, ClipboardList, Eye, FolderKanban, Loader2, RefreshCcw, Search, Timer } from "lucide-react";
+import { BarChart3, CheckCircle2, ClipboardList, Eye, FileSpreadsheet, FileText, FolderKanban, Loader2, RefreshCcw, Search, Timer } from "lucide-react";
+import {
+  downloadInfraProjectBillPdf,
+  downloadInfraProjectsSummaryExcel,
+  downloadInfraProjectsSummaryPdf
+} from "@/lib/infra-financial-export";
+import { toast } from "sonner";
 
 export default function HodDashboard() {
   const [search, setSearch] = useState("");
@@ -401,6 +407,9 @@ export default function HodDashboard() {
           </button>
           <MiniStat label="Mobilized" value={infraOverview?.mobilizedTeamMembers ?? 0} />
         </div>
+        <div className="mb-4">
+          <MiniStat label="Total Infra Staff Cost" value={infraOverview?.totalStaffCost ?? 0} isCurrency />
+        </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
           {(infraOverview?.byUnit ?? []).map((unit) => (
@@ -440,10 +449,55 @@ export default function HodDashboard() {
           <Badge variant="outline" className="rounded-full self-center">
             {filteredInfraProjects.length} showing
           </Badge>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1 ml-auto"
+            onClick={() => {
+              void downloadInfraProjectsSummaryPdf(
+                filteredInfraProjects.map((project, index) => ({
+                  sr: index + 1,
+                  projectName: project.name,
+                  projectNumber: project.projectNumber || "",
+                  unitCode: project.subTechnicalUnitCode,
+                  totalAmount: project.totalCost ?? 0
+                }))
+              )
+                .then(() => toast.success("Infra summary PDF downloaded"))
+                .catch((error) => toast.error(error instanceof Error ? error.message : "Failed to download PDF"));
+            }}
+          >
+            <FileText className="h-3.5 w-3.5" />
+            Summary PDF
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1"
+            onClick={() => {
+              try {
+                downloadInfraProjectsSummaryExcel(
+                  filteredInfraProjects.map((project, index) => ({
+                    sr: index + 1,
+                    projectName: project.name,
+                    projectNumber: project.projectNumber || "",
+                    unitCode: project.subTechnicalUnitCode,
+                    totalAmount: project.totalCost ?? 0
+                  }))
+                );
+                toast.success("Infra summary Excel downloaded");
+              } catch (error) {
+                toast.error(error instanceof Error ? error.message : "Failed to download Excel");
+              }
+            }}
+          >
+            <FileSpreadsheet className="h-3.5 w-3.5" />
+            Summary Excel
+          </Button>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[900px]">
+          <table className="w-full text-sm min-w-[980px]">
             <thead>
               <tr className="border-b border-border/40 text-muted-foreground">
                 <th className="py-3 pr-4 text-left font-medium">Project Number</th>
@@ -451,13 +505,14 @@ export default function HodDashboard() {
                 <th className="py-3 px-4 text-left font-medium">Unit</th>
                 <th className="py-3 px-4 text-left font-medium">Lifecycle</th>
                 <th className="py-3 px-4 text-right font-medium">Active Staff</th>
+                <th className="py-3 px-4 text-right font-medium">Total Staff Cost</th>
                 <th className="py-3 pl-4 text-right font-medium">Action</th>
               </tr>
             </thead>
             <tbody>
               {loadingInfraProjects ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-muted-foreground">
+                  <td colSpan={7} className="py-8 text-center text-muted-foreground">
                     <span className="inline-flex items-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Loading infra projects...
@@ -467,7 +522,7 @@ export default function HodDashboard() {
               ) : null}
               {!loadingInfraProjects && filteredInfraProjects.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-muted-foreground">
+                  <td colSpan={7} className="py-8 text-center text-muted-foreground">
                     No infra projects match the selected filters.
                   </td>
                 </tr>
@@ -480,11 +535,43 @@ export default function HodDashboard() {
                       <td className="py-3 px-4"><Badge variant="outline">{project.subTechnicalUnitCode || "-"}</Badge></td>
                       <td className="py-3 px-4"><Badge>{project.lifecycle}</Badge></td>
                       <td className="py-3 px-4 text-right tabular-nums">{project.activeAssignments}</td>
+                      <td className="py-3 px-4 text-right tabular-nums text-muted-foreground">
+                        {formatHodCurrency(project.totalCost ?? 0)}
+                      </td>
                       <td className="py-3 pl-4 text-right">
-                        <Button size="sm" variant="outline" className="gap-1" onClick={() => setSelectedInfraProjectId(project.id)}>
-                          <Eye className="h-3.5 w-3.5" />
-                          View Team
-                        </Button>
+                        <div className="inline-flex items-center gap-2 justify-end">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1"
+                            onClick={() => {
+                              void downloadInfraProjectBillPdf({
+                                projectName: project.name,
+                                projectNumber: project.projectNumber || "",
+                                unitCode: project.subTechnicalUnitCode,
+                                lines: project.assignments.map((assignment, index) => ({
+                                  sr: index + 1,
+                                  name: assignment.teamMember.name,
+                                  email: assignment.teamMember.email || "",
+                                  role: assignment.teamMember.manpowerRole,
+                                  monthlyCost: assignment.teamMember.monthlyCost ?? null,
+                                  daysWorked: assignment.daysWorked ?? null,
+                                  amount: assignment.amount ?? 0
+                                })),
+                                totalAmount: project.totalCost ?? 0
+                              })
+                                .then(() => toast.success("Project bill PDF downloaded"))
+                                .catch((error) => toast.error(error instanceof Error ? error.message : "Failed to download PDF"));
+                            }}
+                          >
+                            <FileText className="h-3.5 w-3.5" />
+                            PDF
+                          </Button>
+                          <Button size="sm" variant="outline" className="gap-1" onClick={() => setSelectedInfraProjectId(project.id)}>
+                            <Eye className="h-3.5 w-3.5" />
+                            View Team
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -671,11 +758,11 @@ function KpiCard({
   );
 }
 
-function MiniStat({ label, value }: { label: string; value: number }) {
+function MiniStat({ label, value, isCurrency = false }: { label: string; value: number; isCurrency?: boolean }) {
   return (
     <div className="rounded-2xl border border-border/40 bg-secondary/20 p-4">
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="text-2xl font-bold mt-1">{value}</p>
+      <p className="text-2xl font-bold mt-1">{isCurrency ? formatHodCurrency(value) : value}</p>
     </div>
   );
 }

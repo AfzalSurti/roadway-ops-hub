@@ -1,7 +1,10 @@
 import type { InfraProjectItem } from "@/lib/domain";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Users2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { downloadInfraProjectBillExcel, downloadInfraProjectBillPdf } from "@/lib/infra-financial-export";
+import { FileSpreadsheet, FileText, Users2 } from "lucide-react";
+import { toast } from "sonner";
 
 type HodInfraProjectDetailDialogProps = {
   open: boolean;
@@ -18,11 +21,32 @@ function formatDate(value?: string | null) {
   });
 }
 
+function formatInr(value?: number | null) {
+  if (value == null) return "-";
+  return `₹${Number(value).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 export function HodInfraProjectDetailDialog({ open, onOpenChange, project }: HodInfraProjectDetailDialogProps) {
   if (!project) return null;
 
   const active = project.assignments.filter((item) => !item.demobilizedAt);
   const closed = project.assignments.filter((item) => item.demobilizedAt);
+
+  const billData = {
+    projectName: project.name,
+    projectNumber: project.projectNumber || "",
+    unitCode: project.subTechnicalUnitCode,
+    lines: project.assignments.map((assignment, index) => ({
+      sr: index + 1,
+      name: assignment.teamMember.name,
+      email: assignment.teamMember.email || "",
+      role: assignment.teamMember.manpowerRole,
+      monthlyCost: assignment.teamMember.monthlyCost ?? null,
+      daysWorked: assignment.daysWorked ?? null,
+      amount: assignment.amount ?? 0
+    })),
+    totalAmount: project.totalCost ?? 0
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -35,10 +59,43 @@ export function HodInfraProjectDetailDialog({ open, onOpenChange, project }: Hod
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm mb-4">
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-sm mb-4">
           <InfoField label="Project Number" value={project.projectNumber ?? "-"} />
           <InfoField label="Sub Technical Unit" value={project.subTechnicalUnitCode ?? "-"} />
           <InfoField label="Active Assignments" value={String(project.activeAssignments)} />
+          <InfoField label="Total Staff Cost" value={formatInr(project.totalCost ?? 0)} />
+        </div>
+
+        <div className="flex flex-wrap gap-2 mb-4">
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1"
+            onClick={() => {
+              void downloadInfraProjectBillPdf(billData)
+                .then(() => toast.success("Project bill PDF downloaded"))
+                .catch((error) => toast.error(error instanceof Error ? error.message : "Failed to download PDF"));
+            }}
+          >
+            <FileText className="h-3.5 w-3.5" />
+            Generate PDF
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1"
+            onClick={() => {
+              try {
+                downloadInfraProjectBillExcel(billData);
+                toast.success("Project bill Excel downloaded");
+              } catch (error) {
+                toast.error(error instanceof Error ? error.message : "Failed to download Excel");
+              }
+            }}
+          >
+            <FileSpreadsheet className="h-3.5 w-3.5" />
+            Generate Excel
+          </Button>
         </div>
 
         <div className="space-y-4">
@@ -63,6 +120,10 @@ export function HodInfraProjectDetailDialog({ open, onOpenChange, project }: Hod
                     <p className="text-xs text-muted-foreground mt-1">
                       Email: {assignment.teamMember.email || "-"} · Phone: {assignment.teamMember.phone || "-"}
                     </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Monthly: {formatInr(assignment.teamMember.monthlyCost)} · Days: {assignment.daysWorked ?? "-"} · Amount:{" "}
+                      {formatInr(assignment.amount ?? 0)}
+                    </p>
                     <p className="text-xs text-muted-foreground mt-1">Mobilized: {formatDate(assignment.mobilizedAt)}</p>
                   </div>
                 ))}
@@ -86,6 +147,10 @@ export function HodInfraProjectDetailDialog({ open, onOpenChange, project }: Hod
                     <p className="font-medium text-sm">{assignment.teamMember.name}</p>
                     <p className="text-xs text-muted-foreground mt-1">
                       {assignment.teamMember.manpowerGroup} · {assignment.teamMember.manpowerRole}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Monthly: {formatInr(assignment.teamMember.monthlyCost)} · Days: {assignment.daysWorked ?? "-"} · Amount:{" "}
+                      {formatInr(assignment.amount ?? 0)}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
                       Mobilized: {formatDate(assignment.mobilizedAt)} · Demobilized: {formatDate(assignment.demobilizedAt)}
