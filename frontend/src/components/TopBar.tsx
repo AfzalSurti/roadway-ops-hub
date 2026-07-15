@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import type { AppNotification, TaskItem } from "@/lib/domain";
 import { toast } from "sonner";
+import { BackButton } from "@/components/BackButton";
 
 export function TopBar() {
   const { user } = useAuth();
@@ -101,12 +102,12 @@ export function TopBar() {
   }, [selectedNotification]);
 
   return (
-    <header className="h-16 border-b border-border bg-background/80 backdrop-blur-xl sticky top-0 z-30 flex items-center justify-between px-6">
-      {/* Search */}
-      <div className="flex items-center gap-3 flex-1 max-w-md">
-        <div className="flex items-center gap-2 w-full px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 text-muted-foreground text-sm">
+    <header className="h-16 border-b border-border bg-background/80 backdrop-blur-xl sticky top-0 z-30 flex items-center justify-between px-6 gap-3">
+      <div className="flex items-center gap-3 flex-1 min-w-0 max-w-xl">
+        <BackButton />
+        <div className="flex items-center gap-2 w-full px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 text-muted-foreground text-sm min-w-0">
           <Search className="h-4 w-4 shrink-0" />
-          <span className="hidden sm:inline">Search tasks, reports…</span>
+          <span className="hidden sm:inline truncate">Search tasks, reports…</span>
           <kbd className="ml-auto hidden sm:inline-flex items-center gap-0.5 rounded bg-muted px-1.5 py-0.5 text-xs font-mono text-muted-foreground">
             ⌘K
           </kbd>
