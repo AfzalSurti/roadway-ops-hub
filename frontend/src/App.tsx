@@ -29,6 +29,7 @@ import HodDashboard from "./pages/hod/Dashboard";
 import InfraDashboard from "./pages/infra/Dashboard";
 import InfraProjects from "./pages/infra/Projects";
 import InfraTeam from "./pages/infra/Team";
+import InfraFinancial from "./pages/infra/Financial";
 import ExpenseDashboard from "./pages/admin/ExpenseDashboard";
 import ExpenseList from "./pages/admin/ExpenseList";
 import AdminExpenseDetail from "./pages/admin/ExpenseDetail";
@@ -145,6 +146,7 @@ function AppRoutes() {
         <Route path="dashboard" element={<InfraDashboard />} />
         <Route path="projects" element={<InfraProjects />} />
         <Route path="team" element={<InfraTeam />} />
+        <Route path="financial" element={<InfraFinancial />} />
       </Route>
 
       {/* Employee Routes */}

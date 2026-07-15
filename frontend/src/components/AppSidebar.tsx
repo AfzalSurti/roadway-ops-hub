@@ -42,6 +42,7 @@ const infraNav = [
   { to: "/infra/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/infra/projects", icon: FolderKanban, label: "Projects" },
   { to: "/infra/team", icon: Users, label: "Team" },
+  { to: "/infra/financial", icon: Landmark, label: "Financial" },
 ];
 
 const employeeNav = [
