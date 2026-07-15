@@ -6,10 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { HodActivityChartDialog } from "@/components/hod/HodActivityChartDialog";
 import { HodDprOverviewSection } from "@/components/hod/HodDprOverviewSection";
+import { HodInfraProjectDetailDialog } from "@/components/hod/HodInfraProjectDetailDialog";
 import { HodProjectDetailDialog } from "@/components/hod/HodProjectDetailDialog";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import type { FinancialProjectBillStatusRow, ProjectItem } from "@/lib/domain";
+import type { FinancialProjectBillStatusRow, InfraProjectItem, ProjectItem } from "@/lib/domain";
 import {
   collectHodFinancialYearOptions,
   compareHodProjectsByNumber,
@@ -42,6 +43,9 @@ export default function HodDashboard() {
   const [financialYearFilter, setFinancialYearFilter] = useState("ALL");
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [chartProjectId, setChartProjectId] = useState<string | null>(null);
+  const [infraUnitFilter, setInfraUnitFilter] = useState<string>("ALL");
+  const [infraLifecycleFilter, setInfraLifecycleFilter] = useState<string>("ALL");
+  const [selectedInfraProjectId, setSelectedInfraProjectId] = useState<string | null>(null);
 
   const { data: projects = [], isLoading: loadingProjects, refetch: refetchProjects } = useQuery({
     queryKey: ["hod-projects"],
@@ -64,6 +68,18 @@ export default function HodDashboard() {
   const { data: infraOverview } = useQuery({
     queryKey: ["infra-overview"],
     queryFn: () => api.getInfraOverview(),
+    staleTime: 5 * 60 * 1000
+  });
+
+  const { data: infraProjects = [], isLoading: loadingInfraProjects, refetch: refetchInfraProjects } = useQuery({
+    queryKey: ["infra-projects", "hod"],
+    queryFn: () => api.getInfraProjects(),
+    staleTime: 5 * 60 * 1000
+  });
+
+  const { data: infraTeam = [] } = useQuery({
+    queryKey: ["infra-team", "hod"],
+    queryFn: () => api.getInfraTeamMembers(),
     staleTime: 5 * 60 * 1000
   });
 
@@ -182,6 +198,22 @@ export default function HodDashboard() {
   const selectedRow = selectedProjectId ? projectRows.find((row) => row.project.id === selectedProjectId) ?? null : null;
   const chartRow = chartProjectId ? projectRows.find((row) => row.project.id === chartProjectId) ?? null : null;
 
+  const filteredInfraProjects = useMemo(() => {
+    return infraProjects.filter((project) => {
+      const unit = project.subTechnicalUnitCode ?? "";
+      if (infraUnitFilter !== "ALL" && unit !== infraUnitFilter) return false;
+      if (infraLifecycleFilter !== "ALL" && project.lifecycle !== infraLifecycleFilter) return false;
+      return true;
+    });
+  }, [infraProjects, infraUnitFilter, infraLifecycleFilter]);
+
+  const selectedInfraProject =
+    selectedInfraProjectId
+      ? filteredInfraProjects.find((project) => project.id === selectedInfraProjectId) ??
+        infraProjects.find((project) => project.id === selectedInfraProjectId) ??
+        null
+      : null;
+
   const resetFilters = () => {
     setSearch("");
     setOrganizationFilter("ALL");
@@ -189,10 +221,12 @@ export default function HodDashboard() {
     setSubTechnicalUnitFilter("ALL");
     setWorkCategoryFilter("ALL");
     setFinancialYearFilter("ALL");
+    setInfraUnitFilter("ALL");
+    setInfraLifecycleFilter("ALL");
   };
 
   const refreshAll = async () => {
-    await Promise.all([refetchProjects(), refetchTasks(), refetchFinancial()]);
+    await Promise.all([refetchProjects(), refetchTasks(), refetchFinancial(), refetchInfraProjects()]);
   };
 
   const isLoading = loadingProjects || loadingTasks || loadingFinancial;
@@ -342,28 +376,121 @@ export default function HodDashboard() {
       </div>
 
       <div className="glass-panel p-6 mb-6">
-        <div className="flex items-center justify-between gap-3 mb-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between mb-4">
           <div>
-            <h3 className="font-semibold text-lg">Infra Snapshot</h3>
-            <p className="text-sm text-muted-foreground">Read-only visibility into infra project and team status.</p>
+            <h3 className="font-semibold text-lg">Infra Monitoring</h3>
+            <p className="text-sm text-muted-foreground">
+              Read-only infra projects (IE / AE / PM / TP) with mobilized employee details from Infra Admin.
+            </p>
           </div>
-          <Badge variant="secondary" className="rounded-full">
-            {infraOverview?.teamMembers ?? 0} team members
+          <Badge variant="secondary" className="rounded-full self-start">
+            {infraOverview?.teamMembers ?? 0} team members · {infraTeam.filter((m) => m.mobilizedAt && !m.demobilizedAt).length}{" "}
+            mobilized
           </Badge>
         </div>
+
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-          <MiniStat label="Infra Projects" value={infraOverview?.totalProjects ?? 0} />
-          <MiniStat label="Ongoing" value={infraOverview?.ongoingProjects ?? 0} />
-          <MiniStat label="Completed" value={infraOverview?.completedProjects ?? 0} />
+          <button type="button" className="text-left" onClick={() => { setInfraUnitFilter("ALL"); setInfraLifecycleFilter("ALL"); }}>
+            <MiniStat label="Infra Projects" value={infraOverview?.totalProjects ?? 0} />
+          </button>
+          <button type="button" className="text-left" onClick={() => setInfraLifecycleFilter("ONGOING")}>
+            <MiniStat label="Ongoing" value={infraOverview?.ongoingProjects ?? 0} />
+          </button>
+          <button type="button" className="text-left" onClick={() => setInfraLifecycleFilter("COMPLETED")}>
+            <MiniStat label="Completed" value={infraOverview?.completedProjects ?? 0} />
+          </button>
           <MiniStat label="Mobilized" value={infraOverview?.mobilizedTeamMembers ?? 0} />
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
           {(infraOverview?.byUnit ?? []).map((unit) => (
-            <div key={unit.code} className="rounded-2xl border border-border/40 bg-secondary/20 p-4">
+            <button
+              key={unit.code}
+              type="button"
+              onClick={() => setInfraUnitFilter(unit.code)}
+              className={`rounded-2xl border p-4 text-left transition-colors ${
+                infraUnitFilter === unit.code ? "border-primary/50 bg-primary/10" : "border-border/40 bg-secondary/20 hover:border-primary/30"
+              }`}
+            >
               <p className="text-xs text-muted-foreground">{unit.code}</p>
               <p className="text-2xl font-bold mt-1">{unit.count}</p>
-            </div>
+            </button>
           ))}
+        </div>
+
+        <div className="flex flex-wrap gap-2 mb-4">
+          <Select value={infraUnitFilter} onValueChange={setInfraUnitFilter}>
+            <SelectTrigger className="w-[150px]"><SelectValue placeholder="Unit" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Units</SelectItem>
+              <SelectItem value="IE">IE</SelectItem>
+              <SelectItem value="AE">AE</SelectItem>
+              <SelectItem value="PM">PM</SelectItem>
+              <SelectItem value="TP">TP</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={infraLifecycleFilter} onValueChange={setInfraLifecycleFilter}>
+            <SelectTrigger className="w-[160px]"><SelectValue placeholder="Status" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Status</SelectItem>
+              <SelectItem value="ONGOING">Ongoing</SelectItem>
+              <SelectItem value="COMPLETED">Completed</SelectItem>
+            </SelectContent>
+          </Select>
+          <Badge variant="outline" className="rounded-full self-center">
+            {filteredInfraProjects.length} showing
+          </Badge>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[900px]">
+            <thead>
+              <tr className="border-b border-border/40 text-muted-foreground">
+                <th className="py-3 pr-4 text-left font-medium">Project Number</th>
+                <th className="py-3 px-4 text-left font-medium">Project Name</th>
+                <th className="py-3 px-4 text-left font-medium">Unit</th>
+                <th className="py-3 px-4 text-left font-medium">Lifecycle</th>
+                <th className="py-3 px-4 text-right font-medium">Active Staff</th>
+                <th className="py-3 pl-4 text-right font-medium">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loadingInfraProjects ? (
+                <tr>
+                  <td colSpan={6} className="py-8 text-center text-muted-foreground">
+                    <span className="inline-flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading infra projects...
+                    </span>
+                  </td>
+                </tr>
+              ) : null}
+              {!loadingInfraProjects && filteredInfraProjects.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-8 text-center text-muted-foreground">
+                    No infra projects match the selected filters.
+                  </td>
+                </tr>
+              ) : null}
+              {!loadingInfraProjects
+                ? filteredInfraProjects.map((project: InfraProjectItem) => (
+                    <tr key={project.id} className="border-b border-border/20 hover:bg-secondary/20 transition-colors">
+                      <td className="py-3 pr-4 font-medium">{project.projectNumber || "-"}</td>
+                      <td className="py-3 px-4 max-w-[260px] truncate">{project.name}</td>
+                      <td className="py-3 px-4"><Badge variant="outline">{project.subTechnicalUnitCode || "-"}</Badge></td>
+                      <td className="py-3 px-4"><Badge>{project.lifecycle}</Badge></td>
+                      <td className="py-3 px-4 text-right tabular-nums">{project.activeAssignments}</td>
+                      <td className="py-3 pl-4 text-right">
+                        <Button size="sm" variant="outline" className="gap-1" onClick={() => setSelectedInfraProjectId(project.id)}>
+                          <Eye className="h-3.5 w-3.5" />
+                          View Team
+                        </Button>
+                      </td>
+                    </tr>
+                  ))
+                : null}
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -483,6 +610,14 @@ export default function HodDashboard() {
             setChartProjectId(selectedRow.project.id);
           }
         }}
+      />
+
+      <HodInfraProjectDetailDialog
+        open={Boolean(selectedInfraProject)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedInfraProjectId(null);
+        }}
+        project={selectedInfraProject}
       />
 
       <HodActivityChartDialog
