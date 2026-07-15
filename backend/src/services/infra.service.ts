@@ -133,39 +133,101 @@ export const infraService = {
     if (!member) throw notFound("Team member not found");
     return infraRepository.deleteTeamMember(id);
   },
-  async assignProject(projectId: string, payload: { teamMemberId: string; mobilizedAt?: string | null; daysWorked?: number | null }) {
+  async assignProject(
+    projectId: string,
+    payload: {
+      teamMemberId?: string;
+      teamMemberIds?: string[];
+      mode?: "assign" | "mobilize";
+      mobilizedAt?: string | null;
+      daysWorked?: number | null;
+    }
+  ) {
     const project = await infraRepository.findProjectById(projectId);
     if (!project) throw notFound("Project not found");
     if (!getProjectSubTechnicalUnitCode(project.projectNumber)) {
       throw badRequest("This project is not an Infra project (IE / AE / PM / TP)");
     }
-    const teamMember = await infraRepository.findTeamMemberById(payload.teamMemberId);
-    if (!teamMember) throw notFound("Team member not found");
 
-    const alreadyActive = project.assignments.some(
-      (assignment) => assignment.teamMemberId === payload.teamMemberId && assignment.demobilizedAt === null
+    const mode = payload.mode ?? (payload.mobilizedAt ? "mobilize" : "assign");
+    const memberIds = Array.from(
+      new Set([...(payload.teamMemberIds ?? []), ...(payload.teamMemberId ? [payload.teamMemberId] : [])])
     );
-    if (alreadyActive) {
-      throw badRequest("This team member is already mobilized on this project");
+    if (memberIds.length === 0) throw badRequest("Select at least one team member");
+
+    let mobilizedAt: Date | null = null;
+    if (mode === "mobilize") {
+      if (!payload.mobilizedAt) throw badRequest("Please select a mobilization date");
+      mobilizedAt = new Date(payload.mobilizedAt);
+      if (Number.isNaN(mobilizedAt.getTime())) throw badRequest("Please select a valid mobilization date");
     }
 
-    const mobilizedAt = payload.mobilizedAt ? new Date(payload.mobilizedAt) : new Date();
-    if (Number.isNaN(mobilizedAt.getTime())) {
-      throw badRequest("Please select a valid mobilization date");
+    const activeByMember = new Map(
+      project.assignments
+        .filter((assignment) => assignment.demobilizedAt === null)
+        .map((assignment) => [assignment.teamMemberId, assignment] as const)
+    );
+
+    const results = [];
+    for (const teamMemberId of memberIds) {
+      const teamMember = await infraRepository.findTeamMemberById(teamMemberId);
+      if (!teamMember) throw notFound(`Team member not found (${teamMemberId})`);
+
+      const activeAssignment = activeByMember.get(teamMemberId);
+
+      if (mode === "assign") {
+        if (activeAssignment) {
+          throw badRequest(`${teamMember.name} is already assigned to this project`);
+        }
+        const assignment = await infraRepository.createAssignment({
+          projectId,
+          teamMemberId,
+          mobilizedAt: null,
+          daysWorked: payload.daysWorked ?? null
+        });
+        await infraRepository.updateTeamMember(teamMember.id, {
+          currentProject: project.name,
+          demobilizedAt: null
+        });
+        activeByMember.set(teamMemberId, assignment as (typeof project.assignments)[number]);
+        results.push(assignment);
+        continue;
+      }
+
+      // mobilize
+      if (activeAssignment) {
+        if (activeAssignment.mobilizedAt) {
+          throw badRequest(`${teamMember.name} is already mobilized on this project`);
+        }
+        const updated = await infraRepository.updateAssignment(activeAssignment.id, {
+          mobilizedAt
+        });
+        await infraRepository.updateTeamMember(teamMember.id, {
+          currentProject: project.name,
+          mobilizedAt,
+          demobilizedAt: null
+        });
+        activeByMember.set(teamMemberId, { ...activeAssignment, mobilizedAt } as (typeof project.assignments)[number]);
+        results.push(updated);
+        continue;
+      }
+
+      const assignment = await infraRepository.createAssignment({
+        projectId,
+        teamMemberId,
+        mobilizedAt,
+        daysWorked: payload.daysWorked ?? null
+      });
+      await infraRepository.updateTeamMember(teamMember.id, {
+        currentProject: project.name,
+        mobilizedAt,
+        demobilizedAt: null
+      });
+      activeByMember.set(teamMemberId, assignment as (typeof project.assignments)[number]);
+      results.push(assignment);
     }
 
-    const assignment = await infraRepository.createAssignment({
-      projectId,
-      teamMemberId: payload.teamMemberId,
-      mobilizedAt,
-      daysWorked: payload.daysWorked ?? null
-    });
-    await infraRepository.updateTeamMember(teamMember.id, {
-      currentProject: project.name,
-      mobilizedAt,
-      demobilizedAt: null
-    });
-    return assignment;
+    return results.length === 1 ? results[0] : results;
   },
   async updateAssignment(
     id: string,

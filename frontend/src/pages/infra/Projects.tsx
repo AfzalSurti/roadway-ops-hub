@@ -1,16 +1,82 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { PageWrapper } from "@/components/PageWrapper";
+import { ProjectFinancialDetailsFields } from "@/components/admin/ProjectFinancialDetailsFields";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { api } from "@/lib/api";
+import type { InfraTeamMemberItem } from "@/lib/domain";
+import { projectToFinancialDetailsForm } from "@/lib/project-financial-details";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FolderKanban, Loader2, Plus, Search, UserRoundCheck, X } from "lucide-react";
+import { FolderKanban, Loader2, Search, UserMinus, UserPlus, Users, X } from "lucide-react";
 import { toast } from "sonner";
 
 const INFRA_CODES = ["IE", "AE", "PM", "TP"] as const;
+
+type PanelMode = "assign" | "mobilize" | null;
+
+function assignmentStatus(assignment: { mobilizedAt?: string | null; demobilizedAt?: string | null }) {
+  if (assignment.demobilizedAt) return "Demobilized" as const;
+  if (assignment.mobilizedAt) return "Mobilized" as const;
+  return "Assigned" as const;
+}
+
+function statusBadgeVariant(status: ReturnType<typeof assignmentStatus>) {
+  if (status === "Mobilized") return "default" as const;
+  if (status === "Assigned") return "secondary" as const;
+  return "outline" as const;
+}
+
+function MemberMultiSelect({
+  members,
+  selectedIds,
+  onChange,
+  emptyText
+}: {
+  members: InfraTeamMemberItem[];
+  selectedIds: string[];
+  onChange: (ids: string[]) => void;
+  emptyText: string;
+}) {
+  if (members.length === 0) {
+    return <p className="text-sm text-muted-foreground">{emptyText}</p>;
+  }
+
+  const toggle = (id: string, checked: boolean) => {
+    onChange(checked ? [...selectedIds, id] : selectedIds.filter((item) => item !== id));
+  };
+
+  return (
+    <div className="max-h-56 overflow-y-auto rounded-xl border border-border/40 divide-y divide-border/30">
+      {members.map((member) => {
+        const checked = selectedIds.includes(member.id);
+        return (
+          <label
+            key={member.id}
+            className="flex items-start gap-3 px-3 py-2.5 cursor-pointer hover:bg-secondary/30 transition-colors"
+          >
+            <Checkbox
+              checked={checked}
+              onCheckedChange={(value) => toggle(member.id, value === true)}
+              className="mt-0.5"
+              aria-label={`Select ${member.name}`}
+            />
+            <span className="min-w-0">
+              <span className="block text-sm font-medium">{member.name}</span>
+              <span className="block text-xs text-muted-foreground">
+                {member.manpowerRole}
+                {member.email ? ` · ${member.email}` : ""}
+              </span>
+            </span>
+          </label>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function InfraProjects() {
   const queryClient = useQueryClient();
@@ -19,13 +85,14 @@ export default function InfraProjects() {
   const [unitFilter, setUnitFilter] = useState<string>(searchParams.get("unit") ?? "ALL");
   const [lifecycleFilter, setLifecycleFilter] = useState<string>(searchParams.get("lifecycle") ?? "ALL");
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(searchParams.get("open"));
-  const [teamMemberId, setTeamMemberId] = useState("");
+  const [panelMode, setPanelMode] = useState<PanelMode>(null);
+  const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [mobilizedAt, setMobilizedAt] = useState(new Date().toISOString().slice(0, 10));
   const [demobilizedAt, setDemobilizedAt] = useState(new Date().toISOString().slice(0, 10));
 
   const { data: projects = [], isLoading } = useQuery({ queryKey: ["infra-projects"], queryFn: () => api.getInfraProjects() });
   const { data: team = [] } = useQuery({ queryKey: ["infra-team"], queryFn: () => api.getInfraTeamMembers() });
-  const { data: selectedProject } = useQuery({
+  const { data: selectedProject, isLoading: loadingSelected } = useQuery({
     queryKey: ["infra-project", selectedProjectId],
     queryFn: () => (selectedProjectId ? api.getInfraProject(selectedProjectId) : Promise.resolve(null)),
     enabled: Boolean(selectedProjectId)
@@ -40,25 +107,62 @@ export default function InfraProjects() {
     if (open) setSelectedProjectId(open);
   }, [searchParams]);
 
+  useEffect(() => {
+    setPanelMode(null);
+    setSelectedMemberIds([]);
+  }, [selectedProjectId]);
+
+  const refreshProjectQueries = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["infra-projects"] }),
+      queryClient.invalidateQueries({ queryKey: ["infra-project", selectedProjectId] }),
+      queryClient.invalidateQueries({ queryKey: ["infra-overview"] }),
+      queryClient.invalidateQueries({ queryKey: ["infra-team"] })
+    ]);
+  };
+
   const assignMutation = useMutation({
     mutationFn: () => {
+      if (selectedMemberIds.length === 0) throw new Error("Select at least one employee");
+      return api.assignInfraProject(selectedProjectId!, {
+        teamMemberIds: selectedMemberIds,
+        mode: "assign"
+      });
+    },
+    onSuccess: async () => {
+      toast.success(
+        selectedMemberIds.length === 1
+          ? "Employee assigned to project"
+          : `${selectedMemberIds.length} employees assigned to project`
+      );
+      setSelectedMemberIds([]);
+      setPanelMode(null);
+      await refreshProjectQueries();
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to assign")
+  });
+
+  const mobilizeMutation = useMutation({
+    mutationFn: () => {
+      if (selectedMemberIds.length === 0) throw new Error("Select at least one employee");
       if (!mobilizedAt) throw new Error("Please select mobilization date");
       return api.assignInfraProject(selectedProjectId!, {
-        teamMemberId,
+        teamMemberIds: selectedMemberIds,
+        mode: "mobilize",
         mobilizedAt: new Date(`${mobilizedAt}T00:00:00`).toISOString()
       });
     },
     onSuccess: async () => {
-      toast.success("Employee mobilized to project");
-      setTeamMemberId("");
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["infra-projects"] }),
-        queryClient.invalidateQueries({ queryKey: ["infra-project", selectedProjectId] }),
-        queryClient.invalidateQueries({ queryKey: ["infra-overview"] }),
-        queryClient.invalidateQueries({ queryKey: ["infra-team"] })
-      ]);
+      toast.success(
+        selectedMemberIds.length === 1
+          ? "Employee mobilized to project"
+          : `${selectedMemberIds.length} employees mobilized to project`
+      );
+      setSelectedMemberIds([]);
+      setPanelMode(null);
+      await refreshProjectQueries();
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to assign project")
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to mobilize")
   });
 
   const demobilizeMutation = useMutation({
@@ -70,12 +174,7 @@ export default function InfraProjects() {
     },
     onSuccess: async () => {
       toast.success("Employee demobilized");
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["infra-projects"] }),
-        queryClient.invalidateQueries({ queryKey: ["infra-project", selectedProjectId] }),
-        queryClient.invalidateQueries({ queryKey: ["infra-overview"] }),
-        queryClient.invalidateQueries({ queryKey: ["infra-team"] })
-      ]);
+      await refreshProjectQueries();
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to demobilize")
   });
@@ -92,11 +191,48 @@ export default function InfraProjects() {
     });
   }, [projects, search, unitFilter, lifecycleFilter]);
 
+  const activeAssignments = useMemo(
+    () => (selectedProject?.assignments ?? []).filter((assignment) => !assignment.demobilizedAt),
+    [selectedProject]
+  );
+
+  const activeMemberIds = useMemo(
+    () => new Set(activeAssignments.map((assignment) => assignment.teamMemberId)),
+    [activeAssignments]
+  );
+
+  const assignableMembers = useMemo(
+    () => team.filter((member) => !activeMemberIds.has(member.id)),
+    [team, activeMemberIds]
+  );
+
+  const mobilizableMembers = useMemo(() => {
+    const assignedNotMobilized = activeAssignments
+      .filter((assignment) => !assignment.mobilizedAt)
+      .map((assignment) => assignment.teamMember);
+    const notOnProject = team.filter((member) => !activeMemberIds.has(member.id));
+    const byId = new Map<string, InfraTeamMemberItem>();
+    [...assignedNotMobilized, ...notOnProject].forEach((member) => byId.set(member.id, member));
+    return Array.from(byId.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [activeAssignments, team, activeMemberIds]);
+
+  const financialForm = useMemo(
+    () => (selectedProject ? projectToFinancialDetailsForm(selectedProject) : null),
+    [selectedProject]
+  );
+
   const closeDetails = () => {
     setSelectedProjectId(null);
+    setPanelMode(null);
+    setSelectedMemberIds([]);
     const next = new URLSearchParams(searchParams);
     next.delete("open");
     setSearchParams(next);
+  };
+
+  const openPanel = (mode: PanelMode) => {
+    setPanelMode(mode);
+    setSelectedMemberIds([]);
   };
 
   return (
@@ -163,7 +299,17 @@ export default function InfraProjects() {
                   <td className="py-3 px-4"><Badge>{project.lifecycle}</Badge></td>
                   <td className="py-3 px-4 text-right tabular-nums">{project.activeAssignments}</td>
                   <td className="py-3 pl-4 text-right">
-                    <Button variant="outline" size="sm" className="gap-1" onClick={() => setSelectedProjectId(project.id)}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1"
+                      onClick={() => {
+                        setSelectedProjectId(project.id);
+                        const next = new URLSearchParams(searchParams);
+                        next.set("open", project.id);
+                        setSearchParams(next);
+                      }}
+                    >
                       <FolderKanban className="h-3.5 w-3.5" />
                       View
                     </Button>
@@ -175,101 +321,215 @@ export default function InfraProjects() {
         </div>
       </div>
 
-      {selectedProject && selectedProjectId && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-background/60 backdrop-blur-sm" onClick={closeDetails}>
-          <div className="w-full max-w-2xl bg-card border-l border-border h-full overflow-y-auto p-6" onClick={(event) => event.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="font-semibold text-lg">Project Details</h3>
-                <p className="text-sm text-muted-foreground">{selectedProject.projectNumber || "No project number"}</p>
+      {selectedProjectId ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4" onClick={closeDetails}>
+          <div
+            className="glass-panel-strong w-full max-w-5xl max-h-[90vh] overflow-y-auto p-6"
+            onClick={(event) => event.stopPropagation()}
+          >
+            {loadingSelected || !selectedProject || !financialForm ? (
+              <div className="py-16 flex justify-center text-muted-foreground">
+                <span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />Loading project...</span>
               </div>
-              <button aria-label="Close" onClick={closeDetails} className="p-1.5 rounded-lg hover:bg-secondary/50"><X className="h-4 w-4" /></button>
-            </div>
-
-            <div className="grid gap-3 mb-6">
-              <div className="rounded-2xl border border-border/40 bg-secondary/20 p-4">
-                <p className="text-xs text-muted-foreground">Name</p>
-                <p className="font-medium mt-1">{selectedProject.name}</p>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-2xl border border-border/40 bg-secondary/20 p-4">
-                  <p className="text-xs text-muted-foreground">Sub Technical Unit</p>
-                  <p className="font-medium mt-1">{selectedProject.subTechnicalUnitCode || "-"}</p>
-                </div>
-                <div className="rounded-2xl border border-border/40 bg-secondary/20 p-4">
-                  <p className="text-xs text-muted-foreground">Active Assignments</p>
-                  <p className="font-medium mt-1">{selectedProject.activeAssignments}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-border/40 bg-secondary/20 p-4 mb-6 space-y-3">
-              <h4 className="font-semibold">Assign / Mobilize Employee</h4>
-              <Select value={teamMemberId} onValueChange={setTeamMemberId}>
-                <SelectTrigger><SelectValue placeholder="Select team member" /></SelectTrigger>
-                <SelectContent>
-                  {team.map((member) => (
-                    <SelectItem key={member.id} value={member.id}>
-                      {member.name} ({member.manpowerRole})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <div>
-                <label htmlFor="mobilize-date" className="text-xs text-muted-foreground mb-1.5 block">Mobilized Date *</label>
-                <Input id="mobilize-date" type="date" value={mobilizedAt} onChange={(e) => setMobilizedAt(e.target.value)} required />
-              </div>
-              <Button
-                onClick={() => assignMutation.mutate()}
-                disabled={!teamMemberId || !mobilizedAt || assignMutation.isPending}
-                className="gap-2"
-              >
-                <Plus className="h-4 w-4" />
-                {assignMutation.isPending ? "Saving..." : "Assign / Mobilize"}
-              </Button>
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <h4 className="font-semibold">Assigned Team</h4>
-                <div>
-                  <label htmlFor="demobilize-date" className="sr-only">Demobilize date</label>
-                  <Input id="demobilize-date" type="date" value={demobilizedAt} onChange={(e) => setDemobilizedAt(e.target.value)} className="w-[160px]" />
-                </div>
-              </div>
-              {selectedProject.assignments.length === 0 ? <p className="text-sm text-muted-foreground">No assignments yet.</p> : null}
-              {selectedProject.assignments.map((assignment) => (
-                <div key={assignment.id} className="rounded-2xl border border-border/40 bg-secondary/20 p-4 flex items-start justify-between gap-3">
+            ) : (
+              <>
+                <div className="flex items-start justify-between gap-3 mb-5">
                   <div>
-                    <p className="font-medium">{assignment.teamMember.name}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{assignment.teamMember.manpowerGroup} · {assignment.teamMember.manpowerRole}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Mobilized: {assignment.mobilizedAt ? new Date(assignment.mobilizedAt).toLocaleDateString("en-IN") : "-"}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Demobilized: {assignment.demobilizedAt ? new Date(assignment.demobilizedAt).toLocaleDateString("en-IN") : "-"}
+                    <h3 className="text-lg font-semibold">Project Details</h3>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      {selectedProject.projectNumber || "No project number"} · {selectedProject.lifecycle}
                     </p>
                   </div>
-                  {!assignment.demobilizedAt ? (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      className="gap-1"
-                      disabled={demobilizeMutation.isPending || !demobilizedAt}
-                      onClick={() => demobilizeMutation.mutate(assignment.id)}
-                    >
-                      <UserRoundCheck className="h-3.5 w-3.5" />
-                      Demobilize
-                    </Button>
+                  <button aria-label="Close" onClick={closeDetails} className="p-1.5 rounded-lg hover:bg-secondary/50">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm mb-2">
+                  <div className="sm:col-span-2">
+                    <p className="text-xs text-muted-foreground">Project Name</p>
+                    <p className="font-medium mt-1">{selectedProject.name}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Project Number</p>
+                    <p className="font-medium mt-1">{selectedProject.projectNumber || "-"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Sub Technical Unit</p>
+                    <p className="font-medium mt-1">{selectedProject.subTechnicalUnitCode || "-"}</p>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <p className="text-xs text-muted-foreground">Description</p>
+                    <p className="mt-1 text-sm">{selectedProject.description?.trim() || "No description added."}</p>
+                  </div>
+
+                  <ProjectFinancialDetailsFields form={financialForm} isEditing={false} onChange={() => undefined} />
+                </div>
+
+                <div className="border-t border-border/30 pt-5 mt-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                    <div>
+                      <p className="text-sm font-semibold text-primary">Team Deployment</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Assign links employees to the project. Mobilize sets the field start date.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant={panelMode === "assign" ? "default" : "outline"}
+                        size="sm"
+                        className="gap-1.5"
+                        onClick={() => openPanel(panelMode === "assign" ? null : "assign")}
+                      >
+                        <UserPlus className="h-3.5 w-3.5" />
+                        Assign
+                      </Button>
+                      <Button
+                        variant={panelMode === "mobilize" ? "default" : "outline"}
+                        size="sm"
+                        className="gap-1.5"
+                        onClick={() => openPanel(panelMode === "mobilize" ? null : "mobilize")}
+                      >
+                        <Users className="h-3.5 w-3.5" />
+                        Mobilize
+                      </Button>
+                    </div>
+                  </div>
+
+                  {panelMode === "assign" ? (
+                    <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 mb-5 space-y-3">
+                      <p className="text-sm font-medium">Assign employees (one or multiple)</p>
+                      <MemberMultiSelect
+                        members={assignableMembers}
+                        selectedIds={selectedMemberIds}
+                        onChange={setSelectedMemberIds}
+                        emptyText="All team members are already on this project."
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          onClick={() => assignMutation.mutate()}
+                          disabled={selectedMemberIds.length === 0 || assignMutation.isPending}
+                          className="gap-2"
+                        >
+                          <UserPlus className="h-4 w-4" />
+                          {assignMutation.isPending
+                            ? "Assigning..."
+                            : `Assign${selectedMemberIds.length ? ` (${selectedMemberIds.length})` : ""}`}
+                        </Button>
+                        <Button variant="ghost" onClick={() => openPanel(null)}>Cancel</Button>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {panelMode === "mobilize" ? (
+                    <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 mb-5 space-y-3">
+                      <p className="text-sm font-medium">Mobilize employees (one or multiple) + date</p>
+                      <MemberMultiSelect
+                        members={mobilizableMembers}
+                        selectedIds={selectedMemberIds}
+                        onChange={setSelectedMemberIds}
+                        emptyText="No employees available to mobilize."
+                      />
+                      <div>
+                        <label htmlFor="mobilize-date" className="text-xs text-muted-foreground mb-1.5 block">
+                          Mobilized Date *
+                        </label>
+                        <Input
+                          id="mobilize-date"
+                          type="date"
+                          value={mobilizedAt}
+                          onChange={(e) => setMobilizedAt(e.target.value)}
+                          className="max-w-[220px]"
+                          required
+                        />
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          onClick={() => mobilizeMutation.mutate()}
+                          disabled={selectedMemberIds.length === 0 || !mobilizedAt || mobilizeMutation.isPending}
+                          className="gap-2"
+                        >
+                          <Users className="h-4 w-4" />
+                          {mobilizeMutation.isPending
+                            ? "Mobilizing..."
+                            : `Mobilize${selectedMemberIds.length ? ` (${selectedMemberIds.length})` : ""}`}
+                        </Button>
+                        <Button variant="ghost" onClick={() => openPanel(null)}>Cancel</Button>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div className="flex items-center justify-between gap-3 mb-3">
+                    <p className="text-sm font-medium">Assigned / Mobilized Team</p>
+                    <div>
+                      <label htmlFor="demobilize-date" className="sr-only">Demobilize date</label>
+                      <Input
+                        id="demobilize-date"
+                        type="date"
+                        value={demobilizedAt}
+                        onChange={(e) => setDemobilizedAt(e.target.value)}
+                        className="w-[160px]"
+                      />
+                    </div>
+                  </div>
+
+                  {selectedProject.assignments.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No assignments yet.</p>
                   ) : (
-                    <Badge variant="outline">Closed</Badge>
+                    <div className="space-y-2">
+                      {selectedProject.assignments.map((assignment) => {
+                        const status = assignmentStatus(assignment);
+                        return (
+                          <div
+                            key={assignment.id}
+                            className="rounded-xl border border-border/40 bg-secondary/20 p-3 flex items-start justify-between gap-3"
+                          >
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="text-sm font-medium">{assignment.teamMember.name}</p>
+                                <Badge variant={statusBadgeVariant(status)}>{status}</Badge>
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {assignment.teamMember.manpowerGroup} · {assignment.teamMember.manpowerRole}
+                                {assignment.teamMember.email ? ` · ${assignment.teamMember.email}` : ""}
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Assigned: {new Date(assignment.createdAt).toLocaleDateString("en-IN")}
+                                {" · "}
+                                Mobilized:{" "}
+                                {assignment.mobilizedAt
+                                  ? new Date(assignment.mobilizedAt).toLocaleDateString("en-IN")
+                                  : "-"}
+                                {" · "}
+                                Demobilized:{" "}
+                                {assignment.demobilizedAt
+                                  ? new Date(assignment.demobilizedAt).toLocaleDateString("en-IN")
+                                  : "-"}
+                              </p>
+                            </div>
+                            {!assignment.demobilizedAt ? (
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                className="gap-1 shrink-0"
+                                disabled={demobilizeMutation.isPending || !demobilizedAt}
+                                onClick={() => demobilizeMutation.mutate(assignment.id)}
+                              >
+                                <UserMinus className="h-3.5 w-3.5" />
+                                Demobilize
+                              </Button>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
-              ))}
-            </div>
+              </>
+            )}
           </div>
         </div>
-      )}
+      ) : null}
     </PageWrapper>
   );
 }

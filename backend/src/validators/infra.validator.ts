@@ -52,11 +52,28 @@ export const createInfraTeamMemberSchema = z.object({
 
 export const updateInfraTeamMemberSchema = createInfraTeamMemberSchema.partial();
 
-export const createProjectAssignmentSchema = z.object({
-  teamMemberId: z.string().min(1, "Team member is required"),
-  mobilizedAt: z.string().datetime({ offset: true }).optional().nullable(),
-  daysWorked: optionalDaysWorked.optional()
-});
+export const createProjectAssignmentSchema = z
+  .object({
+    teamMemberId: z.string().min(1).optional(),
+    teamMemberIds: z.array(z.string().min(1)).min(1).optional(),
+    /** assign = link to project only; mobilize = set mobilization date */
+    mode: z.enum(["assign", "mobilize"]).optional(),
+    mobilizedAt: z.string().datetime({ offset: true }).optional().nullable(),
+    daysWorked: optionalDaysWorked.optional()
+  })
+  .superRefine((value, ctx) => {
+    const ids = [
+      ...(value.teamMemberIds ?? []),
+      ...(value.teamMemberId ? [value.teamMemberId] : [])
+    ];
+    if (ids.length === 0) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Select at least one team member", path: ["teamMemberIds"] });
+    }
+    const mode = value.mode ?? (value.mobilizedAt ? "mobilize" : "assign");
+    if (mode === "mobilize" && !value.mobilizedAt) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Mobilization date is required", path: ["mobilizedAt"] });
+    }
+  });
 
 export const updateProjectAssignmentSchema = z.object({
   mobilizedAt: z.string().datetime({ offset: true }).optional().nullable(),

@@ -478,7 +478,9 @@ export const api = {
   assignInfraProject(
     projectId: string,
     payload: {
-      teamMemberId: string;
+      teamMemberId?: string;
+      teamMemberIds?: string[];
+      mode?: "assign" | "mobilize";
       mobilizedAt?: string | null;
       daysWorked?: number | null;
     }
