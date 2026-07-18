@@ -14,6 +14,7 @@ import { assetRouter } from "./asset.routes.js";
 import { dprOverviewRouter } from "./dpr-overview.routes.js";
 import { expenseRouter } from "./expense.routes.js";
 import { infraRouter } from "./infra.routes.js";
+import { letterNumberingRouter } from "./letter-numbering.routes.js";
 
 export const apiRouter = Router();
 
@@ -32,3 +33,4 @@ apiRouter.use("/assets", assetRouter);
 apiRouter.use("/dpr-overviews", dprOverviewRouter);
 apiRouter.use("/expenses", expenseRouter);
 apiRouter.use("/infra", infraRouter);
+apiRouter.use("/letter-numbering", letterNumberingRouter);

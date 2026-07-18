@@ -45,6 +45,12 @@ enum Priority {
   URGENT
 }
 
+enum LetterCategory {
+  INWARD
+  OUTWARD
+  OTHER
+}
+
 enum ReportStatus {
   SUBMITTED
   APPROVED
@@ -155,6 +161,7 @@ model Project {
   dprOverview           ProjectDprOverview?
   expenseSheets         ExpenseSheet[]
   assignments           ProjectAssignment[]
+  letterProjects        LetterProject[]
 
   @@index([name])
   @@index([projectCodePrefix, financialYearShort])
@@ -667,4 +674,47 @@ model ExpenseApproval {
 
   @@index([expenseSheetId])
   @@index([reviewerId])
+}
+
+/// Letter Numbering module (DPR Admin) — project registry used by letter database
+model LetterProject {
+  id                 String        @id @default(cuid())
+  projectNumber      String
+  projectCode        String
+  shortName          String
+  fullName           String        @default("")
+  projectCoordinator String        @default("")
+  projectEngineer    String        @default("")
+  linkedProjectId    String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  linkedProject      Project?      @relation(fields: [linkedProjectId], references: [id], onDelete: SetNull)
+  letters            LetterEntry[]
+
+  @@unique([projectNumber, projectCode])
+  @@index([shortName])
+  @@index([linkedProjectId])
+}
+
+model LetterEntry {
+  id                String         @id @default(cuid())
+  letterProjectId   String
+  sortOrder         Float
+  serialLabel       String
+  letterDate        DateTime?
+  letterNumber      String         @default("")
+  category          LetterCategory
+  sentBy            String         @default("")
+  sentTo            String         @default("")
+  subject           String         @default("")
+  ccTo              String         @default("")
+  subjectCategory   String         @default("")
+  letterLinkUrl     String?
+  outwardSequence   String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  letterProject     LetterProject  @relation(fields: [letterProjectId], references: [id], onDelete: Cascade)
+
+  @@index([letterProjectId, sortOrder])
+  @@index([letterProjectId, category])
 }
