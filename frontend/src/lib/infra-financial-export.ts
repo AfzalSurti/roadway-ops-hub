@@ -10,6 +10,17 @@ export type InfraBillLine = {
   monthlyCost: number | null;
   daysWorked: number | null;
   amount: number;
+  actualAmount?: number | null;
+  drawnAmount?: number | null;
+  profitLoss?: number;
+};
+
+export type InfraOtherCostLine = {
+  sr: number;
+  description: string;
+  actualAmount: number | null;
+  drawnAmount: number | null;
+  profitLoss: number;
 };
 
 export type InfraProjectBillData = {
@@ -18,7 +29,11 @@ export type InfraProjectBillData = {
   unitCode?: string | null;
   generatedAt?: Date;
   lines: InfraBillLine[];
+  otherCosts?: InfraOtherCostLine[];
   totalAmount: number;
+  totalActualAmount?: number;
+  totalDrawnAmount?: number;
+  totalProfitLoss?: number;
 };
 
 export type InfraSummaryRow = {
@@ -27,6 +42,8 @@ export type InfraSummaryRow = {
   projectNumber: string;
   unitCode?: string | null;
   totalAmount: number;
+  totalDrawnAmount?: number;
+  totalProfitLoss?: number;
 };
 
 const COMPANY = "Geo Designs & Research Pvt. Ltd.";
@@ -85,7 +102,7 @@ export async function downloadInfraProjectBillPdf(data: InfraProjectBillData) {
 
   drawHeader(
     doc,
-    "Infra Staff Cost Bill",
+    "Infra Project Financial Monitoring",
     `Generated: ${generatedAt.toLocaleDateString("en-IN")}`,
     logo
   );
@@ -103,80 +120,102 @@ export async function downloadInfraProjectBillPdf(data: InfraProjectBillData) {
 
   autoTable(doc, {
     startY: 72,
-    head: [["Sr.", "Employee Name", "Email", "Role", "Monthly Cost (Rs.)", "Days", "Amount (Rs.)"]],
+    head: [["Sr.", "Employee", "Email", "Est.", "Actual", "Drawn", "P/L"]],
     body: data.lines.map((line) => [
       String(line.sr),
       line.name,
       line.email || "-",
-      line.role,
-      line.monthlyCost != null ? formatInr(line.monthlyCost) : "-",
-      line.daysWorked != null ? String(line.daysWorked) : "-",
-      formatInr(line.amount)
+      formatInr(line.amount),
+      line.actualAmount != null ? formatInr(line.actualAmount) : "-",
+      line.drawnAmount != null ? formatInr(line.drawnAmount) : "-",
+      formatInr(line.profitLoss ?? 0)
     ]),
     styles: { fontSize: 8, cellPadding: 2 },
     headStyles: { fillColor: [11, 61, 145], textColor: 255 },
-    foot: [["", "", "", "", "", "Total", formatInr(data.totalAmount)]],
-    footStyles: { fillColor: [232, 245, 233], textColor: [31, 107, 46], fontStyle: "bold" },
     theme: "grid"
   });
 
-  const finalY = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 120;
-  doc.setFontSize(9);
-  doc.setTextColor(90);
-  doc.text("Formula: Amount = (Monthly Cost / 30) × Days Worked", 14, finalY + 10);
-  doc.text("This is a computer-generated industrial staff cost bill.", 14, finalY + 16);
+  let finalY = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 120;
+
+  if (data.otherCosts?.length) {
+    autoTable(doc, {
+      startY: finalY + 8,
+      head: [["Sr.", "Other Cost Description", "Actual", "Drawn", "P/L"]],
+      body: data.otherCosts.map((line) => [
+        String(line.sr),
+        line.description,
+        line.actualAmount != null ? formatInr(line.actualAmount) : "-",
+        line.drawnAmount != null ? formatInr(line.drawnAmount) : "-",
+        formatInr(line.profitLoss)
+      ]),
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [31, 107, 46], textColor: 255 },
+      theme: "grid"
+    });
+    finalY = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? finalY;
+  }
 
   doc.setFont("helvetica", "bold");
-  doc.setTextColor(BRAND);
-  doc.text("Authorized Signatory", 140, finalY + 36);
-  doc.setDrawColor(150);
-  doc.line(140, finalY + 32, 196, finalY + 32);
+  doc.setFontSize(10);
+  doc.setTextColor(20);
+  doc.text(`Total Actual: Rs. ${formatInr(data.totalActualAmount ?? 0)}`, 14, finalY + 10);
+  doc.text(`Total Drawn: Rs. ${formatInr(data.totalDrawnAmount ?? 0)}`, 14, finalY + 16);
+  doc.text(`Profit / Loss: Rs. ${formatInr(data.totalProfitLoss ?? 0)}`, 14, finalY + 22);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(90);
+  doc.text("P/L = Drawn (govt.) − Actual (paid). Estimated staff = (Monthly / 30) × Days.", 14, finalY + 30);
 
   const safeName = (data.projectNumber || data.projectName || "project").replace(/[^\w.-]+/g, "_");
-  doc.save(`Infra_Staff_Bill_${safeName}.pdf`);
+  doc.save(`Infra_Financial_Monitor_${safeName}.pdf`);
 }
 
 export async function downloadInfraProjectsSummaryPdf(rows: InfraSummaryRow[]) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const logo = await loadLogoDataUrl();
-  const total = Number(rows.reduce((sum, row) => sum + row.totalAmount, 0).toFixed(2));
+  const totalActual = Number(rows.reduce((sum, row) => sum + row.totalAmount, 0).toFixed(2));
+  const totalDrawn = Number(rows.reduce((sum, row) => sum + (row.totalDrawnAmount ?? 0), 0).toFixed(2));
+  const totalPl = Number(rows.reduce((sum, row) => sum + (row.totalProfitLoss ?? 0), 0).toFixed(2));
 
   drawHeader(
     doc,
-    "Infra Projects Cost Summary",
+    "Infra Projects Financial Summary",
     `Generated: ${new Date().toLocaleDateString("en-IN")}`,
     logo
   );
 
   autoTable(doc, {
     startY: 44,
-    head: [["Sr.", "Project Name", "Project Number", "Unit", "Total Cost (Rs.)"]],
+    head: [["Sr.", "Project Name", "Project Number", "Unit", "Actual", "Drawn", "P/L"]],
     body: rows.map((row) => [
       String(row.sr),
       row.projectName,
       row.projectNumber || "-",
       row.unitCode || "-",
-      formatInr(row.totalAmount)
+      formatInr(row.totalAmount),
+      formatInr(row.totalDrawnAmount ?? 0),
+      formatInr(row.totalProfitLoss ?? 0)
     ]),
-    styles: { fontSize: 9, cellPadding: 2.2 },
+    styles: { fontSize: 8, cellPadding: 2.2 },
     headStyles: { fillColor: [11, 61, 145], textColor: 255 },
-    foot: [["", "", "", "Grand Total", formatInr(total)]],
+    foot: [["", "", "", "Total", formatInr(totalActual), formatInr(totalDrawn), formatInr(totalPl)]],
     footStyles: { fillColor: [232, 245, 233], textColor: [31, 107, 46], fontStyle: "bold" },
     theme: "grid"
   });
 
-  doc.save("Infra_Projects_Cost_Summary.pdf");
+  doc.save("Infra_Projects_Financial_Summary.pdf");
 }
 
 export function downloadInfraProjectBillExcel(data: InfraProjectBillData) {
   const sheetData = [
     [COMPANY],
-    ["Infra Staff Cost Bill"],
+    ["Infra Project Financial Monitoring"],
     [`Project Name: ${data.projectName}`],
     [`Project Number: ${data.projectNumber || "-"}`],
     [`Sub Technical Unit: ${data.unitCode || "-"}`],
     [],
-    ["Sr.", "Employee Name", "Email", "Role", "Monthly Cost (Rs.)", "Days Worked", "Amount (Rs.)"],
+    ["Sr.", "Employee Name", "Email", "Role", "Monthly Cost", "Days", "Estimated", "Actual", "Drawn", "P/L"],
     ...data.lines.map((line) => [
       line.sr,
       line.name,
@@ -184,34 +223,59 @@ export function downloadInfraProjectBillExcel(data: InfraProjectBillData) {
       line.role,
       line.monthlyCost ?? "",
       line.daysWorked ?? "",
-      line.amount
+      line.amount,
+      line.actualAmount ?? "",
+      line.drawnAmount ?? "",
+      line.profitLoss ?? 0
     ]),
     [],
-    ["", "", "", "", "", "Total", data.totalAmount]
+    ["Other Costs"],
+    ["Sr.", "Description", "Actual", "Drawn", "P/L"],
+    ...(data.otherCosts ?? []).map((line) => [
+      line.sr,
+      line.description,
+      line.actualAmount ?? "",
+      line.drawnAmount ?? "",
+      line.profitLoss
+    ]),
+    [],
+    ["Total Actual", data.totalActualAmount ?? 0],
+    ["Total Drawn", data.totalDrawnAmount ?? 0],
+    ["Profit / Loss", data.totalProfitLoss ?? 0]
   ];
 
   const workbook = XLSX.utils.book_new();
   const sheet = XLSX.utils.aoa_to_sheet(sheetData);
-  XLSX.utils.book_append_sheet(workbook, sheet, "Staff Bill");
+  XLSX.utils.book_append_sheet(workbook, sheet, "Monitoring");
   const safeName = (data.projectNumber || data.projectName || "project").replace(/[^\w.-]+/g, "_");
-  XLSX.writeFile(workbook, `Infra_Staff_Bill_${safeName}.xlsx`);
+  XLSX.writeFile(workbook, `Infra_Financial_Monitor_${safeName}.xlsx`);
 }
 
 export function downloadInfraProjectsSummaryExcel(rows: InfraSummaryRow[]) {
-  const total = Number(rows.reduce((sum, row) => sum + row.totalAmount, 0).toFixed(2));
+  const totalActual = Number(rows.reduce((sum, row) => sum + row.totalAmount, 0).toFixed(2));
+  const totalDrawn = Number(rows.reduce((sum, row) => sum + (row.totalDrawnAmount ?? 0), 0).toFixed(2));
+  const totalPl = Number(rows.reduce((sum, row) => sum + (row.totalProfitLoss ?? 0), 0).toFixed(2));
   const sheetData = [
     [COMPANY],
-    ["Infra Projects Cost Summary"],
+    ["Infra Projects Financial Summary"],
     [],
-    ["Sr.", "Project Name", "Project Number", "Unit", "Total Cost (Rs.)"],
-    ...rows.map((row) => [row.sr, row.projectName, row.projectNumber || "-", row.unitCode || "-", row.totalAmount]),
+    ["Sr.", "Project Name", "Project Number", "Unit", "Actual", "Drawn", "P/L"],
+    ...rows.map((row) => [
+      row.sr,
+      row.projectName,
+      row.projectNumber || "-",
+      row.unitCode || "-",
+      row.totalAmount,
+      row.totalDrawnAmount ?? 0,
+      row.totalProfitLoss ?? 0
+    ]),
     [],
-    ["", "", "", "Grand Total", total]
+    ["", "", "", "Grand Total", totalActual, totalDrawn, totalPl]
   ];
   const workbook = XLSX.utils.book_new();
   const sheet = XLSX.utils.aoa_to_sheet(sheetData);
   XLSX.utils.book_append_sheet(workbook, sheet, "Summary");
-  XLSX.writeFile(workbook, "Infra_Projects_Cost_Summary.xlsx");
+  XLSX.writeFile(workbook, "Infra_Projects_Financial_Summary.xlsx");
 }
 
 export function calcInfraAmount(monthlyCost?: number | null, daysWorked?: number | null) {
