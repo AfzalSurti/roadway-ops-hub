@@ -408,7 +408,9 @@ export default function HodDashboard() {
           <MiniStat label="Mobilized" value={infraOverview?.mobilizedTeamMembers ?? 0} />
         </div>
         <div className="mb-4">
-          <MiniStat label="Total Infra Staff Cost" value={infraOverview?.totalStaffCost ?? 0} isCurrency />
+          <MiniStat label="Infra Actual Given" value={infraOverview?.totalActualAmount ?? infraOverview?.totalStaffCost ?? 0} isCurrency />
+          <MiniStat label="Infra Drawn (Govt.)" value={infraOverview?.totalDrawnAmount ?? 0} isCurrency />
+          <MiniStat label="Infra Profit / Loss" value={infraOverview?.totalProfitLoss ?? 0} isCurrency />
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
@@ -460,7 +462,9 @@ export default function HodDashboard() {
                   projectName: project.name,
                   projectNumber: project.projectNumber || "",
                   unitCode: project.subTechnicalUnitCode,
-                  totalAmount: project.totalCost ?? 0
+                  totalAmount: project.totalActualAmount ?? 0,
+                  totalDrawnAmount: project.totalDrawnAmount ?? 0,
+                  totalProfitLoss: project.totalProfitLoss ?? 0
                 }))
               )
                 .then(() => toast.success("Infra summary PDF downloaded"))
@@ -482,7 +486,9 @@ export default function HodDashboard() {
                     projectName: project.name,
                     projectNumber: project.projectNumber || "",
                     unitCode: project.subTechnicalUnitCode,
-                    totalAmount: project.totalCost ?? 0
+                    totalAmount: project.totalActualAmount ?? 0,
+                    totalDrawnAmount: project.totalDrawnAmount ?? 0,
+                    totalProfitLoss: project.totalProfitLoss ?? 0
                   }))
                 );
                 toast.success("Infra summary Excel downloaded");
@@ -505,14 +511,16 @@ export default function HodDashboard() {
                 <th className="py-3 px-4 text-left font-medium">Unit</th>
                 <th className="py-3 px-4 text-left font-medium">Lifecycle</th>
                 <th className="py-3 px-4 text-right font-medium">Active Staff</th>
-                <th className="py-3 px-4 text-right font-medium">Total Staff Cost</th>
+                <th className="py-3 px-4 text-right font-medium">Actual</th>
+                <th className="py-3 px-4 text-right font-medium">Drawn</th>
+                <th className="py-3 px-4 text-right font-medium">P/L</th>
                 <th className="py-3 pl-4 text-right font-medium">Action</th>
               </tr>
             </thead>
             <tbody>
               {loadingInfraProjects ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-muted-foreground">
+                  <td colSpan={9} className="py-8 text-center text-muted-foreground">
                     <span className="inline-flex items-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Loading infra projects...
@@ -522,7 +530,7 @@ export default function HodDashboard() {
               ) : null}
               {!loadingInfraProjects && filteredInfraProjects.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-muted-foreground">
+                  <td colSpan={9} className="py-8 text-center text-muted-foreground">
                     No infra projects match the selected filters.
                   </td>
                 </tr>
@@ -536,7 +544,13 @@ export default function HodDashboard() {
                       <td className="py-3 px-4"><Badge>{project.lifecycle}</Badge></td>
                       <td className="py-3 px-4 text-right tabular-nums">{project.activeAssignments}</td>
                       <td className="py-3 px-4 text-right tabular-nums text-muted-foreground">
-                        {formatHodCurrency(project.totalCost ?? 0)}
+                        {formatHodCurrency(project.totalActualAmount ?? 0)}
+                      </td>
+                      <td className="py-3 px-4 text-right tabular-nums text-muted-foreground">
+                        {formatHodCurrency(project.totalDrawnAmount ?? 0)}
+                      </td>
+                      <td className="py-3 px-4 text-right tabular-nums text-muted-foreground">
+                        {formatHodCurrency(project.totalProfitLoss ?? 0)}
                       </td>
                       <td className="py-3 pl-4 text-right">
                         <div className="inline-flex items-center gap-2 justify-end">
@@ -556,9 +570,22 @@ export default function HodDashboard() {
                                   role: assignment.teamMember.manpowerRole,
                                   monthlyCost: assignment.teamMember.monthlyCost ?? null,
                                   daysWorked: assignment.daysWorked ?? null,
-                                  amount: assignment.amount ?? 0
+                                  amount: assignment.amount ?? 0,
+                                  actualAmount: assignment.actualAmount ?? null,
+                                  drawnAmount: assignment.drawnAmount ?? null,
+                                  profitLoss: assignment.profitLoss ?? 0
                                 })),
-                                totalAmount: project.totalCost ?? 0
+                                otherCosts: (project.infraOtherCosts ?? []).map((cost, index) => ({
+                                  sr: index + 1,
+                                  description: cost.description,
+                                  actualAmount: cost.actualAmount ?? null,
+                                  drawnAmount: cost.drawnAmount ?? null,
+                                  profitLoss: cost.profitLoss ?? 0
+                                })),
+                                totalAmount: project.totalCost ?? 0,
+                                totalActualAmount: project.totalActualAmount ?? 0,
+                                totalDrawnAmount: project.totalDrawnAmount ?? 0,
+                                totalProfitLoss: project.totalProfitLoss ?? 0
                               })
                                 .then(() => toast.success("Project bill PDF downloaded"))
                                 .catch((error) => toast.error(error instanceof Error ? error.message : "Failed to download PDF"));

@@ -11,8 +11,12 @@ import { api } from "@/lib/api";
 import type { InfraTeamMemberItem } from "@/lib/domain";
 import { projectToFinancialDetailsForm } from "@/lib/project-financial-details";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FolderKanban, Loader2, Search, UserMinus, UserPlus, Users, X } from "lucide-react";
+import { FolderKanban, Loader2, Plus, Search, Trash2, UserMinus, UserPlus, Users, X } from "lucide-react";
 import { toast } from "sonner";
+
+function formatInr(value: number) {
+  return `₹${Number(value || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
 
 const INFRA_CODES = ["IE", "AE", "PM", "TP"] as const;
 
@@ -89,6 +93,7 @@ export default function InfraProjects() {
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [mobilizedAt, setMobilizedAt] = useState(new Date().toISOString().slice(0, 10));
   const [demobilizedAt, setDemobilizedAt] = useState(new Date().toISOString().slice(0, 10));
+  const [otherDraft, setOtherDraft] = useState({ description: "", actualAmount: "", drawnAmount: "" });
 
   const { data: projects = [], isLoading } = useQuery({ queryKey: ["infra-projects"], queryFn: () => api.getInfraProjects() });
   const { data: team = [] } = useQuery({ queryKey: ["infra-team"], queryFn: () => api.getInfraTeamMembers() });
@@ -177,6 +182,40 @@ export default function InfraProjects() {
       await refreshProjectQueries();
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to demobilize")
+  });
+
+  const addOtherCostMutation = useMutation({
+    mutationFn: () => {
+      if (!selectedProjectId) throw new Error("No project selected");
+      if (!otherDraft.description.trim()) throw new Error("Description is required");
+      const actual = otherDraft.actualAmount.trim() === "" ? null : Number(otherDraft.actualAmount);
+      const drawn = otherDraft.drawnAmount.trim() === "" ? null : Number(otherDraft.drawnAmount);
+      if (actual !== null && (!Number.isFinite(actual) || actual < 0)) throw new Error("Invalid actual amount");
+      if (drawn !== null && (!Number.isFinite(drawn) || drawn < 0)) throw new Error("Invalid drawn amount");
+      return api.createInfraOtherCost(selectedProjectId, {
+        description: otherDraft.description.trim(),
+        actualAmount: actual === null ? null : Number(actual.toFixed(2)),
+        drawnAmount: drawn === null ? null : Number(drawn.toFixed(2))
+      });
+    },
+    onSuccess: async () => {
+      toast.success("Other cost added");
+      setOtherDraft({ description: "", actualAmount: "", drawnAmount: "" });
+      await refreshProjectQueries();
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to add other cost")
+  });
+
+  const deleteOtherCostMutation = useMutation({
+    mutationFn: (costId: string) => {
+      if (!selectedProjectId) throw new Error("No project selected");
+      return api.deleteInfraOtherCost(selectedProjectId, costId);
+    },
+    onSuccess: async () => {
+      toast.success("Other cost removed");
+      await refreshProjectQueries();
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to remove cost")
   });
 
   const filteredProjects = useMemo(() => {
@@ -364,6 +403,109 @@ export default function InfraProjects() {
                   </div>
 
                   <ProjectFinancialDetailsFields form={financialForm} isEditing={false} onChange={() => undefined} />
+                </div>
+
+                <div className="border-t border-border/30 pt-5 mt-4 space-y-3">
+                  <div>
+                    <p className="text-sm font-semibold text-primary">Other Project Costs</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Vehicle, equipment, misc. Optional actual (paid) and drawn (govt.) amounts. Included in Financial monitoring totals.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                    <Input
+                      className="sm:col-span-2"
+                      placeholder="Description (e.g. Vehicle amount)"
+                      value={otherDraft.description}
+                      onChange={(e) => setOtherDraft((prev) => ({ ...prev, description: e.target.value }))}
+                    />
+                    <Input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      placeholder="Actual (optional)"
+                      value={otherDraft.actualAmount}
+                      onChange={(e) => setOtherDraft((prev) => ({ ...prev, actualAmount: e.target.value }))}
+                    />
+                    <div className="flex gap-2">
+                      <Input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        placeholder="Drawn (optional)"
+                        value={otherDraft.drawnAmount}
+                        onChange={(e) => setOtherDraft((prev) => ({ ...prev, drawnAmount: e.target.value }))}
+                      />
+                      <Button
+                        size="sm"
+                        className="gap-1 shrink-0"
+                        disabled={addOtherCostMutation.isPending || !otherDraft.description.trim()}
+                        onClick={() => addOtherCostMutation.mutate()}
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        Add
+                      </Button>
+                    </div>
+                  </div>
+                  {(selectedProject.infraOtherCosts ?? []).length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No other costs added yet.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {(selectedProject.infraOtherCosts ?? []).map((cost) => {
+                        const pl = Number(((Number(cost.drawnAmount) || 0) - (Number(cost.actualAmount) || 0)).toFixed(2));
+                        return (
+                          <div
+                            key={cost.id}
+                            className="rounded-xl border border-border/40 bg-secondary/20 p-3 flex items-start justify-between gap-3"
+                          >
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium">{cost.description}</p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Actual: {cost.actualAmount != null ? formatInr(cost.actualAmount) : "-"}
+                                {" · "}
+                                Drawn: {cost.drawnAmount != null ? formatInr(cost.drawnAmount) : "-"}
+                                {" · "}
+                                P/L:{" "}
+                                <span className={pl > 0 ? "text-emerald-600" : pl < 0 ? "text-red-500" : ""}>
+                                  {formatInr(pl)}
+                                </span>
+                              </p>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={deleteOtherCostMutation.isPending}
+                              onClick={() => {
+                                if (window.confirm("Remove this other cost?")) {
+                                  deleteOtherCostMutation.mutate(cost.id);
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <div className="rounded-xl border border-primary/15 bg-primary/5 px-3 py-2 text-xs sm:text-sm grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <span>Actual total: <strong className="tabular-nums">{formatInr(selectedProject.totalActualAmount ?? 0)}</strong></span>
+                    <span>Drawn total: <strong className="tabular-nums">{formatInr(selectedProject.totalDrawnAmount ?? 0)}</strong></span>
+                    <span>
+                      P/L:{" "}
+                      <strong
+                        className={`tabular-nums ${
+                          (selectedProject.totalProfitLoss ?? 0) > 0
+                            ? "text-emerald-600"
+                            : (selectedProject.totalProfitLoss ?? 0) < 0
+                              ? "text-red-500"
+                              : ""
+                        }`}
+                      >
+                        {formatInr(selectedProject.totalProfitLoss ?? 0)}
+                      </strong>
+                    </span>
+                  </div>
                 </div>
 
                 <div className="border-t border-border/30 pt-5 mt-4">
