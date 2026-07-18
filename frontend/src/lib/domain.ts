@@ -114,6 +114,43 @@ export type InfraOverviewItem = {
   totalStaffCost?: number;
 };
 
+export type LetterCategory = "INWARD" | "OUTWARD" | "OTHER";
+
+export type LetterProjectItem = {
+  id: string;
+  projectNumber: string;
+  projectCode: string;
+  shortName: string;
+  fullName: string;
+  projectCoordinator: string;
+  projectEngineer: string;
+  linkedProjectId?: string | null;
+  linkedProject?: Pick<ProjectItem, "id" | "name" | "projectNumber"> | null;
+  _count?: { letters: number };
+  letters?: LetterEntryItem[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type LetterEntryItem = {
+  id: string;
+  letterProjectId: string;
+  sortOrder: number;
+  serialLabel: string;
+  letterDate?: string | null;
+  letterNumber: string;
+  category: LetterCategory;
+  sentBy: string;
+  sentTo: string;
+  subject: string;
+  ccTo: string;
+  subjectCategory: string;
+  letterLinkUrl?: string | null;
+  outwardSequence?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type ProjectDprOverviewItem = {
   id: string;
   projectId: string;

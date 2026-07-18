@@ -16,6 +16,7 @@ import AdminReports from "./pages/admin/Reports";
 import AdminFinancial from "./pages/admin/Financial";
 import AdminTeam from "./pages/admin/Team";
 import AdminProjects from "./pages/admin/Projects";
+import LetterNumbering from "./pages/admin/LetterNumbering";
 import EmployeeDashboard from "./pages/employee/Dashboard";
 import EmployeeTasks from "./pages/employee/Tasks";
 import TaskDetail from "./pages/employee/TaskDetail";
@@ -118,6 +119,7 @@ function AppRoutes() {
         <Route path="financial" element={<AdminFinancial />} />
         <Route path="team" element={<AdminTeam />} />
         <Route path="projects" element={<AdminProjects />} />
+        <Route path="letter-numbering" element={<LetterNumbering />} />
         <Route path="expenses">
           <Route index element={<ExpenseDashboard />} />
           <Route path="my">
@@ -134,6 +136,7 @@ function AppRoutes() {
       <Route path="/administrative" element={<PmoRoute><AppLayout /></PmoRoute>}>
         <Route path="dashboard" element={<AdministrativeDashboard />} />
         <Route path="project-management" element={<AdminProjects />} />
+        <Route path="letter-numbering" element={<LetterNumbering />} />
         <Route path="assets" element={<AssetManagement />} />
         <Route path="assets/:id" element={<AssetDetail />} />
       </Route>

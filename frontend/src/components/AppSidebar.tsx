@@ -8,6 +8,7 @@ import {
   FolderKanban,
   FileCheck,
   Landmark,
+  Mail,
   Receipt,
   Package,
   ChevronLeft,
@@ -26,11 +27,13 @@ const adminNav = [
   { to: "/admin/expenses", icon: Receipt, label: "Expenses" },
   { to: "/admin/team", icon: Users, label: "Team" },
   { to: "/admin/projects", icon: FolderKanban, label: "Projects" },
+  { to: "/admin/letter-numbering", icon: Mail, label: "Letter Numbering" },
 ];
 
 const administrativeNav = [
   { to: "/administrative/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/administrative/project-management", icon: FolderKanban, label: "Project Management" },
+  { to: "/administrative/letter-numbering", icon: Mail, label: "Letter Numbering" },
   { to: "/administrative/assets", icon: Package, label: "Asset Management" },
 ];
 

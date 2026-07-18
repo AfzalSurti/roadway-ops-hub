@@ -29,6 +29,9 @@ import type {
   InfraOverviewItem,
   InfraProjectItem,
   InfraTeamMemberItem,
+  LetterCategory,
+  LetterEntryItem,
+  LetterProjectItem,
   ProjectItem,
   ProjectRequisitionFormItem,
   ReportItem,
@@ -504,6 +507,155 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(payload)
     });
+  },
+
+  getLetterProjects() {
+    return request<LetterProjectItem[]>("/letter-numbering/projects");
+  },
+
+  getLetterProject(id: string) {
+    return request<LetterProjectItem>(`/letter-numbering/projects/${id}`);
+  },
+
+  getLetterMainProjects() {
+    return request<Array<Pick<ProjectItem, "id" | "name" | "description" | "projectNumber">>>(
+      "/letter-numbering/main-projects"
+    );
+  },
+
+  createLetterProject(payload: {
+    projectNumber: string;
+    projectCode: string;
+    shortName: string;
+    fullName?: string;
+    projectCoordinator?: string;
+    projectEngineer?: string;
+    linkedProjectId?: string | null;
+    syncToMainProject?: boolean;
+  }) {
+    return request<LetterProjectItem>("/letter-numbering/projects", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+  },
+
+  importLetterProject(payload: {
+    mainProjectId: string;
+    projectNumber?: string;
+    projectCode?: string;
+    shortName?: string;
+    fullName?: string;
+    projectCoordinator?: string;
+    projectEngineer?: string;
+  }) {
+    return request<LetterProjectItem>("/letter-numbering/projects/import", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+  },
+
+  syncLetterProjectToMain(id: string) {
+    return request<LetterProjectItem>(`/letter-numbering/projects/${id}/sync-to-main`, {
+      method: "POST"
+    });
+  },
+
+  updateLetterProject(
+    id: string,
+    payload: Partial<{
+      projectNumber: string;
+      projectCode: string;
+      shortName: string;
+      fullName: string;
+      projectCoordinator: string;
+      projectEngineer: string;
+    }>
+  ) {
+    return request<LetterProjectItem>(`/letter-numbering/projects/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    });
+  },
+
+  deleteLetterProject(id: string) {
+    return request<{ deleted: boolean }>(`/letter-numbering/projects/${id}`, { method: "DELETE" });
+  },
+
+  getLetterEntries(letterProjectId: string) {
+    return request<LetterEntryItem[]>(`/letter-numbering/projects/${letterProjectId}/letters`);
+  },
+
+  createLetterEntry(
+    letterProjectId: string,
+    payload: {
+      category: LetterCategory;
+      letterDate?: string | null;
+      sentBy?: string;
+      sentTo?: string;
+      subject?: string;
+      ccTo?: string;
+      subjectCategory?: string;
+      letterLinkUrl?: string | null;
+    }
+  ) {
+    return request<LetterEntryItem>(`/letter-numbering/projects/${letterProjectId}/letters`, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+  },
+
+  insertLetterEntry(
+    letterProjectId: string,
+    payload: {
+      afterLetterId: string;
+      category: LetterCategory;
+      letterDate?: string | null;
+      sentBy?: string;
+      sentTo?: string;
+      subject?: string;
+      ccTo?: string;
+      subjectCategory?: string;
+      letterLinkUrl?: string | null;
+    }
+  ) {
+    return request<LetterEntryItem>(`/letter-numbering/projects/${letterProjectId}/letters/insert`, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+  },
+
+  updateLetterEntry(
+    letterId: string,
+    payload: Partial<{
+      category: LetterCategory;
+      letterDate: string | null;
+      sentBy: string;
+      sentTo: string;
+      subject: string;
+      ccTo: string;
+      subjectCategory: string;
+      letterLinkUrl: string | null;
+    }>
+  ) {
+    return request<LetterEntryItem>(`/letter-numbering/letters/${letterId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    });
+  },
+
+  deleteLetterEntry(letterId: string) {
+    return request<{ deleted: boolean }>(`/letter-numbering/letters/${letterId}`, { method: "DELETE" });
+  },
+
+  getLetterSuggestions(args: {
+    field: "sentBy" | "sentTo" | "subject" | "ccTo";
+    q?: string;
+    letterProjectId?: string;
+  }) {
+    const params = new URLSearchParams({ field: args.field });
+    if (args.q) params.set("q", args.q);
+    if (args.letterProjectId) params.set("letterProjectId", args.letterProjectId);
+    return request<string[]>(`/letter-numbering/suggestions?${params.toString()}`);
   },
 
   getProjectRequisitionForms() {
