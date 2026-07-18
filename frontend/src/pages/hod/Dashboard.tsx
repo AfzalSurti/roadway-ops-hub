@@ -43,6 +43,14 @@ import { toast } from "sonner";
 /** Infra Admin sub-units from project number chars 3–4 (Supervision Consultancy). */
 const INFRA_SUB_UNITS = new Set(["IE", "AE", "PM", "TP"]);
 
+/** Same rule as Infra Admin API: chars 3–4 of project number. */
+function getInfraUnitFromProjectNumber(projectNumber?: string | null): string | null {
+  const number = projectNumber?.trim().toUpperCase();
+  if (!number || number.length < 4) return null;
+  const candidate = number.slice(2, 4);
+  return INFRA_SUB_UNITS.has(candidate) ? candidate : null;
+}
+
 export default function HodDashboard() {
   const [search, setSearch] = useState("");
   const [organizationFilter, setOrganizationFilter] = useState("ALL");
@@ -208,20 +216,25 @@ export default function HodDashboard() {
 
   /** Section view follows project-number filters: IE/AE/PM/TP → Infra; everything else → DPR. */
   const isInfraSection = INFRA_SUB_UNITS.has(subTechnicalUnitFilter);
+  const activeInfraUnit = isInfraSection ? subTechnicalUnitFilter : null;
 
   const filteredInfraProjects = useMemo(() => {
+    // Only when a specific infra sub-unit is selected — never show mixed IE+AE+PM+TP.
+    if (!activeInfraUnit) return [];
+
     const query = search.trim().toLowerCase();
     return infraProjects.filter((project) => {
+      const unitFromNumber = getInfraUnitFromProjectNumber(project.projectNumber);
+      // Strict: IE filter → only IE projects (from project number), not all infra
+      if (unitFromNumber !== activeInfraUnit) return false;
+
       const companyCode = getProjectCompanyCode(project);
       const technicalUnitCode = getProjectTechnicalUnitCode(project);
-      const subTechnicalUnitCode = project.subTechnicalUnitCode ?? getProjectSubTechnicalUnitCode(project);
       const workCategoryCode = getProjectWorkCategoryCode(project);
       const financialYearShort = getProjectFinancialYearShort(project);
 
-      if (!INFRA_SUB_UNITS.has(subTechnicalUnitCode ?? "")) return false;
       if (organizationFilter !== "ALL" && companyCode !== organizationFilter) return false;
       if (technicalUnitFilter !== "ALL" && technicalUnitCode !== technicalUnitFilter) return false;
-      if (subTechnicalUnitFilter !== "ALL" && subTechnicalUnitCode !== subTechnicalUnitFilter) return false;
       if (workCategoryFilter !== "ALL" && workCategoryCode !== workCategoryFilter) return false;
       if (
         financialYearFilter !== "ALL" &&
@@ -232,19 +245,19 @@ export default function HodDashboard() {
       if (infraLifecycleFilter !== "ALL" && project.lifecycle !== infraLifecycleFilter) return false;
 
       if (!query) return true;
-      const haystack = [project.name, project.projectNumber, subTechnicalUnitCode]
+      const haystack = [project.name, project.projectNumber, unitFromNumber]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
       return haystack.includes(query);
     });
   }, [
+    activeInfraUnit,
     financialYearFilter,
     infraLifecycleFilter,
     infraProjects,
     organizationFilter,
     search,
-    subTechnicalUnitFilter,
     technicalUnitFilter,
     workCategoryFilter
   ]);
@@ -286,10 +299,20 @@ export default function HodDashboard() {
     setInfraLifecycleFilter("ALL");
     setSelectedInfraProjectId(null);
     setSelectedProjectId(null);
+    setChartProjectId(null);
   };
 
   const refreshAll = async () => {
+    resetFilters();
     await Promise.all([refetchProjects(), refetchTasks(), refetchFinancial(), refetchInfraProjects()]);
+    toast.success("Refreshed — all filters cleared");
+  };
+
+  const selectInfraSubUnit = (code: string) => {
+    setTechnicalUnitFilter("S");
+    setSubTechnicalUnitFilter(code);
+    setInfraLifecycleFilter("ALL");
+    setSelectedInfraProjectId(null);
   };
 
   const isLoading = loadingProjects || loadingTasks || loadingFinancial;
@@ -302,7 +325,12 @@ export default function HodDashboard() {
           <h1 className="page-title">HOD Dashboard</h1>
           <p className="page-subtitle">Executive view of project progress and task activity (read-only).</p>
         </div>
-        <Button variant="outline" className="gap-2" onClick={() => void refreshAll()}>
+        <Button
+          variant="outline"
+          className="gap-2"
+          onClick={() => void refreshAll()}
+          title="Clear all filters and reload data"
+        >
           <RefreshCcw className="h-4 w-4" />
           Refresh
         </Button>
@@ -351,7 +379,12 @@ export default function HodDashboard() {
           <FilterField label="Sub Technical Unit">
             <Select
               value={subTechnicalUnitFilter}
-              onValueChange={setSubTechnicalUnitFilter}
+              onValueChange={(value) => {
+                setSubTechnicalUnitFilter(value);
+                setInfraLifecycleFilter("ALL");
+                setSelectedInfraProjectId(null);
+                setSelectedProjectId(null);
+              }}
               disabled={technicalUnitFilter === "ALL"}
             >
               <SelectTrigger>
@@ -439,14 +472,14 @@ export default function HodDashboard() {
       {technicalUnitFilter === "S" && subTechnicalUnitFilter === "ALL" ? (
         <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 mb-6 text-sm">
           You selected <strong>Supervision Consultancy</strong>. Choose a sub unit to open the right section:{" "}
-          <button type="button" className="text-primary underline font-medium" onClick={() => setSubTechnicalUnitFilter("IE")}>IE</button>
+          <button type="button" className="text-primary underline font-medium" onClick={() => selectInfraSubUnit("IE")}>IE</button>
           {", "}
-          <button type="button" className="text-primary underline font-medium" onClick={() => setSubTechnicalUnitFilter("AE")}>AE</button>
+          <button type="button" className="text-primary underline font-medium" onClick={() => selectInfraSubUnit("AE")}>AE</button>
           {", "}
-          <button type="button" className="text-primary underline font-medium" onClick={() => setSubTechnicalUnitFilter("PM")}>PM</button>
+          <button type="button" className="text-primary underline font-medium" onClick={() => selectInfraSubUnit("PM")}>PM</button>
           {", "}
-          <button type="button" className="text-primary underline font-medium" onClick={() => setSubTechnicalUnitFilter("TP")}>TP</button>
-          {" for Infra · or PC / FH / RS etc. for DPR."}
+          <button type="button" className="text-primary underline font-medium" onClick={() => selectInfraSubUnit("TP")}>TP</button>
+          {" for Infra (only that unit’s projects) · or PC / FH / RS etc. for DPR."}
         </div>
       ) : null}
 
@@ -591,7 +624,7 @@ export default function HodDashboard() {
               {!loadingInfraProjects && filteredInfraProjects.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="py-8 text-center text-muted-foreground">
-                    No infra projects match the selected filters.
+                    No {activeInfraUnit} projects match the selected filters.
                   </td>
                 </tr>
               ) : null}
