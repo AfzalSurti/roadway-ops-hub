@@ -40,6 +40,27 @@ const optionalDaysWorked = z
     return Number(num.toFixed(2));
   });
 
+const optionalMoney = (label: string) =>
+  z
+    .union([z.number(), z.string(), z.null(), z.undefined()])
+    .transform((value, ctx) => {
+      if (value === null || value === undefined || value === "") return null;
+      const num = typeof value === "number" ? value : Number(value);
+      if (!Number.isFinite(num)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: `${label} must be a valid number` });
+        return z.NEVER;
+      }
+      if (num < 0) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: `${label} cannot be negative` });
+        return z.NEVER;
+      }
+      if (num > 100_000_000) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: `${label} is too high` });
+        return z.NEVER;
+      }
+      return Number(num.toFixed(2));
+    });
+
 export const createInfraTeamMemberSchema = z.object({
   name: z.string().min(2, "Name is required"),
   email: z.string().email("Valid email is required").nullable().optional(),
@@ -78,5 +99,15 @@ export const createProjectAssignmentSchema = z
 export const updateProjectAssignmentSchema = z.object({
   mobilizedAt: z.string().datetime({ offset: true }).optional().nullable(),
   demobilizedAt: z.string().datetime({ offset: true }).optional().nullable(),
-  daysWorked: optionalDaysWorked.optional()
+  daysWorked: optionalDaysWorked.optional(),
+  actualAmount: optionalMoney("Actual amount").optional(),
+  drawnAmount: optionalMoney("Drawn amount").optional()
 });
+
+export const createInfraOtherCostSchema = z.object({
+  description: z.string().trim().min(1, "Description is required").max(500),
+  actualAmount: optionalMoney("Actual amount").optional(),
+  drawnAmount: optionalMoney("Drawn amount").optional()
+});
+
+export const updateInfraOtherCostSchema = createInfraOtherCostSchema.partial();

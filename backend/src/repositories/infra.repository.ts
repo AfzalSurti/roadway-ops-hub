@@ -8,7 +8,8 @@ export const infraRepository = {
         assignments: {
           include: { teamMember: true },
           orderBy: { createdAt: "desc" }
-        }
+        },
+        infraOtherCosts: { orderBy: { createdAt: "asc" } }
       }
     });
   },
@@ -19,7 +20,8 @@ export const infraRepository = {
         assignments: {
           include: { teamMember: true },
           orderBy: { createdAt: "desc" }
-        }
+        },
+        infraOtherCosts: { orderBy: { createdAt: "asc" } }
       }
     });
   },
@@ -86,11 +88,37 @@ export const infraRepository = {
   },
   updateAssignment(
     id: string,
-    data: { mobilizedAt?: Date | null; demobilizedAt?: Date | null; daysWorked?: number | null }
+    data: {
+      mobilizedAt?: Date | null;
+      demobilizedAt?: Date | null;
+      daysWorked?: number | null;
+      actualAmount?: number | null;
+      drawnAmount?: number | null;
+    }
   ) {
     return prisma.projectAssignment.update({ where: { id }, data });
   },
   findAssignmentById(id: string) {
     return prisma.projectAssignment.findUnique({ where: { id }, include: { teamMember: true, project: true } });
+  },
+  createOtherCost(data: {
+    projectId: string;
+    description: string;
+    actualAmount?: number | null;
+    drawnAmount?: number | null;
+  }) {
+    return prisma.infraProjectOtherCost.create({ data });
+  },
+  updateOtherCost(
+    id: string,
+    data: Partial<{ description: string; actualAmount: number | null; drawnAmount: number | null }>
+  ) {
+    return prisma.infraProjectOtherCost.update({ where: { id }, data });
+  },
+  deleteOtherCost(id: string) {
+    return prisma.infraProjectOtherCost.delete({ where: { id } });
+  },
+  findOtherCostById(id: string) {
+    return prisma.infraProjectOtherCost.findUnique({ where: { id } });
   }
 };

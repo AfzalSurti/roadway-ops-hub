@@ -90,17 +90,45 @@ export type ProjectAssignmentItem = {
   mobilizedAt?: string | null;
   demobilizedAt?: string | null;
   daysWorked?: number | null;
+  /** Estimated from monthlyCost/30 * days */
   amount?: number;
+  estimatedAmount?: number;
+  /** Amount actually paid to employee */
+  actualAmount?: number | null;
+  /** Amount drawn from government/client */
+  drawnAmount?: number | null;
+  profitLoss?: number;
   createdAt: string;
   updatedAt: string;
   teamMember?: InfraTeamMemberItem;
+};
+
+export type InfraOtherCostItem = {
+  id: string;
+  projectId: string;
+  description: string;
+  actualAmount?: number | null;
+  drawnAmount?: number | null;
+  profitLoss?: number;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type InfraProjectItem = ProjectItem & {
   subTechnicalUnitCode?: string | null;
   lifecycle: "ONGOING" | "COMPLETED";
   activeAssignments: number;
+  /** Estimated staff cost (legacy) */
   totalCost?: number;
+  staffEstimatedTotal?: number;
+  staffActualTotal?: number;
+  staffDrawnTotal?: number;
+  otherActualTotal?: number;
+  otherDrawnTotal?: number;
+  totalActualAmount?: number;
+  totalDrawnAmount?: number;
+  totalProfitLoss?: number;
+  infraOtherCosts?: InfraOtherCostItem[];
   assignments: Array<ProjectAssignmentItem & { teamMember: InfraTeamMemberItem }>;
 };
 
@@ -112,6 +140,9 @@ export type InfraOverviewItem = {
   teamMembers: number;
   mobilizedTeamMembers: number;
   totalStaffCost?: number;
+  totalActualAmount?: number;
+  totalDrawnAmount?: number;
+  totalProfitLoss?: number;
 };
 
 export type LetterCategory = "INWARD" | "OUTWARD" | "OTHER";

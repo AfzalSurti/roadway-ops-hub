@@ -29,5 +29,14 @@ export const infraController = {
   },
   async updateAssignment(req: Request, res: Response) {
     return sendSuccess(res, await infraService.updateAssignment(req.params.assignmentId, req.body));
+  },
+  async createOtherCost(req: Request, res: Response) {
+    return sendSuccess(res, await infraService.createOtherCost(req.params.id, req.body), 201);
+  },
+  async updateOtherCost(req: Request, res: Response) {
+    return sendSuccess(res, await infraService.updateOtherCost(req.params.costId, req.body));
+  },
+  async removeOtherCost(req: Request, res: Response) {
+    return sendSuccess(res, await infraService.removeOtherCost(req.params.costId));
   }
 };

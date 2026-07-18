@@ -26,6 +26,7 @@ import type {
   FinancialProjectSummary,
   FinancialRaBill,
   ProjectDprOverviewItem,
+  InfraOtherCostItem,
   InfraOverviewItem,
   InfraProjectItem,
   InfraTeamMemberItem,
@@ -501,11 +502,40 @@ export const api = {
       mobilizedAt?: string | null;
       demobilizedAt?: string | null;
       daysWorked?: number | null;
+      actualAmount?: number | null;
+      drawnAmount?: number | null;
     }
   ) {
     return request(`/infra/projects/${projectId}/assignments/${assignmentId}`, {
       method: "PATCH",
       body: JSON.stringify(payload)
+    });
+  },
+
+  createInfraOtherCost(
+    projectId: string,
+    payload: { description: string; actualAmount?: number | null; drawnAmount?: number | null }
+  ) {
+    return request<InfraOtherCostItem>(`/infra/projects/${projectId}/other-costs`, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+  },
+
+  updateInfraOtherCost(
+    projectId: string,
+    costId: string,
+    payload: Partial<{ description: string; actualAmount: number | null; drawnAmount: number | null }>
+  ) {
+    return request<InfraOtherCostItem>(`/infra/projects/${projectId}/other-costs/${costId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    });
+  },
+
+  deleteInfraOtherCost(projectId: string, costId: string) {
+    return request<{ deleted: boolean }>(`/infra/projects/${projectId}/other-costs/${costId}`, {
+      method: "DELETE"
     });
   },
 

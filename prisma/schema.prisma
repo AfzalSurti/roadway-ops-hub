@@ -162,25 +162,44 @@ model Project {
   expenseSheets         ExpenseSheet[]
   assignments           ProjectAssignment[]
   letterProjects        LetterProject[]
+  infraOtherCosts       InfraProjectOtherCost[]
 
   @@index([name])
   @@index([projectCodePrefix, financialYearShort])
 }
 
 model ProjectAssignment {
-  id          String   @id @default(cuid())
-  projectId    String
-  teamMemberId String
-  mobilizedAt  DateTime?
+  id           String    @id @default(cuid())
+  projectId     String
+  teamMemberId  String
+  mobilizedAt   DateTime?
   demobilizedAt DateTime?
-  daysWorked   Float?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  teamMember   InfraTeamMember @relation(fields: [teamMemberId], references: [id], onDelete: Cascade)
+  daysWorked    Float?
+  /// Amount actually paid / given to the employee for this project
+  actualAmount  Float?
+  /// Amount drawn / received from government (or client) against this employee
+  drawnAmount   Float?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  teamMember    InfraTeamMember @relation(fields: [teamMemberId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
   @@index([teamMemberId])
+}
+
+/// Non-staff project costs (vehicle, equipment, misc.) for Infra financial monitoring
+model InfraProjectOtherCost {
+  id          String   @id @default(cuid())
+  projectId    String
+  description String
+  actualAmount Float?
+  drawnAmount  Float?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
 }
 
 model InfraTeamMember {

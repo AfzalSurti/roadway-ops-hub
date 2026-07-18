@@ -15,19 +15,76 @@ function getProjectLifecycle(assignments: Array<{ demobilizedAt: Date | null }>)
   return assignments.every((assignment) => assignment.demobilizedAt !== null) ? ("COMPLETED" as const) : ("ONGOING" as const);
 }
 
+function money(value?: number | null) {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
 function calcAssignmentAmount(monthlyCost?: number | null, daysWorked?: number | null) {
-  const month = typeof monthlyCost === "number" && Number.isFinite(monthlyCost) ? monthlyCost : 0;
-  const days = typeof daysWorked === "number" && Number.isFinite(daysWorked) ? daysWorked : 0;
+  const month = money(monthlyCost);
+  const days = money(daysWorked);
   return Number(((month / 30) * days).toFixed(2));
 }
 
-function withFinancials<T extends { assignments: Array<{ daysWorked: number | null; teamMember: { monthlyCost: number | null } }> }>(project: T) {
-  const assignments = project.assignments.map((assignment) => ({
-    ...assignment,
-    amount: calcAssignmentAmount(assignment.teamMember.monthlyCost, assignment.daysWorked)
+function withFinancials<
+  T extends {
+    assignments: Array<{
+      daysWorked: number | null;
+      actualAmount?: number | null;
+      drawnAmount?: number | null;
+      teamMember: { monthlyCost: number | null };
+    }>;
+    infraOtherCosts?: Array<{
+      actualAmount?: number | null;
+      drawnAmount?: number | null;
+    }>;
+  }
+>(project: T) {
+  const assignments = project.assignments.map((assignment) => {
+    const estimatedAmount = calcAssignmentAmount(assignment.teamMember.monthlyCost, assignment.daysWorked);
+    const actualAmount = assignment.actualAmount ?? null;
+    const drawnAmount = assignment.drawnAmount ?? null;
+    const profitLoss = Number((money(drawnAmount) - money(actualAmount)).toFixed(2));
+    return {
+      ...assignment,
+      amount: estimatedAmount,
+      estimatedAmount,
+      actualAmount,
+      drawnAmount,
+      profitLoss
+    };
+  });
+
+  const otherCosts = (project.infraOtherCosts ?? []).map((cost) => ({
+    ...cost,
+    profitLoss: Number((money(cost.drawnAmount) - money(cost.actualAmount)).toFixed(2))
   }));
-  const totalCost = Number(assignments.reduce((sum, item) => sum + item.amount, 0).toFixed(2));
-  return { ...project, assignments, totalCost };
+
+  const staffEstimatedTotal = Number(assignments.reduce((sum, item) => sum + item.estimatedAmount, 0).toFixed(2));
+  const staffActualTotal = Number(assignments.reduce((sum, item) => sum + money(item.actualAmount), 0).toFixed(2));
+  const staffDrawnTotal = Number(assignments.reduce((sum, item) => sum + money(item.drawnAmount), 0).toFixed(2));
+  const otherActualTotal = Number(otherCosts.reduce((sum, item) => sum + money(item.actualAmount), 0).toFixed(2));
+  const otherDrawnTotal = Number(otherCosts.reduce((sum, item) => sum + money(item.drawnAmount), 0).toFixed(2));
+
+  const totalActualAmount = Number((staffActualTotal + otherActualTotal).toFixed(2));
+  const totalDrawnAmount = Number((staffDrawnTotal + otherDrawnTotal).toFixed(2));
+  const totalProfitLoss = Number((totalDrawnAmount - totalActualAmount).toFixed(2));
+  // Back-compat: totalCost was estimated staff cost; keep for existing UI/PDF
+  const totalCost = staffEstimatedTotal;
+
+  return {
+    ...project,
+    assignments,
+    infraOtherCosts: otherCosts,
+    totalCost,
+    staffEstimatedTotal,
+    staffActualTotal,
+    staffDrawnTotal,
+    otherActualTotal,
+    otherDrawnTotal,
+    totalActualAmount,
+    totalDrawnAmount,
+    totalProfitLoss
+  };
 }
 
 export const infraService = {
@@ -40,6 +97,9 @@ export const infraService = {
     const completedProjects = filtered.filter((project) => getProjectLifecycle(project.assignments) === "COMPLETED").length;
     const withCosts = filtered.map((project) => withFinancials(project));
     const totalStaffCost = Number(withCosts.reduce((sum, project) => sum + project.totalCost, 0).toFixed(2));
+    const totalActualAmount = Number(withCosts.reduce((sum, project) => sum + project.totalActualAmount, 0).toFixed(2));
+    const totalDrawnAmount = Number(withCosts.reduce((sum, project) => sum + project.totalDrawnAmount, 0).toFixed(2));
+    const totalProfitLoss = Number((totalDrawnAmount - totalActualAmount).toFixed(2));
 
     const byUnit = ["IE", "AE", "PM", "TP"].map((code) => ({
       code,
@@ -53,7 +113,10 @@ export const infraService = {
       byUnit,
       teamMembers: teamMembers.length,
       mobilizedTeamMembers: teamMembers.filter((member) => member.mobilizedAt && !member.demobilizedAt).length,
-      totalStaffCost
+      totalStaffCost,
+      totalActualAmount,
+      totalDrawnAmount,
+      totalProfitLoss
     };
   },
   async listProjects() {
@@ -231,7 +294,13 @@ export const infraService = {
   },
   async updateAssignment(
     id: string,
-    payload: { mobilizedAt?: string | null; demobilizedAt?: string | null; daysWorked?: number | null }
+    payload: {
+      mobilizedAt?: string | null;
+      demobilizedAt?: string | null;
+      daysWorked?: number | null;
+      actualAmount?: number | null;
+      drawnAmount?: number | null;
+    }
   ) {
     const assignment = await infraRepository.findAssignmentById(id);
     if (!assignment) throw notFound("Assignment not found");
@@ -256,7 +325,9 @@ export const infraService = {
     const updated = await infraRepository.updateAssignment(id, {
       mobilizedAt: nextMobilizedAt,
       demobilizedAt: nextDemobilizedAt,
-      daysWorked: payload.daysWorked === undefined ? undefined : payload.daysWorked
+      daysWorked: payload.daysWorked === undefined ? undefined : payload.daysWorked,
+      actualAmount: payload.actualAmount === undefined ? undefined : payload.actualAmount,
+      drawnAmount: payload.drawnAmount === undefined ? undefined : payload.drawnAmount
     });
 
     if (payload.demobilizedAt !== undefined) {
@@ -273,5 +344,44 @@ export const infraService = {
     }
 
     return updated;
+  },
+
+  async createOtherCost(
+    projectId: string,
+    payload: { description: string; actualAmount?: number | null; drawnAmount?: number | null }
+  ) {
+    const project = await infraRepository.findProjectById(projectId);
+    if (!project) throw notFound("Project not found");
+    if (!getProjectSubTechnicalUnitCode(project.projectNumber)) {
+      throw badRequest("This project is not an Infra project (IE / AE / PM / TP)");
+    }
+    const description = payload.description.trim();
+    if (!description) throw badRequest("Description is required");
+    return infraRepository.createOtherCost({
+      projectId,
+      description,
+      actualAmount: payload.actualAmount ?? null,
+      drawnAmount: payload.drawnAmount ?? null
+    });
+  },
+
+  async updateOtherCost(
+    id: string,
+    payload: Partial<{ description: string; actualAmount: number | null; drawnAmount: number | null }>
+  ) {
+    const cost = await infraRepository.findOtherCostById(id);
+    if (!cost) throw notFound("Other cost not found");
+    return infraRepository.updateOtherCost(id, {
+      description: payload.description?.trim(),
+      actualAmount: payload.actualAmount === undefined ? undefined : payload.actualAmount,
+      drawnAmount: payload.drawnAmount === undefined ? undefined : payload.drawnAmount
+    });
+  },
+
+  async removeOtherCost(id: string) {
+    const cost = await infraRepository.findOtherCostById(id);
+    if (!cost) throw notFound("Other cost not found");
+    await infraRepository.deleteOtherCost(id);
+    return { deleted: true };
   }
 };
