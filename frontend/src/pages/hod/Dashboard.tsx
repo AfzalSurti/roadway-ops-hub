@@ -40,6 +40,9 @@ import {
 } from "@/lib/infra-financial-export";
 import { toast } from "sonner";
 
+/** Infra Admin sub-units from project number chars 3–4 (Supervision Consultancy). */
+const INFRA_SUB_UNITS = new Set(["IE", "AE", "PM", "TP"]);
+
 export default function HodDashboard() {
   const [search, setSearch] = useState("");
   const [organizationFilter, setOrganizationFilter] = useState("ALL");
@@ -49,7 +52,6 @@ export default function HodDashboard() {
   const [financialYearFilter, setFinancialYearFilter] = useState("ALL");
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [chartProjectId, setChartProjectId] = useState<string | null>(null);
-  const [infraUnitFilter, setInfraUnitFilter] = useState<string>("ALL");
   const [infraLifecycleFilter, setInfraLifecycleFilter] = useState<string>("ALL");
   const [selectedInfraProjectId, setSelectedInfraProjectId] = useState<string | null>(null);
 
@@ -204,14 +206,68 @@ export default function HodDashboard() {
   const selectedRow = selectedProjectId ? projectRows.find((row) => row.project.id === selectedProjectId) ?? null : null;
   const chartRow = chartProjectId ? projectRows.find((row) => row.project.id === chartProjectId) ?? null : null;
 
+  /** Section view follows project-number filters: IE/AE/PM/TP → Infra; everything else → DPR. */
+  const isInfraSection = INFRA_SUB_UNITS.has(subTechnicalUnitFilter);
+
   const filteredInfraProjects = useMemo(() => {
+    const query = search.trim().toLowerCase();
     return infraProjects.filter((project) => {
-      const unit = project.subTechnicalUnitCode ?? "";
-      if (infraUnitFilter !== "ALL" && unit !== infraUnitFilter) return false;
+      const companyCode = getProjectCompanyCode(project);
+      const technicalUnitCode = getProjectTechnicalUnitCode(project);
+      const subTechnicalUnitCode = project.subTechnicalUnitCode ?? getProjectSubTechnicalUnitCode(project);
+      const workCategoryCode = getProjectWorkCategoryCode(project);
+      const financialYearShort = getProjectFinancialYearShort(project);
+
+      if (!INFRA_SUB_UNITS.has(subTechnicalUnitCode ?? "")) return false;
+      if (organizationFilter !== "ALL" && companyCode !== organizationFilter) return false;
+      if (technicalUnitFilter !== "ALL" && technicalUnitCode !== technicalUnitFilter) return false;
+      if (subTechnicalUnitFilter !== "ALL" && subTechnicalUnitCode !== subTechnicalUnitFilter) return false;
+      if (workCategoryFilter !== "ALL" && workCategoryCode !== workCategoryFilter) return false;
+      if (
+        financialYearFilter !== "ALL" &&
+        (financialYearShort == null || String(financialYearShort) !== financialYearFilter)
+      ) {
+        return false;
+      }
       if (infraLifecycleFilter !== "ALL" && project.lifecycle !== infraLifecycleFilter) return false;
-      return true;
+
+      if (!query) return true;
+      const haystack = [project.name, project.projectNumber, subTechnicalUnitCode]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(query);
     });
-  }, [infraProjects, infraUnitFilter, infraLifecycleFilter]);
+  }, [
+    financialYearFilter,
+    infraLifecycleFilter,
+    infraProjects,
+    organizationFilter,
+    search,
+    subTechnicalUnitFilter,
+    technicalUnitFilter,
+    workCategoryFilter
+  ]);
+
+  const infraTotals = useMemo(() => {
+    const ongoing = filteredInfraProjects.filter((project) => project.lifecycle === "ONGOING").length;
+    const completed = filteredInfraProjects.filter((project) => project.lifecycle === "COMPLETED").length;
+    const totalActual = Number(
+      filteredInfraProjects.reduce((sum, project) => sum + (project.totalActualAmount ?? 0), 0).toFixed(2)
+    );
+    const totalDrawn = Number(
+      filteredInfraProjects.reduce((sum, project) => sum + (project.totalDrawnAmount ?? 0), 0).toFixed(2)
+    );
+    const totalProfitLoss = Number((totalDrawn - totalActual).toFixed(2));
+    return {
+      total: filteredInfraProjects.length,
+      ongoing,
+      completed,
+      totalActual,
+      totalDrawn,
+      totalProfitLoss
+    };
+  }, [filteredInfraProjects]);
 
   const selectedInfraProject =
     selectedInfraProjectId
@@ -227,8 +283,9 @@ export default function HodDashboard() {
     setSubTechnicalUnitFilter("ALL");
     setWorkCategoryFilter("ALL");
     setFinancialYearFilter("ALL");
-    setInfraUnitFilter("ALL");
     setInfraLifecycleFilter("ALL");
+    setSelectedInfraProjectId(null);
+    setSelectedProjectId(null);
   };
 
   const refreshAll = async () => {
@@ -368,25 +425,54 @@ export default function HodDashboard() {
           </FilterField>
         </div>
 
-        <div className="mt-3 flex justify-end">
+        <div className="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <p className="text-xs text-muted-foreground">
+            Section follows project number: pick Technical Unit → Sub Unit.{" "}
+            <span className="font-medium text-foreground">IE / AE / PM / TP</span> opens Infra monitoring; other units open DPR monitoring.
+          </p>
           <Button variant="ghost" size="sm" onClick={resetFilters}>
             Reset filters
           </Button>
         </div>
       </div>
 
+      {technicalUnitFilter === "S" && subTechnicalUnitFilter === "ALL" ? (
+        <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 mb-6 text-sm">
+          You selected <strong>Supervision Consultancy</strong>. Choose a sub unit to open the right section:{" "}
+          <button type="button" className="text-primary underline font-medium" onClick={() => setSubTechnicalUnitFilter("IE")}>IE</button>
+          {", "}
+          <button type="button" className="text-primary underline font-medium" onClick={() => setSubTechnicalUnitFilter("AE")}>AE</button>
+          {", "}
+          <button type="button" className="text-primary underline font-medium" onClick={() => setSubTechnicalUnitFilter("PM")}>PM</button>
+          {", "}
+          <button type="button" className="text-primary underline font-medium" onClick={() => setSubTechnicalUnitFilter("TP")}>TP</button>
+          {" for Infra · or PC / FH / RS etc. for DPR."}
+        </div>
+      ) : null}
+
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <KpiCard label="Total Projects" value={totals.total} icon={FolderKanban} tone="text-primary bg-primary/10" />
-        <KpiCard label="Completed Projects" value={totals.completed} icon={CheckCircle2} tone="text-emerald-600 bg-emerald-500/10" />
-        <KpiCard label="Ongoing Projects" value={totals.ongoing} icon={Timer} tone="text-amber-600 bg-amber-500/10" />
+        {isInfraSection ? (
+          <>
+            <KpiCard label={`${subTechnicalUnitFilter} Projects`} value={infraTotals.total} icon={FolderKanban} tone="text-primary bg-primary/10" />
+            <KpiCard label="Completed" value={infraTotals.completed} icon={CheckCircle2} tone="text-emerald-600 bg-emerald-500/10" />
+            <KpiCard label="Ongoing" value={infraTotals.ongoing} icon={Timer} tone="text-amber-600 bg-amber-500/10" />
+          </>
+        ) : (
+          <>
+            <KpiCard label="Total Projects" value={totals.total} icon={FolderKanban} tone="text-primary bg-primary/10" />
+            <KpiCard label="Completed Projects" value={totals.completed} icon={CheckCircle2} tone="text-emerald-600 bg-emerald-500/10" />
+            <KpiCard label="Ongoing Projects" value={totals.ongoing} icon={Timer} tone="text-amber-600 bg-amber-500/10" />
+          </>
+        )}
       </div>
 
+      {isInfraSection ? (
       <div className="glass-panel p-6 mb-6">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between mb-4">
           <div>
-            <h3 className="font-semibold text-lg">Infra Monitoring</h3>
+            <h3 className="font-semibold text-lg">Infra Monitoring · {subTechnicalUnitFilter}</h3>
             <p className="text-sm text-muted-foreground">
-              Read-only infra projects (IE / AE / PM / TP) with mobilized employee details from Infra Admin.
+              Projects with sub-unit <strong>{subTechnicalUnitFilter}</strong> from the project number (Supervision). Filtered by the selectors above.
             </p>
           </div>
           <Badge variant="secondary" className="rounded-full self-start">
@@ -395,51 +481,25 @@ export default function HodDashboard() {
           </Badge>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-          <button type="button" className="text-left" onClick={() => { setInfraUnitFilter("ALL"); setInfraLifecycleFilter("ALL"); }}>
-            <MiniStat label="Infra Projects" value={infraOverview?.totalProjects ?? 0} />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+          <button type="button" className="text-left" onClick={() => setInfraLifecycleFilter("ALL")}>
+            <MiniStat label="Showing" value={infraTotals.total} />
           </button>
           <button type="button" className="text-left" onClick={() => setInfraLifecycleFilter("ONGOING")}>
-            <MiniStat label="Ongoing" value={infraOverview?.ongoingProjects ?? 0} />
+            <MiniStat label="Ongoing" value={infraTotals.ongoing} />
           </button>
           <button type="button" className="text-left" onClick={() => setInfraLifecycleFilter("COMPLETED")}>
-            <MiniStat label="Completed" value={infraOverview?.completedProjects ?? 0} />
+            <MiniStat label="Completed" value={infraTotals.completed} />
           </button>
-          <MiniStat label="Mobilized" value={infraOverview?.mobilizedTeamMembers ?? 0} />
+          <MiniStat label="Mobilized (all infra)" value={infraOverview?.mobilizedTeamMembers ?? 0} />
         </div>
-        <div className="mb-4">
-          <MiniStat label="Infra Actual Given" value={infraOverview?.totalActualAmount ?? infraOverview?.totalStaffCost ?? 0} isCurrency />
-          <MiniStat label="Infra Drawn (Govt.)" value={infraOverview?.totalDrawnAmount ?? 0} isCurrency />
-          <MiniStat label="Infra Profit / Loss" value={infraOverview?.totalProfitLoss ?? 0} isCurrency />
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-          {(infraOverview?.byUnit ?? []).map((unit) => (
-            <button
-              key={unit.code}
-              type="button"
-              onClick={() => setInfraUnitFilter(unit.code)}
-              className={`rounded-2xl border p-4 text-left transition-colors ${
-                infraUnitFilter === unit.code ? "border-primary/50 bg-primary/10" : "border-border/40 bg-secondary/20 hover:border-primary/30"
-              }`}
-            >
-              <p className="text-xs text-muted-foreground">{unit.code}</p>
-              <p className="text-2xl font-bold mt-1">{unit.count}</p>
-            </button>
-          ))}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+          <MiniStat label="Actual Given" value={infraTotals.totalActual} isCurrency />
+          <MiniStat label="Drawn (Govt.)" value={infraTotals.totalDrawn} isCurrency />
+          <MiniStat label="Profit / Loss" value={infraTotals.totalProfitLoss} isCurrency />
         </div>
 
         <div className="flex flex-wrap gap-2 mb-4">
-          <Select value={infraUnitFilter} onValueChange={setInfraUnitFilter}>
-            <SelectTrigger className="w-[150px]"><SelectValue placeholder="Unit" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">All Units</SelectItem>
-              <SelectItem value="IE">IE</SelectItem>
-              <SelectItem value="AE">AE</SelectItem>
-              <SelectItem value="PM">PM</SelectItem>
-              <SelectItem value="TP">TP</SelectItem>
-            </SelectContent>
-          </Select>
           <Select value={infraLifecycleFilter} onValueChange={setInfraLifecycleFilter}>
             <SelectTrigger className="w-[160px]"><SelectValue placeholder="Status" /></SelectTrigger>
             <SelectContent>
@@ -449,7 +509,7 @@ export default function HodDashboard() {
             </SelectContent>
           </Select>
           <Badge variant="outline" className="rounded-full self-center">
-            {filteredInfraProjects.length} showing
+            {filteredInfraProjects.length} {subTechnicalUnitFilter} project(s)
           </Badge>
           <Button
             variant="outline"
@@ -607,13 +667,14 @@ export default function HodDashboard() {
           </table>
         </div>
       </div>
-
+      ) : (
+      <>
       <div className="glass-panel p-6">
         <div className="flex items-center justify-between gap-3 mb-4">
           <div>
-            <h3 className="font-semibold text-lg">Project monitoring</h3>
+            <h3 className="font-semibold text-lg">DPR Project monitoring</h3>
             <p className="text-sm text-muted-foreground">
-              Task activity from DPR Admin assignments; financial progress and billing from DPR Admin Financial.
+              Task activity from DPR Admin; financial progress from DPR Financial. Filtered by project number section above.
             </p>
           </div>
           <Badge variant="secondary" className="rounded-full">
@@ -711,6 +772,8 @@ export default function HodDashboard() {
       </div>
 
       <HodDprOverviewSection projects={filteredProjects} tasks={tasks} isLoading={isLoading} />
+      </>
+      )}
 
       <HodProjectDetailDialog
         open={Boolean(selectedRow)}
