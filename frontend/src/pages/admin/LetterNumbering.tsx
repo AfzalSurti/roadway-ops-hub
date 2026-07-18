@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { api } from "@/lib/api";
 import type { LetterCategory, LetterEntryItem, LetterProjectItem } from "@/lib/domain";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link2, Loader2, Mail, Plus, Trash2 } from "lucide-react";
+import { CheckCircle2, Link2, Loader2, Mail, MailWarning, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 type ViewMode = "new" | "list" | "database";
@@ -127,6 +127,17 @@ export default function LetterNumbering() {
   });
 
   const letters = selectedProject?.letters ?? [];
+
+  const pendingReplyLetters = useMemo(
+    () =>
+      letters.filter(
+        (letter) =>
+          (letter.category === "INWARD" || letter.category === "OTHER") &&
+          letter.needsReply === true &&
+          !letter.repliedAt
+      ),
+    [letters]
+  );
 
   const suggestionQueries = {
     sentBy: useQuery({
@@ -269,7 +280,10 @@ export default function LetterNumbering() {
       letterId: string;
       payload: Parameters<typeof api.updateLetterEntry>[1];
     }) => api.updateLetterEntry(letterId, payload),
-    onSuccess: async () => {
+    onSuccess: async (_data, variables) => {
+      if (variables.payload.replied === true) toast.success("Marked as replied");
+      else if (variables.payload.needsReply === true) toast.success("Added to reply list");
+      else if (variables.payload.needsReply === false) toast.success("Reply not required");
       await refresh();
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Update failed")
@@ -662,7 +676,67 @@ export default function LetterNumbering() {
                     >
                       Add Other
                     </Button>
+                    {pendingReplyLetters.length > 0 ? (
+                      <Badge variant="secondary" className="rounded-full self-center gap-1">
+                        <MailWarning className="h-3.5 w-3.5" />
+                        {pendingReplyLetters.length} to reply
+                      </Badge>
+                    ) : null}
                   </div>
+
+                  {!loadingSelected && pendingReplyLetters.length > 0 ? (
+                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-3">
+                      <div>
+                        <p className="text-sm font-semibold text-amber-700 dark:text-amber-400 inline-flex items-center gap-2">
+                          <MailWarning className="h-4 w-4" />
+                          Letters you should reply to
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Inward / Other letters marked “Need reply = Yes”. Mark as replied when done.
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        {pendingReplyLetters.map((letter) => (
+                          <div
+                            key={letter.id}
+                            className="rounded-lg border border-border/40 bg-card/60 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                          >
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium">
+                                #{letter.serialLabel} · {letter.letterNumber || letter.category}
+                                <Badge variant="outline" className="ml-2 text-[10px]">
+                                  {letter.category}
+                                </Badge>
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-1 truncate">
+                                {letter.letterDate
+                                  ? new Date(letter.letterDate).toLocaleDateString("en-IN")
+                                  : "No date"}
+                                {" · From: "}
+                                {letter.sentBy || "-"}
+                                {" · "}
+                                {letter.subject || "No subject"}
+                              </p>
+                            </div>
+                            <Button
+                              size="sm"
+                              className="gap-1 shrink-0"
+                              disabled={updateLetterMutation.isPending}
+                              onClick={() =>
+                                updateLetterMutation.mutate({
+                                  letterId: letter.id,
+                                  payload: { replied: true }
+                                })
+                              }
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                              Mark replied
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
 
                   {loadingSelected ? (
                     <p className="text-sm text-muted-foreground inline-flex items-center gap-2">
@@ -670,13 +744,14 @@ export default function LetterNumbering() {
                     </p>
                   ) : (
                     <div className="overflow-x-auto rounded-xl border border-border/40">
-                      <table className="w-full text-xs min-w-[1280px]">
+                      <table className="w-full text-xs min-w-[1400px]">
                         <thead>
                           <tr className="bg-secondary/40 text-muted-foreground">
                             <th className="p-2 text-left font-medium w-14">Sr.</th>
                             <th className="p-2 text-left font-medium w-32">Date</th>
                             <th className="p-2 text-left font-medium w-48">Letter Number</th>
                             <th className="p-2 text-left font-medium w-32">Category</th>
+                            <th className="p-2 text-left font-medium w-36">Need reply?</th>
                             <th className="p-2 text-left font-medium">Sent By</th>
                             <th className="p-2 text-left font-medium">Sent To</th>
                             <th className="p-2 text-left font-medium">Subject</th>
@@ -689,7 +764,7 @@ export default function LetterNumbering() {
                         <tbody>
                           {letters.length === 0 ? (
                             <tr>
-                              <td colSpan={11} className="p-8 text-center text-muted-foreground">
+                              <td colSpan={12} className="p-8 text-center text-muted-foreground">
                                 No letters yet. Add Inward / Outward / Other.
                               </td>
                             </tr>
@@ -739,6 +814,49 @@ export default function LetterNumbering() {
                                       <SelectItem value="OTHER">Other</SelectItem>
                                     </SelectContent>
                                   </Select>
+                                </td>
+                                <td className="p-2">
+                                  {letter.category === "OUTWARD" ? (
+                                    <span className="text-muted-foreground">—</span>
+                                  ) : (
+                                    <div className="space-y-1">
+                                      <Select
+                                        value={
+                                          letter.needsReply === true
+                                            ? "yes"
+                                            : letter.needsReply === false
+                                              ? "no"
+                                              : "__unset__"
+                                        }
+                                        onValueChange={(value) =>
+                                          updateLetterMutation.mutate({
+                                            letterId: letter.id,
+                                            payload: {
+                                              needsReply:
+                                                value === "yes" ? true : value === "no" ? false : null,
+                                              ...(value !== "yes" ? { replied: false } : {})
+                                            }
+                                          })
+                                        }
+                                      >
+                                        <SelectTrigger className="h-8 text-xs">
+                                          <SelectValue placeholder="Select" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="__unset__">Select…</SelectItem>
+                                          <SelectItem value="yes">Yes — need reply</SelectItem>
+                                          <SelectItem value="no">No</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                      {letter.needsReply === true && letter.repliedAt ? (
+                                        <p className="text-[10px] text-emerald-600">
+                                          Replied {new Date(letter.repliedAt).toLocaleDateString("en-IN")}
+                                        </p>
+                                      ) : letter.needsReply === true ? (
+                                        <p className="text-[10px] text-amber-600">Pending reply</p>
+                                      ) : null}
+                                    </div>
+                                  )}
                                 </td>
                                 {(
                                   [

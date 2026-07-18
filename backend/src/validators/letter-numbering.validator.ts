@@ -41,7 +41,20 @@ const optionalDate = z
     return date.toISOString();
   });
 
-export const createLetterEntrySchema = z.object({
+const refineReplyTracking = (
+  value: { category?: "INWARD" | "OUTWARD" | "OTHER"; needsReply?: boolean | null },
+  ctx: z.RefinementCtx
+) => {
+  if (value.category === "OUTWARD" && value.needsReply === true) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Reply tracking applies only to Inward / Other letters",
+      path: ["needsReply"]
+    });
+  }
+};
+
+const createLetterEntryObjectSchema = z.object({
   category: letterCategory,
   letterDate: optionalDate.optional(),
   sentBy: z.string().trim().max(500).optional(),
@@ -49,14 +62,35 @@ export const createLetterEntrySchema = z.object({
   subject: z.string().trim().max(2000).optional(),
   ccTo: z.string().trim().max(1000).optional(),
   subjectCategory: z.string().trim().max(200).optional(),
-  letterLinkUrl: z.string().trim().max(2000).nullable().optional()
+  letterLinkUrl: z.string().trim().max(2000).nullable().optional(),
+  /** Inward/Other only: must we reply to this letter? */
+  needsReply: z.boolean().nullable().optional(),
+  /** Mark reply completed (true) or reopen (false) */
+  replied: z.boolean().optional()
 });
 
-export const updateLetterEntrySchema = createLetterEntrySchema.partial();
+export const createLetterEntrySchema = createLetterEntryObjectSchema.superRefine(refineReplyTracking);
 
-export const insertLetterEntrySchema = createLetterEntrySchema.extend({
-  afterLetterId: z.string().min(1, "Reference letter is required")
-});
+export const updateLetterEntrySchema = z
+  .object({
+    category: letterCategory.optional(),
+    letterDate: optionalDate.optional(),
+    sentBy: z.string().trim().max(500).optional(),
+    sentTo: z.string().trim().max(500).optional(),
+    subject: z.string().trim().max(2000).optional(),
+    ccTo: z.string().trim().max(1000).optional(),
+    subjectCategory: z.string().trim().max(200).optional(),
+    letterLinkUrl: z.string().trim().max(2000).nullable().optional(),
+    needsReply: z.boolean().nullable().optional(),
+    replied: z.boolean().optional()
+  })
+  .superRefine(refineReplyTracking);
+
+export const insertLetterEntrySchema = createLetterEntryObjectSchema
+  .extend({
+    afterLetterId: z.string().min(1, "Reference letter is required")
+  })
+  .superRefine(refineReplyTracking);
 
 export const letterSuggestionsQuerySchema = z.object({
   field: z.enum(["sentBy", "sentTo", "subject", "ccTo"]),

@@ -178,6 +178,10 @@ export type LetterEntryItem = {
   subjectCategory: string;
   letterLinkUrl?: string | null;
   outwardSequence?: string | null;
+  /** Inward/Other: whether a reply is required */
+  needsReply?: boolean | null;
+  /** When reply was marked done */
+  repliedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 };

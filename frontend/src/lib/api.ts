@@ -626,6 +626,8 @@ export const api = {
       ccTo?: string;
       subjectCategory?: string;
       letterLinkUrl?: string | null;
+      needsReply?: boolean | null;
+      replied?: boolean;
     }
   ) {
     return request<LetterEntryItem>(`/letter-numbering/projects/${letterProjectId}/letters`, {
@@ -646,6 +648,8 @@ export const api = {
       ccTo?: string;
       subjectCategory?: string;
       letterLinkUrl?: string | null;
+      needsReply?: boolean | null;
+      replied?: boolean;
     }
   ) {
     return request<LetterEntryItem>(`/letter-numbering/projects/${letterProjectId}/letters/insert`, {
@@ -665,6 +669,8 @@ export const api = {
       ccTo: string;
       subjectCategory: string;
       letterLinkUrl: string | null;
+      needsReply: boolean | null;
+      replied: boolean;
     }>
   ) {
     return request<LetterEntryItem>(`/letter-numbering/letters/${letterId}`, {

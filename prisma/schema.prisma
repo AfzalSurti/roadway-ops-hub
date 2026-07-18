@@ -730,10 +730,15 @@ model LetterEntry {
   subjectCategory   String         @default("")
   letterLinkUrl     String?
   outwardSequence   String?
+  /// For Inward/Other: whether a reply is required (null = not set / N/A for Outward)
+  needsReply        Boolean?
+  /// When the required reply was marked done
+  repliedAt         DateTime?
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
   letterProject     LetterProject  @relation(fields: [letterProjectId], references: [id], onDelete: Cascade)
 
   @@index([letterProjectId, sortOrder])
   @@index([letterProjectId, category])
+  @@index([letterProjectId, needsReply, repliedAt])
 }

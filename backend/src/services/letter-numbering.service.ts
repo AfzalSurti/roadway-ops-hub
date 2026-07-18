@@ -16,6 +16,34 @@ function parseDate(value?: string | null) {
   return date;
 }
 
+function resolveReplyFields(
+  category: LetterCategory,
+  args: {
+    needsReply?: boolean | null;
+    replied?: boolean;
+    currentNeedsReply?: boolean | null;
+    currentRepliedAt?: Date | null;
+  }
+) {
+  if (category === "OUTWARD") {
+    return { needsReply: null as boolean | null, repliedAt: null as Date | null };
+  }
+
+  let needsReply =
+    args.needsReply !== undefined ? args.needsReply : (args.currentNeedsReply ?? null);
+  let repliedAt = args.currentRepliedAt ?? null;
+
+  if (needsReply !== true) {
+    repliedAt = null;
+  } else if (args.replied === true) {
+    repliedAt = new Date();
+  } else if (args.replied === false) {
+    repliedAt = null;
+  }
+
+  return { needsReply, repliedAt };
+}
+
 function regenerateNumbers(
   project: { projectNumber: string; projectCode: string },
   letters: Array<{
@@ -229,6 +257,8 @@ export const letterNumberingService = {
       ccTo?: string;
       subjectCategory?: string;
       letterLinkUrl?: string | null;
+      needsReply?: boolean | null;
+      replied?: boolean;
     }
   ) {
     const project = await this.getProject(letterProjectId);
@@ -252,6 +282,13 @@ export const letterNumberingService = {
       outwardSequence
     });
 
+    const replyFields = resolveReplyFields(payload.category, {
+      needsReply: payload.needsReply,
+      replied: payload.replied,
+      currentNeedsReply: null,
+      currentRepliedAt: null
+    });
+
     return letterNumberingRepository.createLetter({
       letterProject: { connect: { id: letterProjectId } },
       sortOrder,
@@ -265,7 +302,9 @@ export const letterNumberingService = {
       ccTo: payload.ccTo?.trim() || "",
       subjectCategory: payload.subjectCategory?.trim() || "",
       letterLinkUrl: payload.letterLinkUrl?.trim() || null,
-      outwardSequence
+      outwardSequence,
+      needsReply: replyFields.needsReply,
+      repliedAt: replyFields.repliedAt
     });
   },
 
@@ -281,6 +320,8 @@ export const letterNumberingService = {
       ccTo?: string;
       subjectCategory?: string;
       letterLinkUrl?: string | null;
+      needsReply?: boolean | null;
+      replied?: boolean;
     }
   ) {
     const project = await this.getProject(letterProjectId);
@@ -319,6 +360,13 @@ export const letterNumberingService = {
       outwardSequence
     });
 
+    const replyFields = resolveReplyFields(payload.category, {
+      needsReply: payload.needsReply,
+      replied: payload.replied,
+      currentNeedsReply: null,
+      currentRepliedAt: null
+    });
+
     return letterNumberingRepository.createLetter({
       letterProject: { connect: { id: letterProjectId } },
       sortOrder,
@@ -332,7 +380,9 @@ export const letterNumberingService = {
       ccTo: payload.ccTo?.trim() || "",
       subjectCategory: payload.subjectCategory?.trim() || "",
       letterLinkUrl: payload.letterLinkUrl?.trim() || null,
-      outwardSequence
+      outwardSequence,
+      needsReply: replyFields.needsReply,
+      repliedAt: replyFields.repliedAt
     });
   },
 
@@ -347,6 +397,8 @@ export const letterNumberingService = {
       ccTo: string;
       subjectCategory: string;
       letterLinkUrl: string | null;
+      needsReply: boolean | null;
+      replied: boolean;
     }>
   ) {
     const letter = await letterNumberingRepository.findLetterById(letterId);
@@ -376,6 +428,13 @@ export const letterNumberingService = {
       outwardSequence
     });
 
+    const replyFields = resolveReplyFields(category, {
+      needsReply: payload.needsReply,
+      replied: payload.replied,
+      currentNeedsReply: letter.needsReply,
+      currentRepliedAt: letter.repliedAt
+    });
+
     return letterNumberingRepository.updateLetter(letterId, {
       category: payload.category,
       letterDate: parseDate(payload.letterDate),
@@ -387,7 +446,9 @@ export const letterNumberingService = {
       letterLinkUrl:
         payload.letterLinkUrl === undefined ? undefined : payload.letterLinkUrl?.trim() || null,
       outwardSequence,
-      letterNumber
+      letterNumber,
+      needsReply: replyFields.needsReply,
+      repliedAt: replyFields.repliedAt
     });
   },
 
