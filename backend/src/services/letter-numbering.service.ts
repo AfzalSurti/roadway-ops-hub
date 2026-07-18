@@ -181,7 +181,7 @@ export const letterNumberingService = {
       if (clash && clash.id !== id) throw conflict("Another letter project already uses this number/code");
     }
 
-    const updated = await letterNumberingRepository.updateProject(id, {
+    await letterNumberingRepository.updateProject(id, {
       projectNumber: payload.projectNumber?.trim(),
       projectCode: payload.projectCode?.trim().toUpperCase(),
       shortName: payload.shortName?.trim(),
@@ -192,11 +192,14 @@ export const letterNumberingService = {
 
     if (
       (payload.projectNumber !== undefined || payload.projectCode !== undefined) &&
-      updated.letters.length
+      project.letters.length
     ) {
       await letterNumberingRepository.updateManyLetters(
         id,
-        regenerateNumbers(updated, updated.letters)
+        regenerateNumbers(
+          { projectNumber: nextNumber, projectCode: nextCode },
+          project.letters
+        )
       );
     }
 

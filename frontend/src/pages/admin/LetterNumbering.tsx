@@ -101,9 +101,23 @@ export default function LetterNumbering() {
     queryFn: () => api.getLetterProjects()
   });
 
-  const { data: mainProjects = [] } = useQuery({
+  // Use Admin/PMO projects list (always available) so import dropdown is never empty when projects exist.
+  const { data: mainProjects = [], isError: mainProjectsError, isLoading: loadingMainProjects } = useQuery({
     queryKey: ["letter-main-projects"],
-    queryFn: () => api.getLetterMainProjects()
+    queryFn: async () => {
+      try {
+        return await api.getLetterMainProjects();
+      } catch {
+        // Fallback if letter-numbering/main-projects is unavailable on an older deploy
+        const projects = await api.getProjects();
+        return projects.map((project) => ({
+          id: project.id,
+          name: project.name,
+          description: project.description ?? null,
+          projectNumber: project.projectNumber ?? null
+        }));
+      }
+    }
   });
 
   const { data: selectedProject, isLoading: loadingSelected } = useQuery({
@@ -169,7 +183,14 @@ export default function LetterNumbering() {
       setView("list");
       await refresh();
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to add project")
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : "Failed to add project";
+      toast.error(
+        /route not found/i.test(message)
+          ? "Letter Numbering API is not available on the server yet. Redeploy the backend, then try again."
+          : message
+      );
+    }
   });
 
   const importMutation = useMutation({
@@ -401,9 +422,23 @@ export default function LetterNumbering() {
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="sm:col-span-2">
-                    <Select value={importMainId} onValueChange={setImportMainId}>
+                    <Select
+                      value={importMainId}
+                      onValueChange={setImportMainId}
+                      disabled={loadingMainProjects || importableMainProjects.length === 0}
+                    >
                       <SelectTrigger>
-                        <SelectValue placeholder="Select project from Project section" />
+                        <SelectValue
+                          placeholder={
+                            loadingMainProjects
+                              ? "Loading projects..."
+                              : importableMainProjects.length === 0
+                                ? mainProjectsError
+                                  ? "Could not load projects"
+                                  : "No projects available to import"
+                                : "Select project from Project section"
+                          }
+                        />
                       </SelectTrigger>
                       <SelectContent>
                         {importableMainProjects.map((project) => (
@@ -414,6 +449,13 @@ export default function LetterNumbering() {
                         ))}
                       </SelectContent>
                     </Select>
+                    {!loadingMainProjects && importableMainProjects.length === 0 ? (
+                      <p className="text-xs text-muted-foreground mt-1.5">
+                        {mainProjects.length === 0
+                          ? "No projects in Admin Project section yet. Create one under Projects, or use New Project Add above."
+                          : "All existing projects are already linked in Letter Numbering."}
+                      </p>
+                    ) : null}
                   </div>
                   <Input
                     placeholder="Letter No. e.g. 376"
