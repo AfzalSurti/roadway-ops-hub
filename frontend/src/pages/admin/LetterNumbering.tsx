@@ -14,6 +14,13 @@ type ViewMode = "new" | "list" | "database" | "pending";
 
 const SUBJECT_CATEGORIES = ["Utility", "Tender", "LAQ", "Work Order", "Other"];
 
+function normalizeSerialLabel(value: string) {
+  const trimmed = value.trim().toLowerCase();
+  const match = trimmed.match(/^0*(\d+)([a-z]*)$/i);
+  if (!match) return trimmed;
+  return `${Number(match[1])}${match[2].toLowerCase()}`;
+}
+
 function SuggestField({
   value,
   onChange,
@@ -107,8 +114,7 @@ export default function LetterNumbering() {
 
   const { data: pendingReplies = [], isLoading: loadingPending } = useQuery({
     queryKey: ["letter-pending-replies"],
-    queryFn: () => api.getLetterPendingReplies(),
-    enabled: view === "pending" || view === "database"
+    queryFn: () => api.getLetterPendingReplies()
   });
 
   const { data: mainProjects = [], isError: mainProjectsError, isLoading: loadingMainProjects } = useQuery({
@@ -136,15 +142,31 @@ export default function LetterNumbering() {
 
   const letters = selectedProject?.letters ?? [];
 
+  const repliedByLinkKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const letter of letters) {
+      const serial = (letter.replyOfSerial ?? "").trim();
+      if (serial) keys.add(normalizeSerialLabel(serial));
+    }
+    return keys;
+  }, [letters]);
+
+  const isLetterReplyDone = (letter: LetterEntryItem) => {
+    if (letter.repliedAt) return true;
+    return repliedByLinkKeys.has(normalizeSerialLabel(letter.serialLabel));
+  };
+
   const pendingReplyLetters = useMemo(
     () =>
       letters.filter(
         (letter) =>
           (letter.category === "INWARD" || letter.category === "OTHER") &&
           letter.needsReply === true &&
-          !letter.repliedAt
+          !isLetterReplyDone(letter)
       ),
-    [letters]
+    // isLetterReplyDone depends on repliedByLinkKeys/letters
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [letters, repliedByLinkKeys]
   );
 
   const suggestionQueries = {
@@ -267,11 +289,52 @@ export default function LetterNumbering() {
       letterId: string;
       payload: Parameters<typeof api.updateLetterEntry>[1];
     }) => api.updateLetterEntry(letterId, payload),
-    onSuccess: async (_data, variables) => {
+    onSuccess: async (data, variables) => {
+      const cleared =
+        data && typeof data === "object" && "clearedPendingSerial" in data
+          ? (data as LetterEntryItem & { clearedPendingSerial?: string | null }).clearedPendingSerial
+          : null;
+
       if (variables.payload.replied === true) toast.success("Marked as replied");
-      else if (variables.payload.replyOfSerial) toast.success("Reply linked — pending cleared if matched");
-      else if (variables.payload.needsReply === true) toast.success("Added to reply list");
+      else if (variables.payload.replyOfSerial) {
+        if (cleared) {
+          toast.success(`Reply linked — #${cleared} marked Reply Done (removed from pending)`);
+        } else {
+          toast.success("Reply Letter of saved");
+        }
+      } else if (variables.payload.needsReply === true) toast.success("Added to reply list");
       else if (variables.payload.needsReply === false) toast.success("Reply not required");
+
+      // Optimistic: mark linked serial as done in current project cache
+      if (variables.payload.replyOfSerial && selectedProjectId) {
+        const targetKey = normalizeSerialLabel(variables.payload.replyOfSerial);
+        queryClient.setQueryData(
+          ["letter-project", selectedProjectId],
+          (prev: LetterProjectItem | null | undefined) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              letters: (prev.letters ?? []).map((item) => {
+                if (item.id === variables.letterId) {
+                  return { ...item, replyOfSerial: variables.payload.replyOfSerial ?? null };
+                }
+                if (
+                  (item.category === "INWARD" || item.category === "OTHER") &&
+                  normalizeSerialLabel(item.serialLabel) === targetKey
+                ) {
+                  return {
+                    ...item,
+                    needsReply: true,
+                    repliedAt: item.repliedAt ?? new Date().toISOString()
+                  };
+                }
+                return item;
+              })
+            };
+          }
+        );
+      }
+
       await refresh();
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Update failed")
@@ -987,7 +1050,7 @@ export default function LetterNumbering() {
                                           <SelectItem value="no">No</SelectItem>
                                         </SelectContent>
                                       </Select>
-                                      {letter.needsReply === true && letter.repliedAt ? (
+                                      {letter.needsReply === true && isLetterReplyDone(letter) ? (
                                         <p className="text-[10px] text-emerald-600 font-medium">Reply Done</p>
                                       ) : letter.needsReply === true ? (
                                         <p className="text-[10px] text-amber-600">Pending reply</p>
@@ -1083,10 +1146,15 @@ export default function LetterNumbering() {
                                 </td>
                                 <td className="p-2">
                                   <Input
-                                    className="h-8 text-xs"
+                                    className="h-8 text-xs font-medium"
                                     placeholder="e.g. 2a"
                                     defaultValue={letter.replyOfSerial ?? ""}
                                     key={`${letter.id}-replyOf-${letter.replyOfSerial ?? ""}`}
+                                    title="Enter Sr. of the letter you are replying to (auto-clears pending)"
+                                    onKeyDown={(e) => {
+                                      if (e.key !== "Enter") return;
+                                      e.currentTarget.blur();
+                                    }}
                                     onBlur={(e) => {
                                       const next = e.target.value.trim();
                                       const prev = (letter.replyOfSerial ?? "").trim();

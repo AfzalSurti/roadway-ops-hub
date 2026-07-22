@@ -79,13 +79,70 @@ export const letterNumberingService = {
     return letterNumberingRepository.listProjects();
   },
 
-  listPendingReplies() {
-    return letterNumberingRepository.listPendingReplies();
+  async listPendingReplies() {
+    const [pending, replyLinks] = await Promise.all([
+      letterNumberingRepository.listPendingReplies(),
+      letterNumberingRepository.listReplyOfLinks()
+    ]);
+
+    const coveredKeys = new Set(
+      replyLinks
+        .map((row) => {
+          const serial = (row.replyOfSerial ?? "").trim();
+          if (!serial) return null;
+          return `${row.letterProjectId}:${normalizeSerialLabel(serial)}`;
+        })
+        .filter((value): value is string => Boolean(value))
+    );
+
+    // Auto-heal: if a reply-of link exists but repliedAt was never set, mark done now
+    const toHeal = pending.filter((letter) =>
+      coveredKeys.has(`${letter.letterProjectId}:${normalizeSerialLabel(letter.serialLabel)}`)
+    );
+    if (toHeal.length > 0) {
+      await Promise.all(
+        toHeal.map((letter) =>
+          letterNumberingRepository.updateLetter(letter.id, { repliedAt: new Date() })
+        )
+      );
+    }
+
+    return pending.filter(
+      (letter) =>
+        !coveredKeys.has(`${letter.letterProjectId}:${normalizeSerialLabel(letter.serialLabel)}`)
+    );
   },
 
   async getProject(id: string) {
     const project = await letterNumberingRepository.findProjectById(id);
     if (!project) throw notFound("Letter project not found");
+
+    const covered = new Set(
+      project.letters
+        .map((letter) => (letter.replyOfSerial ?? "").trim())
+        .filter(Boolean)
+        .map((serial) => normalizeSerialLabel(serial))
+    );
+
+    const heals = project.letters.filter(
+      (letter) =>
+        (letter.category === "INWARD" || letter.category === "OTHER") &&
+        letter.needsReply === true &&
+        !letter.repliedAt &&
+        covered.has(normalizeSerialLabel(letter.serialLabel))
+    );
+
+    if (heals.length > 0) {
+      await Promise.all(
+        heals.map((letter) =>
+          letterNumberingRepository.updateLetter(letter.id, { repliedAt: new Date() })
+        )
+      );
+      const refreshed = await letterNumberingRepository.findProjectById(id);
+      if (!refreshed) throw notFound("Letter project not found");
+      return refreshed;
+    }
+
     return project;
   },
 
@@ -427,16 +484,20 @@ export const letterNumberingService = {
     const targetKey = normalizeSerialLabel(serial);
     if (!targetKey) return null;
     const siblings = await letterNumberingRepository.listLetters(letterProjectId);
-    const target = siblings.find(
-      (item) =>
-        item.id !== excludeLetterId &&
-        normalizeSerialLabel(item.serialLabel) === targetKey &&
-        (item.category === "INWARD" || item.category === "OTHER") &&
-        item.needsReply === true &&
-        !item.repliedAt
-    );
+    const target = siblings.find((item) => {
+      if (excludeLetterId && item.id === excludeLetterId) return false;
+      if (item.category !== "INWARD" && item.category !== "OTHER") return false;
+      const serialMatch = normalizeSerialLabel(item.serialLabel) === targetKey;
+      const numberMatch = normalizeSerialLabel(item.letterNumber || "") === targetKey;
+      return serialMatch || numberMatch;
+    });
     if (!target) return null;
-    return letterNumberingRepository.updateLetter(target.id, { repliedAt: new Date() });
+
+    // Linking a reply means this letter is done — set needsReply + repliedAt
+    return letterNumberingRepository.updateLetter(target.id, {
+      needsReply: true,
+      repliedAt: new Date()
+    });
   },
 
   async updateLetter(
@@ -513,11 +574,13 @@ export const letterNumberingService = {
       remark: payload.remark?.trim()
     });
 
+    let clearedPendingSerial: string | null = null;
     if (replyOfSerial) {
-      await this.markSerialReplied(letter.letterProjectId, replyOfSerial, letterId);
+      const cleared = await this.markSerialReplied(letter.letterProjectId, replyOfSerial, letterId);
+      if (cleared) clearedPendingSerial = replyOfSerial;
     }
 
-    return updated;
+    return { ...updated, clearedPendingSerial };
   },
 
   async removeLetter(letterId: string) {

@@ -88,6 +88,19 @@ export const letterNumberingRepository = {
     });
   },
 
+  listReplyOfLinks() {
+    return prisma.letterEntry.findMany({
+      where: {
+        replyOfSerial: { not: null }
+      },
+      select: {
+        id: true,
+        letterProjectId: true,
+        replyOfSerial: true
+      }
+    });
+  },
+
   createLetter(data: Prisma.LetterEntryCreateInput) {
     return prisma.letterEntry.create({ data });
   },
