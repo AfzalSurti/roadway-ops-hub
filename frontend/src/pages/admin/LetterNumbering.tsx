@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { PageWrapper } from "@/components/PageWrapper";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { api } from "@/lib/api";
@@ -11,7 +10,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, Link2, Loader2, Mail, MailWarning, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
-type ViewMode = "new" | "list" | "database";
+type ViewMode = "new" | "list" | "database" | "pending";
 
 const SUBJECT_CATEGORIES = ["Utility", "Tender", "LAQ", "Work Order", "Other"];
 
@@ -32,14 +31,19 @@ function SuggestField({
   const filtered = useMemo(() => {
     const q = value.trim().toLowerCase();
     if (!q) return suggestions.slice(0, 8);
-    return suggestions.filter((item) => item.toLowerCase().includes(q)).slice(0, 8);
+    const starts = suggestions.filter((item) => item.toLowerCase().startsWith(q));
+    const contains = suggestions.filter(
+      (item) => !item.toLowerCase().startsWith(q) && item.toLowerCase().includes(q)
+    );
+    return [...starts, ...contains].slice(0, 8);
   }, [suggestions, value]);
 
   return (
-    <div className="relative">
-      <Input
+    <div className="relative min-w-[160px]">
+      <textarea
         value={value}
         placeholder={placeholder}
+        rows={2}
         onChange={(e) => {
           onChange(e.target.value);
           setOpen(true);
@@ -49,7 +53,7 @@ function SuggestField({
           window.setTimeout(() => setOpen(false), 150);
           onBlur?.(value);
         }}
-        className="h-8 text-xs"
+        className="w-full min-h-[2.5rem] resize-y rounded-md border border-input bg-transparent px-2 py-1.5 text-xs leading-snug whitespace-pre-wrap break-words outline-none focus-visible:ring-1 focus-visible:ring-ring"
       />
       {open && filtered.length > 0 ? (
         <div className="absolute z-20 mt-1 w-full max-h-40 overflow-auto rounded-lg border border-border/50 bg-card shadow-lg">
@@ -57,11 +61,12 @@ function SuggestField({
             <button
               key={item}
               type="button"
-              className="w-full text-left px-2 py-1.5 text-xs hover:bg-secondary/60"
+              className="w-full text-left px-2 py-1.5 text-xs hover:bg-secondary/60 whitespace-normal break-words"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => {
                 onChange(item);
                 setOpen(false);
+                onBlur?.(item);
               }}
             >
               {item}
@@ -82,33 +87,36 @@ export default function LetterNumbering() {
   const queryClient = useQueryClient();
   const [view, setView] = useState<ViewMode>("list");
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const [projectFilter, setProjectFilter] = useState("");
-  const [syncToMain, setSyncToMain] = useState(true);
-  const [form, setForm] = useState({
+  const [listFilter, setListFilter] = useState("");
+  const [filterNumber, setFilterNumber] = useState("");
+  const [filterShortName, setFilterShortName] = useState("");
+  const [importMainId, setImportMainId] = useState("");
+  const [importDetails, setImportDetails] = useState({
     projectNumber: "",
     projectCode: "",
     shortName: "",
     fullName: "",
     projectCoordinator: "",
-    projectEngineer: "",
-    linkedProjectId: ""
+    projectEngineer: ""
   });
-  const [importMainId, setImportMainId] = useState("");
-  const [importNumber, setImportNumber] = useState("");
 
   const { data: letterProjects = [], isLoading } = useQuery({
     queryKey: ["letter-projects"],
     queryFn: () => api.getLetterProjects()
   });
 
-  // Use Admin/PMO projects list (always available) so import dropdown is never empty when projects exist.
+  const { data: pendingReplies = [], isLoading: loadingPending } = useQuery({
+    queryKey: ["letter-pending-replies"],
+    queryFn: () => api.getLetterPendingReplies(),
+    enabled: view === "pending" || view === "database"
+  });
+
   const { data: mainProjects = [], isError: mainProjectsError, isLoading: loadingMainProjects } = useQuery({
     queryKey: ["letter-main-projects"],
     queryFn: async () => {
       try {
         return await api.getLetterMainProjects();
       } catch {
-        // Fallback if letter-numbering/main-projects is unavailable on an older deploy
         const projects = await api.getProjects();
         return projects.map((project) => ({
           id: project.id,
@@ -168,58 +176,37 @@ export default function LetterNumbering() {
       queryClient.invalidateQueries({ queryKey: ["letter-project", selectedProjectId] }),
       queryClient.invalidateQueries({ queryKey: ["letter-main-projects"] }),
       queryClient.invalidateQueries({ queryKey: ["letter-suggestions"] }),
+      queryClient.invalidateQueries({ queryKey: ["letter-pending-replies"] }),
       queryClient.invalidateQueries({ queryKey: ["projects"] })
     ]);
   };
 
-  const createMutation = useMutation({
-    mutationFn: () =>
-      api.createLetterProject({
-        ...form,
-        projectCode: form.projectCode.toUpperCase(),
-        linkedProjectId: form.linkedProjectId || null,
-        syncToMainProject: syncToMain
-      }),
+  const importMutation = useMutation({
+    mutationFn: () => {
+      if (!importMainId) throw new Error("Select a project from Sankalp Database");
+      if (!importDetails.projectNumber.trim()) throw new Error("Enter letter project number (e.g. 376)");
+      if (!importDetails.projectCode.trim()) throw new Error("Project code is required");
+      return api.importLetterProject({
+        mainProjectId: importMainId,
+        projectNumber: importDetails.projectNumber.trim(),
+        projectCode: importDetails.projectCode.trim().toUpperCase(),
+        shortName: importDetails.shortName.trim() || undefined,
+        fullName: importDetails.fullName.trim() || undefined,
+        projectCoordinator: importDetails.projectCoordinator.trim() || undefined,
+        projectEngineer: importDetails.projectEngineer.trim() || undefined
+      });
+    },
     onSuccess: async () => {
-      toast.success("Letter project added");
-      setForm({
+      toast.success("Project added to Letter Data Base");
+      setImportMainId("");
+      setImportDetails({
         projectNumber: "",
         projectCode: "",
         shortName: "",
         fullName: "",
         projectCoordinator: "",
-        projectEngineer: "",
-        linkedProjectId: ""
+        projectEngineer: ""
       });
-      setView("list");
-      await refresh();
-    },
-    onError: (error) => {
-      const message = error instanceof Error ? error.message : "Failed to add project";
-      toast.error(
-        /route not found/i.test(message)
-          ? "Letter Numbering API is not available on the server yet. Redeploy the backend, then try again."
-          : message
-      );
-    }
-  });
-
-  const importMutation = useMutation({
-    mutationFn: () => {
-      if (!importMainId) throw new Error("Select a project from Project section");
-      if (!importNumber.trim()) throw new Error("Enter letter project number (e.g. 376)");
-      const main = mainProjects.find((item) => item.id === importMainId);
-      return api.importLetterProject({
-        mainProjectId: importMainId,
-        projectNumber: importNumber.trim(),
-        projectCode: (main?.projectNumber || "").toUpperCase() || undefined,
-        shortName: main?.name
-      });
-    },
-    onSuccess: async () => {
-      toast.success("Project imported into Letter Numbering");
-      setImportMainId("");
-      setImportNumber("");
       setView("list");
       await refresh();
     },
@@ -282,6 +269,7 @@ export default function LetterNumbering() {
     }) => api.updateLetterEntry(letterId, payload),
     onSuccess: async (_data, variables) => {
       if (variables.payload.replied === true) toast.success("Marked as replied");
+      else if (variables.payload.replyOfSerial) toast.success("Reply linked — pending cleared if matched");
       else if (variables.payload.needsReply === true) toast.success("Added to reply list");
       else if (variables.payload.needsReply === false) toast.success("Reply not required");
       await refresh();
@@ -298,8 +286,8 @@ export default function LetterNumbering() {
     onError: (error) => toast.error(error instanceof Error ? error.message : "Delete failed")
   });
 
-  const filteredProjects = useMemo(() => {
-    const q = projectFilter.trim().toLowerCase();
+  const filteredListProjects = useMemo(() => {
+    const q = listFilter.trim().toLowerCase();
     if (!q) return letterProjects;
     return letterProjects.filter((project) =>
       [project.projectNumber, project.projectCode, project.shortName, project.fullName]
@@ -307,13 +295,23 @@ export default function LetterNumbering() {
         .toLowerCase()
         .includes(q)
     );
-  }, [letterProjects, projectFilter]);
+  }, [letterProjects, listFilter]);
+
+  const databaseProjects = useMemo(() => {
+    const num = filterNumber.trim().toLowerCase();
+    const name = filterShortName.trim().toLowerCase();
+    return letterProjects.filter((project) => {
+      const numberOk = !num || project.projectNumber.toLowerCase().includes(num);
+      const nameOk = !name || project.shortName.toLowerCase().includes(name);
+      return numberOk && nameOk;
+    });
+  }, [letterProjects, filterNumber, filterShortName]);
 
   useEffect(() => {
-    if (view === "database" && !selectedProjectId && letterProjects[0]) {
-      setSelectedProjectId(letterProjects[0].id);
-    }
-  }, [view, selectedProjectId, letterProjects]);
+    if (view !== "database") return;
+    if (selectedProjectId && databaseProjects.some((p) => p.id === selectedProjectId)) return;
+    setSelectedProjectId(databaseProjects[0]?.id ?? null);
+  }, [view, selectedProjectId, databaseProjects]);
 
   const alreadyLinkedMainIds = useMemo(
     () => new Set(letterProjects.map((item) => item.linkedProjectId).filter(Boolean)),
@@ -321,6 +319,25 @@ export default function LetterNumbering() {
   );
 
   const importableMainProjects = mainProjects.filter((item) => !alreadyLinkedMainIds.has(item.id));
+
+  const applyMainProjectSelection = (mainId: string) => {
+    setImportMainId(mainId);
+    const main = mainProjects.find((item) => item.id === mainId);
+    if (!main) return;
+    setImportDetails((prev) => ({
+      ...prev,
+      projectCode: (main.projectNumber || prev.projectCode || "").toUpperCase(),
+      shortName: main.name || prev.shortName,
+      fullName: main.description || prev.fullName
+    }));
+  };
+
+  const navItems: Array<[ViewMode, string]> = [
+    ["new", "New Project Add"],
+    ["list", "All Project List"],
+    ["database", "Letter Data Base"],
+    ["pending", "Reply Pending"]
+  ];
 
   return (
     <PageWrapper>
@@ -331,21 +348,23 @@ export default function LetterNumbering() {
             DPR Admin letter database — synced with Projects. Geo Designs &amp; Research Pvt. Ltd.
           </p>
         </div>
-        <Badge variant="secondary" className="rounded-full self-start">
-          {letterProjects.length} letter project(s)
-        </Badge>
+        <div className="flex flex-wrap gap-2 self-start">
+          {pendingReplies.length > 0 ? (
+            <Badge variant="secondary" className="rounded-full gap-1">
+              <MailWarning className="h-3.5 w-3.5" />
+              {pendingReplies.length} pending reply
+            </Badge>
+          ) : null}
+          <Badge variant="secondary" className="rounded-full">
+            {letterProjects.length} letter project(s)
+          </Badge>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[240px_1fr] gap-4">
         <div className="glass-panel p-3 space-y-2 h-fit">
           <p className="text-xs font-medium text-muted-foreground px-2 mb-1">Letter Module</p>
-          {(
-            [
-              ["new", "New Project Add"],
-              ["list", "All Project List"],
-              ["database", "Letter Data Base"]
-            ] as const
-          ).map(([key, label]) => (
+          {navItems.map(([key, label]) => (
             <button
               key={key}
               type="button"
@@ -354,7 +373,14 @@ export default function LetterNumbering() {
                 view === key ? "bg-primary text-primary-foreground" : "hover:bg-secondary/50"
               }`}
             >
-              {label}
+              <span className="inline-flex items-center gap-2">
+                {label}
+                {key === "pending" && pendingReplies.length > 0 ? (
+                  <Badge variant="secondary" className="rounded-full h-5 px-1.5 text-[10px]">
+                    {pendingReplies.length}
+                  </Badge>
+                ) : null}
+              </span>
             </button>
           ))}
         </div>
@@ -365,124 +391,133 @@ export default function LetterNumbering() {
               <div>
                 <h2 className="text-lg font-semibold">New Project Add</h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Add a project to the Letter Data Base. Optionally push it into the main Project section.
+                  Project data already exists in the Sankalp Database. Select a project, fill letter-only
+                  details (Letter No., coordinator, engineer), then add it to Letter Data Base.
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {(
-                  [
-                    ["projectNumber", "Project Number", "376"],
-                    ["projectCode", "Project Code", "GSIR2305R"],
-                    ["shortName", "Project Short Name", "Vadodara SOU High-Speed Corridor"],
-                    ["projectCoordinator", "Project Coordinator", ""],
-                    ["projectEngineer", "Project Engineer", ""]
-                  ] as const
-                ).map(([key, label, placeholder]) => (
-                  <div key={key} className={key === "shortName" ? "sm:col-span-2" : ""}>
-                    <label className="text-xs text-muted-foreground mb-1.5 block">{label}</label>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1.5 block">
+                    Select project from Sankalp Database
+                  </label>
+                  <Select
+                    value={importMainId}
+                    onValueChange={applyMainProjectSelection}
+                    disabled={loadingMainProjects || importableMainProjects.length === 0}
+                  >
+                    <SelectTrigger>
+                      <SelectValue
+                        placeholder={
+                          loadingMainProjects
+                            ? "Loading projects..."
+                            : importableMainProjects.length === 0
+                              ? mainProjectsError
+                                ? "Could not load projects"
+                                : "No projects available to import"
+                              : "Select project from Sankalp Database"
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {importableMainProjects.map((project) => (
+                        <SelectItem key={project.id} value={project.id}>
+                          {project.name}
+                          {project.projectNumber ? ` (${project.projectNumber})` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {!loadingMainProjects && importableMainProjects.length === 0 ? (
+                    <p className="text-xs text-muted-foreground mt-1.5">
+                      {mainProjects.length === 0
+                        ? "No projects in Sankalp Project section yet. Create one under Projects first."
+                        : "All existing projects are already linked in Letter Numbering."}
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1.5 block">
+                      Letter Project Number *
+                    </label>
                     <Input
-                      value={form[key]}
-                      placeholder={placeholder}
+                      placeholder="e.g. 376"
+                      value={importDetails.projectNumber}
                       onChange={(e) =>
-                        setForm((prev) => ({
-                          ...prev,
-                          [key]: key === "projectCode" ? e.target.value.toUpperCase() : e.target.value
-                        }))
+                        setImportDetails((prev) => ({ ...prev, projectNumber: e.target.value }))
                       }
                     />
                   </div>
-                ))}
-                <div className="sm:col-span-2">
-                  <label className="text-xs text-muted-foreground mb-1.5 block">Project Full Name</label>
-                  <textarea
-                    value={form.fullName}
-                    onChange={(e) => setForm((prev) => ({ ...prev, fullName: e.target.value }))}
-                    rows={3}
-                    className="w-full px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 text-sm outline-none focus:border-primary/50"
-                    placeholder="Full consultancy / DPR description"
-                  />
-                </div>
-              </div>
-
-              <label className="flex items-start gap-2 cursor-pointer rounded-xl border border-border/40 bg-secondary/20 p-3">
-                <Checkbox checked={syncToMain} onCheckedChange={(v) => setSyncToMain(v === true)} className="mt-0.5" />
-                <span>
-                  <span className="text-sm font-medium block">Also add to Project section</span>
-                  <span className="text-xs text-muted-foreground">
-                    Creates/links a main Project so HOD/Admin project lists stay in sync.
-                  </span>
-                </span>
-              </label>
-
-              <Button
-                className="gap-2"
-                disabled={
-                  !form.projectNumber.trim() ||
-                  !form.projectCode.trim() ||
-                  !form.shortName.trim() ||
-                  createMutation.isPending
-                }
-                onClick={() => createMutation.mutate()}
-              >
-                <Plus className="h-4 w-4" />
-                {createMutation.isPending ? "Saving..." : "Add Above Project"}
-              </Button>
-
-              <div className="border-t border-border/30 pt-5 space-y-3">
-                <h3 className="font-semibold">Import from Project section</h3>
-                <p className="text-sm text-muted-foreground">
-                  Pull an existing Admin/PMO project into Letter Numbering (requires a numeric letter project no.).
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="sm:col-span-2">
-                    <Select
-                      value={importMainId}
-                      onValueChange={setImportMainId}
-                      disabled={loadingMainProjects || importableMainProjects.length === 0}
-                    >
-                      <SelectTrigger>
-                        <SelectValue
-                          placeholder={
-                            loadingMainProjects
-                              ? "Loading projects..."
-                              : importableMainProjects.length === 0
-                                ? mainProjectsError
-                                  ? "Could not load projects"
-                                  : "No projects available to import"
-                                : "Select project from Project section"
-                          }
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {importableMainProjects.map((project) => (
-                          <SelectItem key={project.id} value={project.id}>
-                            {project.name}
-                            {project.projectNumber ? ` (${project.projectNumber})` : ""}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {!loadingMainProjects && importableMainProjects.length === 0 ? (
-                      <p className="text-xs text-muted-foreground mt-1.5">
-                        {mainProjects.length === 0
-                          ? "No projects in Admin Project section yet. Create one under Projects, or use New Project Add above."
-                          : "All existing projects are already linked in Letter Numbering."}
-                      </p>
-                    ) : null}
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1.5 block">Project Code</label>
+                    <Input
+                      value={importDetails.projectCode}
+                      onChange={(e) =>
+                        setImportDetails((prev) => ({
+                          ...prev,
+                          projectCode: e.target.value.toUpperCase()
+                        }))
+                      }
+                      placeholder="From Sankalp (editable)"
+                    />
                   </div>
-                  <Input
-                    placeholder="Letter No. e.g. 376"
-                    value={importNumber}
-                    onChange={(e) => setImportNumber(e.target.value)}
-                  />
+                  <div className="sm:col-span-2">
+                    <label className="text-xs text-muted-foreground mb-1.5 block">Project Short Name</label>
+                    <Input
+                      value={importDetails.shortName}
+                      onChange={(e) =>
+                        setImportDetails((prev) => ({ ...prev, shortName: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1.5 block">Project Coordinator</label>
+                    <Input
+                      value={importDetails.projectCoordinator}
+                      onChange={(e) =>
+                        setImportDetails((prev) => ({ ...prev, projectCoordinator: e.target.value }))
+                      }
+                      placeholder="Optional"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1.5 block">Project Engineer</label>
+                    <Input
+                      value={importDetails.projectEngineer}
+                      onChange={(e) =>
+                        setImportDetails((prev) => ({ ...prev, projectEngineer: e.target.value }))
+                      }
+                      placeholder="Optional"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="text-xs text-muted-foreground mb-1.5 block">Project Full Name</label>
+                    <textarea
+                      value={importDetails.fullName}
+                      onChange={(e) =>
+                        setImportDetails((prev) => ({ ...prev, fullName: e.target.value }))
+                      }
+                      rows={3}
+                      className="w-full px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 text-sm outline-none focus:border-primary/50"
+                      placeholder="Fetched from Sankalp — edit if needed"
+                    />
+                  </div>
                 </div>
+
                 <Button
-                  variant="outline"
-                  disabled={!importMainId || !importNumber.trim() || importMutation.isPending}
+                  className="gap-2"
+                  disabled={
+                    !importMainId ||
+                    !importDetails.projectNumber.trim() ||
+                    !importDetails.projectCode.trim() ||
+                    importMutation.isPending
+                  }
                   onClick={() => importMutation.mutate()}
                 >
-                  {importMutation.isPending ? "Importing..." : "Import into Letter Data Base"}
+                  <Plus className="h-4 w-4" />
+                  {importMutation.isPending ? "Adding..." : "Add to Letter Data Base"}
                 </Button>
               </div>
             </div>
@@ -498,8 +533,8 @@ export default function LetterNumbering() {
                 <Input
                   className="sm:max-w-xs"
                   placeholder="Filter projects..."
-                  value={projectFilter}
-                  onChange={(e) => setProjectFilter(e.target.value)}
+                  value={listFilter}
+                  onChange={(e) => setListFilter(e.target.value)}
                 />
               </div>
               <div className="overflow-x-auto">
@@ -525,20 +560,20 @@ export default function LetterNumbering() {
                         </td>
                       </tr>
                     ) : null}
-                    {!isLoading && filteredProjects.length === 0 ? (
+                    {!isLoading && filteredListProjects.length === 0 ? (
                       <tr>
                         <td colSpan={7} className="py-10 text-center text-muted-foreground">
-                          No letter projects yet. Use New Project Add.
+                          No letter projects yet. Use New Project Add (from Sankalp Database).
                         </td>
                       </tr>
                     ) : null}
-                    {filteredProjects.map((project: LetterProjectItem, index) => (
+                    {filteredListProjects.map((project: LetterProjectItem, index) => (
                       <tr key={project.id} className="border-b border-border/20 hover:bg-secondary/20">
                         <td className="py-3 pr-3">{index + 1}</td>
                         <td className="py-3 px-3 font-medium">{project.projectNumber}</td>
                         <td className="py-3 px-3">{project.projectCode}</td>
                         <td className="py-3 px-3">{project.shortName}</td>
-                        <td className="py-3 px-3 max-w-[280px] truncate" title={project.fullName}>
+                        <td className="py-3 px-3 max-w-[280px] whitespace-normal break-words" title={project.fullName}>
                           {project.fullName || "-"}
                         </td>
                         <td className="py-3 px-3">
@@ -595,13 +630,110 @@ export default function LetterNumbering() {
             </div>
           ) : null}
 
+          {view === "pending" ? (
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-lg font-semibold inline-flex items-center gap-2">
+                  <MailWarning className="h-5 w-5 text-amber-500" />
+                  Reply Pending
+                </h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  All Inward / Other letters marked Need reply = Yes across Letter Data Base.
+                </p>
+              </div>
+              {loadingPending ? (
+                <p className="text-sm text-muted-foreground inline-flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Loading pending letters...
+                </p>
+              ) : pendingReplies.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-8 text-center">No letters pending reply.</p>
+              ) : (
+                <div className="space-y-2">
+                  {pendingReplies.map((letter) => (
+                    <div
+                      key={letter.id}
+                      className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">
+                          {letter.letterProject.projectNumber} · {letter.letterProject.shortName}
+                          <Badge variant="outline" className="ml-2 text-[10px]">
+                            #{letter.serialLabel} {letter.category}
+                          </Badge>
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1 whitespace-normal break-words">
+                          {letter.letterDate
+                            ? new Date(letter.letterDate).toLocaleDateString("en-IN")
+                            : "No date"}
+                          {" · From: "}
+                          {letter.sentBy || "-"}
+                          {" · "}
+                          {letter.subject || "No subject"}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2 shrink-0">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setSelectedProjectId(letter.letterProject.id);
+                            setView("database");
+                          }}
+                        >
+                          Open project
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="gap-1"
+                          disabled={updateLetterMutation.isPending}
+                          onClick={() =>
+                            updateLetterMutation.mutate({
+                              letterId: letter.id,
+                              payload: { replied: true }
+                            })
+                          }
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          Mark replied
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : null}
+
           {view === "database" ? (
             <div className="space-y-4">
               <div>
                 <h2 className="text-lg font-semibold">Letter Data Base</h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Select a project, then manage inward / outward / other letters with auto numbering.
+                  Filter by project number or short name, then manage inward / outward / other letters.
                 </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1.5 block">
+                    Filter Project Number
+                  </label>
+                  <Input
+                    placeholder="e.g. 376"
+                    value={filterNumber}
+                    onChange={(e) => setFilterNumber(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1.5 block">
+                    Filter Project Short Name
+                  </label>
+                  <Input
+                    placeholder="e.g. Vadodara"
+                    value={filterShortName}
+                    onChange={(e) => setFilterShortName(e.target.value)}
+                  />
+                </div>
               </div>
 
               <div className="rounded-xl border border-border/40 overflow-hidden">
@@ -610,10 +742,12 @@ export default function LetterNumbering() {
                   <span>Project Short Name</span>
                 </div>
                 <div className="max-h-48 overflow-y-auto divide-y divide-border/30">
-                  {letterProjects.length === 0 ? (
-                    <p className="p-4 text-sm text-muted-foreground">No projects in Letter Data Base yet.</p>
+                  {databaseProjects.length === 0 ? (
+                    <p className="p-4 text-sm text-muted-foreground">
+                      No projects match the filters (or Letter Data Base is empty).
+                    </p>
                   ) : (
-                    letterProjects.map((project) => (
+                    databaseProjects.map((project) => (
                       <button
                         key={project.id}
                         type="button"
@@ -692,7 +826,8 @@ export default function LetterNumbering() {
                           Letters you should reply to
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Inward / Other letters marked “Need reply = Yes”. Mark as replied when done.
+                          Inward / Other letters marked “Need reply = Yes”. Linking Sr. in “Reply Letter of”
+                          or Mark replied clears them.
                         </p>
                       </div>
                       <div className="space-y-2">
@@ -708,7 +843,7 @@ export default function LetterNumbering() {
                                   {letter.category}
                                 </Badge>
                               </p>
-                              <p className="text-xs text-muted-foreground mt-1 truncate">
+                              <p className="text-xs text-muted-foreground mt-1 whitespace-normal break-words">
                                 {letter.letterDate
                                   ? new Date(letter.letterDate).toLocaleDateString("en-IN")
                                   : "No date"}
@@ -744,7 +879,7 @@ export default function LetterNumbering() {
                     </p>
                   ) : (
                     <div className="overflow-x-auto rounded-xl border border-border/40">
-                      <table className="w-full text-xs min-w-[1400px]">
+                      <table className="w-full text-xs min-w-[1700px] table-auto">
                         <thead>
                           <tr className="bg-secondary/40 text-muted-foreground">
                             <th className="p-2 text-left font-medium w-14">Sr.</th>
@@ -752,24 +887,26 @@ export default function LetterNumbering() {
                             <th className="p-2 text-left font-medium w-48">Letter Number</th>
                             <th className="p-2 text-left font-medium w-32">Category</th>
                             <th className="p-2 text-left font-medium w-36">Need reply?</th>
-                            <th className="p-2 text-left font-medium">Sent By</th>
-                            <th className="p-2 text-left font-medium">Sent To</th>
-                            <th className="p-2 text-left font-medium">Subject</th>
-                            <th className="p-2 text-left font-medium">CC To</th>
+                            <th className="p-2 text-left font-medium min-w-[180px]">Sent By</th>
+                            <th className="p-2 text-left font-medium min-w-[180px]">Sent To</th>
+                            <th className="p-2 text-left font-medium min-w-[200px]">Subject</th>
+                            <th className="p-2 text-left font-medium min-w-[160px]">CC To</th>
                             <th className="p-2 text-left font-medium w-36">Subject Cat.</th>
                             <th className="p-2 text-left font-medium w-28">Linked</th>
+                            <th className="p-2 text-left font-medium w-28">Reply Letter of</th>
+                            <th className="p-2 text-left font-medium min-w-[160px]">Remark if Any</th>
                             <th className="p-2 text-right font-medium w-24"> </th>
                           </tr>
                         </thead>
                         <tbody>
                           {letters.length === 0 ? (
                             <tr>
-                              <td colSpan={12} className="p-8 text-center text-muted-foreground">
+                              <td colSpan={14} className="p-8 text-center text-muted-foreground">
                                 No letters yet. Add Inward / Outward / Other.
                               </td>
                             </tr>
                           ) : null}
-                          {letters.map((letter: LetterEntryItem, index) => {
+                          {letters.map((letter: LetterEntryItem) => {
                             const isInsert = /[a-z]/i.test(letter.serialLabel);
                             return (
                               <tr
@@ -794,7 +931,9 @@ export default function LetterNumbering() {
                                     }
                                   />
                                 </td>
-                                <td className="p-2 font-mono text-[11px]">{letter.letterNumber || "-"}</td>
+                                <td className="p-2 font-mono text-[11px] whitespace-normal break-all">
+                                  {letter.letterNumber || "-"}
+                                </td>
                                 <td className="p-2">
                                   <Select
                                     value={letter.category}
@@ -849,9 +988,7 @@ export default function LetterNumbering() {
                                         </SelectContent>
                                       </Select>
                                       {letter.needsReply === true && letter.repliedAt ? (
-                                        <p className="text-[10px] text-emerald-600">
-                                          Replied {new Date(letter.repliedAt).toLocaleDateString("en-IN")}
-                                        </p>
+                                        <p className="text-[10px] text-emerald-600 font-medium">Reply Done</p>
                                       ) : letter.needsReply === true ? (
                                         <p className="text-[10px] text-amber-600">Pending reply</p>
                                       ) : null}
@@ -866,7 +1003,7 @@ export default function LetterNumbering() {
                                     ["ccTo", suggestionQueries.ccTo.data ?? []]
                                   ] as const
                                 ).map(([field, suggestions]) => (
-                                  <td key={field} className="p-2 min-w-[140px]">
+                                  <td key={field} className="p-2 align-top">
                                     <SuggestField
                                       value={letter[field]}
                                       suggestions={suggestions}
@@ -944,6 +1081,40 @@ export default function LetterNumbering() {
                                     />
                                   )}
                                 </td>
+                                <td className="p-2">
+                                  <Input
+                                    className="h-8 text-xs"
+                                    placeholder="e.g. 2a"
+                                    defaultValue={letter.replyOfSerial ?? ""}
+                                    key={`${letter.id}-replyOf-${letter.replyOfSerial ?? ""}`}
+                                    onBlur={(e) => {
+                                      const next = e.target.value.trim();
+                                      const prev = (letter.replyOfSerial ?? "").trim();
+                                      if (next === prev) return;
+                                      updateLetterMutation.mutate({
+                                        letterId: letter.id,
+                                        payload: { replyOfSerial: next || null }
+                                      });
+                                    }}
+                                  />
+                                </td>
+                                <td className="p-2 align-top">
+                                  <textarea
+                                    rows={2}
+                                    placeholder="Optional"
+                                    defaultValue={letter.remark ?? ""}
+                                    key={`${letter.id}-remark-${letter.updatedAt}`}
+                                    onBlur={(e) => {
+                                      const next = e.target.value.trim();
+                                      if (next === (letter.remark ?? "").trim()) return;
+                                      updateLetterMutation.mutate({
+                                        letterId: letter.id,
+                                        payload: { remark: next }
+                                      });
+                                    }}
+                                    className="w-full min-h-[2.5rem] min-w-[140px] resize-y rounded-md border border-input bg-transparent px-2 py-1.5 text-xs leading-snug whitespace-pre-wrap break-words outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                  />
+                                </td>
                                 <td className="p-2 text-right">
                                   <div className="inline-flex gap-1">
                                     <Button
@@ -969,7 +1140,6 @@ export default function LetterNumbering() {
                                     </Button>
                                   </div>
                                 </td>
-                                {index < letters.length - 1 ? null : null}
                               </tr>
                             );
                           })}
@@ -982,7 +1152,8 @@ export default function LetterNumbering() {
                     <span className="font-mono">
                       {selectedProject.projectNumber}/{selectedProject.projectCode}/Sr/OutwardSeq
                     </span>
-                    . Use + on a row to insert a back-dated letter (3a, 5a…).
+                    . Use + on a row to insert a back-dated letter (3a, 5a…). Enter Sr. in “Reply Letter of”
+                    to auto-clear that letter from pending.
                   </p>
                 </>
               ) : (

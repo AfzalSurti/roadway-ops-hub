@@ -65,3 +65,9 @@ ALTER TABLE "LetterEntry" ADD COLUMN IF NOT EXISTS "needsReply" BOOLEAN;
 ALTER TABLE "LetterEntry" ADD COLUMN IF NOT EXISTS "repliedAt" TIMESTAMP(3);
 CREATE INDEX IF NOT EXISTS "LetterEntry_letterProjectId_needsReply_repliedAt_idx"
   ON "LetterEntry"("letterProjectId", "needsReply", "repliedAt");
+
+-- Reply-of linkage + optional remark
+ALTER TABLE "LetterEntry" ADD COLUMN IF NOT EXISTS "replyOfSerial" TEXT;
+ALTER TABLE "LetterEntry" ADD COLUMN IF NOT EXISTS "remark" TEXT NOT NULL DEFAULT '';
+CREATE INDEX IF NOT EXISTS "LetterEntry_letterProjectId_replyOfSerial_idx"
+  ON "LetterEntry"("letterProjectId", "replyOfSerial");

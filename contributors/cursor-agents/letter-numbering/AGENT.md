@@ -23,9 +23,10 @@ Work only on the Letter Numbering module and its sync with Projects:
 ## Product rules (from DPR Admin mockups)
 
 1. **Module sections**
-   - New Project Add
+   - New Project Add (from Sankalp / main Project DB only — no manual create)
    - All Project List
-   - Letter Data Base (project filter + letter grid)
+   - Letter Data Base (filter by number + short name + letter grid)
+   - Reply Pending (global list of Need-reply letters)
 
 2. **Letter project fields**
    - Project Number (e.g. `376`)
@@ -34,9 +35,8 @@ Work only on the Letter Numbering module and its sync with Projects:
    - Project Coordinator, Project Engineer
 
 3. **Sync with Project section**
-   - Letter projects can link to main `Project` via `linkedProjectId`.
-   - Creating a letter project may set `syncToMainProject: true`.
-   - Import from main projects: `POST /letter-numbering/projects/import`.
+   - Letter projects link to main `Project` via `linkedProjectId`.
+   - Import from Sankalp: `POST /letter-numbering/projects/import` (primary “New Project Add”).
    - Push letter-only projects into Projects: `POST /letter-numbering/projects/:id/sync-to-main`.
    - Never orphan UI from API — keep sync buttons wired.
 
@@ -47,11 +47,16 @@ Work only on the Letter Numbering module and its sync with Projects:
    - Outward sequence increments only among Outward rows (`01`, `02`…).
    - Back-date insert (`+` under a row): serial becomes `3a`, `3b`…; outward may become `02a`.
 
-5. **Autocomplete (four columns)**
+5. **Reply tracking**
+   - Inward/Other: `needsReply` + `repliedAt`; pending section + Reply Pending menu.
+   - `replyOfSerial` on a row (e.g. `2a`) auto-marks that serial as replied.
+   - Optional `remark` column.
+
+6. **Autocomplete (four columns)**
    - Sent By, Sent To, Subject, CC To suggest prior values from the same column.
    - Use `GET /letter-numbering/suggestions?field=...`.
 
-6. **Access**
+7. **Access**
    - Roles: `ADMIN`, `PMO` only (middleware on `/letter-numbering`).
 
 ## How to work

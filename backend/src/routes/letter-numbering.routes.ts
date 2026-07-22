@@ -18,6 +18,7 @@ export const letterNumberingRouter = Router();
 letterNumberingRouter.use(requireAuth, requireRole("ADMIN", "PMO"));
 
 letterNumberingRouter.get("/projects", asyncHandler(letterNumberingController.listProjects));
+letterNumberingRouter.get("/pending-replies", asyncHandler(letterNumberingController.listPendingReplies));
 letterNumberingRouter.get("/main-projects", asyncHandler(letterNumberingController.listMainProjects));
 letterNumberingRouter.get("/suggestions", asyncHandler(letterNumberingController.suggestions));
 letterNumberingRouter.post(

@@ -182,8 +182,21 @@ export type LetterEntryItem = {
   needsReply?: boolean | null;
   /** When reply was marked done */
   repliedAt?: string | null;
+  /** Serial this letter replies to (e.g. "2a") */
+  replyOfSerial?: string | null;
+  /** Optional remark */
+  remark?: string;
   createdAt: string;
   updatedAt: string;
+};
+
+export type LetterPendingReplyItem = LetterEntryItem & {
+  letterProject: {
+    id: string;
+    projectNumber: string;
+    projectCode: string;
+    shortName: string;
+  };
 };
 
 export type ProjectDprOverviewItem = {

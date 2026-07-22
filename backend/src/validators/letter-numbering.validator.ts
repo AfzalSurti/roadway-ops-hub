@@ -66,7 +66,10 @@ const createLetterEntryObjectSchema = z.object({
   /** Inward/Other only: must we reply to this letter? */
   needsReply: z.boolean().nullable().optional(),
   /** Mark reply completed (true) or reopen (false) */
-  replied: z.boolean().optional()
+  replied: z.boolean().optional(),
+  /** Serial of the letter this row replies to (e.g. "2a") */
+  replyOfSerial: z.string().trim().max(40).nullable().optional(),
+  remark: z.string().trim().max(4000).optional()
 });
 
 export const createLetterEntrySchema = createLetterEntryObjectSchema.superRefine(refineReplyTracking);
@@ -82,7 +85,9 @@ export const updateLetterEntrySchema = z
     subjectCategory: z.string().trim().max(200).optional(),
     letterLinkUrl: z.string().trim().max(2000).nullable().optional(),
     needsReply: z.boolean().nullable().optional(),
-    replied: z.boolean().optional()
+    replied: z.boolean().optional(),
+    replyOfSerial: z.string().trim().max(40).nullable().optional(),
+    remark: z.string().trim().max(4000).optional()
   })
   .superRefine(refineReplyTracking);
 

@@ -734,6 +734,10 @@ model LetterEntry {
   needsReply        Boolean?
   /// When the required reply was marked done
   repliedAt         DateTime?
+  /// Serial of the letter this row replies to (e.g. "2a") — auto-clears that letter from pending
+  replyOfSerial     String?
+  /// Optional free-text remark
+  remark            String         @default("")
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
   letterProject     LetterProject  @relation(fields: [letterProjectId], references: [id], onDelete: Cascade)
@@ -741,4 +745,5 @@ model LetterEntry {
   @@index([letterProjectId, sortOrder])
   @@index([letterProjectId, category])
   @@index([letterProjectId, needsReply, repliedAt])
+  @@index([letterProjectId, replyOfSerial])
 }

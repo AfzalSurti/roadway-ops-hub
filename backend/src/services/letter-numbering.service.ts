@@ -16,6 +16,13 @@ function parseDate(value?: string | null) {
   return date;
 }
 
+function normalizeSerialLabel(value: string) {
+  const trimmed = value.trim().toLowerCase();
+  const match = trimmed.match(/^0*(\d+)([a-z]*)$/i);
+  if (!match) return trimmed;
+  return `${Number(match[1])}${match[2].toLowerCase()}`;
+}
+
 function resolveReplyFields(
   category: LetterCategory,
   args: {
@@ -70,6 +77,10 @@ function regenerateNumbers(
 export const letterNumberingService = {
   listProjects() {
     return letterNumberingRepository.listProjects();
+  },
+
+  listPendingReplies() {
+    return letterNumberingRepository.listPendingReplies();
   },
 
   async getProject(id: string) {
@@ -259,6 +270,8 @@ export const letterNumberingService = {
       letterLinkUrl?: string | null;
       needsReply?: boolean | null;
       replied?: boolean;
+      replyOfSerial?: string | null;
+      remark?: string;
     }
   ) {
     const project = await this.getProject(letterProjectId);
@@ -289,7 +302,10 @@ export const letterNumberingService = {
       currentRepliedAt: null
     });
 
-    return letterNumberingRepository.createLetter({
+    const replyOfSerial =
+      payload.replyOfSerial === undefined ? null : payload.replyOfSerial?.trim() || null;
+
+    const created = await letterNumberingRepository.createLetter({
       letterProject: { connect: { id: letterProjectId } },
       sortOrder,
       serialLabel,
@@ -304,8 +320,16 @@ export const letterNumberingService = {
       letterLinkUrl: payload.letterLinkUrl?.trim() || null,
       outwardSequence,
       needsReply: replyFields.needsReply,
-      repliedAt: replyFields.repliedAt
+      repliedAt: replyFields.repliedAt,
+      replyOfSerial,
+      remark: payload.remark?.trim() || ""
     });
+
+    if (replyOfSerial) {
+      await this.markSerialReplied(letterProjectId, replyOfSerial, created.id);
+    }
+
+    return created;
   },
 
   async insertLetterAfter(
@@ -322,6 +346,8 @@ export const letterNumberingService = {
       letterLinkUrl?: string | null;
       needsReply?: boolean | null;
       replied?: boolean;
+      replyOfSerial?: string | null;
+      remark?: string;
     }
   ) {
     const project = await this.getProject(letterProjectId);
@@ -367,7 +393,10 @@ export const letterNumberingService = {
       currentRepliedAt: null
     });
 
-    return letterNumberingRepository.createLetter({
+    const replyOfSerial =
+      payload.replyOfSerial === undefined ? null : payload.replyOfSerial?.trim() || null;
+
+    const created = await letterNumberingRepository.createLetter({
       letterProject: { connect: { id: letterProjectId } },
       sortOrder,
       serialLabel,
@@ -382,8 +411,32 @@ export const letterNumberingService = {
       letterLinkUrl: payload.letterLinkUrl?.trim() || null,
       outwardSequence,
       needsReply: replyFields.needsReply,
-      repliedAt: replyFields.repliedAt
+      repliedAt: replyFields.repliedAt,
+      replyOfSerial,
+      remark: payload.remark?.trim() || ""
     });
+
+    if (replyOfSerial) {
+      await this.markSerialReplied(letterProjectId, replyOfSerial, created.id);
+    }
+
+    return created;
+  },
+
+  async markSerialReplied(letterProjectId: string, serial: string, excludeLetterId?: string) {
+    const targetKey = normalizeSerialLabel(serial);
+    if (!targetKey) return null;
+    const siblings = await letterNumberingRepository.listLetters(letterProjectId);
+    const target = siblings.find(
+      (item) =>
+        item.id !== excludeLetterId &&
+        normalizeSerialLabel(item.serialLabel) === targetKey &&
+        (item.category === "INWARD" || item.category === "OTHER") &&
+        item.needsReply === true &&
+        !item.repliedAt
+    );
+    if (!target) return null;
+    return letterNumberingRepository.updateLetter(target.id, { repliedAt: new Date() });
   },
 
   async updateLetter(
@@ -399,6 +452,8 @@ export const letterNumberingService = {
       letterLinkUrl: string | null;
       needsReply: boolean | null;
       replied: boolean;
+      replyOfSerial: string | null;
+      remark: string;
     }>
   ) {
     const letter = await letterNumberingRepository.findLetterById(letterId);
@@ -435,7 +490,12 @@ export const letterNumberingService = {
       currentRepliedAt: letter.repliedAt
     });
 
-    return letterNumberingRepository.updateLetter(letterId, {
+    const replyOfSerial =
+      payload.replyOfSerial === undefined
+        ? undefined
+        : payload.replyOfSerial?.trim() || null;
+
+    const updated = await letterNumberingRepository.updateLetter(letterId, {
       category: payload.category,
       letterDate: parseDate(payload.letterDate),
       sentBy: payload.sentBy?.trim(),
@@ -448,8 +508,16 @@ export const letterNumberingService = {
       outwardSequence,
       letterNumber,
       needsReply: replyFields.needsReply,
-      repliedAt: replyFields.repliedAt
+      repliedAt: replyFields.repliedAt,
+      replyOfSerial,
+      remark: payload.remark?.trim()
     });
+
+    if (replyOfSerial) {
+      await this.markSerialReplied(letter.letterProjectId, replyOfSerial, letterId);
+    }
+
+    return updated;
   },
 
   async removeLetter(letterId: string) {

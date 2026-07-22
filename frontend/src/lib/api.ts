@@ -32,6 +32,7 @@ import type {
   InfraTeamMemberItem,
   LetterCategory,
   LetterEntryItem,
+  LetterPendingReplyItem,
   LetterProjectItem,
   ProjectItem,
   ProjectRequisitionFormItem,
@@ -543,6 +544,10 @@ export const api = {
     return request<LetterProjectItem[]>("/letter-numbering/projects");
   },
 
+  getLetterPendingReplies() {
+    return request<LetterPendingReplyItem[]>("/letter-numbering/pending-replies");
+  },
+
   getLetterProject(id: string) {
     return request<LetterProjectItem>(`/letter-numbering/projects/${id}`);
   },
@@ -628,6 +633,8 @@ export const api = {
       letterLinkUrl?: string | null;
       needsReply?: boolean | null;
       replied?: boolean;
+      replyOfSerial?: string | null;
+      remark?: string;
     }
   ) {
     return request<LetterEntryItem>(`/letter-numbering/projects/${letterProjectId}/letters`, {
@@ -650,6 +657,8 @@ export const api = {
       letterLinkUrl?: string | null;
       needsReply?: boolean | null;
       replied?: boolean;
+      replyOfSerial?: string | null;
+      remark?: string;
     }
   ) {
     return request<LetterEntryItem>(`/letter-numbering/projects/${letterProjectId}/letters/insert`, {
@@ -671,6 +680,8 @@ export const api = {
       letterLinkUrl: string | null;
       needsReply: boolean | null;
       replied: boolean;
+      replyOfSerial: string | null;
+      remark: string;
     }>
   ) {
     return request<LetterEntryItem>(`/letter-numbering/letters/${letterId}`, {

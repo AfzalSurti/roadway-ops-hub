@@ -7,6 +7,10 @@ export const letterNumberingController = {
     return sendSuccess(res, await letterNumberingService.listProjects());
   },
 
+  async listPendingReplies(_req: Request, res: Response) {
+    return sendSuccess(res, await letterNumberingService.listPendingReplies());
+  },
+
   async getProject(req: Request, res: Response) {
     return sendSuccess(res, await letterNumberingService.getProject(req.params.id));
   },

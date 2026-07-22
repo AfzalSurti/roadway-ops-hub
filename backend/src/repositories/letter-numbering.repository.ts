@@ -67,6 +67,27 @@ export const letterNumberingRepository = {
     });
   },
 
+  listPendingReplies() {
+    return prisma.letterEntry.findMany({
+      where: {
+        needsReply: true,
+        repliedAt: null,
+        category: { in: ["INWARD", "OTHER"] }
+      },
+      include: {
+        letterProject: {
+          select: {
+            id: true,
+            projectNumber: true,
+            projectCode: true,
+            shortName: true
+          }
+        }
+      },
+      orderBy: [{ letterDate: "asc" }, { sortOrder: "asc" }]
+    });
+  },
+
   createLetter(data: Prisma.LetterEntryCreateInput) {
     return prisma.letterEntry.create({ data });
   },
