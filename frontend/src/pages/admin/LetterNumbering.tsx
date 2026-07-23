@@ -1286,8 +1286,9 @@ export default function LetterNumbering() {
                     <span className="font-mono">
                       {selectedProject.projectNumber}/{selectedProject.projectCode}/Sr/OutwardSeq
                     </span>
-                    . Use + on a row to insert a back-dated letter (3a, 5a…). Enter Sr. in “Reply Letter of”
-                    to auto-clear that letter from pending.
+                    . Use + on a row to insert a back-dated letter (3a, 5a…). Inserted Outward rows get a
+                    position-based sequence (e.g. after 02 → 02a). Enter Sr. in “Reply Letter of” to
+                    auto-clear that letter from pending.
                   </p>
                 </>
               ) : (

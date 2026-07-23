@@ -83,6 +83,41 @@ export function nextOutwardSequence(existing: string[], afterSequence?: string |
   return formatOutwardSequence(String(max + 1));
 }
 
+/** True when serial is an insert suffix like 3a / 3b (not a whole number). */
+export function isInsertSerialLabel(serialLabel: string): boolean {
+  return /[a-z]/i.test(serialLabel.trim());
+}
+
+/**
+ * Plan outward sequences in table (sortOrder) order.
+ * Whole rows get 01, 02, 03… Inserted rows (3a/3b) get position-based suffixes (02a after 02).
+ */
+export function planOutwardSequences(
+  letters: Array<{
+    id: string;
+    category: LetterCategory;
+    sortOrder: number;
+    serialLabel: string;
+  }>
+): Map<string, string> {
+  const sorted = [...letters].sort((a, b) => a.sortOrder - b.sortOrder);
+  const result = new Map<string, string>();
+  const assigned: string[] = [];
+  let previousSequence: string | null = null;
+
+  for (const letter of sorted) {
+    if (letter.category !== "OUTWARD") continue;
+    const sequence: string = isInsertSerialLabel(letter.serialLabel)
+      ? nextOutwardSequence(assigned, previousSequence)
+      : nextOutwardSequence(assigned);
+    result.set(letter.id, sequence);
+    assigned.push(sequence);
+    previousSequence = sequence;
+  }
+
+  return result;
+}
+
 function nextLetterSuffix(existing: string[], num: string): string {
   const suffixes = existing
     .map((value) => value.trim().match(new RegExp(`^${Number(num)}([a-z]+)$`, "i")))

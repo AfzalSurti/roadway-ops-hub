@@ -4,7 +4,8 @@ import {
   buildLetterNumber,
   nextInsertSerial,
   nextOutwardSequence,
-  nextWholeSerial
+  nextWholeSerial,
+  planOutwardSequences
 } from "../utils/letter-numbering.js";
 import type { LetterCategory } from "@prisma/client";
 
@@ -74,6 +75,57 @@ function regenerateNumbers(
   }));
 }
 
+async function resequenceOutwardLetters(
+  letterProjectId: string,
+  project: { projectNumber: string; projectCode: string }
+) {
+  const letters = await letterNumberingRepository.listLetters(letterProjectId);
+  const planned = planOutwardSequences(letters);
+  const updates: Array<{ id: string; data: { outwardSequence: string | null; letterNumber: string } }> =
+    [];
+
+  for (const letter of letters) {
+    if (letter.category !== "OUTWARD") {
+      if (letter.outwardSequence) {
+        updates.push({
+          id: letter.id,
+          data: {
+            outwardSequence: null,
+            letterNumber: buildLetterNumber({
+              projectNumber: project.projectNumber,
+              projectCode: project.projectCode,
+              serialLabel: letter.serialLabel,
+              category: letter.category,
+              outwardSequence: null
+            })
+          }
+        });
+      }
+      continue;
+    }
+
+    const nextSeq = planned.get(letter.id);
+    if (!nextSeq) continue;
+    const nextNumber = buildLetterNumber({
+      projectNumber: project.projectNumber,
+      projectCode: project.projectCode,
+      serialLabel: letter.serialLabel,
+      category: "OUTWARD",
+      outwardSequence: nextSeq
+    });
+    if (letter.outwardSequence === nextSeq && letter.letterNumber === nextNumber) continue;
+    updates.push({
+      id: letter.id,
+      data: { outwardSequence: nextSeq, letterNumber: nextNumber }
+    });
+  }
+
+  if (updates.length > 0) {
+    await letterNumberingRepository.updateManyLetters(letterProjectId, updates);
+  }
+  return updates.length;
+}
+
 export const letterNumberingService = {
   listProjects() {
     return letterNumberingRepository.listProjects();
@@ -132,12 +184,23 @@ export const letterNumberingService = {
         covered.has(normalizeSerialLabel(letter.serialLabel))
     );
 
+    let dirty = false;
     if (heals.length > 0) {
       await Promise.all(
         heals.map((letter) =>
           letterNumberingRepository.updateLetter(letter.id, { repliedAt: new Date() })
         )
       );
+      dirty = true;
+    }
+
+    const outwardFixed = await resequenceOutwardLetters(id, {
+      projectNumber: project.projectNumber,
+      projectCode: project.projectCode
+    });
+    if (outwardFixed > 0) dirty = true;
+
+    if (dirty) {
       const refreshed = await letterNumberingRepository.findProjectById(id);
       if (!refreshed) throw notFound("Letter project not found");
       return refreshed;
@@ -477,6 +540,15 @@ export const letterNumberingService = {
       await this.markSerialReplied(letterProjectId, replyOfSerial, created.id);
     }
 
+    if (payload.category === "OUTWARD") {
+      await resequenceOutwardLetters(letterProjectId, {
+        projectNumber: project.projectNumber,
+        projectCode: project.projectCode
+      });
+      const refreshed = await letterNumberingRepository.findLetterById(created.id);
+      return refreshed ?? created;
+    }
+
     return created;
   },
 
@@ -553,11 +625,22 @@ export const letterNumberingService = {
 
     if (payload.category && payload.category !== letter.category) {
       if (category === "OUTWARD") {
+        // Temporary placeholder; full project resequence runs after save
         const siblings = await letterNumberingRepository.listLetters(letter.letterProjectId);
+        const previousOutward = [...siblings]
+          .filter(
+            (item) =>
+              item.id !== letter.id &&
+              item.category === "OUTWARD" &&
+              item.sortOrder <= letter.sortOrder
+          )
+          .sort((a, b) => a.sortOrder - b.sortOrder)
+          .at(-1);
         outwardSequence = nextOutwardSequence(
           siblings
             .filter((item) => item.category === "OUTWARD" && item.id !== letter.id)
-            .map((item) => item.outwardSequence || "")
+            .map((item) => item.outwardSequence || ""),
+          previousOutward?.outwardSequence
         );
       } else {
         outwardSequence = null;
@@ -603,6 +686,14 @@ export const letterNumberingService = {
       remark: payload.remark?.trim()
     });
 
+    // Keep Outward seq / letter numbers correct in table order (fixes 3b=/04 vs 4=/03)
+    if (payload.category && payload.category !== letter.category) {
+      await resequenceOutwardLetters(letter.letterProjectId, {
+        projectNumber: letter.letterProject.projectNumber,
+        projectCode: letter.letterProject.projectCode
+      });
+    }
+
     let clearedPendingSerial: string | null = null;
     let reopenedPendingSerial: string | null = null;
 
@@ -610,7 +701,6 @@ export const letterNumberingService = {
       const prevKey = previousReplyOf ? normalizeSerialLabel(previousReplyOf) : "";
       const nextKey = replyOfSerial ? normalizeSerialLabel(replyOfSerial) : "";
 
-      // Cleared or changed away from previous Sr. → reopen old letter if nothing else links it
       if (previousReplyOf && prevKey !== nextKey) {
         const reopened = await this.reopenSerialIfUnlinked(
           letter.letterProjectId,
@@ -626,13 +716,24 @@ export const letterNumberingService = {
       }
     }
 
-    return { ...updated, clearedPendingSerial, reopenedPendingSerial };
+    const refreshed = await letterNumberingRepository.findLetterById(letterId);
+    return {
+      ...(refreshed ?? updated),
+      clearedPendingSerial,
+      reopenedPendingSerial
+    };
   },
 
   async removeLetter(letterId: string) {
     const letter = await letterNumberingRepository.findLetterById(letterId);
     if (!letter) throw notFound("Letter not found");
+    const projectMeta = {
+      projectNumber: letter.letterProject.projectNumber,
+      projectCode: letter.letterProject.projectCode
+    };
+    const letterProjectId = letter.letterProjectId;
     await letterNumberingRepository.deleteLetter(letterId);
+    await resequenceOutwardLetters(letterProjectId, projectMeta);
     return { deleted: true };
   },
 
