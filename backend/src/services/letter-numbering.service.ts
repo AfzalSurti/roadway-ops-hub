@@ -500,6 +500,34 @@ export const letterNumberingService = {
     });
   },
 
+  /** If no other row still links to this serial, put it back to Reply Pending */
+  async reopenSerialIfUnlinked(letterProjectId: string, serial: string, excludeLetterId?: string) {
+    const targetKey = normalizeSerialLabel(serial);
+    if (!targetKey) return null;
+    const siblings = await letterNumberingRepository.listLetters(letterProjectId);
+
+    const stillLinked = siblings.some((item) => {
+      if (excludeLetterId && item.id === excludeLetterId) return false;
+      const link = (item.replyOfSerial ?? "").trim();
+      return Boolean(link) && normalizeSerialLabel(link) === targetKey;
+    });
+    if (stillLinked) return null;
+
+    const target = siblings.find((item) => {
+      if (excludeLetterId && item.id === excludeLetterId) return false;
+      if (item.category !== "INWARD" && item.category !== "OTHER") return false;
+      const serialMatch = normalizeSerialLabel(item.serialLabel) === targetKey;
+      const numberMatch = normalizeSerialLabel(item.letterNumber || "") === targetKey;
+      return serialMatch || numberMatch;
+    });
+    if (!target || !target.repliedAt) return null;
+
+    return letterNumberingRepository.updateLetter(target.id, {
+      needsReply: true,
+      repliedAt: null
+    });
+  },
+
   async updateLetter(
     letterId: string,
     payload: Partial<{
@@ -551,6 +579,7 @@ export const letterNumberingService = {
       currentRepliedAt: letter.repliedAt
     });
 
+    const previousReplyOf = (letter.replyOfSerial ?? "").trim() || null;
     const replyOfSerial =
       payload.replyOfSerial === undefined
         ? undefined
@@ -575,12 +604,29 @@ export const letterNumberingService = {
     });
 
     let clearedPendingSerial: string | null = null;
-    if (replyOfSerial) {
-      const cleared = await this.markSerialReplied(letter.letterProjectId, replyOfSerial, letterId);
-      if (cleared) clearedPendingSerial = replyOfSerial;
+    let reopenedPendingSerial: string | null = null;
+
+    if (replyOfSerial !== undefined) {
+      const prevKey = previousReplyOf ? normalizeSerialLabel(previousReplyOf) : "";
+      const nextKey = replyOfSerial ? normalizeSerialLabel(replyOfSerial) : "";
+
+      // Cleared or changed away from previous Sr. → reopen old letter if nothing else links it
+      if (previousReplyOf && prevKey !== nextKey) {
+        const reopened = await this.reopenSerialIfUnlinked(
+          letter.letterProjectId,
+          previousReplyOf,
+          letterId
+        );
+        if (reopened) reopenedPendingSerial = previousReplyOf;
+      }
+
+      if (replyOfSerial) {
+        const cleared = await this.markSerialReplied(letter.letterProjectId, replyOfSerial, letterId);
+        if (cleared) clearedPendingSerial = replyOfSerial;
+      }
     }
 
-    return { ...updated, clearedPendingSerial };
+    return { ...updated, clearedPendingSerial, reopenedPendingSerial };
   },
 
   async removeLetter(letterId: string) {

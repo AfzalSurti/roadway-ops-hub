@@ -290,24 +290,36 @@ export default function LetterNumbering() {
       payload: Parameters<typeof api.updateLetterEntry>[1];
     }) => api.updateLetterEntry(letterId, payload),
     onSuccess: async (data, variables) => {
-      const cleared =
-        data && typeof data === "object" && "clearedPendingSerial" in data
-          ? (data as LetterEntryItem & { clearedPendingSerial?: string | null }).clearedPendingSerial
+      const extra =
+        data && typeof data === "object"
+          ? (data as LetterEntryItem & {
+              clearedPendingSerial?: string | null;
+              reopenedPendingSerial?: string | null;
+            })
           : null;
+      const cleared = extra?.clearedPendingSerial ?? null;
+      const reopened = extra?.reopenedPendingSerial ?? null;
 
       if (variables.payload.replied === true) toast.success("Marked as replied");
-      else if (variables.payload.replyOfSerial) {
+      else if ("replyOfSerial" in variables.payload) {
         if (cleared) {
           toast.success(`Reply linked — #${cleared} marked Reply Done (removed from pending)`);
-        } else {
+        } else if (reopened) {
+          toast.success(`#${reopened} back to Reply Pending`);
+        } else if (variables.payload.replyOfSerial) {
           toast.success("Reply Letter of saved");
+        } else {
+          toast.success("Reply Letter of cleared");
         }
       } else if (variables.payload.needsReply === true) toast.success("Added to reply list");
       else if (variables.payload.needsReply === false) toast.success("Reply not required");
 
-      // Optimistic: mark linked serial as done in current project cache
-      if (variables.payload.replyOfSerial && selectedProjectId) {
-        const targetKey = normalizeSerialLabel(variables.payload.replyOfSerial);
+      // Optimistic cache update for reply-of link / unlink
+      if ("replyOfSerial" in variables.payload && selectedProjectId) {
+        const nextSerial = (variables.payload.replyOfSerial ?? "").trim();
+        const targetKey = nextSerial ? normalizeSerialLabel(nextSerial) : "";
+        const reopenKey = reopened ? normalizeSerialLabel(reopened) : "";
+
         queryClient.setQueryData(
           ["letter-project", selectedProjectId],
           (prev: LetterProjectItem | null | undefined) => {
@@ -316,9 +328,10 @@ export default function LetterNumbering() {
               ...prev,
               letters: (prev.letters ?? []).map((item) => {
                 if (item.id === variables.letterId) {
-                  return { ...item, replyOfSerial: variables.payload.replyOfSerial ?? null };
+                  return { ...item, replyOfSerial: nextSerial || null };
                 }
                 if (
+                  targetKey &&
                   (item.category === "INWARD" || item.category === "OTHER") &&
                   normalizeSerialLabel(item.serialLabel) === targetKey
                 ) {
@@ -327,6 +340,13 @@ export default function LetterNumbering() {
                     needsReply: true,
                     repliedAt: item.repliedAt ?? new Date().toISOString()
                   };
+                }
+                if (
+                  reopenKey &&
+                  (item.category === "INWARD" || item.category === "OTHER") &&
+                  normalizeSerialLabel(item.serialLabel) === reopenKey
+                ) {
+                  return { ...item, needsReply: true, repliedAt: null };
                 }
                 return item;
               })
@@ -360,21 +380,52 @@ export default function LetterNumbering() {
     );
   }, [letterProjects, listFilter]);
 
+  const hasProjectSearch = Boolean(filterNumber.trim() || filterShortName.trim());
+
   const databaseProjects = useMemo(() => {
     const num = filterNumber.trim().toLowerCase();
     const name = filterShortName.trim().toLowerCase();
+
+    // After selection with empty search: show only the selected project
+    if (selectedProjectId && !hasProjectSearch) {
+      return letterProjects.filter((project) => project.id === selectedProjectId);
+    }
+
+    // No search typed yet → hide full list (like Structure inventory)
+    if (!num && !name) return [];
+
     return letterProjects.filter((project) => {
-      const numberOk = !num || project.projectNumber.toLowerCase().includes(num);
-      const nameOk = !name || project.shortName.toLowerCase().includes(name);
+      const numberOk = !num || project.projectNumber.toLowerCase().startsWith(num);
+      const nameOk =
+        !name ||
+        project.shortName.toLowerCase().startsWith(name) ||
+        project.shortName.toLowerCase().includes(name);
       return numberOk && nameOk;
     });
-  }, [letterProjects, filterNumber, filterShortName]);
+  }, [letterProjects, filterNumber, filterShortName, selectedProjectId, hasProjectSearch]);
 
+  // Do not auto-select first project — user must search & pick
   useEffect(() => {
     if (view !== "database") return;
-    if (selectedProjectId && databaseProjects.some((p) => p.id === selectedProjectId)) return;
-    setSelectedProjectId(databaseProjects[0]?.id ?? null);
-  }, [view, selectedProjectId, databaseProjects]);
+    if (!selectedProjectId) return;
+    // If selected project was deleted, clear selection
+    if (!letterProjects.some((p) => p.id === selectedProjectId)) {
+      setSelectedProjectId(null);
+    }
+  }, [view, selectedProjectId, letterProjects]);
+
+  const selectLetterProject = (projectId: string) => {
+    setSelectedProjectId(projectId);
+    // Clear search so list collapses to only the selected project
+    setFilterNumber("");
+    setFilterShortName("");
+  };
+
+  const changeLetterProject = () => {
+    setSelectedProjectId(null);
+    setFilterNumber("");
+    setFilterShortName("");
+  };
 
   const alreadyLinkedMainIds = useMemo(
     () => new Set(letterProjects.map((item) => item.linkedProjectId).filter(Boolean)),
@@ -739,7 +790,7 @@ export default function LetterNumbering() {
                           size="sm"
                           variant="outline"
                           onClick={() => {
-                            setSelectedProjectId(letter.letterProject.id);
+                            selectLetterProject(letter.letterProject.id);
                             setView("database");
                           }}
                         >
@@ -772,7 +823,8 @@ export default function LetterNumbering() {
               <div>
                 <h2 className="text-lg font-semibold">Letter Data Base</h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Filter by project number or short name, then manage inward / outward / other letters.
+                  Type a project number or short name to search, then select one project (list stays
+                  collapsed after selection).
                 </p>
               </div>
 
@@ -782,9 +834,15 @@ export default function LetterNumbering() {
                     Filter Project Number
                   </label>
                   <Input
-                    placeholder="e.g. 376"
+                    placeholder="Type e.g. 3 or 376"
                     value={filterNumber}
-                    onChange={(e) => setFilterNumber(e.target.value)}
+                    onChange={(e) => {
+                      setFilterNumber(e.target.value);
+                      // Searching again unlocks the full match list
+                      if (selectedProjectId && e.target.value.trim()) {
+                        // keep selected until user picks another
+                      }
+                    }}
                   />
                 </div>
                 <div>
@@ -792,7 +850,7 @@ export default function LetterNumbering() {
                     Filter Project Short Name
                   </label>
                   <Input
-                    placeholder="e.g. Vadodara"
+                    placeholder="Type e.g. Vadodara"
                     value={filterShortName}
                     onChange={(e) => setFilterShortName(e.target.value)}
                   />
@@ -805,16 +863,21 @@ export default function LetterNumbering() {
                   <span>Project Short Name</span>
                 </div>
                 <div className="max-h-48 overflow-y-auto divide-y divide-border/30">
-                  {databaseProjects.length === 0 ? (
+                  {!hasProjectSearch && !selectedProjectId ? (
                     <p className="p-4 text-sm text-muted-foreground">
-                      No projects match the filters (or Letter Data Base is empty).
+                      Type in the filters above to find a project. The full list stays hidden until you
+                      search.
+                    </p>
+                  ) : databaseProjects.length === 0 ? (
+                    <p className="p-4 text-sm text-muted-foreground">
+                      No projects match the filters.
                     </p>
                   ) : (
                     databaseProjects.map((project) => (
                       <button
                         key={project.id}
                         type="button"
-                        onClick={() => setSelectedProjectId(project.id)}
+                        onClick={() => selectLetterProject(project.id)}
                         className={`w-full grid grid-cols-2 gap-2 px-3 py-2.5 text-left text-sm transition-colors ${
                           selectedProjectId === project.id ? "bg-primary/15" : "hover:bg-secondary/30"
                         }`}
@@ -829,23 +892,26 @@ export default function LetterNumbering() {
 
               {selectedProjectId && selectedProject ? (
                 <>
-                  <div className="rounded-lg bg-primary/10 border border-primary/20 px-4 py-2.5 text-sm font-medium">
-                    {selectedProject.projectNumber}, {selectedProject.shortName}
+                  <div className="rounded-lg bg-primary/10 border border-primary/20 px-4 py-2.5 text-sm font-medium flex flex-wrap items-center gap-2">
+                    <span>
+                      {selectedProject.projectNumber}, {selectedProject.shortName}
+                    </span>
                     {!selectedProject.linkedProjectId ? (
                       <Button
                         size="sm"
                         variant="outline"
-                        className="ml-3 h-7"
+                        className="h-7"
                         disabled={syncMutation.isPending}
                         onClick={() => syncMutation.mutate(selectedProject.id)}
                       >
                         Add to Project section
                       </Button>
                     ) : (
-                      <Badge className="ml-3" variant="secondary">
-                        Synced
-                      </Badge>
+                      <Badge variant="secondary">Synced</Badge>
                     )}
+                    <Button size="sm" variant="ghost" className="h-7 ml-auto" onClick={changeLetterProject}>
+                      Change project
+                    </Button>
                   </div>
 
                   <div className="flex flex-wrap gap-2">
