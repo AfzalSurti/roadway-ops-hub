@@ -23,10 +23,10 @@ assetRouter.post("/catalog", requireRole("PMO", "ADMIN"), validate(createAssetCa
 assetRouter.patch("/catalog/:id", requireRole("PMO", "ADMIN"), validate(updateAssetCatalogSchema), asyncHandler(assetCatalogController.update));
 assetRouter.delete("/catalog/:id", requireRole("PMO", "ADMIN"), asyncHandler(assetCatalogController.remove));
 
-assetRouter.get("/stats", requireRole("PMO", "ADMIN"), asyncHandler(assetController.getStats));
-assetRouter.get("/", requireRole("PMO", "ADMIN"), asyncHandler(assetController.list));
+assetRouter.get("/stats", requireRole("PMO", "ADMIN", "HOD"), asyncHandler(assetController.getStats));
+assetRouter.get("/", requireRole("PMO", "ADMIN", "HOD"), asyncHandler(assetController.list));
 assetRouter.post("/import", requireRole("PMO", "ADMIN"), validate(bulkImportAssetsSchema), asyncHandler(assetController.bulkImport));
-assetRouter.get("/:id", requireRole("PMO", "ADMIN"), asyncHandler(assetController.getById));
+assetRouter.get("/:id", requireRole("PMO", "ADMIN", "HOD"), asyncHandler(assetController.getById));
 assetRouter.post("/", requireRole("PMO", "ADMIN"), validate(createAssetSchema), asyncHandler(assetController.create));
 assetRouter.patch("/:id", requireRole("PMO", "ADMIN"), validate(updateAssetSchema), asyncHandler(assetController.update));
 assetRouter.delete("/:id", requireRole("PMO"), asyncHandler(assetController.remove));

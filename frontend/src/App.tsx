@@ -27,6 +27,7 @@ import AdministrativeDashboard from "./pages/administrative/Dashboard";
 import AssetManagement from "./pages/administrative/AssetManagement";
 import AssetDetail from "./pages/administrative/AssetDetail";
 import HodDashboard from "./pages/hod/Dashboard";
+import HodAssets from "./pages/hod/Assets";
 import InfraDashboard from "./pages/infra/Dashboard";
 import InfraProjects from "./pages/infra/Projects";
 import InfraTeam from "./pages/infra/Team";
@@ -143,6 +144,7 @@ function AppRoutes() {
 
       <Route path="/hod" element={<HodRoute><AppLayout /></HodRoute>}>
         <Route path="dashboard" element={<HodDashboard />} />
+        <Route path="assets" element={<HodAssets />} />
       </Route>
 
       <Route path="/infra" element={<InfraRoute><AppLayout /></InfraRoute>}>

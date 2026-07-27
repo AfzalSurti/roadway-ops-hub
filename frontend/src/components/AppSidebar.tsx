@@ -39,6 +39,7 @@ const administrativeNav = [
 
 const hodNav = [
   { to: "/hod/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+  { to: "/hod/assets", icon: Package, label: "Assets" },
 ];
 
 const infraNav = [
