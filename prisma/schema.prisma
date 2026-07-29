@@ -13,6 +13,8 @@ enum Role {
   PMO
   HOD
   INFRA
+  TENDER
+  OPERATIONS
   EMPLOYEE
 }
 
@@ -746,4 +748,66 @@ model LetterEntry {
   @@index([letterProjectId, category])
   @@index([letterProjectId, needsReply, repliedAt])
   @@index([letterProjectId, replyOfSerial])
+}
+
+enum TenderBidStatus {
+  ALLOTTED
+  NOT_ALLOTTED
+}
+
+enum SecurityDepositType {
+  PERFORMANCE_SECURITY
+  BANK_GUARANTEE
+  FDR
+}
+
+/// Tender module — tracks submitted bids
+model TenderBid {
+  id              String          @id @default(cuid())
+  srNo            Int
+  nameOfWork      String
+  workCategory    String
+  client          String
+  state           String          @default("")
+  emd             Float           @default(0)
+  tenderFees      Float           @default(0)
+  infraconFees    Float           @default(0)
+  status          TenderBidStatus @default(NOT_ALLOTTED)
+  letterPreviewUrl String?
+  remarks         String          @default("")
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([status])
+  @@index([workCategory])
+  @@index([client])
+}
+
+/// Operations module — tracks pre-contract activities
+model PreContractActivity {
+  id                        String              @id @default(cuid())
+  srNo                      Int
+  nameOfWork                String
+  workCategory              String
+  client                    String
+  state                     String              @default("")
+  awardOfProjectDate        DateTime?
+  awardOfProjectLetterUrl   String?
+  securityDepositType       SecurityDepositType?
+  sdBank                    String              @default("")
+  sdIssuedDate              DateTime?
+  sdNumber                  String              @default("")
+  sdAmount                  Float               @default(0)
+  sdExpiryDate              DateTime?
+  signingAgreementDate      DateTime?
+  signingAgreementLetterUrl String?
+  proceedingOrderDate       DateTime?
+  proceedingOrderLetterUrl  String?
+  insurancePolicy           String              @default("")
+  remarks                   String              @default("")
+  createdAt                 DateTime            @default(now())
+  updatedAt                 DateTime            @updatedAt
+
+  @@index([workCategory])
+  @@index([client])
 }

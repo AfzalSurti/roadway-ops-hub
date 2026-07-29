@@ -15,6 +15,8 @@ import { dprOverviewRouter } from "./dpr-overview.routes.js";
 import { expenseRouter } from "./expense.routes.js";
 import { infraRouter } from "./infra.routes.js";
 import { letterNumberingRouter } from "./letter-numbering.routes.js";
+import { tenderRouter } from "./tender.routes.js";
+import { operationsRouter } from "./operations.routes.js";
 
 export const apiRouter = Router();
 
@@ -34,3 +36,5 @@ apiRouter.use("/dpr-overviews", dprOverviewRouter);
 apiRouter.use("/expenses", expenseRouter);
 apiRouter.use("/infra", infraRouter);
 apiRouter.use("/letter-numbering", letterNumberingRouter);
+apiRouter.use("/tender", tenderRouter);
+apiRouter.use("/operations", operationsRouter);

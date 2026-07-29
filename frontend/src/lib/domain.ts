@@ -1,4 +1,4 @@
-export type Role = "ADMIN" | "PMO" | "HOD" | "INFRA" | "EMPLOYEE";
+export type Role = "ADMIN" | "PMO" | "HOD" | "INFRA" | "TENDER" | "OPERATIONS" | "EMPLOYEE";
 export type Priority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 export type TaskStatus = "TODO" | "IN_PROGRESS" | "BLOCKED" | "DONE";
 export type ReportStatus = "SUBMITTED" | "APPROVED" | "CHANGES_REQUESTED" | "REJECTED";
@@ -730,3 +730,84 @@ export const expenseSheetStatusConfig: Record<ExpenseSheetStatus, { label: strin
   APPROVED: { label: "Approved", className: "bg-emerald-500/15 text-emerald-600" },
   REJECTED: { label: "Rejected", className: "bg-rose-500/15 text-rose-600" }
 };
+
+export type TenderBidStatus = "ALLOTTED" | "NOT_ALLOTTED";
+
+export type TenderBidItem = {
+  id: string;
+  srNo: number;
+  nameOfWork: string;
+  workCategory: string;
+  client: string;
+  state: string;
+  emd: number;
+  tenderFees: number;
+  infraconFees: number;
+  status: TenderBidStatus;
+  letterPreviewUrl?: string | null;
+  remarks: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SecurityDepositType = "PERFORMANCE_SECURITY" | "BANK_GUARANTEE" | "FDR";
+
+export type PreContractActivityItem = {
+  id: string;
+  srNo: number;
+  nameOfWork: string;
+  workCategory: string;
+  client: string;
+  state: string;
+  awardOfProjectDate?: string | null;
+  awardOfProjectLetterUrl?: string | null;
+  securityDepositType?: SecurityDepositType | null;
+  sdBank: string;
+  sdIssuedDate?: string | null;
+  sdNumber: string;
+  sdAmount: number;
+  sdExpiryDate?: string | null;
+  signingAgreementDate?: string | null;
+  signingAgreementLetterUrl?: string | null;
+  proceedingOrderDate?: string | null;
+  proceedingOrderLetterUrl?: string | null;
+  insurancePolicy: string;
+  remarks: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export const WORK_CATEGORY_OPTIONS = [
+  { code: "AE", label: "Authority Engineer" },
+  { code: "IE", label: "Independent Engineer" },
+  { code: "PM", label: "Project Management Consultant" },
+  { code: "TP", label: "Third Party Inspection" },
+  { code: "PC", label: "Proof Checking" },
+  { code: "FH", label: "Field Highway Testing" },
+  { code: "RS", label: "Road Safety Audit" },
+  { code: "EA", label: "Environment Audit" },
+  { code: "IR", label: "Road Infrastructure Designs" },
+  { code: "IB", label: "Bridge Infrastructure Designs" },
+  { code: "IS", label: "Industrial Infrastructure & Park" },
+  { code: "MS", label: "Marine Infrastructure" },
+  { code: "DD", label: "Detail Design Infrastructure" },
+  { code: "HE", label: "Hydro Engineering" },
+  { code: "TE", label: "Tunnel Engineering" }
+] as const;
+
+export const CLIENT_OPTIONS = [
+  "NHAI",
+  "NHIDCL",
+  "BRO",
+  "R&B",
+  "Panchayat",
+  "UDA",
+  "MoRT&H",
+  "GIDC"
+] as const;
+
+export const SECURITY_DEPOSIT_TYPE_OPTIONS: Array<{ value: SecurityDepositType; label: string }> = [
+  { value: "PERFORMANCE_SECURITY", label: "Performance Security" },
+  { value: "BANK_GUARANTEE", label: "Bank Guarantee" },
+  { value: "FDR", label: "FDR" }
+];

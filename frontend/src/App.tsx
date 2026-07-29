@@ -40,6 +40,10 @@ import ExpenseVouchers from "./pages/admin/ExpenseVouchers";
 import ExpenseReports from "./pages/admin/ExpenseReports";
 import EmployeeExpenses from "./pages/employee/Expenses";
 import EmployeeExpenseDetail from "./pages/employee/ExpenseDetail";
+import TenderDashboard from "./pages/tender/Dashboard";
+import OperationsDashboard from "./pages/operations/Dashboard";
+import HodTender from "./pages/hod/Tender";
+import HodOperations from "./pages/hod/Operations";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -65,6 +69,8 @@ function getLandingPath(role?: string | null) {
   if (role === "PMO") return "/administrative/dashboard";
   if (role === "HOD") return "/hod/dashboard";
   if (role === "INFRA") return "/infra/dashboard";
+  if (role === "TENDER") return "/tender/dashboard";
+  if (role === "OPERATIONS") return "/operations/dashboard";
   return "/app/dashboard";
 }
 
@@ -93,6 +99,20 @@ function InfraRoute({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
   if (user.role !== "INFRA") return <Navigate to={getLandingPath(user.role)} replace />;
+  return <>{children}</>;
+}
+
+function TenderRoute({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role !== "TENDER") return <Navigate to={getLandingPath(user.role)} replace />;
+  return <>{children}</>;
+}
+
+function OperationsRoute({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role !== "OPERATIONS") return <Navigate to={getLandingPath(user.role)} replace />;
   return <>{children}</>;
 }
 
@@ -145,6 +165,16 @@ function AppRoutes() {
       <Route path="/hod" element={<HodRoute><AppLayout /></HodRoute>}>
         <Route path="dashboard" element={<HodDashboard />} />
         <Route path="assets" element={<HodAssets />} />
+        <Route path="tender" element={<HodTender />} />
+        <Route path="operations" element={<HodOperations />} />
+      </Route>
+
+      <Route path="/tender" element={<TenderRoute><AppLayout /></TenderRoute>}>
+        <Route path="dashboard" element={<TenderDashboard />} />
+      </Route>
+
+      <Route path="/operations" element={<OperationsRoute><AppLayout /></OperationsRoute>}>
+        <Route path="dashboard" element={<OperationsDashboard />} />
       </Route>
 
       <Route path="/infra" element={<InfraRoute><AppLayout /></InfraRoute>}>

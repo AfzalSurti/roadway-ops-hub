@@ -15,6 +15,8 @@ import {
   ChevronRight,
   LogOut,
   UserCircle,
+  Gavel,
+  Cog,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -40,6 +42,16 @@ const administrativeNav = [
 const hodNav = [
   { to: "/hod/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/hod/assets", icon: Package, label: "Assets" },
+  { to: "/hod/tender", icon: Gavel, label: "Tender" },
+  { to: "/hod/operations", icon: Cog, label: "Operations" },
+];
+
+const tenderNav = [
+  { to: "/tender/dashboard", icon: Gavel, label: "Submitted Bids" },
+];
+
+const operationsNav = [
+  { to: "/operations/dashboard", icon: Cog, label: "Pre-Contract" },
 ];
 
 const infraNav = [
@@ -58,9 +70,9 @@ const employeeNav = [
 ];
 
 export function AppSidebar() {
-  const { user, isAdmin, isPmo, isHod, logout } = useAuth();
+  const { user, isAdmin, isPmo, isHod, isTender, isOperations, logout } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
-  const navItems = isAdmin ? adminNav : isPmo ? administrativeNav : isHod ? hodNav : user?.role === "INFRA" ? infraNav : employeeNav;
+  const navItems = isAdmin ? adminNav : isPmo ? administrativeNav : isHod ? hodNav : isTender ? tenderNav : isOperations ? operationsNav : user?.role === "INFRA" ? infraNav : employeeNav;
 
   const handleLogout = async () => {
     const confirmed = window.confirm("Are you sure you want to logout?");

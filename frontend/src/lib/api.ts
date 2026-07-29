@@ -34,6 +34,7 @@ import type {
   LetterEntryItem,
   LetterPendingReplyItem,
   LetterProjectItem,
+  PreContractActivityItem,
   ProjectItem,
   ProjectRequisitionFormItem,
   ReportItem,
@@ -41,7 +42,9 @@ import type {
   ReportTemplate,
   TaskComment,
   TaskItem,
-  TaskStatus
+  TaskStatus,
+  TenderBidItem,
+  TenderBidStatus
 } from "./domain";
 
   const API_BASE_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:4000").replace(/\/+$/, "");
@@ -1505,5 +1508,114 @@ export const api = {
     return request<{ items: ExpenseVoucherItem[]; page: number; limit: number; total: number; totalPages: number }>(
       `/expenses/vouchers${suffix}`
     );
+  },
+
+  getTenderBids(params?: { page?: number; limit?: number; search?: string; workCategory?: string; client?: string; status?: TenderBidStatus }) {
+    const query = new URLSearchParams();
+    if (params?.page) query.set("page", String(params.page));
+    if (params?.limit) query.set("limit", String(params.limit));
+    if (params?.search) query.set("search", params.search);
+    if (params?.workCategory) query.set("workCategory", params.workCategory);
+    if (params?.client) query.set("client", params.client);
+    if (params?.status) query.set("status", params.status);
+    return request<{ items: TenderBidItem[]; pagination: { page: number; limit: number; total: number; totalPages: number } }>(
+      `/tender${query.toString() ? `?${query.toString()}` : ""}`
+    );
+  },
+
+  createTenderBid(payload: {
+    nameOfWork: string;
+    workCategory: string;
+    client: string;
+    state?: string;
+    emd?: number;
+    tenderFees?: number;
+    infraconFees?: number;
+    status?: TenderBidStatus;
+    letterPreviewUrl?: string | null;
+    remarks?: string;
+  }) {
+    return request<TenderBidItem>("/tender", { method: "POST", body: JSON.stringify(payload) });
+  },
+
+  updateTenderBid(id: string, payload: Partial<{
+    nameOfWork: string;
+    workCategory: string;
+    client: string;
+    state: string;
+    emd: number;
+    tenderFees: number;
+    infraconFees: number;
+    status: TenderBidStatus;
+    letterPreviewUrl: string | null;
+    remarks: string;
+  }>) {
+    return request<TenderBidItem>(`/tender/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+  },
+
+  deleteTenderBid(id: string) {
+    return request<{ deleted: boolean }>(`/tender/${id}`, { method: "DELETE" });
+  },
+
+  getPreContractActivities(params?: { page?: number; limit?: number; search?: string; workCategory?: string; client?: string }) {
+    const query = new URLSearchParams();
+    if (params?.page) query.set("page", String(params.page));
+    if (params?.limit) query.set("limit", String(params.limit));
+    if (params?.search) query.set("search", params.search);
+    if (params?.workCategory) query.set("workCategory", params.workCategory);
+    if (params?.client) query.set("client", params.client);
+    return request<{ items: PreContractActivityItem[]; pagination: { page: number; limit: number; total: number; totalPages: number } }>(
+      `/operations${query.toString() ? `?${query.toString()}` : ""}`
+    );
+  },
+
+  createPreContractActivity(payload: {
+    nameOfWork: string;
+    workCategory: string;
+    client: string;
+    state?: string;
+    awardOfProjectDate?: string | null;
+    awardOfProjectLetterUrl?: string | null;
+    securityDepositType?: string | null;
+    sdBank?: string;
+    sdIssuedDate?: string | null;
+    sdNumber?: string;
+    sdAmount?: number;
+    sdExpiryDate?: string | null;
+    signingAgreementDate?: string | null;
+    signingAgreementLetterUrl?: string | null;
+    proceedingOrderDate?: string | null;
+    proceedingOrderLetterUrl?: string | null;
+    insurancePolicy?: string;
+    remarks?: string;
+  }) {
+    return request<PreContractActivityItem>("/operations", { method: "POST", body: JSON.stringify(payload) });
+  },
+
+  updatePreContractActivity(id: string, payload: Partial<{
+    nameOfWork: string;
+    workCategory: string;
+    client: string;
+    state: string;
+    awardOfProjectDate: string | null;
+    awardOfProjectLetterUrl: string | null;
+    securityDepositType: string | null;
+    sdBank: string;
+    sdIssuedDate: string | null;
+    sdNumber: string;
+    sdAmount: number;
+    sdExpiryDate: string | null;
+    signingAgreementDate: string | null;
+    signingAgreementLetterUrl: string | null;
+    proceedingOrderDate: string | null;
+    proceedingOrderLetterUrl: string | null;
+    insurancePolicy: string;
+    remarks: string;
+  }>) {
+    return request<PreContractActivityItem>(`/operations/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+  },
+
+  deletePreContractActivity(id: string) {
+    return request<{ deleted: boolean }>(`/operations/${id}`, { method: "DELETE" });
   }
 };
