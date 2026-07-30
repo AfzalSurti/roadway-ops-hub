@@ -83,3 +83,43 @@ CREATE TABLE IF NOT EXISTS "PreContractActivity" (
 
 CREATE INDEX IF NOT EXISTS "PreContractActivity_workCategory_idx" ON "PreContractActivity"("workCategory");
 CREATE INDEX IF NOT EXISTS "PreContractActivity_client_idx" ON "PreContractActivity"("client");
+
+-- Tender user (email: tender@sankalp.com, password: Tender@123)
+INSERT INTO "User" (
+  "id", "name", "email", "passwordHash", "role", "createdAt", "updatedAt"
+)
+VALUES (
+  'tender-user',
+  'Tender Manager',
+  'tender@sankalp.com',
+  '$2b$10$DuTAE3HA2fwsObF4LS8G4uCDTyLhfid0k60xDwX7ofCHwFynu0KfO',
+  'TENDER',
+  CURRENT_TIMESTAMP,
+  CURRENT_TIMESTAMP
+)
+ON CONFLICT ("email") DO UPDATE
+SET
+  "name" = EXCLUDED."name",
+  "passwordHash" = EXCLUDED."passwordHash",
+  "role" = EXCLUDED."role",
+  "updatedAt" = CURRENT_TIMESTAMP;
+
+-- Operations user (email: operations@sankalp.com, password: Operations@123)
+INSERT INTO "User" (
+  "id", "name", "email", "passwordHash", "role", "createdAt", "updatedAt"
+)
+VALUES (
+  'operations-user',
+  'Operations Manager',
+  'operations@sankalp.com',
+  '$2b$10$.MgrLEpU1h6wPj6bYi.SCOXJdeid1NyLBhpQZww/B8COeqJuDvGZq',
+  'OPERATIONS',
+  CURRENT_TIMESTAMP,
+  CURRENT_TIMESTAMP
+)
+ON CONFLICT ("email") DO UPDATE
+SET
+  "name" = EXCLUDED."name",
+  "passwordHash" = EXCLUDED."passwordHash",
+  "role" = EXCLUDED."role",
+  "updatedAt" = CURRENT_TIMESTAMP;
