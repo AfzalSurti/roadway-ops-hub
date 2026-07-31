@@ -47,7 +47,7 @@ const hodNav = [
 ];
 
 const tenderNav = [
-  { to: "/tender/dashboard", icon: Gavel, label: "Submitted Bids" },
+  { to: "/tender/dashboard", icon: Gavel, label: "Tender Management" },
 ];
 
 const operationsNav = [

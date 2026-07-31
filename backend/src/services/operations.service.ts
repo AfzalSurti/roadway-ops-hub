@@ -4,7 +4,7 @@ import { getPagination } from "../utils/pagination.js";
 
 export const operationsService = {
   async list(
-    filters: { workCategory?: string; client?: string; search?: string },
+    filters: { workCategory?: string; client?: string; search?: string; tenderBidId?: string },
     page = 1,
     limit = 100
   ) {
@@ -25,11 +25,16 @@ export const operationsService = {
     return activity;
   },
 
+  async getByTenderBidId(tenderBidId: string) {
+    return operationsRepository.findByTenderBidId(tenderBidId);
+  },
+
   async create(data: {
     nameOfWork: string;
     workCategory: string;
     client: string;
     state?: string;
+    tenderBidId?: string;
     awardOfProjectDate?: string | null;
     awardOfProjectLetterUrl?: string | null;
     securityDepositType?: "PERFORMANCE_SECURITY" | "BANK_GUARANTEE" | "FDR" | null;
@@ -46,7 +51,7 @@ export const operationsService = {
     remarks?: string;
   }) {
     const srNo = await operationsRepository.nextSrNo();
-    return operationsRepository.create({
+    const createInput: Parameters<typeof operationsRepository.create>[0] = {
       srNo,
       nameOfWork: data.nameOfWork,
       workCategory: data.workCategory,
@@ -66,7 +71,11 @@ export const operationsService = {
       proceedingOrderLetterUrl: data.proceedingOrderLetterUrl ?? null,
       insurancePolicy: data.insurancePolicy ?? "",
       remarks: data.remarks ?? ""
-    });
+    };
+    if (data.tenderBidId) {
+      createInput.tenderBid = { connect: { id: data.tenderBidId } };
+    }
+    return operationsRepository.create(createInput);
   },
 
   async update(id: string, data: Record<string, unknown>) {

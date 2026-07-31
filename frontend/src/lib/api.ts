@@ -1569,11 +1569,16 @@ export const api = {
     );
   },
 
+  getPreContractByTenderBidId(tenderBidId: string) {
+    return request<PreContractActivityItem | null>(`/operations/by-tender/${tenderBidId}`);
+  },
+
   createPreContractActivity(payload: {
     nameOfWork: string;
     workCategory: string;
     client: string;
     state?: string;
+    tenderBidId?: string;
     awardOfProjectDate?: string | null;
     awardOfProjectLetterUrl?: string | null;
     securityDepositType?: string | null;

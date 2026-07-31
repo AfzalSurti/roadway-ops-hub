@@ -58,6 +58,7 @@ CREATE INDEX IF NOT EXISTS "TenderBid_client_idx" ON "TenderBid"("client");
 CREATE TABLE IF NOT EXISTS "PreContractActivity" (
   "id"                        TEXT NOT NULL DEFAULT gen_random_uuid()::TEXT,
   "srNo"                      INTEGER NOT NULL,
+  "tenderBidId"               TEXT,
   "nameOfWork"                TEXT NOT NULL,
   "workCategory"              TEXT NOT NULL,
   "client"                    TEXT NOT NULL,
@@ -78,9 +79,23 @@ CREATE TABLE IF NOT EXISTS "PreContractActivity" (
   "remarks"                   TEXT NOT NULL DEFAULT '',
   "createdAt"                 TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedAt"                 TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT "PreContractActivity_pkey" PRIMARY KEY ("id")
+  CONSTRAINT "PreContractActivity_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "PreContractActivity_tenderBidId_key" UNIQUE ("tenderBidId"),
+  CONSTRAINT "PreContractActivity_tenderBidId_fkey" FOREIGN KEY ("tenderBidId") REFERENCES "TenderBid"("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
+-- Add tenderBidId column if table already exists but column is missing
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'PreContractActivity' AND column_name = 'tenderBidId') THEN
+    ALTER TABLE "PreContractActivity" ADD COLUMN "tenderBidId" TEXT;
+    ALTER TABLE "PreContractActivity" ADD CONSTRAINT "PreContractActivity_tenderBidId_key" UNIQUE ("tenderBidId");
+    ALTER TABLE "PreContractActivity" ADD CONSTRAINT "PreContractActivity_tenderBidId_fkey" FOREIGN KEY ("tenderBidId") REFERENCES "TenderBid"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+  END IF;
+END
+$$;
+
+CREATE INDEX IF NOT EXISTS "PreContractActivity_tenderBidId_idx" ON "PreContractActivity"("tenderBidId");
 CREATE INDEX IF NOT EXISTS "PreContractActivity_workCategory_idx" ON "PreContractActivity"("workCategory");
 CREATE INDEX IF NOT EXISTS "PreContractActivity_client_idx" ON "PreContractActivity"("client");
 

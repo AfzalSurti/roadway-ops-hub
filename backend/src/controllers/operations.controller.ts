@@ -8,7 +8,8 @@ export const operationsController = {
       {
         workCategory: req.query.workCategory as string | undefined,
         client: req.query.client as string | undefined,
-        search: req.query.search as string | undefined
+        search: req.query.search as string | undefined,
+        tenderBidId: req.query.tenderBidId as string | undefined
       },
       req.query.page ? Number(req.query.page) : undefined,
       req.query.limit ? Number(req.query.limit) : undefined
@@ -18,6 +19,11 @@ export const operationsController = {
 
   async getById(req: Request, res: Response) {
     const result = await operationsService.getById(req.params.id);
+    return sendSuccess(res, result);
+  },
+
+  async getByTenderBidId(req: Request, res: Response) {
+    const result = await operationsService.getByTenderBidId(req.params.tenderBidId);
     return sendSuccess(res, result);
   },
 

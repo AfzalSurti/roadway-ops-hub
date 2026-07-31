@@ -7,6 +7,7 @@ export const createPreContractSchema = z.object({
   workCategory: z.string().trim().min(1).max(10),
   client: z.string().trim().min(1).max(100),
   state: z.string().trim().max(100).optional(),
+  tenderBidId: z.string().trim().max(100).optional(),
   awardOfProjectDate: isoDateOrNull,
   awardOfProjectLetterUrl: z.string().trim().max(1000).nullable().optional(),
   securityDepositType: z.enum(["PERFORMANCE_SECURITY", "BANK_GUARANTEE", "FDR"]).nullable().optional(),

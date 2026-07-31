@@ -777,6 +777,7 @@ model TenderBid {
   remarks         String          @default("")
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
+  preContract     PreContractActivity?
 
   @@index([status])
   @@index([workCategory])
@@ -787,6 +788,7 @@ model TenderBid {
 model PreContractActivity {
   id                        String              @id @default(cuid())
   srNo                      Int
+  tenderBidId               String?             @unique
   nameOfWork                String
   workCategory              String
   client                    String
@@ -807,7 +809,9 @@ model PreContractActivity {
   remarks                   String              @default("")
   createdAt                 DateTime            @default(now())
   updatedAt                 DateTime            @updatedAt
+  tenderBid                 TenderBid?          @relation(fields: [tenderBidId], references: [id], onDelete: SetNull)
 
+  @@index([tenderBidId])
   @@index([workCategory])
   @@index([client])
 }

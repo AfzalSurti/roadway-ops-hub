@@ -755,6 +755,7 @@ export type SecurityDepositType = "PERFORMANCE_SECURITY" | "BANK_GUARANTEE" | "F
 export type PreContractActivityItem = {
   id: string;
   srNo: number;
+  tenderBidId?: string | null;
   nameOfWork: string;
   workCategory: string;
   client: string;

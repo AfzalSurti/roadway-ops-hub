@@ -1,43 +1,40 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../prisma/client.js";
 
+type ListFilters = { workCategory?: string; client?: string; search?: string; tenderBidId?: string };
+
+function buildWhere(filters: ListFilters): Prisma.PreContractActivityWhereInput {
+  const where: Prisma.PreContractActivityWhereInput = {};
+  if (filters.workCategory) where.workCategory = filters.workCategory;
+  if (filters.client) where.client = filters.client;
+  if (filters.tenderBidId) where.tenderBidId = filters.tenderBidId;
+  if (filters.search?.trim()) {
+    const s = filters.search.trim();
+    where.OR = [
+      { nameOfWork: { contains: s, mode: "insensitive" } },
+      { client: { contains: s, mode: "insensitive" } },
+      { state: { contains: s, mode: "insensitive" } },
+      { workCategory: { contains: s, mode: "insensitive" } }
+    ];
+  }
+  return where;
+}
+
 export const operationsRepository = {
-  findMany(filters: { workCategory?: string; client?: string; search?: string }, skip: number, take: number) {
-    const where: Prisma.PreContractActivityWhereInput = {};
-
-    if (filters.workCategory) where.workCategory = filters.workCategory;
-    if (filters.client) where.client = filters.client;
-
-    if (filters.search?.trim()) {
-      const s = filters.search.trim();
-      where.OR = [
-        { nameOfWork: { contains: s, mode: "insensitive" } },
-        { client: { contains: s, mode: "insensitive" } },
-        { state: { contains: s, mode: "insensitive" } },
-        { workCategory: { contains: s, mode: "insensitive" } }
-      ];
-    }
-
-    return prisma.preContractActivity.findMany({ where, orderBy: { srNo: "asc" }, skip, take });
+  findMany(filters: ListFilters, skip: number, take: number) {
+    return prisma.preContractActivity.findMany({ where: buildWhere(filters), orderBy: { srNo: "asc" }, skip, take });
   },
 
-  count(filters: { workCategory?: string; client?: string; search?: string }) {
-    const where: Prisma.PreContractActivityWhereInput = {};
-    if (filters.workCategory) where.workCategory = filters.workCategory;
-    if (filters.client) where.client = filters.client;
-    if (filters.search?.trim()) {
-      const s = filters.search.trim();
-      where.OR = [
-        { nameOfWork: { contains: s, mode: "insensitive" } },
-        { client: { contains: s, mode: "insensitive" } },
-        { state: { contains: s, mode: "insensitive" } }
-      ];
-    }
-    return prisma.preContractActivity.count({ where });
+  count(filters: ListFilters) {
+    return prisma.preContractActivity.count({ where: buildWhere(filters) });
   },
 
   findById(id: string) {
     return prisma.preContractActivity.findUnique({ where: { id } });
+  },
+
+  findByTenderBidId(tenderBidId: string) {
+    return prisma.preContractActivity.findUnique({ where: { tenderBidId } });
   },
 
   create(data: Prisma.PreContractActivityCreateInput) {
