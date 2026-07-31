@@ -85,8 +85,16 @@ export const operationsService = {
       "awardOfProjectDate",
       "sdIssuedDate",
       "sdExpiryDate",
+      "additionalSdIssuedDate",
+      "additionalSdExpiryDate",
       "signingAgreementDate",
-      "proceedingOrderDate"
+      "proceedingOrderDate",
+      "piPlPolicyDate",
+      "piPlPolicyIssueDate",
+      "piPlPolicyExpiryDate",
+      "wcPolicyDate",
+      "wcPolicyIssueDate",
+      "wcPolicyExpiryDate"
     ]) {
       if (dateField in updateData) {
         const val = updateData[dateField];

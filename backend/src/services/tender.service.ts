@@ -25,37 +25,43 @@ export const tenderService = {
     return bid;
   },
 
-  async create(data: {
-    nameOfWork: string;
-    workCategory: string;
-    client: string;
-    state?: string;
-    emd?: number;
-    tenderFees?: number;
-    infraconFees?: number;
-    status?: "ALLOTTED" | "NOT_ALLOTTED";
-    letterPreviewUrl?: string | null;
-    remarks?: string;
-  }) {
+  async create(data: Record<string, unknown> & { nameOfWork: string; workCategory: string; client: string }) {
     const srNo = await tenderRepository.nextSrNo();
     return tenderRepository.create({
       srNo,
       nameOfWork: data.nameOfWork,
+      nameOfBidder: (data.nameOfBidder as string) ?? "",
+      bidInvitingAuthority: (data.bidInvitingAuthority as string) ?? "",
+      tenderId: (data.tenderId as string) ?? "",
+      projectLengthKm: (data.projectLengthKm as number) ?? 0,
       workCategory: data.workCategory,
       client: data.client,
-      state: data.state ?? "",
-      emd: data.emd ?? 0,
-      tenderFees: data.tenderFees ?? 0,
-      infraconFees: data.infraconFees ?? 0,
-      status: data.status ?? "NOT_ALLOTTED",
-      letterPreviewUrl: data.letterPreviewUrl ?? null,
-      remarks: data.remarks ?? ""
+      state: (data.state as string) ?? "",
+      emd: (data.emd as number) ?? 0,
+      emdType: (data.emdType as string) ?? "",
+      emdBank: (data.emdBank as string) ?? "",
+      emdIssuedDate: data.emdIssuedDate ? new Date(data.emdIssuedDate as string) : null,
+      emdNumber: (data.emdNumber as string) ?? "",
+      emdValidUpto: data.emdValidUpto ? new Date(data.emdValidUpto as string) : null,
+      emdLetterUrl: (data.emdLetterUrl as string) ?? null,
+      tenderFees: (data.tenderFees as number) ?? 0,
+      infraconFees: (data.infraconFees as number) ?? 0,
+      status: (data.status as "ALLOTTED" | "NOT_ALLOTTED") ?? "NOT_ALLOTTED",
+      letterPreviewUrl: (data.letterPreviewUrl as string) ?? null,
+      remarks: (data.remarks as string) ?? "",
     });
   },
 
   async update(id: string, data: Record<string, unknown>) {
     await this.getById(id);
-    return tenderRepository.update(id, data);
+    const update = { ...data };
+    for (const dateField of ["emdIssuedDate", "emdValidUpto"]) {
+      if (dateField in update) {
+        const val = update[dateField];
+        update[dateField] = val ? new Date(val as string) : null;
+      }
+    }
+    return tenderRepository.update(id, update);
   },
 
   async remove(id: string) {

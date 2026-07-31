@@ -26,7 +26,10 @@ $$;
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'SecurityDepositType') THEN
-    CREATE TYPE "SecurityDepositType" AS ENUM ('PERFORMANCE_SECURITY', 'BANK_GUARANTEE', 'FDR');
+    CREATE TYPE "SecurityDepositType" AS ENUM ('PERFORMANCE_SECURITY', 'BANK_GUARANTEE', 'FDR', 'SECURITY_BOND');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'SECURITY_BOND' AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'SecurityDepositType')) THEN
+    ALTER TYPE "SecurityDepositType" ADD VALUE 'SECURITY_BOND';
   END IF;
 END
 $$;
@@ -53,6 +56,42 @@ CREATE TABLE IF NOT EXISTS "TenderBid" (
 CREATE INDEX IF NOT EXISTS "TenderBid_status_idx" ON "TenderBid"("status");
 CREATE INDEX IF NOT EXISTS "TenderBid_workCategory_idx" ON "TenderBid"("workCategory");
 CREATE INDEX IF NOT EXISTS "TenderBid_client_idx" ON "TenderBid"("client");
+
+-- Add new TenderBid columns if missing
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='TenderBid' AND column_name='nameOfBidder') THEN
+    ALTER TABLE "TenderBid" ADD COLUMN "nameOfBidder" TEXT NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='TenderBid' AND column_name='bidInvitingAuthority') THEN
+    ALTER TABLE "TenderBid" ADD COLUMN "bidInvitingAuthority" TEXT NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='TenderBid' AND column_name='tenderId') THEN
+    ALTER TABLE "TenderBid" ADD COLUMN "tenderId" TEXT NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='TenderBid' AND column_name='projectLengthKm') THEN
+    ALTER TABLE "TenderBid" ADD COLUMN "projectLengthKm" DOUBLE PRECISION NOT NULL DEFAULT 0;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='TenderBid' AND column_name='emdType') THEN
+    ALTER TABLE "TenderBid" ADD COLUMN "emdType" TEXT NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='TenderBid' AND column_name='emdBank') THEN
+    ALTER TABLE "TenderBid" ADD COLUMN "emdBank" TEXT NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='TenderBid' AND column_name='emdIssuedDate') THEN
+    ALTER TABLE "TenderBid" ADD COLUMN "emdIssuedDate" TIMESTAMP(3);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='TenderBid' AND column_name='emdNumber') THEN
+    ALTER TABLE "TenderBid" ADD COLUMN "emdNumber" TEXT NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='TenderBid' AND column_name='emdValidUpto') THEN
+    ALTER TABLE "TenderBid" ADD COLUMN "emdValidUpto" TIMESTAMP(3);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='TenderBid' AND column_name='emdLetterUrl') THEN
+    ALTER TABLE "TenderBid" ADD COLUMN "emdLetterUrl" TEXT;
+  END IF;
+END
+$$;
 
 -- PreContractActivity table
 CREATE TABLE IF NOT EXISTS "PreContractActivity" (
@@ -84,13 +123,73 @@ CREATE TABLE IF NOT EXISTS "PreContractActivity" (
   CONSTRAINT "PreContractActivity_tenderBidId_fkey" FOREIGN KEY ("tenderBidId") REFERENCES "TenderBid"("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
--- Add tenderBidId column if table already exists but column is missing
+-- Add missing PreContractActivity columns
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'PreContractActivity' AND column_name = 'tenderBidId') THEN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='PreContractActivity' AND column_name='tenderBidId') THEN
     ALTER TABLE "PreContractActivity" ADD COLUMN "tenderBidId" TEXT;
     ALTER TABLE "PreContractActivity" ADD CONSTRAINT "PreContractActivity_tenderBidId_key" UNIQUE ("tenderBidId");
     ALTER TABLE "PreContractActivity" ADD CONSTRAINT "PreContractActivity_tenderBidId_fkey" FOREIGN KEY ("tenderBidId") REFERENCES "TenderBid"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='PreContractActivity' AND column_name='sdLetterUrl') THEN
+    ALTER TABLE "PreContractActivity" ADD COLUMN "sdLetterUrl" TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='PreContractActivity' AND column_name='additionalSdType') THEN
+    ALTER TABLE "PreContractActivity" ADD COLUMN "additionalSdType" "SecurityDepositType";
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='PreContractActivity' AND column_name='additionalSdBank') THEN
+    ALTER TABLE "PreContractActivity" ADD COLUMN "additionalSdBank" TEXT NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='PreContractActivity' AND column_name='additionalSdIssuedDate') THEN
+    ALTER TABLE "PreContractActivity" ADD COLUMN "additionalSdIssuedDate" TIMESTAMP(3);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='PreContractActivity' AND column_name='additionalSdNumber') THEN
+    ALTER TABLE "PreContractActivity" ADD COLUMN "additionalSdNumber" TEXT NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='PreContractActivity' AND column_name='additionalSdAmount') THEN
+    ALTER TABLE "PreContractActivity" ADD COLUMN "additionalSdAmount" DOUBLE PRECISION NOT NULL DEFAULT 0;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='PreContractActivity' AND column_name='additionalSdExpiryDate') THEN
+    ALTER TABLE "PreContractActivity" ADD COLUMN "additionalSdExpiryDate" TIMESTAMP(3);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='PreContractActivity' AND column_name='additionalSdLetterUrl') THEN
+    ALTER TABLE "PreContractActivity" ADD COLUMN "additionalSdLetterUrl" TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='PreContractActivity' AND column_name='piPlPolicyNo') THEN
+    ALTER TABLE "PreContractActivity" ADD COLUMN "piPlPolicyNo" TEXT NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='PreContractActivity' AND column_name='piPlPolicyDate') THEN
+    ALTER TABLE "PreContractActivity" ADD COLUMN "piPlPolicyDate" TIMESTAMP(3);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='PreContractActivity' AND column_name='piPlPolicyAmount') THEN
+    ALTER TABLE "PreContractActivity" ADD COLUMN "piPlPolicyAmount" DOUBLE PRECISION NOT NULL DEFAULT 0;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='PreContractActivity' AND column_name='piPlPolicyIssueDate') THEN
+    ALTER TABLE "PreContractActivity" ADD COLUMN "piPlPolicyIssueDate" TIMESTAMP(3);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='PreContractActivity' AND column_name='piPlPolicyExpiryDate') THEN
+    ALTER TABLE "PreContractActivity" ADD COLUMN "piPlPolicyExpiryDate" TIMESTAMP(3);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='PreContractActivity' AND column_name='piPlPolicyLetterUrl') THEN
+    ALTER TABLE "PreContractActivity" ADD COLUMN "piPlPolicyLetterUrl" TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='PreContractActivity' AND column_name='wcPolicyNo') THEN
+    ALTER TABLE "PreContractActivity" ADD COLUMN "wcPolicyNo" TEXT NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='PreContractActivity' AND column_name='wcPolicyDate') THEN
+    ALTER TABLE "PreContractActivity" ADD COLUMN "wcPolicyDate" TIMESTAMP(3);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='PreContractActivity' AND column_name='wcPolicyAmount') THEN
+    ALTER TABLE "PreContractActivity" ADD COLUMN "wcPolicyAmount" DOUBLE PRECISION NOT NULL DEFAULT 0;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='PreContractActivity' AND column_name='wcPolicyIssueDate') THEN
+    ALTER TABLE "PreContractActivity" ADD COLUMN "wcPolicyIssueDate" TIMESTAMP(3);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='PreContractActivity' AND column_name='wcPolicyExpiryDate') THEN
+    ALTER TABLE "PreContractActivity" ADD COLUMN "wcPolicyExpiryDate" TIMESTAMP(3);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='PreContractActivity' AND column_name='wcPolicyLetterUrl') THEN
+    ALTER TABLE "PreContractActivity" ADD COLUMN "wcPolicyLetterUrl" TEXT;
   END IF;
 END
 $$;

@@ -759,25 +759,36 @@ enum SecurityDepositType {
   PERFORMANCE_SECURITY
   BANK_GUARANTEE
   FDR
+  SECURITY_BOND
 }
 
 /// Tender module — tracks submitted bids
 model TenderBid {
-  id              String          @id @default(cuid())
-  srNo            Int
-  nameOfWork      String
-  workCategory    String
-  client          String
-  state           String          @default("")
-  emd             Float           @default(0)
-  tenderFees      Float           @default(0)
-  infraconFees    Float           @default(0)
-  status          TenderBidStatus @default(NOT_ALLOTTED)
-  letterPreviewUrl String?
-  remarks         String          @default("")
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  preContract     PreContractActivity?
+  id                String          @id @default(cuid())
+  srNo              Int
+  nameOfWork        String
+  nameOfBidder      String          @default("")
+  bidInvitingAuthority String       @default("")
+  tenderId          String          @default("")
+  projectLengthKm   Float           @default(0)
+  workCategory      String
+  client            String
+  state             String          @default("")
+  emd               Float           @default(0)
+  emdType           String          @default("")
+  emdBank           String          @default("")
+  emdIssuedDate     DateTime?
+  emdNumber         String          @default("")
+  emdValidUpto      DateTime?
+  emdLetterUrl      String?
+  tenderFees        Float           @default(0)
+  infraconFees      Float           @default(0)
+  status            TenderBidStatus @default(NOT_ALLOTTED)
+  letterPreviewUrl  String?
+  remarks           String          @default("")
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  preContract       PreContractActivity?
 
   @@index([status])
   @@index([workCategory])
@@ -801,10 +812,30 @@ model PreContractActivity {
   sdNumber                  String              @default("")
   sdAmount                  Float               @default(0)
   sdExpiryDate              DateTime?
+  sdLetterUrl               String?
+  additionalSdType          SecurityDepositType?
+  additionalSdBank          String              @default("")
+  additionalSdIssuedDate    DateTime?
+  additionalSdNumber        String              @default("")
+  additionalSdAmount        Float               @default(0)
+  additionalSdExpiryDate    DateTime?
+  additionalSdLetterUrl     String?
   signingAgreementDate      DateTime?
   signingAgreementLetterUrl String?
   proceedingOrderDate       DateTime?
   proceedingOrderLetterUrl  String?
+  piPlPolicyNo              String              @default("")
+  piPlPolicyDate            DateTime?
+  piPlPolicyAmount          Float               @default(0)
+  piPlPolicyIssueDate       DateTime?
+  piPlPolicyExpiryDate      DateTime?
+  piPlPolicyLetterUrl       String?
+  wcPolicyNo                String              @default("")
+  wcPolicyDate              DateTime?
+  wcPolicyAmount            Float               @default(0)
+  wcPolicyIssueDate         DateTime?
+  wcPolicyExpiryDate        DateTime?
+  wcPolicyLetterUrl         String?
   insurancePolicy           String              @default("")
   remarks                   String              @default("")
   createdAt                 DateTime            @default(now())

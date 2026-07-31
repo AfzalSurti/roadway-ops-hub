@@ -127,15 +127,20 @@ export default function HodTender() {
       ) : (
         <div className="glass-panel overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[1100px]">
+            <table className="w-full text-sm min-w-[1600px]">
               <thead>
                 <tr className="text-muted-foreground border-b border-border/30">
                   <th className="text-left font-medium p-3 w-12">Sr</th>
                   <th className="text-left font-medium p-3">Name of Work</th>
+                  <th className="text-left font-medium p-3">Bidder</th>
+                  <th className="text-left font-medium p-3">Bid Inviting Authority</th>
+                  <th className="text-left font-medium p-3">Tender ID</th>
+                  <th className="text-right font-medium p-3">Length (Km)</th>
                   <th className="text-left font-medium p-3 w-16">W.C.</th>
                   <th className="text-left font-medium p-3">Client</th>
                   <th className="text-left font-medium p-3">State / Region</th>
-                  <th className="text-right font-medium p-3">EMD</th>
+                  <th className="text-left font-medium p-3">Type of EMD</th>
+                  <th className="text-right font-medium p-3">EMD Amt</th>
                   <th className="text-right font-medium p-3">Tender Fees</th>
                   <th className="text-right font-medium p-3">Infracon Fees</th>
                   <th className="text-center font-medium p-3">Status</th>
@@ -146,10 +151,15 @@ export default function HodTender() {
                 {filtered.map((bid: TenderBidItem) => (
                   <tr key={bid.id} className="border-b border-border/20 hover:bg-secondary/20">
                     <td className="p-3 font-medium tabular-nums">{bid.srNo}</td>
-                    <td className="p-3 max-w-[260px]"><span className="line-clamp-2">{bid.nameOfWork}</span></td>
+                    <td className="p-3 max-w-[200px]"><span className="line-clamp-2">{bid.nameOfWork}</span></td>
+                    <td className="p-3 max-w-[140px]"><span className="line-clamp-1">{bid.nameOfBidder || "—"}</span></td>
+                    <td className="p-3 max-w-[180px]"><span className="line-clamp-1">{bid.bidInvitingAuthority || "—"}</span></td>
+                    <td className="p-3 text-xs font-mono">{bid.tenderId || "—"}</td>
+                    <td className="p-3 text-right tabular-nums">{bid.projectLengthKm || "—"}</td>
                     <td className="p-3 font-mono text-xs">{bid.workCategory}</td>
                     <td className="p-3">{bid.client}</td>
                     <td className="p-3">{bid.state || "Not Selected"}</td>
+                    <td className="p-3 text-xs">{bid.emdType || "—"}</td>
                     <td className="p-3 text-right tabular-nums">{formatCurrency(bid.emd)}</td>
                     <td className="p-3 text-right tabular-nums">{formatCurrency(bid.tenderFees)}</td>
                     <td className="p-3 text-right tabular-nums">{formatCurrency(bid.infraconFees)}</td>

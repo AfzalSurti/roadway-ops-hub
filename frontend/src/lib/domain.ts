@@ -737,10 +737,20 @@ export type TenderBidItem = {
   id: string;
   srNo: number;
   nameOfWork: string;
+  nameOfBidder: string;
+  bidInvitingAuthority: string;
+  tenderId: string;
+  projectLengthKm: number;
   workCategory: string;
   client: string;
   state: string;
   emd: number;
+  emdType: string;
+  emdBank: string;
+  emdIssuedDate?: string | null;
+  emdNumber: string;
+  emdValidUpto?: string | null;
+  emdLetterUrl?: string | null;
   tenderFees: number;
   infraconFees: number;
   status: TenderBidStatus;
@@ -750,7 +760,7 @@ export type TenderBidItem = {
   updatedAt: string;
 };
 
-export type SecurityDepositType = "PERFORMANCE_SECURITY" | "BANK_GUARANTEE" | "FDR";
+export type SecurityDepositType = "PERFORMANCE_SECURITY" | "BANK_GUARANTEE" | "FDR" | "SECURITY_BOND";
 
 export type PreContractActivityItem = {
   id: string;
@@ -768,10 +778,30 @@ export type PreContractActivityItem = {
   sdNumber: string;
   sdAmount: number;
   sdExpiryDate?: string | null;
+  sdLetterUrl?: string | null;
+  additionalSdType?: SecurityDepositType | null;
+  additionalSdBank: string;
+  additionalSdIssuedDate?: string | null;
+  additionalSdNumber: string;
+  additionalSdAmount: number;
+  additionalSdExpiryDate?: string | null;
+  additionalSdLetterUrl?: string | null;
   signingAgreementDate?: string | null;
   signingAgreementLetterUrl?: string | null;
   proceedingOrderDate?: string | null;
   proceedingOrderLetterUrl?: string | null;
+  piPlPolicyNo: string;
+  piPlPolicyDate?: string | null;
+  piPlPolicyAmount: number;
+  piPlPolicyIssueDate?: string | null;
+  piPlPolicyExpiryDate?: string | null;
+  piPlPolicyLetterUrl?: string | null;
+  wcPolicyNo: string;
+  wcPolicyDate?: string | null;
+  wcPolicyAmount: number;
+  wcPolicyIssueDate?: string | null;
+  wcPolicyExpiryDate?: string | null;
+  wcPolicyLetterUrl?: string | null;
   insurancePolicy: string;
   remarks: string;
   createdAt: string;
@@ -810,5 +840,14 @@ export const CLIENT_OPTIONS = [
 export const SECURITY_DEPOSIT_TYPE_OPTIONS: Array<{ value: SecurityDepositType; label: string }> = [
   { value: "PERFORMANCE_SECURITY", label: "Performance Security" },
   { value: "BANK_GUARANTEE", label: "Bank Guarantee" },
-  { value: "FDR", label: "FDR" }
+  { value: "FDR", label: "FDR" },
+  { value: "SECURITY_BOND", label: "Security Bond" },
 ];
+
+export const EMD_TYPE_OPTIONS = [
+  "Bank Guarantee",
+  "FDR",
+  "D.D.",
+  "NEFT",
+  "RTGS",
+] as const;
