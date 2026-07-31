@@ -159,6 +159,7 @@ export const letterNumberingRepository = {
 
   listMainProjects() {
     return prisma.project.findMany({
+      where: { subTechnicalUnitCode: "IR" },
       orderBy: { name: "asc" },
       select: {
         id: true,

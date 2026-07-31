@@ -124,12 +124,14 @@ export default function LetterNumbering() {
         return await api.getLetterMainProjects();
       } catch {
         const projects = await api.getProjects();
-        return projects.map((project) => ({
-          id: project.id,
-          name: project.name,
-          description: project.description ?? null,
-          projectNumber: project.projectNumber ?? null
-        }));
+        return projects
+          .filter((p) => p.subTechnicalUnitCode === "IR")
+          .map((project) => ({
+            id: project.id,
+            name: project.name,
+            description: project.description ?? null,
+            projectNumber: project.projectNumber ?? null
+          }));
       }
     }
   });
