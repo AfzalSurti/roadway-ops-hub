@@ -106,6 +106,7 @@ export const contractService = {
   async remove(id: string) {
     await this.getById(id);
     await contractRepository.delete(id);
+    await contractRepository.resequenceSrNos();
     return { deleted: true };
   }
 };

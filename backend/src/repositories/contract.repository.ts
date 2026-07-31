@@ -51,6 +51,16 @@ export const contractRepository = {
     return prisma.contractActivity.delete({ where: { id } });
   },
 
+  async resequenceSrNos() {
+    const items = await prisma.contractActivity.findMany({ orderBy: { srNo: "asc" }, select: { id: true } });
+    if (items.length === 0) return;
+    await prisma.$transaction(
+      items.map((item, index) =>
+        prisma.contractActivity.update({ where: { id: item.id }, data: { srNo: index + 1 } })
+      )
+    );
+  },
+
   nextSrNo() {
     return prisma.contractActivity.aggregate({ _max: { srNo: true } }).then((r) => (r._max.srNo ?? 0) + 1);
   }

@@ -49,6 +49,16 @@ export const operationsRepository = {
     return prisma.preContractActivity.delete({ where: { id } });
   },
 
+  async resequenceSrNos() {
+    const items = await prisma.preContractActivity.findMany({ orderBy: { srNo: "asc" }, select: { id: true } });
+    if (items.length === 0) return;
+    await prisma.$transaction(
+      items.map((item, index) =>
+        prisma.preContractActivity.update({ where: { id: item.id }, data: { srNo: index + 1 } })
+      )
+    );
+  },
+
   nextSrNo() {
     return prisma.preContractActivity.aggregate({ _max: { srNo: true } }).then((r) => (r._max.srNo ?? 0) + 1);
   }

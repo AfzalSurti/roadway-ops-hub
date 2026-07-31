@@ -107,6 +107,7 @@ export const operationsService = {
   async remove(id: string) {
     await this.getById(id);
     await operationsRepository.delete(id);
+    await operationsRepository.resequenceSrNos();
     return { deleted: true };
   }
 };

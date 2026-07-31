@@ -68,6 +68,7 @@ export const tenderService = {
   async remove(id: string) {
     await this.getById(id);
     await tenderRepository.delete(id);
+    await tenderRepository.resequenceSrNos();
     return { deleted: true };
   }
 };
