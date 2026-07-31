@@ -296,24 +296,24 @@ export default function TenderDashboard() {
           ) : (
             <div className="glass-panel overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm min-w-[1600px]">
+                <table className="w-full text-sm min-w-[2800px]">
                   <thead>
                     <tr className="text-muted-foreground border-b border-border/30">
                       <th className="text-left font-medium p-3 w-12">Sr</th>
-                      <th className="text-left font-medium p-3">Name of Work</th>
-                      <th className="text-left font-medium p-3">Bidder</th>
-                      <th className="text-left font-medium p-3">Bid Inviting Authority</th>
-                      <th className="text-left font-medium p-3">Tender ID</th>
-                      <th className="text-right font-medium p-3">Length (Km)</th>
+                      <th className="text-left font-medium p-3 min-w-[520px]">Name of Work</th>
+                      <th className="text-left font-medium p-3 min-w-[280px]">Bidder</th>
+                      <th className="text-left font-medium p-3 min-w-[420px]">Bid Inviting Authority</th>
+                      <th className="text-left font-medium p-3 min-w-[200px]">Tender ID</th>
+                      <th className="text-right font-medium p-3 min-w-[110px]">Length (Km)</th>
                       <th className="text-left font-medium p-3 w-16">W.C.</th>
-                      <th className="text-left font-medium p-3">Client</th>
-                      <th className="text-left font-medium p-3">State / Region</th>
-                      <th className="text-left font-medium p-3">Type of EMD</th>
-                      <th className="text-right font-medium p-3">EMD Amt</th>
-                      <th className="text-right font-medium p-3">Tender Fees</th>
-                      <th className="text-right font-medium p-3">Infracon Fees</th>
-                      <th className="text-center font-medium p-3">Status</th>
-                      <th className="text-center font-medium p-3">Letter</th>
+                      <th className="text-left font-medium p-3 min-w-[100px]">Client</th>
+                      <th className="text-left font-medium p-3 min-w-[140px]">State / Region</th>
+                      <th className="text-left font-medium p-3 min-w-[120px]">Type of EMD</th>
+                      <th className="text-right font-medium p-3 min-w-[120px]">EMD Amt</th>
+                      <th className="text-right font-medium p-3 min-w-[120px]">Tender Fees</th>
+                      <th className="text-right font-medium p-3 min-w-[130px]">Infracon Fees</th>
+                      <th className="text-center font-medium p-3 min-w-[140px]">Status</th>
+                      <th className="text-center font-medium p-3 min-w-[110px]">Letter</th>
                       <th className="text-right font-medium p-3 w-20"></th>
                     </tr>
                   </thead>
@@ -325,9 +325,9 @@ export default function TenderDashboard() {
                         onClick={() => setSelectedBid(bid)}
                       >
                         <td className="p-3 font-medium tabular-nums">{bid.srNo}</td>
-                        <td className="p-3">{bid.nameOfWork}</td>
-                        <td className="p-3">{bid.nameOfBidder || "—"}</td>
-                        <td className="p-3">{bid.bidInvitingAuthority || "—"}</td>
+                        <td className="p-3 whitespace-nowrap">{bid.nameOfWork}</td>
+                        <td className="p-3 whitespace-nowrap">{bid.nameOfBidder || "—"}</td>
+                        <td className="p-3 whitespace-nowrap">{bid.bidInvitingAuthority || "—"}</td>
                         <td className="p-3 text-xs font-mono whitespace-nowrap">{bid.tenderId || "—"}</td>
                         <td className="p-3 text-right tabular-nums whitespace-nowrap">{bid.projectLengthKm || "—"}</td>
                         <td className="p-3 font-mono text-xs whitespace-nowrap">{bid.workCategory}</td>
@@ -602,23 +602,23 @@ function PreContractSection({ allottedBids }: { allottedBids: TenderBidItem[] })
       ) : (
         <div className="glass-panel overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[1600px]">
+            <table className="w-full text-sm min-w-[2800px]">
               <thead>
                 <tr className="text-muted-foreground border-b border-border/30">
                   <th className="text-left font-medium p-3 w-12">Sr</th>
-                  <th className="text-left font-medium p-3">Name of Work</th>
-                  <th className="text-left font-medium p-3">Bidder</th>
-                  <th className="text-left font-medium p-3">Bid Inviting Authority</th>
-                  <th className="text-left font-medium p-3">Tender ID</th>
-                  <th className="text-right font-medium p-3">Length (Km)</th>
+                  <th className="text-left font-medium p-3 min-w-[520px]">Name of Work</th>
+                  <th className="text-left font-medium p-3 min-w-[280px]">Bidder</th>
+                  <th className="text-left font-medium p-3 min-w-[420px]">Bid Inviting Authority</th>
+                  <th className="text-left font-medium p-3 min-w-[200px]">Tender ID</th>
+                  <th className="text-right font-medium p-3 min-w-[110px]">Length (Km)</th>
                   <th className="text-left font-medium p-3 w-16">W.C.</th>
-                  <th className="text-left font-medium p-3">Client</th>
-                  <th className="text-left font-medium p-3">State / Region</th>
-                  <th className="text-left font-medium p-3">Type of EMD</th>
-                  <th className="text-right font-medium p-3">EMD Amt</th>
-                  <th className="text-right font-medium p-3">Tender Fees</th>
-                  <th className="text-right font-medium p-3">Infracon Fees</th>
-                  <th className="text-center font-medium p-3">Pre-Contract</th>
+                  <th className="text-left font-medium p-3 min-w-[100px]">Client</th>
+                  <th className="text-left font-medium p-3 min-w-[140px]">State / Region</th>
+                  <th className="text-left font-medium p-3 min-w-[120px]">Type of EMD</th>
+                  <th className="text-right font-medium p-3 min-w-[120px]">EMD Amt</th>
+                  <th className="text-right font-medium p-3 min-w-[120px]">Tender Fees</th>
+                  <th className="text-right font-medium p-3 min-w-[130px]">Infracon Fees</th>
+                  <th className="text-center font-medium p-3 min-w-[130px]">Pre-Contract</th>
                 </tr>
               </thead>
               <tbody>
@@ -631,9 +631,9 @@ function PreContractSection({ allottedBids }: { allottedBids: TenderBidItem[] })
                       onClick={() => setSelectedPcBid(bid)}
                     >
                       <td className="p-3 font-medium tabular-nums">{bid.srNo}</td>
-                      <td className="p-3">{bid.nameOfWork}</td>
-                      <td className="p-3">{bid.nameOfBidder || "—"}</td>
-                      <td className="p-3">{bid.bidInvitingAuthority || "—"}</td>
+                      <td className="p-3 whitespace-nowrap">{bid.nameOfWork}</td>
+                      <td className="p-3 whitespace-nowrap">{bid.nameOfBidder || "—"}</td>
+                      <td className="p-3 whitespace-nowrap">{bid.bidInvitingAuthority || "—"}</td>
                       <td className="p-3 text-xs font-mono whitespace-nowrap">{bid.tenderId || "—"}</td>
                       <td className="p-3 text-right tabular-nums whitespace-nowrap">{bid.projectLengthKm || "—"}</td>
                       <td className="p-3 font-mono text-xs whitespace-nowrap">{bid.workCategory}</td>
@@ -725,20 +725,20 @@ function PreContractDetailModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="w-full max-w-5xl rounded-2xl border border-border bg-card shadow-xl max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-card border-b border-border/40 px-5 py-4 flex items-center justify-between gap-3 z-10">
+      <div className="w-full max-w-6xl rounded-2xl border border-border bg-card shadow-xl max-h-[90vh] flex flex-col overflow-hidden">
+        <div className="shrink-0 bg-card border-b border-border/40 px-5 py-4 flex items-center justify-between gap-3">
           <div>
             <p className="font-semibold">Pre-Contract Details</p>
             <p className="text-xs text-muted-foreground">Sr #{bid.srNo} · {wcLabel} ({bid.workCategory}) · {bid.client} · {bid.state || "No State"}</p>
           </div>
           <Button size="sm" variant="ghost" onClick={onClose}><X className="h-4 w-4" /></Button>
         </div>
-        <div className="p-5 space-y-4">
+        <div className="p-5 space-y-4 overflow-y-auto flex-1">
           {/* Tender Bid Details — Editable */}
           <div className="rounded-xl border border-border/40 bg-secondary/10 p-4">
             <p className="text-xs font-medium text-muted-foreground mb-3">Tender Bid Details</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="sm:col-span-2 lg:col-span-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="sm:col-span-2 lg:col-span-3">
                 <label className="text-xs text-muted-foreground mb-1 block">Name of Work</label>
                 <Input defaultValue={bid.nameOfWork} onBlur={(e) => { if (e.target.value !== bid.nameOfWork) onBidUpdate("nameOfWork", e.target.value); }} />
               </div>
@@ -830,6 +830,22 @@ function PreContractDetailModal({
             />
           )}
         </div>
+        {preContract && (
+          <div className="shrink-0 bg-card border-t border-border/40 px-5 py-3 flex gap-2 justify-end">
+            <Button size="sm" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button
+              size="sm"
+              disabled={updateMutation.isPending}
+              onClick={() => {
+                toast.success("Pre-contract details saved");
+                onClose();
+              }}
+            >
+              {updateMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : null}
+              Save
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1342,70 +1358,75 @@ function PreContractForm({
       {/* PI/PL Insurance Policy Details */}
       <div className="col-span-1 sm:col-span-2 lg:col-span-3 rounded-xl border border-border/40 bg-secondary/10 p-4">
         <p className="text-xs font-medium text-muted-foreground mb-3">PI/PL Insurance Policy Details</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div className="min-w-0">
             <label className="text-xs text-muted-foreground mb-1 block">Policy No.</label>
-            <Input defaultValue={preContract.piPlPolicyNo} onBlur={(e) => { if (e.target.value !== preContract.piPlPolicyNo) onUpdate("piPlPolicyNo", e.target.value); }} />
+            <Input className="w-full" defaultValue={preContract.piPlPolicyNo} onBlur={(e) => { if (e.target.value !== preContract.piPlPolicyNo) onUpdate("piPlPolicyNo", e.target.value); }} />
           </div>
-          <div>
+          <div className="min-w-0">
             <label className="text-xs text-muted-foreground mb-1 block">Date</label>
-            <Input type="date" defaultValue={preContract.piPlPolicyDate ? new Date(preContract.piPlPolicyDate).toISOString().split("T")[0] : ""} onChange={(e) => onUpdate("piPlPolicyDate", e.target.value || null)} />
+            <Input className="w-full" type="date" defaultValue={preContract.piPlPolicyDate ? new Date(preContract.piPlPolicyDate).toISOString().split("T")[0] : ""} onChange={(e) => onUpdate("piPlPolicyDate", e.target.value || null)} />
           </div>
-          <div>
+          <div className="min-w-0">
             <label className="text-xs text-muted-foreground mb-1 block">Amount</label>
-            <Input type="number" defaultValue={preContract.piPlPolicyAmount || ""} onBlur={(e) => { const v = Number(e.target.value); if (v !== preContract.piPlPolicyAmount) onUpdate("piPlPolicyAmount", v); }} />
+            <Input className="w-full" type="number" defaultValue={preContract.piPlPolicyAmount || ""} onBlur={(e) => { const v = Number(e.target.value); if (v !== preContract.piPlPolicyAmount) onUpdate("piPlPolicyAmount", v); }} />
           </div>
-          <div>
+          <div className="min-w-0">
             <label className="text-xs text-muted-foreground mb-1 block">Date of Issue</label>
-            <Input type="date" defaultValue={preContract.piPlPolicyIssueDate ? new Date(preContract.piPlPolicyIssueDate).toISOString().split("T")[0] : ""} onChange={(e) => onUpdate("piPlPolicyIssueDate", e.target.value || null)} />
+            <Input className="w-full" type="date" defaultValue={preContract.piPlPolicyIssueDate ? new Date(preContract.piPlPolicyIssueDate).toISOString().split("T")[0] : ""} onChange={(e) => onUpdate("piPlPolicyIssueDate", e.target.value || null)} />
           </div>
-          <div>
+          <div className="min-w-0">
             <label className="text-xs text-muted-foreground mb-1 block">Date of Expiry</label>
-            <Input type="date" defaultValue={preContract.piPlPolicyExpiryDate ? new Date(preContract.piPlPolicyExpiryDate).toISOString().split("T")[0] : ""} onChange={(e) => onUpdate("piPlPolicyExpiryDate", e.target.value || null)} />
+            <Input className="w-full" type="date" defaultValue={preContract.piPlPolicyExpiryDate ? new Date(preContract.piPlPolicyExpiryDate).toISOString().split("T")[0] : ""} onChange={(e) => onUpdate("piPlPolicyExpiryDate", e.target.value || null)} />
           </div>
-          <AttachmentUpload
-            label="Policy Attachment"
-            urlValue={preContract.piPlPolicyLetterUrl}
-            onUrlChange={(url) => onUpdate("piPlPolicyLetterUrl", url)}
-          />
+          <div className="min-w-0">
+            <AttachmentUpload
+              label="Policy Attachment"
+              urlValue={preContract.piPlPolicyLetterUrl}
+              onUrlChange={(url) => onUpdate("piPlPolicyLetterUrl", url)}
+            />
+          </div>
         </div>
       </div>
 
       {/* WC Insurance Policy Details */}
       <div className="col-span-1 sm:col-span-2 lg:col-span-3 rounded-xl border border-border/40 bg-secondary/10 p-4">
         <p className="text-xs font-medium text-muted-foreground mb-3">WC Insurance Policy Details</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div className="min-w-0">
             <label className="text-xs text-muted-foreground mb-1 block">Policy No.</label>
-            <Input defaultValue={preContract.wcPolicyNo} onBlur={(e) => { if (e.target.value !== preContract.wcPolicyNo) onUpdate("wcPolicyNo", e.target.value); }} />
+            <Input className="w-full" defaultValue={preContract.wcPolicyNo} onBlur={(e) => { if (e.target.value !== preContract.wcPolicyNo) onUpdate("wcPolicyNo", e.target.value); }} />
           </div>
-          <div>
+          <div className="min-w-0">
             <label className="text-xs text-muted-foreground mb-1 block">Date</label>
-            <Input type="date" defaultValue={preContract.wcPolicyDate ? new Date(preContract.wcPolicyDate).toISOString().split("T")[0] : ""} onChange={(e) => onUpdate("wcPolicyDate", e.target.value || null)} />
+            <Input className="w-full" type="date" defaultValue={preContract.wcPolicyDate ? new Date(preContract.wcPolicyDate).toISOString().split("T")[0] : ""} onChange={(e) => onUpdate("wcPolicyDate", e.target.value || null)} />
           </div>
-          <div>
+          <div className="min-w-0">
             <label className="text-xs text-muted-foreground mb-1 block">Amount</label>
-            <Input type="number" defaultValue={preContract.wcPolicyAmount || ""} onBlur={(e) => { const v = Number(e.target.value); if (v !== preContract.wcPolicyAmount) onUpdate("wcPolicyAmount", v); }} />
+            <Input className="w-full" type="number" defaultValue={preContract.wcPolicyAmount || ""} onBlur={(e) => { const v = Number(e.target.value); if (v !== preContract.wcPolicyAmount) onUpdate("wcPolicyAmount", v); }} />
           </div>
-          <div>
+          <div className="min-w-0">
             <label className="text-xs text-muted-foreground mb-1 block">Date of Issue</label>
-            <Input type="date" defaultValue={preContract.wcPolicyIssueDate ? new Date(preContract.wcPolicyIssueDate).toISOString().split("T")[0] : ""} onChange={(e) => onUpdate("wcPolicyIssueDate", e.target.value || null)} />
+            <Input className="w-full" type="date" defaultValue={preContract.wcPolicyIssueDate ? new Date(preContract.wcPolicyIssueDate).toISOString().split("T")[0] : ""} onChange={(e) => onUpdate("wcPolicyIssueDate", e.target.value || null)} />
           </div>
-          <div>
+          <div className="min-w-0">
             <label className="text-xs text-muted-foreground mb-1 block">Date of Expiry</label>
-            <Input type="date" defaultValue={preContract.wcPolicyExpiryDate ? new Date(preContract.wcPolicyExpiryDate).toISOString().split("T")[0] : ""} onChange={(e) => onUpdate("wcPolicyExpiryDate", e.target.value || null)} />
+            <Input className="w-full" type="date" defaultValue={preContract.wcPolicyExpiryDate ? new Date(preContract.wcPolicyExpiryDate).toISOString().split("T")[0] : ""} onChange={(e) => onUpdate("wcPolicyExpiryDate", e.target.value || null)} />
           </div>
-          <AttachmentUpload
-            label="Policy Attachment"
-            urlValue={preContract.wcPolicyLetterUrl}
-            onUrlChange={(url) => onUpdate("wcPolicyLetterUrl", url)}
-          />
+          <div className="min-w-0">
+            <AttachmentUpload
+              label="Policy Attachment"
+              urlValue={preContract.wcPolicyLetterUrl}
+              onUrlChange={(url) => onUpdate("wcPolicyLetterUrl", url)}
+            />
+          </div>
         </div>
       </div>
 
-      <div className="sm:col-span-2">
+      <div className="col-span-1 sm:col-span-2 lg:col-span-3">
         <label className="text-xs text-muted-foreground mb-1 block">Remarks</label>
         <Input
+          className="w-full"
           defaultValue={preContract.remarks}
           onBlur={(e) => { if (e.target.value !== preContract.remarks) onUpdate("remarks", e.target.value); }}
         />
@@ -1557,23 +1578,23 @@ function ContractSection({ allottedBids }: { allottedBids: TenderBidItem[] }) {
       ) : (
         <div className="glass-panel overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[1800px]">
+            <table className="w-full text-sm min-w-[3200px]">
               <thead>
                 <tr className="text-muted-foreground border-b border-border/30">
                   <th className="text-left font-medium p-3 w-12">Sr</th>
-                  <th className="text-left font-medium p-3">Name of Work</th>
-                  <th className="text-left font-medium p-3">Name of Bidder</th>
-                  <th className="text-left font-medium p-3">Bid Inviting Authority</th>
-                  <th className="text-left font-medium p-3">Authority Address</th>
-                  <th className="text-left font-medium p-3">Type of Performance SD</th>
-                  <th className="text-left font-medium p-3">SD Details</th>
-                  <th className="text-left font-medium p-3">Additional SD Type</th>
-                  <th className="text-left font-medium p-3">Additional SD Details</th>
-                  <th className="text-left font-medium p-3">Proceeding / WO</th>
-                  <th className="text-right font-medium p-3">WO Amount</th>
-                  <th className="text-left font-medium p-3">PI/PL Policy</th>
-                  <th className="text-left font-medium p-3">WC Policy</th>
-                  <th className="text-center font-medium p-3">Contract</th>
+                  <th className="text-left font-medium p-3 min-w-[520px]">Name of Work</th>
+                  <th className="text-left font-medium p-3 min-w-[280px]">Name of Bidder</th>
+                  <th className="text-left font-medium p-3 min-w-[360px]">Bid Inviting Authority</th>
+                  <th className="text-left font-medium p-3 min-w-[360px]">Authority Address</th>
+                  <th className="text-left font-medium p-3 min-w-[180px]">Type of Performance SD</th>
+                  <th className="text-left font-medium p-3 min-w-[220px]">SD Details</th>
+                  <th className="text-left font-medium p-3 min-w-[180px]">Additional SD Type</th>
+                  <th className="text-left font-medium p-3 min-w-[220px]">Additional SD Details</th>
+                  <th className="text-left font-medium p-3 min-w-[140px]">Proceeding / WO</th>
+                  <th className="text-right font-medium p-3 min-w-[120px]">WO Amount</th>
+                  <th className="text-left font-medium p-3 min-w-[140px]">PI/PL Policy</th>
+                  <th className="text-left font-medium p-3 min-w-[140px]">WC Policy</th>
+                  <th className="text-center font-medium p-3 min-w-[120px]">Contract</th>
                 </tr>
               </thead>
               <tbody>
@@ -1592,10 +1613,10 @@ function ContractSection({ allottedBids }: { allottedBids: TenderBidItem[] }) {
                       onClick={() => setSelectedBid(bid)}
                     >
                       <td className="p-3 font-medium tabular-nums">{bid.srNo}</td>
-                      <td className="p-3">{bid.nameOfWork}</td>
-                      <td className="p-3">{bid.nameOfBidder || "—"}</td>
-                      <td className="p-3">{bid.bidInvitingAuthority || "—"}</td>
-                      <td className="p-3">{bid.bidInvitingAuthorityAddress || "—"}</td>
+                      <td className="p-3 whitespace-nowrap">{bid.nameOfWork}</td>
+                      <td className="p-3 whitespace-nowrap">{bid.nameOfBidder || "—"}</td>
+                      <td className="p-3 whitespace-nowrap">{bid.bidInvitingAuthority || "—"}</td>
+                      <td className="p-3 whitespace-nowrap">{bid.bidInvitingAuthorityAddress || "—"}</td>
                       <td className="p-3 text-xs whitespace-nowrap">{sdLabel}</td>
                       <td className="p-3 text-xs">
                         {c?.securityDepositType ? (
@@ -1783,15 +1804,15 @@ function ContractDetailModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="w-full max-w-5xl rounded-2xl border border-border bg-card shadow-xl max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-card border-b border-border/40 px-5 py-4 flex items-center justify-between gap-3 z-10">
+      <div className="w-full max-w-6xl rounded-2xl border border-border bg-card shadow-xl max-h-[90vh] flex flex-col overflow-hidden">
+        <div className="shrink-0 bg-card border-b border-border/40 px-5 py-4 flex items-center justify-between gap-3">
           <div>
             <p className="font-semibold">Contract Activity Details</p>
             <p className="text-xs text-muted-foreground">Sr #{bid.srNo} · {bid.client} · {bid.state || "No State"}</p>
           </div>
           <Button size="sm" variant="ghost" onClick={onClose}><X className="h-4 w-4" /></Button>
         </div>
-        <div className="p-5 space-y-4">
+        <div className="p-5 space-y-4 overflow-y-auto flex-1">
           <div className="rounded-xl border border-border/40 bg-secondary/10 p-4">
             <p className="text-xs font-medium text-muted-foreground mb-3">Details from Tender</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1831,6 +1852,22 @@ function ContractDetailModal({
             />
           )}
         </div>
+        {contract && (
+          <div className="shrink-0 bg-card border-t border-border/40 px-5 py-3 flex gap-2 justify-end">
+            <Button size="sm" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button
+              size="sm"
+              disabled={updateMutation.isPending}
+              onClick={() => {
+                toast.success("Contract details saved");
+                onClose();
+              }}
+            >
+              {updateMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : null}
+              Save
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1954,69 +1991,73 @@ function ContractForm({
 
       <div className="col-span-1 sm:col-span-2 lg:col-span-3 rounded-xl border border-border/40 bg-secondary/10 p-4">
         <p className="text-xs font-medium text-muted-foreground mb-3">PI/PL Insurance Policy Details</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div className="min-w-0">
             <label className="text-xs text-muted-foreground mb-1 block">Policy No.</label>
-            <Input defaultValue={contract.piPlPolicyNo} onBlur={(e) => { if (e.target.value !== contract.piPlPolicyNo) onUpdate("piPlPolicyNo", e.target.value); }} />
+            <Input className="w-full" defaultValue={contract.piPlPolicyNo} onBlur={(e) => { if (e.target.value !== contract.piPlPolicyNo) onUpdate("piPlPolicyNo", e.target.value); }} />
           </div>
-          <div>
+          <div className="min-w-0">
             <label className="text-xs text-muted-foreground mb-1 block">Date</label>
-            <Input type="date" defaultValue={contract.piPlPolicyDate ? new Date(contract.piPlPolicyDate).toISOString().split("T")[0] : ""} onChange={(e) => onUpdate("piPlPolicyDate", e.target.value || null)} />
+            <Input className="w-full" type="date" defaultValue={contract.piPlPolicyDate ? new Date(contract.piPlPolicyDate).toISOString().split("T")[0] : ""} onChange={(e) => onUpdate("piPlPolicyDate", e.target.value || null)} />
           </div>
-          <div>
+          <div className="min-w-0">
             <label className="text-xs text-muted-foreground mb-1 block">Amount</label>
-            <Input type="number" defaultValue={contract.piPlPolicyAmount || ""} onBlur={(e) => { const v = Number(e.target.value); if (v !== contract.piPlPolicyAmount) onUpdate("piPlPolicyAmount", v); }} />
+            <Input className="w-full" type="number" defaultValue={contract.piPlPolicyAmount || ""} onBlur={(e) => { const v = Number(e.target.value); if (v !== contract.piPlPolicyAmount) onUpdate("piPlPolicyAmount", v); }} />
           </div>
-          <div>
+          <div className="min-w-0">
             <label className="text-xs text-muted-foreground mb-1 block">Date of Issue</label>
-            <Input type="date" defaultValue={contract.piPlPolicyIssueDate ? new Date(contract.piPlPolicyIssueDate).toISOString().split("T")[0] : ""} onChange={(e) => onUpdate("piPlPolicyIssueDate", e.target.value || null)} />
+            <Input className="w-full" type="date" defaultValue={contract.piPlPolicyIssueDate ? new Date(contract.piPlPolicyIssueDate).toISOString().split("T")[0] : ""} onChange={(e) => onUpdate("piPlPolicyIssueDate", e.target.value || null)} />
           </div>
-          <div>
+          <div className="min-w-0">
             <label className="text-xs text-muted-foreground mb-1 block">Date of Expiry</label>
-            <Input type="date" defaultValue={contract.piPlPolicyExpiryDate ? new Date(contract.piPlPolicyExpiryDate).toISOString().split("T")[0] : ""} onChange={(e) => onUpdate("piPlPolicyExpiryDate", e.target.value || null)} />
+            <Input className="w-full" type="date" defaultValue={contract.piPlPolicyExpiryDate ? new Date(contract.piPlPolicyExpiryDate).toISOString().split("T")[0] : ""} onChange={(e) => onUpdate("piPlPolicyExpiryDate", e.target.value || null)} />
           </div>
-          <AttachmentUpload
-            label="Policy Attachment"
-            urlValue={contract.piPlPolicyLetterUrl}
-            onUrlChange={(url) => onUpdate("piPlPolicyLetterUrl", url)}
-          />
+          <div className="min-w-0">
+            <AttachmentUpload
+              label="Policy Attachment"
+              urlValue={contract.piPlPolicyLetterUrl}
+              onUrlChange={(url) => onUpdate("piPlPolicyLetterUrl", url)}
+            />
+          </div>
         </div>
       </div>
 
       <div className="col-span-1 sm:col-span-2 lg:col-span-3 rounded-xl border border-border/40 bg-secondary/10 p-4">
         <p className="text-xs font-medium text-muted-foreground mb-3">WC Insurance Policy Details</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div className="min-w-0">
             <label className="text-xs text-muted-foreground mb-1 block">Policy No.</label>
-            <Input defaultValue={contract.wcPolicyNo} onBlur={(e) => { if (e.target.value !== contract.wcPolicyNo) onUpdate("wcPolicyNo", e.target.value); }} />
+            <Input className="w-full" defaultValue={contract.wcPolicyNo} onBlur={(e) => { if (e.target.value !== contract.wcPolicyNo) onUpdate("wcPolicyNo", e.target.value); }} />
           </div>
-          <div>
+          <div className="min-w-0">
             <label className="text-xs text-muted-foreground mb-1 block">Date</label>
-            <Input type="date" defaultValue={contract.wcPolicyDate ? new Date(contract.wcPolicyDate).toISOString().split("T")[0] : ""} onChange={(e) => onUpdate("wcPolicyDate", e.target.value || null)} />
+            <Input className="w-full" type="date" defaultValue={contract.wcPolicyDate ? new Date(contract.wcPolicyDate).toISOString().split("T")[0] : ""} onChange={(e) => onUpdate("wcPolicyDate", e.target.value || null)} />
           </div>
-          <div>
+          <div className="min-w-0">
             <label className="text-xs text-muted-foreground mb-1 block">Amount</label>
-            <Input type="number" defaultValue={contract.wcPolicyAmount || ""} onBlur={(e) => { const v = Number(e.target.value); if (v !== contract.wcPolicyAmount) onUpdate("wcPolicyAmount", v); }} />
+            <Input className="w-full" type="number" defaultValue={contract.wcPolicyAmount || ""} onBlur={(e) => { const v = Number(e.target.value); if (v !== contract.wcPolicyAmount) onUpdate("wcPolicyAmount", v); }} />
           </div>
-          <div>
+          <div className="min-w-0">
             <label className="text-xs text-muted-foreground mb-1 block">Date of Issue</label>
-            <Input type="date" defaultValue={contract.wcPolicyIssueDate ? new Date(contract.wcPolicyIssueDate).toISOString().split("T")[0] : ""} onChange={(e) => onUpdate("wcPolicyIssueDate", e.target.value || null)} />
+            <Input className="w-full" type="date" defaultValue={contract.wcPolicyIssueDate ? new Date(contract.wcPolicyIssueDate).toISOString().split("T")[0] : ""} onChange={(e) => onUpdate("wcPolicyIssueDate", e.target.value || null)} />
           </div>
-          <div>
+          <div className="min-w-0">
             <label className="text-xs text-muted-foreground mb-1 block">Date of Expiry</label>
-            <Input type="date" defaultValue={contract.wcPolicyExpiryDate ? new Date(contract.wcPolicyExpiryDate).toISOString().split("T")[0] : ""} onChange={(e) => onUpdate("wcPolicyExpiryDate", e.target.value || null)} />
+            <Input className="w-full" type="date" defaultValue={contract.wcPolicyExpiryDate ? new Date(contract.wcPolicyExpiryDate).toISOString().split("T")[0] : ""} onChange={(e) => onUpdate("wcPolicyExpiryDate", e.target.value || null)} />
           </div>
-          <AttachmentUpload
-            label="Policy Attachment"
-            urlValue={contract.wcPolicyLetterUrl}
-            onUrlChange={(url) => onUpdate("wcPolicyLetterUrl", url)}
-          />
+          <div className="min-w-0">
+            <AttachmentUpload
+              label="Policy Attachment"
+              urlValue={contract.wcPolicyLetterUrl}
+              onUrlChange={(url) => onUpdate("wcPolicyLetterUrl", url)}
+            />
+          </div>
         </div>
       </div>
 
-      <div className="sm:col-span-2">
+      <div className="col-span-1 sm:col-span-2 lg:col-span-3">
         <label className="text-xs text-muted-foreground mb-1 block">Remarks</label>
-        <Input defaultValue={contract.remarks} onBlur={(e) => { if (e.target.value !== contract.remarks) onUpdate("remarks", e.target.value); }} />
+        <Input className="w-full" defaultValue={contract.remarks} onBlur={(e) => { if (e.target.value !== contract.remarks) onUpdate("remarks", e.target.value); }} />
       </div>
     </div>
   );
