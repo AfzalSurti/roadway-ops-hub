@@ -381,7 +381,7 @@ export default function TenderDashboard() {
 
       {/* Pre-Contract Tab */}
       {tab === "precontract" && (
-        <PreContractSection allottedBids={filtered} />
+        <PreContractSection allottedBids={items.filter((b) => b.status === "ALLOTTED")} />
       )}
 
       {/* Tender Detail Modal */}
@@ -457,16 +457,22 @@ export default function TenderDashboard() {
   );
 }
 
-/* ─── Pre-Contract Section ─── */
+/* ─── Pre-Contract Section (table view like bids) ─── */
 
 function PreContractSection({ allottedBids }: { allottedBids: TenderBidItem[] }) {
   const queryClient = useQueryClient();
-  const [expandedBidId, setExpandedBidId] = useState<string | null>(null);
+  const [pcSearch, setPcSearch] = useState("");
+  const [pcWcFilter, setPcWcFilter] = useState("ALL");
+  const [pcClientFilter, setPcClientFilter] = useState("ALL");
+  const [pcStateFilter, setPcStateFilter] = useState("ALL");
+  const [pcBidderFilter, setPcBidderFilter] = useState("ALL");
+  const [pcAuthorityFilter, setPcAuthorityFilter] = useState("ALL");
+  const [selectedPcBid, setSelectedPcBid] = useState<TenderBidItem | null>(null);
 
   const { data: preContractData } = useQuery({
     queryKey: ["pre-contract-activities"],
     queryFn: () => api.getPreContractActivities({ page: 1, limit: 500 }),
-    staleTime: 2 * 60 * 1000
+    staleTime: 2 * 60 * 1000,
   });
 
   const preContractMap = useMemo(() => {
@@ -477,43 +483,183 @@ function PreContractSection({ allottedBids }: { allottedBids: TenderBidItem[] })
     return map;
   }, [preContractData]);
 
+  const pcBidders = useMemo(() => [...new Set(allottedBids.map((b) => b.nameOfBidder).filter(Boolean))].sort(), [allottedBids]);
+  const pcAuthorities = useMemo(() => [...new Set(allottedBids.map((b) => b.bidInvitingAuthority).filter(Boolean))].sort(), [allottedBids]);
+
+  const filtered = useMemo(() => {
+    const q = pcSearch.trim().toLowerCase();
+    return allottedBids.filter((bid) => {
+      if (pcWcFilter !== "ALL" && bid.workCategory !== pcWcFilter) return false;
+      if (pcClientFilter !== "ALL" && bid.client !== pcClientFilter) return false;
+      if (pcStateFilter !== "ALL" && bid.state !== pcStateFilter) return false;
+      if (pcBidderFilter !== "ALL" && bid.nameOfBidder !== pcBidderFilter) return false;
+      if (pcAuthorityFilter !== "ALL" && bid.bidInvitingAuthority !== pcAuthorityFilter) return false;
+      if (!q) return true;
+      return [bid.nameOfWork, bid.workCategory, bid.client, bid.state, bid.nameOfBidder, bid.bidInvitingAuthority].join(" ").toLowerCase().includes(q);
+    });
+  }, [allottedBids, pcSearch, pcWcFilter, pcClientFilter, pcStateFilter, pcBidderFilter, pcAuthorityFilter]);
+
+  const clearPcFilters = () => { setPcSearch(""); setPcWcFilter("ALL"); setPcClientFilter("ALL"); setPcStateFilter("ALL"); setPcBidderFilter("ALL"); setPcAuthorityFilter("ALL"); };
+
   if (allottedBids.length === 0) {
-    return (
-      <div className="glass-panel p-10 text-center text-muted-foreground">
-        No allotted tenders yet. Change a bid's status to "Allotted" to see it here.
-      </div>
-    );
+    return <div className="glass-panel p-10 text-center text-muted-foreground">No allotted tenders yet. Change a bid&apos;s status to &quot;Allotted&quot; to see it here.</div>;
   }
 
   return (
-    <div className="space-y-3">
-      {allottedBids.map((bid) => (
-        <PreContractCard
-          key={bid.id}
-          bid={bid}
-          preContract={preContractMap.get(bid.id) ?? null}
-          expanded={expandedBidId === bid.id}
-          onToggle={() => setExpandedBidId(expandedBidId === bid.id ? null : bid.id)}
+    <>
+      {/* Filters */}
+      <div className="glass-panel p-4 space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="sm:col-span-2 lg:col-span-3">
+            <label className="text-xs text-muted-foreground mb-1.5 block">Search</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input className="pl-9" placeholder="Name of work, client, state, bidder..." value={pcSearch} onChange={(e) => setPcSearch(e.target.value)} />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1.5 block">Bid Inviting Authority</label>
+            <Select value={pcAuthorityFilter} onValueChange={setPcAuthorityFilter}>
+              <SelectTrigger><SelectValue placeholder="All" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All</SelectItem>
+                {pcAuthorities.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1.5 block">Work Category</label>
+            <Select value={pcWcFilter} onValueChange={setPcWcFilter}>
+              <SelectTrigger><SelectValue placeholder="All" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All</SelectItem>
+                {WORK_CATEGORY_OPTIONS.map((o) => <SelectItem key={o.code} value={o.code}>{o.code} — {o.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1.5 block">Client</label>
+            <Select value={pcClientFilter} onValueChange={setPcClientFilter}>
+              <SelectTrigger><SelectValue placeholder="All" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All</SelectItem>
+                {CLIENT_OPTIONS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1.5 block">Bidder</label>
+            <Select value={pcBidderFilter} onValueChange={setPcBidderFilter}>
+              <SelectTrigger><SelectValue placeholder="All" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All</SelectItem>
+                {pcBidders.map((b) => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1.5 block">State / Region</label>
+            <Select value={pcStateFilter} onValueChange={setPcStateFilter}>
+              <SelectTrigger><SelectValue placeholder="All" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All</SelectItem>
+                {ALL_LOCATIONS.map((loc) => <SelectItem key={loc} value={loc}>{loc}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className="flex justify-end">
+          <Button size="sm" variant="ghost" className="gap-1" onClick={clearPcFilters}>
+            <X className="h-3.5 w-3.5" /> Clear filters
+          </Button>
+        </div>
+      </div>
+
+      {/* Table */}
+      {filtered.length === 0 ? (
+        <div className="glass-panel p-10 text-center text-muted-foreground">No allotted bids match the filters.</div>
+      ) : (
+        <div className="glass-panel overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[1600px]">
+              <thead>
+                <tr className="text-muted-foreground border-b border-border/30">
+                  <th className="text-left font-medium p-3 w-12">Sr</th>
+                  <th className="text-left font-medium p-3">Name of Work</th>
+                  <th className="text-left font-medium p-3">Bidder</th>
+                  <th className="text-left font-medium p-3">Bid Inviting Authority</th>
+                  <th className="text-left font-medium p-3">Tender ID</th>
+                  <th className="text-right font-medium p-3">Length (Km)</th>
+                  <th className="text-left font-medium p-3 w-16">W.C.</th>
+                  <th className="text-left font-medium p-3">Client</th>
+                  <th className="text-left font-medium p-3">State / Region</th>
+                  <th className="text-left font-medium p-3">Type of EMD</th>
+                  <th className="text-right font-medium p-3">EMD Amt</th>
+                  <th className="text-right font-medium p-3">Tender Fees</th>
+                  <th className="text-right font-medium p-3">Infracon Fees</th>
+                  <th className="text-center font-medium p-3">Pre-Contract</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((bid) => {
+                  const hasPC = preContractMap.has(bid.id);
+                  return (
+                    <tr
+                      key={bid.id}
+                      className="border-b border-border/20 hover:bg-secondary/20 cursor-pointer"
+                      onClick={() => setSelectedPcBid(bid)}
+                    >
+                      <td className="p-3 font-medium tabular-nums">{bid.srNo}</td>
+                      <td className="p-3">{bid.nameOfWork}</td>
+                      <td className="p-3">{bid.nameOfBidder || "—"}</td>
+                      <td className="p-3">{bid.bidInvitingAuthority || "—"}</td>
+                      <td className="p-3 text-xs font-mono whitespace-nowrap">{bid.tenderId || "—"}</td>
+                      <td className="p-3 text-right tabular-nums whitespace-nowrap">{bid.projectLengthKm || "—"}</td>
+                      <td className="p-3 font-mono text-xs whitespace-nowrap">{bid.workCategory}</td>
+                      <td className="p-3 whitespace-nowrap">{bid.client}</td>
+                      <td className="p-3 whitespace-nowrap">{bid.state || "Not Selected"}</td>
+                      <td className="p-3 text-xs whitespace-nowrap">{bid.emdType || "—"}</td>
+                      <td className="p-3 text-right tabular-nums whitespace-nowrap">{formatCurrency(bid.emd)}</td>
+                      <td className="p-3 text-right tabular-nums whitespace-nowrap">{formatCurrency(bid.tenderFees)}</td>
+                      <td className="p-3 text-right tabular-nums whitespace-nowrap">{formatCurrency(bid.infraconFees)}</td>
+                      <td className="p-3 text-center">
+                        <Badge variant={hasPC ? "secondary" : "outline"} className="text-[10px]">
+                          {hasPC ? "Active" : "Not Created"}
+                        </Badge>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Pre-Contract Detail Modal */}
+      {selectedPcBid && (
+        <PreContractDetailModal
+          bid={selectedPcBid}
+          preContract={preContractMap.get(selectedPcBid.id) ?? null}
+          onClose={() => setSelectedPcBid(null)}
           onRefresh={() => queryClient.invalidateQueries({ queryKey: ["pre-contract-activities"] })}
         />
-      ))}
-    </div>
+      )}
+    </>
   );
 }
 
-/* ─── Pre-Contract Card per allotted bid ─── */
+/* ─── Pre-Contract Detail Modal ─── */
 
-function PreContractCard({
+function PreContractDetailModal({
   bid,
   preContract,
-  expanded,
-  onToggle,
+  onClose,
   onRefresh,
 }: {
   bid: TenderBidItem;
   preContract: PreContractActivityItem | null;
-  expanded: boolean;
-  onToggle: () => void;
+  onClose: () => void;
   onRefresh: () => void;
 }) {
   const queryClient = useQueryClient();
@@ -554,33 +700,19 @@ function PreContractCard({
   });
 
   const onBidUpdate = (field: string, value: unknown) => updateBidMutation.mutate({ [field]: value });
-
   const wcLabel = WORK_CATEGORY_OPTIONS.find((o) => o.code === bid.workCategory)?.label ?? bid.workCategory;
 
   return (
-    <div className="glass-panel overflow-hidden">
-      {/* Header */}
-      <button
-        className="w-full flex items-center gap-4 p-4 text-left hover:bg-secondary/20 transition-colors"
-        onClick={onToggle}
-      >
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary" className="rounded-full text-[10px]">Sr {bid.srNo}</Badge>
-            <Badge className="rounded-full text-[10px] bg-emerald-500/15 text-emerald-600">Allotted</Badge>
-            {preContract && <Badge variant="outline" className="rounded-full text-[10px]">Pre-Contract Active</Badge>}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="w-full max-w-5xl rounded-2xl border border-border bg-card shadow-xl max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-card border-b border-border/40 px-5 py-4 flex items-center justify-between gap-3 z-10">
+          <div>
+            <p className="font-semibold">Pre-Contract Details</p>
+            <p className="text-xs text-muted-foreground">Sr #{bid.srNo} · {wcLabel} ({bid.workCategory}) · {bid.client} · {bid.state || "No State"}</p>
           </div>
-          <p className="mt-1 font-medium line-clamp-1">{bid.nameOfWork}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">{wcLabel} ({bid.workCategory}) · {bid.client} · {bid.state || "No State"}</p>
+          <Button size="sm" variant="ghost" onClick={onClose}><X className="h-4 w-4" /></Button>
         </div>
-        <div className="text-muted-foreground">
-          <svg className={`h-5 w-5 transition-transform ${expanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-        </div>
-      </button>
-
-      {/* Expanded Content */}
-      {expanded && (
-        <div className="border-t border-border/30 p-4 space-y-4">
+        <div className="p-5 space-y-4">
           {/* Tender Bid Details — Editable */}
           <div className="rounded-xl border border-border/40 bg-secondary/10 p-4">
             <p className="text-xs font-medium text-muted-foreground mb-3">Tender Bid Details</p>
@@ -594,7 +726,7 @@ function PreContractCard({
                 <Input defaultValue={bid.nameOfBidder} onBlur={(e) => { if (e.target.value !== bid.nameOfBidder) onBidUpdate("nameOfBidder", e.target.value); }} />
               </div>
               <div className="sm:col-span-2">
-                <label className="text-xs text-muted-foreground mb-1 block">Name & Address of Bid Inviting Authority</label>
+                <label className="text-xs text-muted-foreground mb-1 block">Bid Inviting Authority</label>
                 <Input defaultValue={bid.bidInvitingAuthority} onBlur={(e) => { if (e.target.value !== bid.bidInvitingAuthority) onBidUpdate("bidInvitingAuthority", e.target.value); }} />
               </div>
               <div>
@@ -609,18 +741,14 @@ function PreContractCard({
                 <label className="text-xs text-muted-foreground mb-1 block">Work Category</label>
                 <Select value={bid.workCategory} onValueChange={(v) => onBidUpdate("workCategory", v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {WORK_CATEGORY_OPTIONS.map((o) => <SelectItem key={o.code} value={o.code}>{o.code} — {o.label}</SelectItem>)}
-                  </SelectContent>
+                  <SelectContent>{WORK_CATEGORY_OPTIONS.map((o) => <SelectItem key={o.code} value={o.code}>{o.code} — {o.label}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div>
                 <label className="text-xs text-muted-foreground mb-1 block">Client</label>
                 <Select value={bid.client} onValueChange={(v) => onBidUpdate("client", v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {CLIENT_OPTIONS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                  </SelectContent>
+                  <SelectContent>{CLIENT_OPTIONS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div>
@@ -635,10 +763,7 @@ function PreContractCard({
                 <label className="text-xs text-muted-foreground mb-1 block">Type of EMD</label>
                 <Select value={bid.emdType || "NONE"} onValueChange={(v) => onBidUpdate("emdType", v === "NONE" ? "" : v)}>
                   <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="NONE">None</SelectItem>
-                    {EMD_TYPE_OPTIONS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                  </SelectContent>
+                  <SelectContent><SelectItem value="NONE">None</SelectItem>{EMD_TYPE_OPTIONS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div>
@@ -668,15 +793,11 @@ function PreContractCard({
             </div>
           </div>
 
+          {/* Pre-Contract Activity Form */}
           {!preContract ? (
             <div className="text-center py-6">
               <p className="text-muted-foreground text-sm mb-3">No pre-contract activity linked to this tender yet.</p>
-              <Button
-                size="sm"
-                className="gap-1.5"
-                disabled={createMutation.isPending}
-                onClick={() => createMutation.mutate()}
-              >
+              <Button size="sm" className="gap-1.5" disabled={createMutation.isPending} onClick={() => createMutation.mutate()}>
                 {createMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
                 Create Pre-Contract Activity
               </Button>
@@ -688,7 +809,7 @@ function PreContractCard({
             />
           )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
