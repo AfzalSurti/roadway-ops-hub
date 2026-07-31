@@ -397,25 +397,25 @@ export default function TenderDashboard() {
                       >
                         <td className="p-2.5 align-top font-medium tabular-nums">{bid.srNo}</td>
                         <td className="p-2.5 align-top">
-                          <p className="leading-snug line-clamp-3 break-words">{bid.nameOfWork}</p>
+                          <p className="leading-snug break-words whitespace-normal">{bid.nameOfWork}</p>
                         </td>
                         <td className="p-2.5 align-top">
-                          <p className="leading-snug line-clamp-2 break-words">{bid.nameOfBidder || "—"}</p>
+                          <p className="leading-snug break-words whitespace-normal">{bid.nameOfBidder || "—"}</p>
                         </td>
                         <td className="p-2.5 align-top">
-                          <p className="leading-snug line-clamp-3 break-words">{bid.bidInvitingAuthority || "—"}</p>
+                          <p className="leading-snug break-words whitespace-normal">{bid.bidInvitingAuthority || "—"}</p>
                         </td>
                         <td className="p-2.5 align-top text-xs font-mono break-all">{bid.tenderId || "—"}</td>
                         <td className="p-2.5 align-top text-right tabular-nums">{bid.projectLengthKm ?? "—"}</td>
                         <td className="p-2.5 align-top font-mono text-xs">{bid.workCategory}</td>
                         <td className="p-2.5 align-top">
-                          <p className="leading-snug line-clamp-2 break-words">{bid.client}</p>
+                          <p className="leading-snug break-words whitespace-normal">{bid.client}</p>
                         </td>
                         <td className="p-2.5 align-top">
-                          <p className="leading-snug line-clamp-2 break-words">{bid.state || "—"}</p>
+                          <p className="leading-snug break-words whitespace-normal">{bid.state || "—"}</p>
                         </td>
                         <td className="p-2.5 align-top text-xs">
-                          <p className="leading-snug line-clamp-2 break-words">{bid.emdType || "—"}</p>
+                          <p className="leading-snug break-words whitespace-normal">{bid.emdType || "—"}</p>
                         </td>
                         <td className="p-2.5 align-top text-right tabular-nums text-xs leading-snug">{formatCurrency(bid.emd)}</td>
                         <td className="p-2.5 align-top text-right text-xs leading-snug">
@@ -723,25 +723,25 @@ function PreContractSection({ allottedBids }: { allottedBids: TenderBidItem[] })
                     >
                       <td className="p-2.5 align-top font-medium tabular-nums">{bid.srNo}</td>
                       <td className="p-2.5 align-top">
-                        <p className="leading-snug line-clamp-3 break-words">{bid.nameOfWork}</p>
+                        <p className="leading-snug break-words whitespace-normal">{bid.nameOfWork}</p>
                       </td>
                       <td className="p-2.5 align-top">
-                        <p className="leading-snug line-clamp-2 break-words">{bid.nameOfBidder || "—"}</p>
+                        <p className="leading-snug break-words whitespace-normal">{bid.nameOfBidder || "—"}</p>
                       </td>
                       <td className="p-2.5 align-top">
-                        <p className="leading-snug line-clamp-3 break-words">{bid.bidInvitingAuthority || "—"}</p>
+                        <p className="leading-snug break-words whitespace-normal">{bid.bidInvitingAuthority || "—"}</p>
                       </td>
                       <td className="p-2.5 align-top text-xs font-mono break-all">{bid.tenderId || "—"}</td>
                       <td className="p-2.5 align-top text-right tabular-nums">{bid.projectLengthKm ?? "—"}</td>
                       <td className="p-2.5 align-top font-mono text-xs">{bid.workCategory}</td>
                       <td className="p-2.5 align-top">
-                        <p className="leading-snug line-clamp-2 break-words">{bid.client}</p>
+                        <p className="leading-snug break-words whitespace-normal">{bid.client}</p>
                       </td>
                       <td className="p-2.5 align-top">
-                        <p className="leading-snug line-clamp-2 break-words">{bid.state || "—"}</p>
+                        <p className="leading-snug break-words whitespace-normal">{bid.state || "—"}</p>
                       </td>
                       <td className="p-2.5 align-top text-xs">
-                        <p className="leading-snug line-clamp-2 break-words">{bid.emdType || "—"}</p>
+                        <p className="leading-snug break-words whitespace-normal">{bid.emdType || "—"}</p>
                       </td>
                       <td className="p-2.5 align-top text-right tabular-nums text-xs leading-snug">{formatCurrency(bid.emd)}</td>
                       <td className="p-2.5 align-top text-right text-xs leading-snug">
@@ -1717,25 +1717,25 @@ function ContractSection({ allottedBids }: { allottedBids: TenderBidItem[] }) {
                     >
                       <td className="p-2.5 align-top font-medium tabular-nums">{bid.srNo}</td>
                       <td className="p-2.5 align-top">
-                        <p className="leading-snug line-clamp-3 break-words">{bid.nameOfWork}</p>
+                        <p className="leading-snug break-words whitespace-normal">{bid.nameOfWork}</p>
                       </td>
                       <td className="p-2.5 align-top">
-                        <p className="leading-snug line-clamp-2 break-words">{bid.nameOfBidder || "—"}</p>
+                        <p className="leading-snug break-words whitespace-normal">{bid.nameOfBidder || "—"}</p>
                       </td>
                       <td className="p-2.5 align-top">
-                        <p className="leading-snug line-clamp-3 break-words">{bid.bidInvitingAuthority || "—"}</p>
+                        <p className="leading-snug break-words whitespace-normal">{bid.bidInvitingAuthority || "—"}</p>
                       </td>
                       <td className="p-2.5 align-top">
-                        <p className="leading-snug line-clamp-3 break-words text-xs">{bid.bidInvitingAuthorityAddress || "—"}</p>
+                        <p className="leading-snug break-words whitespace-normal text-xs">{bid.bidInvitingAuthorityAddress || "—"}</p>
                       </td>
                       <td className="p-2.5 align-top text-xs">
-                        <p className="leading-snug line-clamp-2 break-words">{sdLabel}</p>
+                        <p className="leading-snug break-words whitespace-normal">{sdLabel}</p>
                       </td>
                       <td className="p-2.5 align-top text-xs">
                         {c?.securityDepositType ? (
                           <button
                             type="button"
-                            className="text-left hover:underline leading-snug line-clamp-3 break-words"
+                            className="text-left hover:underline leading-snug break-words whitespace-normal"
                             onClick={(e) => {
                               e.stopPropagation();
                               if (c.sdLetterUrl) openAttachment(c.sdLetterUrl);
@@ -1750,7 +1750,7 @@ function ContractSection({ allottedBids }: { allottedBids: TenderBidItem[] }) {
                         {c?.additionalSdType ? (
                           <button
                             type="button"
-                            className="text-left hover:underline leading-snug line-clamp-3 break-words"
+                            className="text-left hover:underline leading-snug break-words whitespace-normal"
                             onClick={(e) => {
                               e.stopPropagation();
                               if (c.additionalSdLetterUrl) openAttachment(c.additionalSdLetterUrl);
