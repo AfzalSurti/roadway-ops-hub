@@ -1,23 +1,23 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { PageWrapper } from "@/components/PageWrapper";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { LocationCombobox } from "@/components/LocationCombobox";
 import { api } from "@/lib/api";
+import { openAttachment, registerAttachmentViewer } from "@/lib/attachments";
 import type { TenderBidItem, TenderBidStatus, PreContractActivityItem, ContractActivityItem, SecurityDepositType } from "@/lib/domain";
 import { WORK_CATEGORY_OPTIONS, CLIENT_OPTIONS, SECURITY_DEPOSIT_TYPE_OPTIONS, EMD_TYPE_OPTIONS } from "@/lib/domain";
 import { ALL_LOCATIONS } from "@/constants/locationOptions";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Eye, FileText, Gavel, Loader2, Plus, RefreshCcw, Search, Trash2, X,
-  Paperclip, ExternalLink, Cog, ClipboardList,
+  Paperclip, Cog, ClipboardList,
 } from "lucide-react";
 import { toast } from "sonner";
-
-const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:3000/api";
 
 function formatCurrency(value: number) {
   if (!value) return "—";
@@ -29,9 +29,77 @@ function formatDate(value?: string | null) {
   return new Date(value).toLocaleDateString("en-IN");
 }
 
-function openAttachment(url?: string | null) {
-  if (!url) return;
-  window.open(`${API_BASE.replace("/api", "")}${url}`, "_blank");
+function AttachmentViewer() {
+  const [url, setUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [objectUrl, setObjectUrl] = useState<string | null>(null);
+  const [mimeType, setMimeType] = useState<string>("");
+
+  useEffect(() => registerAttachmentViewer(setUrl), []);
+
+  useEffect(() => {
+    let cancelled = false;
+    let created: string | null = null;
+
+    async function load() {
+      setError(null);
+      setObjectUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
+      setMimeType("");
+      if (!url) return;
+
+      setLoading(true);
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Attachment could not be opened");
+        const blob = await response.blob();
+        if (cancelled) return;
+        created = URL.createObjectURL(blob);
+        setMimeType(blob.type || response.headers.get("content-type") || "");
+        setObjectUrl(created);
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Attachment could not be opened");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    void load();
+    return () => {
+      cancelled = true;
+      if (created) URL.revokeObjectURL(created);
+    };
+  }, [url]);
+
+  const isImage = mimeType.startsWith("image/");
+
+  return (
+    <Dialog open={Boolean(url)} onOpenChange={(open) => { if (!open) setUrl(null); }}>
+      <DialogContent className="max-w-5xl w-[95vw] h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
+        <DialogHeader className="px-4 py-3 border-b border-border/50 shrink-0">
+          <DialogTitle className="text-base">Attachment</DialogTitle>
+        </DialogHeader>
+        <div className="relative flex-1 min-h-0 bg-secondary/20">
+          {loading ? (
+            <div className="h-full flex items-center justify-center gap-2 text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin" /> Loading…
+            </div>
+          ) : error ? (
+            <div className="h-full flex items-center justify-center text-sm text-destructive px-4 text-center">{error}</div>
+          ) : objectUrl && isImage ? (
+            <div className="h-full overflow-auto flex items-center justify-center p-4">
+              <img src={objectUrl} alt="Attachment" className="max-w-full max-h-full object-contain" />
+            </div>
+          ) : objectUrl ? (
+            <iframe title="Attachment" src={objectUrl} className="w-full h-full border-0 bg-white" />
+          ) : null}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 type Tab = "bids" | "precontract" | "contract";
@@ -144,6 +212,7 @@ export default function TenderDashboard() {
 
   return (
     <PageWrapper>
+      <AttachmentViewer />
       <div className="page-header flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="page-title inline-flex items-center gap-2">
@@ -465,9 +534,13 @@ export default function TenderDashboard() {
               {selectedBid.emdLetterUrl && (
                 <div className="rounded-xl border border-border/40 bg-secondary/20 px-3 py-2">
                   <p className="text-[11px] text-muted-foreground">EMD Attachment</p>
-                  <a href={`${API_BASE.replace("/api", "")}${selectedBid.emdLetterUrl}`} target="_blank" rel="noreferrer" className="mt-0.5 text-primary underline inline-flex items-center gap-1">
-                    <ExternalLink className="h-3 w-3" /> View
-                  </a>
+                  <button
+                    type="button"
+                    onClick={() => openAttachment(selectedBid.emdLetterUrl)}
+                    className="mt-0.5 text-primary underline inline-flex items-center gap-1"
+                  >
+                    <Eye className="h-3 w-3" /> View
+                  </button>
                 </div>
               )}
             </div>
@@ -925,7 +998,7 @@ function DateWithAttachment({
             title="View attachment"
             onClick={() => openAttachment(urlValue)}
           >
-            <ExternalLink className="h-4 w-4" />
+            <Eye className="h-4 w-4" />
           </Button>
         ) : null}
       </div>
@@ -1069,7 +1142,7 @@ function AddBidModal({
                     title="View EMD attachment"
                     onClick={() => openAttachment(newBid.emdLetterUrl as string)}
                   >
-                    <ExternalLink className="h-4 w-4" />
+                    <Eye className="h-4 w-4" />
                   </Button>
                 ) : null}
               </div>
@@ -1197,7 +1270,7 @@ function AttachmentUpload({
             title="View attachment"
             onClick={() => openAttachment(urlValue)}
           >
-            <ExternalLink className="h-4 w-4" />
+            <Eye className="h-4 w-4" />
           </Button>
         ) : null}
       </div>

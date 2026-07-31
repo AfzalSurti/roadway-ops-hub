@@ -6,5 +6,7 @@ import { asyncHandler } from "../utils/async-handler.js";
 
 export const uploadsRouter = Router();
 
-uploadsRouter.use(requireAuth);
-uploadsRouter.post("/", upload.single("file"), asyncHandler(uploadController.upload));
+// Public file serve (bytes live in DB so Render restarts don't break links)
+uploadsRouter.get("/:fileName", asyncHandler(uploadController.getFile));
+
+uploadsRouter.post("/", requireAuth, upload.single("file"), asyncHandler(uploadController.upload));

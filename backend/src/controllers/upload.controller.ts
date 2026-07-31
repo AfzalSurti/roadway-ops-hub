@@ -21,5 +21,16 @@ export const uploadController = {
         size: attachment.size
       }
     }, 201);
+  },
+
+  async getFile(req: Request, res: Response) {
+    const file = await uploadService.getFile(String(req.params.fileName ?? ""));
+    res.setHeader("Content-Type", file.mimeType);
+    res.setHeader(
+      "Content-Disposition",
+      `inline; filename="${encodeURIComponent(file.originalName)}"`
+    );
+    res.setHeader("Cache-Control", "private, max-age=3600");
+    return res.send(file.data);
   }
 };

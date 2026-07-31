@@ -419,12 +419,14 @@ model Report {
 
 model Attachment {
   id           String   @id @default(cuid())
-  fileName     String
+  fileName     String   @unique
   originalName String
   mimeType     String
   size         Int
   path         String
   url          String
+  /// File bytes persisted for hosts with ephemeral disks (e.g. Render).
+  data         Bytes?
   taskId       String?
   reportId     String?
   uploadedById String

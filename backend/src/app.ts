@@ -16,7 +16,13 @@ const allowedOrigins = env.CORS_ORIGIN.split(",")
   .filter(Boolean);
 
 app.use(httpLogger);
-app.use(helmet());
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    crossOriginEmbedderPolicy: false,
+    frameguard: false
+  })
+);
 app.use(
   cors({
     origin: (origin, callback) => {
@@ -29,7 +35,7 @@ app.use(
     credentials: true
   })
 );
-app.use(express.json({ limit: "2mb" }));
+app.use(express.json({ limit: "12mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 app.get("/health", (_req, res) => {
@@ -53,6 +59,7 @@ app.post("/send-mail", async (req, res) => {
   }
 });
 
+// Disk fallback for older uploads; DB-backed GET is on uploadsRouter
 app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
 app.use("/", apiRouter);
 app.use("/api", apiRouter);

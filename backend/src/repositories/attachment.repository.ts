@@ -4,5 +4,9 @@ import { prisma } from "../prisma/client.js";
 export const attachmentRepository = {
   create(data: Prisma.AttachmentUncheckedCreateInput) {
     return prisma.attachment.create({ data });
+  },
+
+  findByFileName(fileName: string) {
+    return prisma.attachment.findUnique({ where: { fileName } });
   }
 };
