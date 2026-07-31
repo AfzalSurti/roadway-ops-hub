@@ -5,9 +5,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { LocationCombobox } from "@/components/LocationCombobox";
 import { api } from "@/lib/api";
 import type { TenderBidItem, TenderBidStatus } from "@/lib/domain";
 import { WORK_CATEGORY_OPTIONS, CLIENT_OPTIONS } from "@/lib/domain";
+import { ALL_LOCATIONS } from "@/constants/locationOptions";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Eye, FileText, Gavel, Loader2, Plus, RefreshCcw, Search, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
@@ -29,6 +31,7 @@ export default function TenderDashboard() {
   const [workCategoryFilter, setWorkCategoryFilter] = useState("ALL");
   const [clientFilter, setClientFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState<TenderBidStatus | "ALL">("ALL");
+  const [stateFilter, setStateFilter] = useState("ALL");
   const [showAddForm, setShowAddForm] = useState(false);
   const [selectedBid, setSelectedBid] = useState<TenderBidItem | null>(null);
 
@@ -87,16 +90,18 @@ export default function TenderDashboard() {
       if (workCategoryFilter !== "ALL" && bid.workCategory !== workCategoryFilter) return false;
       if (clientFilter !== "ALL" && bid.client !== clientFilter) return false;
       if (statusFilter !== "ALL" && bid.status !== statusFilter) return false;
+      if (stateFilter !== "ALL" && bid.state !== stateFilter) return false;
       if (!q) return true;
       return [bid.nameOfWork, bid.workCategory, bid.client, bid.state].join(" ").toLowerCase().includes(q);
     });
-  }, [items, search, workCategoryFilter, clientFilter, statusFilter]);
+  }, [items, search, workCategoryFilter, clientFilter, statusFilter, stateFilter]);
 
   const clearFilters = () => {
     setSearch("");
     setWorkCategoryFilter("ALL");
     setClientFilter("ALL");
     setStatusFilter("ALL");
+    setStateFilter("ALL");
   };
 
   return (
@@ -160,6 +165,16 @@ export default function TenderDashboard() {
               </SelectContent>
             </Select>
           </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1.5 block">State / Region</label>
+            <Select value={stateFilter} onValueChange={setStateFilter}>
+              <SelectTrigger><SelectValue placeholder="All" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All</SelectItem>
+                {ALL_LOCATIONS.map((loc) => <SelectItem key={loc} value={loc}>{loc}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         <div className="flex justify-end">
           <Button size="sm" variant="ghost" className="gap-1" onClick={clearFilters}>
@@ -195,8 +210,8 @@ export default function TenderDashboard() {
               </Select>
             </div>
             <div>
-              <label className="text-xs text-muted-foreground mb-1 block">State</label>
-              <Input value={newBid.state} onChange={(e) => setNewBid({ ...newBid, state: e.target.value })} />
+              <label className="text-xs text-muted-foreground mb-1 block">State / Region *</label>
+              <LocationCombobox value={newBid.state} onValueChange={(v) => setNewBid({ ...newBid, state: v })} />
             </div>
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">EMD</label>
@@ -225,7 +240,7 @@ export default function TenderDashboard() {
             <Button size="sm" variant="outline" onClick={() => setShowAddForm(false)}>Cancel</Button>
             <Button
               size="sm"
-              disabled={!newBid.nameOfWork || !newBid.workCategory || !newBid.client || createMutation.isPending}
+              disabled={!newBid.nameOfWork || !newBid.workCategory || !newBid.client || !newBid.state || createMutation.isPending}
               onClick={() => createMutation.mutate(newBid)}
             >
               {createMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : null}
@@ -251,7 +266,7 @@ export default function TenderDashboard() {
                   <th className="text-left font-medium p-3">Name of Work</th>
                   <th className="text-left font-medium p-3 w-16">W.C.</th>
                   <th className="text-left font-medium p-3">Client</th>
-                  <th className="text-left font-medium p-3">State</th>
+                  <th className="text-left font-medium p-3">State / Region</th>
                   <th className="text-right font-medium p-3">EMD</th>
                   <th className="text-right font-medium p-3">Tender Fees</th>
                   <th className="text-right font-medium p-3">Infracon Fees</th>
@@ -273,7 +288,7 @@ export default function TenderDashboard() {
                     </td>
                     <td className="p-3 font-mono text-xs">{bid.workCategory}</td>
                     <td className="p-3">{bid.client}</td>
-                    <td className="p-3">{bid.state || "—"}</td>
+                    <td className="p-3">{bid.state || "Not Selected"}</td>
                     <td className="p-3 text-right tabular-nums">{formatCurrency(bid.emd)}</td>
                     <td className="p-3 text-right tabular-nums">{formatCurrency(bid.tenderFees)}</td>
                     <td className="p-3 text-right tabular-nums">{formatCurrency(bid.infraconFees)}</td>
@@ -365,7 +380,7 @@ export default function TenderDashboard() {
                 ["Name of Work", selectedBid.nameOfWork],
                 ["Work Category", `${selectedBid.workCategory} — ${WORK_CATEGORY_OPTIONS.find((o) => o.code === selectedBid.workCategory)?.label ?? ""}`],
                 ["Client", selectedBid.client],
-                ["State", selectedBid.state],
+                ["State / Region", selectedBid.state || "Not Selected"],
                 ["EMD", formatCurrency(selectedBid.emd)],
                 ["Tender Fees", formatCurrency(selectedBid.tenderFees)],
                 ["Infracon Fees", formatCurrency(selectedBid.infraconFees)],

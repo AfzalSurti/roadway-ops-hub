@@ -4,9 +4,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { LocationCombobox } from "@/components/LocationCombobox";
 import { api } from "@/lib/api";
 import type { PreContractActivityItem, SecurityDepositType } from "@/lib/domain";
 import { WORK_CATEGORY_OPTIONS, CLIENT_OPTIONS, SECURITY_DEPOSIT_TYPE_OPTIONS } from "@/lib/domain";
+import { ALL_LOCATIONS } from "@/constants/locationOptions";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Cog, Eye, Loader2, Plus, RefreshCcw, Search, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
@@ -26,6 +28,7 @@ export default function OperationsDashboard() {
   const [search, setSearch] = useState("");
   const [workCategoryFilter, setWorkCategoryFilter] = useState("ALL");
   const [clientFilter, setClientFilter] = useState("ALL");
+  const [stateFilter, setStateFilter] = useState("ALL");
   const [showAddForm, setShowAddForm] = useState(false);
   const [selectedItem, setSelectedItem] = useState<PreContractActivityItem | null>(null);
 
@@ -105,15 +108,17 @@ export default function OperationsDashboard() {
     return items.filter((item) => {
       if (workCategoryFilter !== "ALL" && item.workCategory !== workCategoryFilter) return false;
       if (clientFilter !== "ALL" && item.client !== clientFilter) return false;
+      if (stateFilter !== "ALL" && item.state !== stateFilter) return false;
       if (!q) return true;
       return [item.nameOfWork, item.workCategory, item.client, item.state].join(" ").toLowerCase().includes(q);
     });
-  }, [items, search, workCategoryFilter, clientFilter]);
+  }, [items, search, workCategoryFilter, clientFilter, stateFilter]);
 
   const clearFilters = () => {
     setSearch("");
     setWorkCategoryFilter("ALL");
     setClientFilter("ALL");
+    setStateFilter("ALL");
   };
 
   return (
@@ -166,6 +171,16 @@ export default function OperationsDashboard() {
               </SelectContent>
             </Select>
           </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1.5 block">State / Region</label>
+            <Select value={stateFilter} onValueChange={setStateFilter}>
+              <SelectTrigger><SelectValue placeholder="All" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All</SelectItem>
+                {ALL_LOCATIONS.map((loc) => <SelectItem key={loc} value={loc}>{loc}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         <div className="flex justify-end">
           <Button size="sm" variant="ghost" className="gap-1" onClick={clearFilters}>
@@ -201,8 +216,8 @@ export default function OperationsDashboard() {
               </Select>
             </div>
             <div>
-              <label className="text-xs text-muted-foreground mb-1 block">State</label>
-              <Input value={newItem.state} onChange={(e) => setNewItem({ ...newItem, state: e.target.value })} />
+              <label className="text-xs text-muted-foreground mb-1 block">State / Region *</label>
+              <LocationCombobox value={newItem.state} onValueChange={(v) => setNewItem({ ...newItem, state: v })} />
             </div>
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">Award of Project / LOA Date</label>
@@ -243,7 +258,7 @@ export default function OperationsDashboard() {
             <Button size="sm" variant="outline" onClick={() => setShowAddForm(false)}>Cancel</Button>
             <Button
               size="sm"
-              disabled={!newItem.nameOfWork || !newItem.workCategory || !newItem.client || createMutation.isPending}
+              disabled={!newItem.nameOfWork || !newItem.workCategory || !newItem.client || !newItem.state || createMutation.isPending}
               onClick={() => createMutation.mutate()}
             >
               {createMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : null}
@@ -269,7 +284,7 @@ export default function OperationsDashboard() {
                   <th className="text-left font-medium p-3">Name of Work</th>
                   <th className="text-left font-medium p-3 w-16">W.C.</th>
                   <th className="text-left font-medium p-3">Client</th>
-                  <th className="text-left font-medium p-3">State</th>
+                  <th className="text-left font-medium p-3">State / Region</th>
                   <th className="text-left font-medium p-3">Award / LOA</th>
                   <th className="text-left font-medium p-3">Security Deposit</th>
                   <th className="text-left font-medium p-3">Agreement</th>
@@ -285,7 +300,7 @@ export default function OperationsDashboard() {
                     <td className="p-3 max-w-[220px]"><span className="line-clamp-2">{item.nameOfWork}</span></td>
                     <td className="p-3 font-mono text-xs">{item.workCategory}</td>
                     <td className="p-3">{item.client}</td>
-                    <td className="p-3">{item.state || "—"}</td>
+                    <td className="p-3">{item.state || "Not Selected"}</td>
                     <td className="p-3 text-xs">{formatDate(item.awardOfProjectDate)}</td>
                     <td className="p-3 text-xs">
                       {item.securityDepositType ? (
@@ -338,7 +353,7 @@ export default function OperationsDashboard() {
                 ["Name of Work", selectedItem.nameOfWork],
                 ["Work Category", selectedItem.workCategory],
                 ["Client", selectedItem.client],
-                ["State", selectedItem.state],
+                ["State / Region", selectedItem.state || "Not Selected"],
                 ["Award of Project Date", formatDate(selectedItem.awardOfProjectDate)],
                 ["Security Deposit Type", SECURITY_DEPOSIT_TYPE_OPTIONS.find((o) => o.value === selectedItem.securityDepositType)?.label ?? "—"],
                 ["SD Bank", selectedItem.sdBank],

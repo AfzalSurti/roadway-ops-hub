@@ -123,7 +123,7 @@ export default function HodOperations() {
                   <th className="text-left font-medium p-3">Name of Work</th>
                   <th className="text-left font-medium p-3 w-16">W.C.</th>
                   <th className="text-left font-medium p-3">Client</th>
-                  <th className="text-left font-medium p-3">State</th>
+                  <th className="text-left font-medium p-3">State / Region</th>
                   <th className="text-left font-medium p-3">Award / LOA</th>
                   <th className="text-left font-medium p-3">Security Deposit</th>
                   <th className="text-left font-medium p-3">Agreement</th>
@@ -139,7 +139,7 @@ export default function HodOperations() {
                     <td className="p-3 max-w-[220px]"><span className="line-clamp-2">{item.nameOfWork}</span></td>
                     <td className="p-3 font-mono text-xs">{item.workCategory}</td>
                     <td className="p-3">{item.client}</td>
-                    <td className="p-3">{item.state || "—"}</td>
+                    <td className="p-3">{item.state || "Not Selected"}</td>
                     <td className="p-3 text-xs">{formatDate(item.awardOfProjectDate)}</td>
                     <td className="p-3 text-xs">
                       {item.securityDepositType ? (
@@ -182,7 +182,7 @@ export default function HodOperations() {
                 ["Name of Work", selectedItem.nameOfWork],
                 ["Work Category", selectedItem.workCategory],
                 ["Client", selectedItem.client],
-                ["State", selectedItem.state],
+                ["State / Region", selectedItem.state || "Not Selected"],
                 ["Award of Project Date", formatDate(selectedItem.awardOfProjectDate)],
                 ["Security Deposit Type", SECURITY_DEPOSIT_TYPE_OPTIONS.find((o) => o.value === selectedItem.securityDepositType)?.label ?? "—"],
                 ["SD Bank", selectedItem.sdBank],

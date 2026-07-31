@@ -134,7 +134,7 @@ export default function HodTender() {
                   <th className="text-left font-medium p-3">Name of Work</th>
                   <th className="text-left font-medium p-3 w-16">W.C.</th>
                   <th className="text-left font-medium p-3">Client</th>
-                  <th className="text-left font-medium p-3">State</th>
+                  <th className="text-left font-medium p-3">State / Region</th>
                   <th className="text-right font-medium p-3">EMD</th>
                   <th className="text-right font-medium p-3">Tender Fees</th>
                   <th className="text-right font-medium p-3">Infracon Fees</th>
@@ -149,7 +149,7 @@ export default function HodTender() {
                     <td className="p-3 max-w-[260px]"><span className="line-clamp-2">{bid.nameOfWork}</span></td>
                     <td className="p-3 font-mono text-xs">{bid.workCategory}</td>
                     <td className="p-3">{bid.client}</td>
-                    <td className="p-3">{bid.state || "—"}</td>
+                    <td className="p-3">{bid.state || "Not Selected"}</td>
                     <td className="p-3 text-right tabular-nums">{formatCurrency(bid.emd)}</td>
                     <td className="p-3 text-right tabular-nums">{formatCurrency(bid.tenderFees)}</td>
                     <td className="p-3 text-right tabular-nums">{formatCurrency(bid.infraconFees)}</td>
