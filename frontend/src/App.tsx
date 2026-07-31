@@ -41,6 +41,7 @@ import ExpenseReports from "./pages/admin/ExpenseReports";
 import EmployeeExpenses from "./pages/employee/Expenses";
 import EmployeeExpenseDetail from "./pages/employee/ExpenseDetail";
 import TenderDashboard from "./pages/tender/Dashboard";
+import TenderLetterPreview from "./pages/tender/LetterPreview";
 import OperationsDashboard from "./pages/operations/Dashboard";
 import HodTender from "./pages/hod/Tender";
 import HodOperations from "./pages/hod/Operations";
@@ -171,6 +172,7 @@ function AppRoutes() {
 
       <Route path="/tender" element={<TenderRoute><AppLayout /></TenderRoute>}>
         <Route path="dashboard" element={<TenderDashboard />} />
+        <Route path="letter" element={<TenderLetterPreview />} />
       </Route>
 
       <Route path="/operations" element={<OperationsRoute><AppLayout /></OperationsRoute>}>
