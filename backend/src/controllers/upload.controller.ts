@@ -25,12 +25,12 @@ export const uploadController = {
 
   async getFile(req: Request, res: Response) {
     const file = await uploadService.getFile(String(req.params.fileName ?? ""));
-    res.setHeader("Content-Type", file.mimeType);
-    res.setHeader(
-      "Content-Disposition",
-      `inline; filename="${encodeURIComponent(file.originalName)}"`
-    );
-    res.setHeader("Cache-Control", "private, max-age=3600");
+    const safeName = file.originalName.replace(/[^\w.\- ()[\]]+/g, "_");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    res.setHeader("Content-Type", file.mimeType || "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename="${safeName}"`);
+    res.setHeader("Cache-Control", "public, max-age=3600");
     return res.send(file.data);
   }
 };

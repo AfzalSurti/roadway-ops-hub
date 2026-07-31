@@ -31,50 +31,14 @@ function formatDate(value?: string | null) {
 
 function AttachmentViewer() {
   const [url, setUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [objectUrl, setObjectUrl] = useState<string | null>(null);
-  const [mimeType, setMimeType] = useState<string>("");
+  const [loadError, setLoadError] = useState(false);
 
-  useEffect(() => registerAttachmentViewer(setUrl), []);
+  useEffect(() => registerAttachmentViewer((next) => {
+    setLoadError(false);
+    setUrl(next);
+  }), []);
 
-  useEffect(() => {
-    let cancelled = false;
-    let created: string | null = null;
-
-    async function load() {
-      setError(null);
-      setObjectUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev);
-        return null;
-      });
-      setMimeType("");
-      if (!url) return;
-
-      setLoading(true);
-      try {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error("Attachment could not be opened");
-        const blob = await response.blob();
-        if (cancelled) return;
-        created = URL.createObjectURL(blob);
-        setMimeType(blob.type || response.headers.get("content-type") || "");
-        setObjectUrl(created);
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Attachment could not be opened");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-
-    void load();
-    return () => {
-      cancelled = true;
-      if (created) URL.revokeObjectURL(created);
-    };
-  }, [url]);
-
-  const isImage = mimeType.startsWith("image/");
+  const isImage = Boolean(url && /\.(png|jpe?g|gif|webp|bmp)($|\?)/i.test(url));
 
   return (
     <Dialog open={Boolean(url)} onOpenChange={(open) => { if (!open) setUrl(null); }}>
@@ -83,19 +47,28 @@ function AttachmentViewer() {
           <DialogTitle className="text-base">Attachment</DialogTitle>
         </DialogHeader>
         <div className="relative flex-1 min-h-0 bg-secondary/20">
-          {loading ? (
-            <div className="h-full flex items-center justify-center gap-2 text-muted-foreground">
-              <Loader2 className="h-5 w-5 animate-spin" /> Loading…
+          {!url ? null : loadError ? (
+            <div className="h-full flex flex-col items-center justify-center gap-2 text-sm text-destructive px-6 text-center">
+              <p>Attachment could not be opened.</p>
+              <p className="text-muted-foreground text-xs">Re-upload the file, then try again.</p>
             </div>
-          ) : error ? (
-            <div className="h-full flex items-center justify-center text-sm text-destructive px-4 text-center">{error}</div>
-          ) : objectUrl && isImage ? (
+          ) : isImage ? (
             <div className="h-full overflow-auto flex items-center justify-center p-4">
-              <img src={objectUrl} alt="Attachment" className="max-w-full max-h-full object-contain" />
+              <img
+                src={url}
+                alt="Attachment"
+                className="max-w-full max-h-full object-contain"
+                onError={() => setLoadError(true)}
+              />
             </div>
-          ) : objectUrl ? (
-            <iframe title="Attachment" src={objectUrl} className="w-full h-full border-0 bg-white" />
-          ) : null}
+          ) : (
+            <iframe
+              title="Attachment"
+              src={url}
+              className="w-full h-full border-0 bg-white"
+              onError={() => setLoadError(true)}
+            />
+          )}
         </div>
       </DialogContent>
     </Dialog>

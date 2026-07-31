@@ -26,15 +26,23 @@ app.use(
 app.use(
   cors({
     origin: (origin, callback) => {
+      // Reflect allowed SPA origins; never throw (throwing breaks /uploads iframe loads).
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
         return;
       }
-      callback(new Error("Not allowed by CORS"));
+      callback(null, false);
     },
     credentials: true
   })
 );
+
+// Attachments must be readable/embeddable from the SPA origin
+app.use("/uploads", (_req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+  next();
+});
 app.use(express.json({ limit: "12mb" }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -59,10 +67,11 @@ app.post("/send-mail", async (req, res) => {
   }
 });
 
-// Disk fallback for older uploads; DB-backed GET is on uploadsRouter
-app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
+// DB-backed file GET (and POST) — register before static so missing disk files still resolve
 app.use("/", apiRouter);
 app.use("/api", apiRouter);
+// Disk fallback for older uploads that still exist on disk
+app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
 
 app.use(notFoundHandler);
 app.use(errorHandler);
