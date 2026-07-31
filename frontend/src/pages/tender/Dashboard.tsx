@@ -718,48 +718,53 @@ function PreContractForm({
         </Select>
       </div>
 
-      <div>
-        <label className="text-xs text-muted-foreground mb-1 block">SD Bank</label>
-        <Input
-          defaultValue={preContract.sdBank}
-          onBlur={(e) => { if (e.target.value !== preContract.sdBank) onUpdate("sdBank", e.target.value); }}
-        />
-      </div>
-
-      <div>
-        <label className="text-xs text-muted-foreground mb-1 block">SD Issued Date</label>
-        <Input
-          type="date"
-          defaultValue={preContract.sdIssuedDate ? new Date(preContract.sdIssuedDate).toISOString().split("T")[0] : ""}
-          onChange={(e) => onUpdate("sdIssuedDate", e.target.value || null)}
-        />
-      </div>
-
-      <div>
-        <label className="text-xs text-muted-foreground mb-1 block">SD Number</label>
-        <Input
-          defaultValue={preContract.sdNumber}
-          onBlur={(e) => { if (e.target.value !== preContract.sdNumber) onUpdate("sdNumber", e.target.value); }}
-        />
-      </div>
-
-      <div>
-        <label className="text-xs text-muted-foreground mb-1 block">SD Amount</label>
-        <Input
-          type="number"
-          defaultValue={preContract.sdAmount || ""}
-          onBlur={(e) => { const v = Number(e.target.value); if (v !== preContract.sdAmount) onUpdate("sdAmount", v); }}
-        />
-      </div>
-
-      <div>
-        <label className="text-xs text-muted-foreground mb-1 block">SD Expiry Date</label>
-        <Input
-          type="date"
-          defaultValue={preContract.sdExpiryDate ? new Date(preContract.sdExpiryDate).toISOString().split("T")[0] : ""}
-          onChange={(e) => onUpdate("sdExpiryDate", e.target.value || null)}
-        />
-      </div>
+      {preContract.securityDepositType && (
+        <div className="col-span-1 sm:col-span-2 lg:col-span-3 rounded-xl border border-border/40 bg-secondary/10 p-4">
+          <p className="text-xs font-medium text-muted-foreground mb-3">
+            Details of Security Deposit — {SECURITY_DEPOSIT_TYPE_OPTIONS.find((o) => o.value === preContract.securityDepositType)?.label}
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Bank</label>
+              <Input
+                defaultValue={preContract.sdBank}
+                onBlur={(e) => { if (e.target.value !== preContract.sdBank) onUpdate("sdBank", e.target.value); }}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Issued Date</label>
+              <Input
+                type="date"
+                defaultValue={preContract.sdIssuedDate ? new Date(preContract.sdIssuedDate).toISOString().split("T")[0] : ""}
+                onChange={(e) => onUpdate("sdIssuedDate", e.target.value || null)}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">No.</label>
+              <Input
+                defaultValue={preContract.sdNumber}
+                onBlur={(e) => { if (e.target.value !== preContract.sdNumber) onUpdate("sdNumber", e.target.value); }}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Amount</label>
+              <Input
+                type="number"
+                defaultValue={preContract.sdAmount || ""}
+                onBlur={(e) => { const v = Number(e.target.value); if (v !== preContract.sdAmount) onUpdate("sdAmount", v); }}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Date of Exp.</label>
+              <Input
+                type="date"
+                defaultValue={preContract.sdExpiryDate ? new Date(preContract.sdExpiryDate).toISOString().split("T")[0] : ""}
+                onChange={(e) => onUpdate("sdExpiryDate", e.target.value || null)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Signing Agreement */}
       <DateWithAttachment

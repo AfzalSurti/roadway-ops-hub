@@ -233,14 +233,30 @@ export default function OperationsDashboard() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <label className="text-xs text-muted-foreground mb-1 block">SD Bank</label>
-              <Input value={newItem.sdBank} onChange={(e) => setNewItem({ ...newItem, sdBank: e.target.value })} />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground mb-1 block">SD Amount</label>
-              <Input type="number" value={newItem.sdAmount || ""} onChange={(e) => setNewItem({ ...newItem, sdAmount: Number(e.target.value) })} />
-            </div>
+            {newItem.securityDepositType && (
+              <>
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">Bank</label>
+                  <Input value={newItem.sdBank} onChange={(e) => setNewItem({ ...newItem, sdBank: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">Issued Date</label>
+                  <Input type="date" value={newItem.sdIssuedDate} onChange={(e) => setNewItem({ ...newItem, sdIssuedDate: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">No.</label>
+                  <Input value={newItem.sdNumber} onChange={(e) => setNewItem({ ...newItem, sdNumber: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">Amount</label>
+                  <Input type="number" value={newItem.sdAmount || ""} onChange={(e) => setNewItem({ ...newItem, sdAmount: Number(e.target.value) })} />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">Date of Exp.</label>
+                  <Input type="date" value={newItem.sdExpiryDate} onChange={(e) => setNewItem({ ...newItem, sdExpiryDate: e.target.value })} />
+                </div>
+              </>
+            )}
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">Signing Agreement Date</label>
               <Input type="date" value={newItem.signingAgreementDate} onChange={(e) => setNewItem({ ...newItem, signingAgreementDate: e.target.value })} />
