@@ -365,25 +365,27 @@ export default function TenderDashboard() {
           ) : (
             <div className="glass-panel overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm min-w-[2800px]">
+                <table className="w-full text-sm table-fixed min-w-[1180px]">
                   <thead>
                     <tr className="text-muted-foreground border-b border-border/30">
-                      <th className="text-left font-medium p-3 w-12">Sr</th>
-                      <th className="text-left font-medium p-3 min-w-[520px]">Name of Work</th>
-                      <th className="text-left font-medium p-3 min-w-[280px]">Bidder</th>
-                      <th className="text-left font-medium p-3 min-w-[420px]">Bid Inviting Authority</th>
-                      <th className="text-left font-medium p-3 min-w-[200px]">Tender ID</th>
-                      <th className="text-right font-medium p-3 min-w-[110px]">Length (Km)</th>
-                      <th className="text-left font-medium p-3 w-16">W.C.</th>
-                      <th className="text-left font-medium p-3 min-w-[100px]">Client</th>
-                      <th className="text-left font-medium p-3 min-w-[140px]">State / Region</th>
-                      <th className="text-left font-medium p-3 min-w-[120px]">Type of EMD</th>
-                      <th className="text-right font-medium p-3 min-w-[120px]">EMD Amt</th>
-                      <th className="text-right font-medium p-3 min-w-[120px]">Tender Fees</th>
-                      <th className="text-right font-medium p-3 min-w-[130px]">Infracon Fees</th>
-                      <th className="text-center font-medium p-3 min-w-[140px]">Status</th>
-                      <th className="text-center font-medium p-3 min-w-[110px]">Letter</th>
-                      <th className="text-right font-medium p-3 w-20"></th>
+                      <th className="text-left font-medium p-2.5 w-10">Sr</th>
+                      <th className="text-left font-medium p-2.5 w-[22%]">Name of Work</th>
+                      <th className="text-left font-medium p-2.5 w-[11%]">Bidder</th>
+                      <th className="text-left font-medium p-2.5 w-[13%]">Bid Inviting Authority</th>
+                      <th className="text-left font-medium p-2.5 w-[9%]">Tender ID</th>
+                      <th className="text-right font-medium p-2.5 w-[6%]">Length</th>
+                      <th className="text-left font-medium p-2.5 w-[4%]">W.C.</th>
+                      <th className="text-left font-medium p-2.5 w-[6%]">Client</th>
+                      <th className="text-left font-medium p-2.5 w-[8%]">State</th>
+                      <th className="text-left font-medium p-2.5 w-[7%]">EMD Type</th>
+                      <th className="text-right font-medium p-2.5 w-[8%]">EMD Amt</th>
+                      <th className="text-right font-medium p-2.5 w-[8%]">
+                        <span className="block leading-tight">Tender Fees</span>
+                        <span className="block text-[10px] font-normal text-muted-foreground leading-tight">Infracon</span>
+                      </th>
+                      <th className="text-center font-medium p-2.5 w-[9%]">Status</th>
+                      <th className="text-center font-medium p-2.5 w-24">Letter</th>
+                      <th className="text-right font-medium p-2.5 w-20"></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -393,25 +395,39 @@ export default function TenderDashboard() {
                         className="border-b border-border/20 hover:bg-secondary/20 cursor-pointer"
                         onClick={() => setSelectedBid(bid)}
                       >
-                        <td className="p-3 font-medium tabular-nums">{bid.srNo}</td>
-                        <td className="p-3 whitespace-nowrap">{bid.nameOfWork}</td>
-                        <td className="p-3 whitespace-nowrap">{bid.nameOfBidder || "—"}</td>
-                        <td className="p-3 whitespace-nowrap">{bid.bidInvitingAuthority || "—"}</td>
-                        <td className="p-3 text-xs font-mono whitespace-nowrap">{bid.tenderId || "—"}</td>
-                        <td className="p-3 text-right tabular-nums whitespace-nowrap">{bid.projectLengthKm || "—"}</td>
-                        <td className="p-3 font-mono text-xs whitespace-nowrap">{bid.workCategory}</td>
-                        <td className="p-3 whitespace-nowrap">{bid.client}</td>
-                        <td className="p-3 whitespace-nowrap">{bid.state || "Not Selected"}</td>
-                        <td className="p-3 text-xs whitespace-nowrap">{bid.emdType || "—"}</td>
-                        <td className="p-3 text-right tabular-nums whitespace-nowrap">{formatCurrency(bid.emd)}</td>
-                        <td className="p-3 text-right tabular-nums whitespace-nowrap">{formatCurrency(bid.tenderFees)}</td>
-                        <td className="p-3 text-right tabular-nums whitespace-nowrap">{formatCurrency(bid.infraconFees)}</td>
-                        <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}>
+                        <td className="p-2.5 align-top font-medium tabular-nums">{bid.srNo}</td>
+                        <td className="p-2.5 align-top">
+                          <p className="leading-snug line-clamp-3 break-words">{bid.nameOfWork}</p>
+                        </td>
+                        <td className="p-2.5 align-top">
+                          <p className="leading-snug line-clamp-2 break-words">{bid.nameOfBidder || "—"}</p>
+                        </td>
+                        <td className="p-2.5 align-top">
+                          <p className="leading-snug line-clamp-3 break-words">{bid.bidInvitingAuthority || "—"}</p>
+                        </td>
+                        <td className="p-2.5 align-top text-xs font-mono break-all">{bid.tenderId || "—"}</td>
+                        <td className="p-2.5 align-top text-right tabular-nums">{bid.projectLengthKm ?? "—"}</td>
+                        <td className="p-2.5 align-top font-mono text-xs">{bid.workCategory}</td>
+                        <td className="p-2.5 align-top">
+                          <p className="leading-snug line-clamp-2 break-words">{bid.client}</p>
+                        </td>
+                        <td className="p-2.5 align-top">
+                          <p className="leading-snug line-clamp-2 break-words">{bid.state || "—"}</p>
+                        </td>
+                        <td className="p-2.5 align-top text-xs">
+                          <p className="leading-snug line-clamp-2 break-words">{bid.emdType || "—"}</p>
+                        </td>
+                        <td className="p-2.5 align-top text-right tabular-nums text-xs leading-snug">{formatCurrency(bid.emd)}</td>
+                        <td className="p-2.5 align-top text-right text-xs leading-snug">
+                          <div className="tabular-nums">{formatCurrency(bid.tenderFees)}</div>
+                          <div className="text-muted-foreground tabular-nums mt-0.5">{formatCurrency(bid.infraconFees)}</div>
+                        </td>
+                        <td className="p-2.5 align-top text-center" onClick={(e) => e.stopPropagation()}>
                           <Select
                             value={bid.status}
                             onValueChange={(v) => updateMutation.mutate({ id: bid.id, payload: { status: v as TenderBidStatus } })}
                           >
-                            <SelectTrigger className="h-7 w-[130px] mx-auto">
+                            <SelectTrigger className="h-7 w-full max-w-[120px] mx-auto text-xs">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -420,7 +436,7 @@ export default function TenderDashboard() {
                             </SelectContent>
                           </Select>
                         </td>
-                        <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}>
+                        <td className="p-2.5 align-top text-center" onClick={(e) => e.stopPropagation()}>
                           <Button
                             size="sm"
                             variant="outline"
@@ -431,7 +447,7 @@ export default function TenderDashboard() {
                             Preview
                           </Button>
                         </td>
-                        <td className="p-3 text-right" onClick={(e) => e.stopPropagation()}>
+                        <td className="p-2.5 align-top text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-1">
                             <Button
                               size="sm"
@@ -675,23 +691,25 @@ function PreContractSection({ allottedBids }: { allottedBids: TenderBidItem[] })
       ) : (
         <div className="glass-panel overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[2800px]">
+            <table className="w-full text-sm table-fixed min-w-[1100px]">
               <thead>
                 <tr className="text-muted-foreground border-b border-border/30">
-                  <th className="text-left font-medium p-3 w-12">Sr</th>
-                  <th className="text-left font-medium p-3 min-w-[520px]">Name of Work</th>
-                  <th className="text-left font-medium p-3 min-w-[280px]">Bidder</th>
-                  <th className="text-left font-medium p-3 min-w-[420px]">Bid Inviting Authority</th>
-                  <th className="text-left font-medium p-3 min-w-[200px]">Tender ID</th>
-                  <th className="text-right font-medium p-3 min-w-[110px]">Length (Km)</th>
-                  <th className="text-left font-medium p-3 w-16">W.C.</th>
-                  <th className="text-left font-medium p-3 min-w-[100px]">Client</th>
-                  <th className="text-left font-medium p-3 min-w-[140px]">State / Region</th>
-                  <th className="text-left font-medium p-3 min-w-[120px]">Type of EMD</th>
-                  <th className="text-right font-medium p-3 min-w-[120px]">EMD Amt</th>
-                  <th className="text-right font-medium p-3 min-w-[120px]">Tender Fees</th>
-                  <th className="text-right font-medium p-3 min-w-[130px]">Infracon Fees</th>
-                  <th className="text-center font-medium p-3 min-w-[130px]">Pre-Contract</th>
+                  <th className="text-left font-medium p-2.5 w-10">Sr</th>
+                  <th className="text-left font-medium p-2.5 w-[24%]">Name of Work</th>
+                  <th className="text-left font-medium p-2.5 w-[12%]">Bidder</th>
+                  <th className="text-left font-medium p-2.5 w-[14%]">Bid Inviting Authority</th>
+                  <th className="text-left font-medium p-2.5 w-[10%]">Tender ID</th>
+                  <th className="text-right font-medium p-2.5 w-[6%]">Length</th>
+                  <th className="text-left font-medium p-2.5 w-[5%]">W.C.</th>
+                  <th className="text-left font-medium p-2.5 w-[7%]">Client</th>
+                  <th className="text-left font-medium p-2.5 w-[8%]">State</th>
+                  <th className="text-left font-medium p-2.5 w-[7%]">EMD Type</th>
+                  <th className="text-right font-medium p-2.5 w-[8%]">EMD Amt</th>
+                  <th className="text-right font-medium p-2.5 w-[8%]">
+                    <span className="block leading-tight">Tender Fees</span>
+                    <span className="block text-[10px] font-normal text-muted-foreground leading-tight">Infracon</span>
+                  </th>
+                  <th className="text-center font-medium p-2.5 w-[9%]">Pre-Contract</th>
                 </tr>
               </thead>
               <tbody>
@@ -703,20 +721,34 @@ function PreContractSection({ allottedBids }: { allottedBids: TenderBidItem[] })
                       className="border-b border-border/20 hover:bg-secondary/20 cursor-pointer"
                       onClick={() => setSelectedPcBid(bid)}
                     >
-                      <td className="p-3 font-medium tabular-nums">{bid.srNo}</td>
-                      <td className="p-3 whitespace-nowrap">{bid.nameOfWork}</td>
-                      <td className="p-3 whitespace-nowrap">{bid.nameOfBidder || "—"}</td>
-                      <td className="p-3 whitespace-nowrap">{bid.bidInvitingAuthority || "—"}</td>
-                      <td className="p-3 text-xs font-mono whitespace-nowrap">{bid.tenderId || "—"}</td>
-                      <td className="p-3 text-right tabular-nums whitespace-nowrap">{bid.projectLengthKm || "—"}</td>
-                      <td className="p-3 font-mono text-xs whitespace-nowrap">{bid.workCategory}</td>
-                      <td className="p-3 whitespace-nowrap">{bid.client}</td>
-                      <td className="p-3 whitespace-nowrap">{bid.state || "Not Selected"}</td>
-                      <td className="p-3 text-xs whitespace-nowrap">{bid.emdType || "—"}</td>
-                      <td className="p-3 text-right tabular-nums whitespace-nowrap">{formatCurrency(bid.emd)}</td>
-                      <td className="p-3 text-right tabular-nums whitespace-nowrap">{formatCurrency(bid.tenderFees)}</td>
-                      <td className="p-3 text-right tabular-nums whitespace-nowrap">{formatCurrency(bid.infraconFees)}</td>
-                      <td className="p-3 text-center">
+                      <td className="p-2.5 align-top font-medium tabular-nums">{bid.srNo}</td>
+                      <td className="p-2.5 align-top">
+                        <p className="leading-snug line-clamp-3 break-words">{bid.nameOfWork}</p>
+                      </td>
+                      <td className="p-2.5 align-top">
+                        <p className="leading-snug line-clamp-2 break-words">{bid.nameOfBidder || "—"}</p>
+                      </td>
+                      <td className="p-2.5 align-top">
+                        <p className="leading-snug line-clamp-3 break-words">{bid.bidInvitingAuthority || "—"}</p>
+                      </td>
+                      <td className="p-2.5 align-top text-xs font-mono break-all">{bid.tenderId || "—"}</td>
+                      <td className="p-2.5 align-top text-right tabular-nums">{bid.projectLengthKm ?? "—"}</td>
+                      <td className="p-2.5 align-top font-mono text-xs">{bid.workCategory}</td>
+                      <td className="p-2.5 align-top">
+                        <p className="leading-snug line-clamp-2 break-words">{bid.client}</p>
+                      </td>
+                      <td className="p-2.5 align-top">
+                        <p className="leading-snug line-clamp-2 break-words">{bid.state || "—"}</p>
+                      </td>
+                      <td className="p-2.5 align-top text-xs">
+                        <p className="leading-snug line-clamp-2 break-words">{bid.emdType || "—"}</p>
+                      </td>
+                      <td className="p-2.5 align-top text-right tabular-nums text-xs leading-snug">{formatCurrency(bid.emd)}</td>
+                      <td className="p-2.5 align-top text-right text-xs leading-snug">
+                        <div className="tabular-nums">{formatCurrency(bid.tenderFees)}</div>
+                        <div className="text-muted-foreground tabular-nums mt-0.5">{formatCurrency(bid.infraconFees)}</div>
+                      </td>
+                      <td className="p-2.5 align-top text-center">
                         <Badge variant={hasPC ? "secondary" : "outline"} className="text-[10px]">
                           {hasPC ? "Active" : "Not Created"}
                         </Badge>
@@ -1651,23 +1683,21 @@ function ContractSection({ allottedBids }: { allottedBids: TenderBidItem[] }) {
       ) : (
         <div className="glass-panel overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[3200px]">
+            <table className="w-full text-sm table-fixed min-w-[1200px]">
               <thead>
                 <tr className="text-muted-foreground border-b border-border/30">
-                  <th className="text-left font-medium p-3 w-12">Sr</th>
-                  <th className="text-left font-medium p-3 min-w-[520px]">Name of Work</th>
-                  <th className="text-left font-medium p-3 min-w-[280px]">Name of Bidder</th>
-                  <th className="text-left font-medium p-3 min-w-[360px]">Bid Inviting Authority</th>
-                  <th className="text-left font-medium p-3 min-w-[360px]">Authority Address</th>
-                  <th className="text-left font-medium p-3 min-w-[180px]">Type of Performance SD</th>
-                  <th className="text-left font-medium p-3 min-w-[220px]">SD Details</th>
-                  <th className="text-left font-medium p-3 min-w-[180px]">Additional SD Type</th>
-                  <th className="text-left font-medium p-3 min-w-[220px]">Additional SD Details</th>
-                  <th className="text-left font-medium p-3 min-w-[140px]">Proceeding / WO</th>
-                  <th className="text-right font-medium p-3 min-w-[120px]">WO Amount</th>
-                  <th className="text-left font-medium p-3 min-w-[140px]">PI/PL Policy</th>
-                  <th className="text-left font-medium p-3 min-w-[140px]">WC Policy</th>
-                  <th className="text-center font-medium p-3 min-w-[120px]">Contract</th>
+                  <th className="text-left font-medium p-2.5 w-10">Sr</th>
+                  <th className="text-left font-medium p-2.5 w-[18%]">Name of Work</th>
+                  <th className="text-left font-medium p-2.5 w-[10%]">Bidder</th>
+                  <th className="text-left font-medium p-2.5 w-[12%]">Authority</th>
+                  <th className="text-left font-medium p-2.5 w-[12%]">Address</th>
+                  <th className="text-left font-medium p-2.5 w-[9%]">Perf. SD</th>
+                  <th className="text-left font-medium p-2.5 w-[10%]">SD Details</th>
+                  <th className="text-left font-medium p-2.5 w-[9%]">Addl. SD</th>
+                  <th className="text-left font-medium p-2.5 w-[8%]">WO / Proc.</th>
+                  <th className="text-right font-medium p-2.5 w-[8%]">WO Amt</th>
+                  <th className="text-left font-medium p-2.5 w-[8%]">Policies</th>
+                  <th className="text-center font-medium p-2.5 w-[7%]">Contract</th>
                 </tr>
               </thead>
               <tbody>
@@ -1685,17 +1715,27 @@ function ContractSection({ allottedBids }: { allottedBids: TenderBidItem[] }) {
                       className="border-b border-border/20 hover:bg-secondary/20 cursor-pointer"
                       onClick={() => setSelectedBid(bid)}
                     >
-                      <td className="p-3 font-medium tabular-nums">{bid.srNo}</td>
-                      <td className="p-3 whitespace-nowrap">{bid.nameOfWork}</td>
-                      <td className="p-3 whitespace-nowrap">{bid.nameOfBidder || "—"}</td>
-                      <td className="p-3 whitespace-nowrap">{bid.bidInvitingAuthority || "—"}</td>
-                      <td className="p-3 whitespace-nowrap">{bid.bidInvitingAuthorityAddress || "—"}</td>
-                      <td className="p-3 text-xs whitespace-nowrap">{sdLabel}</td>
-                      <td className="p-3 text-xs">
+                      <td className="p-2.5 align-top font-medium tabular-nums">{bid.srNo}</td>
+                      <td className="p-2.5 align-top">
+                        <p className="leading-snug line-clamp-3 break-words">{bid.nameOfWork}</p>
+                      </td>
+                      <td className="p-2.5 align-top">
+                        <p className="leading-snug line-clamp-2 break-words">{bid.nameOfBidder || "—"}</p>
+                      </td>
+                      <td className="p-2.5 align-top">
+                        <p className="leading-snug line-clamp-3 break-words">{bid.bidInvitingAuthority || "—"}</p>
+                      </td>
+                      <td className="p-2.5 align-top">
+                        <p className="leading-snug line-clamp-3 break-words text-xs">{bid.bidInvitingAuthorityAddress || "—"}</p>
+                      </td>
+                      <td className="p-2.5 align-top text-xs">
+                        <p className="leading-snug line-clamp-2 break-words">{sdLabel}</p>
+                      </td>
+                      <td className="p-2.5 align-top text-xs">
                         {c?.securityDepositType ? (
                           <button
                             type="button"
-                            className="text-left hover:underline"
+                            className="text-left hover:underline leading-snug line-clamp-3 break-words"
                             onClick={(e) => {
                               e.stopPropagation();
                               if (c.sdLetterUrl) openAttachment(c.sdLetterUrl);
@@ -1706,26 +1746,26 @@ function ContractSection({ allottedBids }: { allottedBids: TenderBidItem[] }) {
                           </button>
                         ) : "—"}
                       </td>
-                      <td className="p-3 text-xs whitespace-nowrap">{addSdLabel}</td>
-                      <td className="p-3 text-xs">
+                      <td className="p-2.5 align-top text-xs">
                         {c?.additionalSdType ? (
                           <button
                             type="button"
-                            className="text-left hover:underline"
+                            className="text-left hover:underline leading-snug line-clamp-3 break-words"
                             onClick={(e) => {
                               e.stopPropagation();
                               if (c.additionalSdLetterUrl) openAttachment(c.additionalSdLetterUrl);
                             }}
                           >
-                            {c.additionalSdBank || "—"} · {formatCurrency(c.additionalSdAmount)}
+                            <span className="block">{addSdLabel}</span>
+                            <span className="block text-muted-foreground">{c.additionalSdBank || "—"} · {formatCurrency(c.additionalSdAmount)}</span>
                           </button>
                         ) : "—"}
                       </td>
-                      <td className="p-3 text-xs whitespace-nowrap">
+                      <td className="p-2.5 align-top text-xs">
                         {c?.proceedingOrderDate ? (
                           <button
                             type="button"
-                            className="hover:underline text-primary"
+                            className="hover:underline text-primary leading-snug"
                             onClick={(e) => {
                               e.stopPropagation();
                               if (c.proceedingOrderLetterUrl) openAttachment(c.proceedingOrderLetterUrl);
@@ -1735,36 +1775,38 @@ function ContractSection({ allottedBids }: { allottedBids: TenderBidItem[] }) {
                           </button>
                         ) : "—"}
                       </td>
-                      <td className="p-3 text-right tabular-nums whitespace-nowrap">{c ? formatCurrency(c.woAmount) : "—"}</td>
-                      <td className="p-3 text-xs">
-                        {c?.piPlPolicyNo ? (
-                          <button
-                            type="button"
-                            className="hover:underline text-primary"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (c.piPlPolicyLetterUrl) openAttachment(c.piPlPolicyLetterUrl);
-                            }}
-                          >
-                            {c.piPlPolicyNo}
-                          </button>
-                        ) : "—"}
+                      <td className="p-2.5 align-top text-right tabular-nums text-xs leading-snug">{c ? formatCurrency(c.woAmount) : "—"}</td>
+                      <td className="p-2.5 align-top text-xs leading-snug">
+                        <div>
+                          {c?.piPlPolicyNo ? (
+                            <button
+                              type="button"
+                              className="hover:underline text-primary break-all"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (c.piPlPolicyLetterUrl) openAttachment(c.piPlPolicyLetterUrl);
+                              }}
+                            >
+                              PI: {c.piPlPolicyNo}
+                            </button>
+                          ) : <span className="text-muted-foreground">PI: —</span>}
+                        </div>
+                        <div className="mt-0.5">
+                          {c?.wcPolicyNo ? (
+                            <button
+                              type="button"
+                              className="hover:underline text-primary break-all"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (c.wcPolicyLetterUrl) openAttachment(c.wcPolicyLetterUrl);
+                              }}
+                            >
+                              WC: {c.wcPolicyNo}
+                            </button>
+                          ) : <span className="text-muted-foreground">WC: —</span>}
+                        </div>
                       </td>
-                      <td className="p-3 text-xs">
-                        {c?.wcPolicyNo ? (
-                          <button
-                            type="button"
-                            className="hover:underline text-primary"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (c.wcPolicyLetterUrl) openAttachment(c.wcPolicyLetterUrl);
-                            }}
-                          >
-                            {c.wcPolicyNo}
-                          </button>
-                        ) : "—"}
-                      </td>
-                      <td className="p-3 text-center">
+                      <td className="p-2.5 align-top text-center">
                         <Badge variant={c ? "secondary" : "outline"} className="text-[10px]">
                           {c ? "Active" : "Not Created"}
                         </Badge>
