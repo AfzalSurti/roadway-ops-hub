@@ -619,6 +619,17 @@ function PreContractCard({
     onError: (e) => toast.error(e.message),
   });
 
+  const updateBidMutation = useMutation({
+    mutationFn: (payload: Record<string, unknown>) => api.updateTenderBid(bid.id, payload as Partial<TenderBidItem>),
+    onSuccess: () => {
+      toast.success("Tender bid updated");
+      queryClient.invalidateQueries({ queryKey: ["tender-bids"] });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const onBidUpdate = (field: string, value: unknown) => updateBidMutation.mutate({ [field]: value });
+
   const wcLabel = WORK_CATEGORY_OPTIONS.find((o) => o.code === bid.workCategory)?.label ?? bid.workCategory;
 
   return (
@@ -645,41 +656,90 @@ function PreContractCard({
       {/* Expanded Content */}
       {expanded && (
         <div className="border-t border-border/30 p-4 space-y-4">
-          {/* Tender Bid Details Summary */}
+          {/* Tender Bid Details — Editable */}
           <div className="rounded-xl border border-border/40 bg-secondary/10 p-4">
             <p className="text-xs font-medium text-muted-foreground mb-3">Tender Bid Details</p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 text-sm">
-              {([
-                ["Name of Work", bid.nameOfWork],
-                ["Name of Bidder", bid.nameOfBidder],
-                ["Bid Inviting Authority", bid.bidInvitingAuthority],
-                ["Tender ID", bid.tenderId],
-                ["Project Length (Km)", bid.projectLengthKm ? String(bid.projectLengthKm) : ""],
-                ["Work Category", `${bid.workCategory} — ${wcLabel}`],
-                ["Client", bid.client],
-                ["State / Region", bid.state || "Not Selected"],
-                ["Type of EMD", bid.emdType],
-                ["EMD Amount", formatCurrency(bid.emd)],
-                ["EMD Bank", bid.emdBank],
-                ["EMD Issued Date", formatDate(bid.emdIssuedDate)],
-                ["EMD No.", bid.emdNumber],
-                ["EMD Valid Upto", formatDate(bid.emdValidUpto)],
-                ["Tender Fees", formatCurrency(bid.tenderFees)],
-                ["Infracon Fees", formatCurrency(bid.infraconFees)],
-              ] as const).map(([label, value]) => (
-                <div key={label}>
-                  <p className="text-[11px] text-muted-foreground">{label}</p>
-                  <p className="mt-0.5 break-words font-medium">{value || "—"}</p>
-                </div>
-              ))}
-              {bid.emdLetterUrl && (
-                <div>
-                  <p className="text-[11px] text-muted-foreground">EMD Attachment</p>
-                  <a href={`${API_BASE.replace("/api", "")}${bid.emdLetterUrl}`} target="_blank" rel="noreferrer" className="mt-0.5 text-primary underline inline-flex items-center gap-1 text-xs">
-                    <ExternalLink className="h-3 w-3" /> View
-                  </a>
-                </div>
-              )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="sm:col-span-2 lg:col-span-4">
+                <label className="text-xs text-muted-foreground mb-1 block">Name of Work</label>
+                <Input defaultValue={bid.nameOfWork} onBlur={(e) => { if (e.target.value !== bid.nameOfWork) onBidUpdate("nameOfWork", e.target.value); }} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Name of Bidder</label>
+                <Input defaultValue={bid.nameOfBidder} onBlur={(e) => { if (e.target.value !== bid.nameOfBidder) onBidUpdate("nameOfBidder", e.target.value); }} />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="text-xs text-muted-foreground mb-1 block">Name & Address of Bid Inviting Authority</label>
+                <Input defaultValue={bid.bidInvitingAuthority} onBlur={(e) => { if (e.target.value !== bid.bidInvitingAuthority) onBidUpdate("bidInvitingAuthority", e.target.value); }} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Tender ID</label>
+                <Input defaultValue={bid.tenderId} onBlur={(e) => { if (e.target.value !== bid.tenderId) onBidUpdate("tenderId", e.target.value); }} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Project Length (Km)</label>
+                <Input type="number" defaultValue={bid.projectLengthKm || ""} onBlur={(e) => { const v = Number(e.target.value); if (v !== bid.projectLengthKm) onBidUpdate("projectLengthKm", v); }} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Work Category</label>
+                <Select value={bid.workCategory} onValueChange={(v) => onBidUpdate("workCategory", v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {WORK_CATEGORY_OPTIONS.map((o) => <SelectItem key={o.code} value={o.code}>{o.code} — {o.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Client</label>
+                <Select value={bid.client} onValueChange={(v) => onBidUpdate("client", v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {CLIENT_OPTIONS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">State / Region</label>
+                <LocationCombobox value={bid.state} onValueChange={(v) => onBidUpdate("state", v)} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">EMD Amount</label>
+                <Input type="number" defaultValue={bid.emd || ""} onBlur={(e) => { const v = Number(e.target.value); if (v !== bid.emd) onBidUpdate("emd", v); }} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Type of EMD</label>
+                <Select value={bid.emdType || "NONE"} onValueChange={(v) => onBidUpdate("emdType", v === "NONE" ? "" : v)}>
+                  <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="NONE">None</SelectItem>
+                    {EMD_TYPE_OPTIONS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">EMD Bank</label>
+                <Input defaultValue={bid.emdBank} onBlur={(e) => { if (e.target.value !== bid.emdBank) onBidUpdate("emdBank", e.target.value); }} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">EMD Issued Date</label>
+                <Input type="date" defaultValue={bid.emdIssuedDate ? new Date(bid.emdIssuedDate).toISOString().split("T")[0] : ""} onChange={(e) => onBidUpdate("emdIssuedDate", e.target.value || null)} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">EMD No.</label>
+                <Input defaultValue={bid.emdNumber} onBlur={(e) => { if (e.target.value !== bid.emdNumber) onBidUpdate("emdNumber", e.target.value); }} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">EMD Valid Upto</label>
+                <Input type="date" defaultValue={bid.emdValidUpto ? new Date(bid.emdValidUpto).toISOString().split("T")[0] : ""} onChange={(e) => onBidUpdate("emdValidUpto", e.target.value || null)} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Tender Fees</label>
+                <Input type="number" defaultValue={bid.tenderFees || ""} onBlur={(e) => { const v = Number(e.target.value); if (v !== bid.tenderFees) onBidUpdate("tenderFees", v); }} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Infracon Fees</label>
+                <Input type="number" defaultValue={bid.infraconFees || ""} onBlur={(e) => { const v = Number(e.target.value); if (v !== bid.infraconFees) onBidUpdate("infraconFees", v); }} />
+              </div>
             </div>
           </div>
 
