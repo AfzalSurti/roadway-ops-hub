@@ -645,6 +645,44 @@ function PreContractCard({
       {/* Expanded Content */}
       {expanded && (
         <div className="border-t border-border/30 p-4 space-y-4">
+          {/* Tender Bid Details Summary */}
+          <div className="rounded-xl border border-border/40 bg-secondary/10 p-4">
+            <p className="text-xs font-medium text-muted-foreground mb-3">Tender Bid Details</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 text-sm">
+              {([
+                ["Name of Work", bid.nameOfWork],
+                ["Name of Bidder", bid.nameOfBidder],
+                ["Bid Inviting Authority", bid.bidInvitingAuthority],
+                ["Tender ID", bid.tenderId],
+                ["Project Length (Km)", bid.projectLengthKm ? String(bid.projectLengthKm) : ""],
+                ["Work Category", `${bid.workCategory} — ${wcLabel}`],
+                ["Client", bid.client],
+                ["State / Region", bid.state || "Not Selected"],
+                ["Type of EMD", bid.emdType],
+                ["EMD Amount", formatCurrency(bid.emd)],
+                ["EMD Bank", bid.emdBank],
+                ["EMD Issued Date", formatDate(bid.emdIssuedDate)],
+                ["EMD No.", bid.emdNumber],
+                ["EMD Valid Upto", formatDate(bid.emdValidUpto)],
+                ["Tender Fees", formatCurrency(bid.tenderFees)],
+                ["Infracon Fees", formatCurrency(bid.infraconFees)],
+              ] as const).map(([label, value]) => (
+                <div key={label}>
+                  <p className="text-[11px] text-muted-foreground">{label}</p>
+                  <p className="mt-0.5 break-words font-medium">{value || "—"}</p>
+                </div>
+              ))}
+              {bid.emdLetterUrl && (
+                <div>
+                  <p className="text-[11px] text-muted-foreground">EMD Attachment</p>
+                  <a href={`${API_BASE.replace("/api", "")}${bid.emdLetterUrl}`} target="_blank" rel="noreferrer" className="mt-0.5 text-primary underline inline-flex items-center gap-1 text-xs">
+                    <ExternalLink className="h-3 w-3" /> View
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+
           {!preContract ? (
             <div className="text-center py-6">
               <p className="text-muted-foreground text-sm mb-3">No pre-contract activity linked to this tender yet.</p>
