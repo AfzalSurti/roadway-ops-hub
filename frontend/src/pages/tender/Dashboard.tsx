@@ -946,11 +946,17 @@ function DateWithAttachment({
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [localUrl, setLocalUrl] = useState<string | null>(urlValue ?? null);
+
+  useEffect(() => {
+    setLocalUrl(urlValue ?? null);
+  }, [urlValue]);
 
   const handleUpload = useCallback(async (file: File) => {
     setUploading(true);
     try {
       const result = await api.uploadFile(file);
+      setLocalUrl(result.url);
       onUrlChange(result.url);
       toast.success(`${label} attachment uploaded`);
     } catch (e) {
@@ -988,26 +994,26 @@ function DateWithAttachment({
           size="sm"
           variant="outline"
           className="h-9 w-9 p-0 shrink-0"
-          title={urlValue ? "Replace attachment" : "Upload attachment"}
+          title={localUrl ? "Replace attachment" : "Upload attachment"}
           disabled={uploading}
           onClick={() => fileRef.current?.click()}
         >
           {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
         </Button>
-        {urlValue ? (
+        {localUrl ? (
           <Button
             type="button"
             size="sm"
             variant="default"
             className="h-9 w-9 p-0 shrink-0"
             title="View attachment"
-            onClick={() => openAttachment(urlValue)}
+            onClick={() => openAttachment(localUrl)}
           >
             <Eye className="h-4 w-4" />
           </Button>
         ) : null}
       </div>
-      {urlValue ? (
+      {localUrl ? (
         <p className="text-[10px] text-emerald-600 mt-0.5 flex items-center gap-1">
           <Paperclip className="h-3 w-3" /> Attachment uploaded
         </p>
@@ -1226,11 +1232,17 @@ function AttachmentUpload({
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [localUrl, setLocalUrl] = useState<string | null>(urlValue ?? null);
+
+  useEffect(() => {
+    setLocalUrl(urlValue ?? null);
+  }, [urlValue]);
 
   const handleUpload = useCallback(async (file: File) => {
     setUploading(true);
     try {
       const result = await api.uploadFile(file);
+      setLocalUrl(result.url);
       onUrlChange(result.url);
       toast.success(`${label} uploaded`);
     } catch {
@@ -1257,29 +1269,29 @@ function AttachmentUpload({
           variant="outline"
           className="h-9 gap-1.5"
           disabled={uploading}
-          title={urlValue ? "Replace attachment" : "Upload attachment"}
+          title={localUrl ? "Replace attachment" : "Upload attachment"}
           onClick={() => fileRef.current?.click()}
         >
           {uploading ? (
             <><Loader2 className="h-4 w-4 animate-spin" /> Uploading…</>
           ) : (
-            <><Paperclip className="h-4 w-4" /> {urlValue ? "Replace" : "Upload"}</>
+            <><Paperclip className="h-4 w-4" /> {localUrl ? "Replace" : "Upload"}</>
           )}
         </Button>
-        {urlValue ? (
+        {localUrl ? (
           <Button
             type="button"
             size="sm"
             variant="default"
             className="h-9 w-9 p-0 shrink-0"
             title="View attachment"
-            onClick={() => openAttachment(urlValue)}
+            onClick={() => openAttachment(localUrl)}
           >
             <Eye className="h-4 w-4" />
           </Button>
         ) : null}
       </div>
-      {urlValue ? (
+      {localUrl ? (
         <p className="text-[10px] text-emerald-600 mt-0.5 flex items-center gap-1">
           <Paperclip className="h-3 w-3" /> Uploaded
         </p>
