@@ -1,137 +1,152 @@
 import type { TenderBidItem } from "@/lib/domain";
 import { WORK_CATEGORY_OPTIONS } from "@/lib/domain";
 
-function formatCurrencyWords(amount: number): string {
+function formatCurrencyINR(amount: number): string {
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: "INR",
-    maximumFractionDigits: 2
+    maximumFractionDigits: 0,
   }).format(amount);
 }
 
-function formatDate(date: Date): string {
+function fmtDate(date: Date): string {
+  return date.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
+function fmtDateLong(date: Date): string {
   return date.toLocaleDateString("en-IN", {
     day: "2-digit",
     month: "long",
-    year: "numeric"
+    year: "numeric",
   });
+}
+
+function fmtDateField(val?: string | null): string {
+  if (!val) return "________";
+  return fmtDate(new Date(val));
 }
 
 function getWorkCategoryLabel(code: string): string {
   return WORK_CATEGORY_OPTIONS.find((o) => o.code === code)?.label ?? code;
 }
 
-export function generateLoaRequestLetter(bid: TenderBidItem): string {
-  const today = formatDate(new Date());
-  const wcLabel = getWorkCategoryLabel(bid.workCategory);
+export function generateEmdRefundLetter(bid: TenderBidItem): string {
+  const today = fmtDate(new Date());
+  const bidderName = bid.nameOfBidder || "M/s Sankalp Infracon Pvt. Ltd.";
+  const authority = bid.bidInvitingAuthority || "________";
+  const tenderId = bid.tenderId || "________";
 
   return `
-<p style="text-align: right;"><strong>Date:</strong> ${today}</p>
+<p><strong>Ref. No.:</strong> GDR/EMD/REFUND/TENDER/____
+<span style="float:right;"><strong>Date:</strong> ${today}</span></p>
 
-<p><strong>To,</strong></p>
-<p>The Managing Director / Chief Engineer,<br/>
-<strong>${bid.client}</strong>,<br/>
-${bid.state || "________"}.</p>
+<p><strong>To,</strong><br/>
+${authority}</p>
 
-<p><strong>Subject:</strong> Request for Issuance of Letter of Acceptance (LOA) for the work of <strong>"${bid.nameOfWork}"</strong> under <strong>${wcLabel} (${bid.workCategory})</strong> category.</p>
+<p><strong>Tender No. :</strong> ${tenderId}</p>
 
-<p><strong>Ref:</strong> Tender Notice / NIT No. ________</p>
+<p><strong>Ref:</strong> ________</p>
 
-<p>Respected Sir/Madam,</p>
+<p><u><strong>Subject: Request for Release of Our Earnest Money Deposit.</strong></u></p>
 
-<p>With reference to the above-mentioned subject, we are pleased to inform you that we, <strong>M/s Sankalp Infracon Pvt. Ltd.</strong>, have been declared as the successful bidder for the work titled:</p>
+<p><strong>Name Of Work:</strong> "${bid.nameOfWork}" in the state of ${bid.state || "________"}.</p>
 
-<blockquote style="margin: 16px 24px; padding: 12px 16px; border-left: 4px solid #0ea5e9; background: #f0f9ff;">
-<strong>"${bid.nameOfWork}"</strong><br/>
-Work Category: <strong>${wcLabel} (${bid.workCategory})</strong><br/>
-Client: <strong>${bid.client}</strong><br/>
-State: <strong>${bid.state || "________"}</strong>
-</blockquote>
+<p>Dear Sir,</p>
 
-<p>We have duly submitted the Earnest Money Deposit (EMD) amounting to <strong>${formatCurrencyWords(bid.emd)}</strong> as per the tender requirements.</p>
+<p>We, <strong>${bidderName},</strong> ${bid.state || "________"}, participated above mentioned Work, now this Tender was Allotted to our Firm, and we had submitted Security Deposit (SD). So, we are requesting to Authority Kindly release Our EMD Amount as soon as possible.</p>
 
-<p>In view of the above, we hereby request you to kindly issue the <strong>Letter of Acceptance (LOA)</strong> at the earliest convenience so that we may proceed with the necessary formalities and commence the work within the stipulated time frame.</p>
+<p><strong>Tender EMD Remittance Details:</strong></p>
 
-<p>We assure you of our best services and look forward to your kind consideration.</p>
+<table style="border-collapse: collapse; margin: 16px 0;">
+  <tr>
+    <td style="border: 1px solid #000; padding: 6px 12px; font-weight: bold;">EMD Amount</td>
+    <td style="border: 1px solid #000; padding: 6px 12px;">Rs. ${bid.emd ? new Intl.NumberFormat("en-IN").format(bid.emd) : "________"}/-</td>
+  </tr>
+  <tr>
+    <td style="border: 1px solid #000; padding: 6px 12px; font-weight: bold;">EMD Details</td>
+    <td style="border: 1px solid #000; padding: 6px 12px;">
+      <strong>${bid.emdType || "________"} No:</strong> ${bid.emdNumber || "________"}<br/>
+      <strong>Date.:</strong>${fmtDateField(bid.emdIssuedDate)}<br/>
+      <strong>Valid Up to.:</strong> ${fmtDateField(bid.emdValidUpto)}<br/>
+      <strong>Bank:</strong> ${bid.emdBank || "________"}
+    </td>
+  </tr>
+</table>
 
-<p style="margin-top: 40px;">Thanking you,</p>
+<p>Thanking you and assuring you of our best services,</p>
 
 <p>Yours faithfully,<br/>
-<strong>For M/s Sankalp Infracon Pvt. Ltd.</strong></p>
+<strong>For ${bidderName}</strong></p>
 
 <p style="margin-top: 48px;">
 <strong>Authorized Signatory</strong><br/>
 Name: ________________________<br/>
-Designation: ________________________<br/>
-Contact: ________________________
+Designation: ________________________
 </p>
 `.trim();
 }
 
-export function generateEmdRefundLetter(bid: TenderBidItem): string {
-  const today = formatDate(new Date());
+export function generateLoaRequestLetter(bid: TenderBidItem): string {
+  const today = fmtDate(new Date());
+  const bidderName = bid.nameOfBidder || "M/s Sankalp Infracon Pvt. Ltd.";
+  const authority = bid.bidInvitingAuthority || "________";
+  const tenderId = bid.tenderId || "________";
   const wcLabel = getWorkCategoryLabel(bid.workCategory);
 
   return `
-<p style="text-align: right;"><strong>Date:</strong> ${today}</p>
+<p><strong>Ref. No.:</strong> ____
+<span style="float:right;"><strong>Date:</strong> ${today}</span></p>
 
-<p><strong>To,</strong></p>
-<p>The Managing Director / Chief Engineer,<br/>
-<strong>${bid.client}</strong>,<br/>
-${bid.state || "________"}.</p>
+<p><strong>To,</strong><br/>
+${authority}</p>
 
-<p><strong>Subject:</strong> Request for Refund of Earnest Money Deposit (EMD) for the work of <strong>"${bid.nameOfWork}"</strong> under <strong>${wcLabel} (${bid.workCategory})</strong> category.</p>
+<p><strong>Tender No. :</strong> ${tenderId}</p>
 
-<p><strong>Ref:</strong> Tender Notice / NIT No. ________</p>
+<p><strong>Ref:</strong> ________</p>
 
-<p>Respected Sir/Madam,</p>
+<p><u><strong>Subject: Request for Issuance of Letter of Acceptance (LOA).</strong></u></p>
 
-<p>With reference to the above-mentioned subject, we had participated in the tender for the following work:</p>
+<p><strong>Name Of Work:</strong> "${bid.nameOfWork}" in the state of ${bid.state || "________"}.</p>
 
-<blockquote style="margin: 16px 24px; padding: 12px 16px; border-left: 4px solid #f59e0b; background: #fffbeb;">
-<strong>"${bid.nameOfWork}"</strong><br/>
-Work Category: <strong>${wcLabel} (${bid.workCategory})</strong><br/>
-Client: <strong>${bid.client}</strong><br/>
-State: <strong>${bid.state || "________"}</strong>
-</blockquote>
+<p>Dear Sir,</p>
 
-<p>We had submitted an Earnest Money Deposit (EMD) amounting to <strong>${formatCurrencyWords(bid.emd)}</strong> as part of the tender submission requirements.</p>
+<p>With reference to the above-mentioned subject, we, <strong>${bidderName},</strong> have been declared as the successful bidder for the above mentioned work under <strong>${wcLabel} (${bid.workCategory})</strong> category.</p>
 
-<p>As per the tender evaluation, the work has <strong>not been allotted</strong> to our firm. In view of the same, we hereby request you to kindly process the refund of the EMD amount of <strong>${formatCurrencyWords(bid.emd)}</strong> at the earliest.</p>
+<p>We have duly submitted the Earnest Money Deposit (EMD) as per the tender requirements.</p>
 
-<p>The refund may kindly be credited to the following bank account:</p>
+<p><strong>Tender EMD Remittance Details:</strong></p>
 
-<table style="border-collapse: collapse; margin: 16px 0; width: 100%;">
+<table style="border-collapse: collapse; margin: 16px 0;">
   <tr>
-    <td style="border: 1px solid #d1d5db; padding: 8px 12px; background: #f9fafb; font-weight: bold; width: 200px;">Bank Name</td>
-    <td style="border: 1px solid #d1d5db; padding: 8px 12px;">________________________</td>
+    <td style="border: 1px solid #000; padding: 6px 12px; font-weight: bold;">EMD Amount</td>
+    <td style="border: 1px solid #000; padding: 6px 12px;">Rs. ${bid.emd ? new Intl.NumberFormat("en-IN").format(bid.emd) : "________"}/-</td>
   </tr>
   <tr>
-    <td style="border: 1px solid #d1d5db; padding: 8px 12px; background: #f9fafb; font-weight: bold;">Account Number</td>
-    <td style="border: 1px solid #d1d5db; padding: 8px 12px;">________________________</td>
-  </tr>
-  <tr>
-    <td style="border: 1px solid #d1d5db; padding: 8px 12px; background: #f9fafb; font-weight: bold;">IFSC Code</td>
-    <td style="border: 1px solid #d1d5db; padding: 8px 12px;">________________________</td>
-  </tr>
-  <tr>
-    <td style="border: 1px solid #d1d5db; padding: 8px 12px; background: #f9fafb; font-weight: bold;">Account Holder Name</td>
-    <td style="border: 1px solid #d1d5db; padding: 8px 12px;">M/s Sankalp Infracon Pvt. Ltd.</td>
+    <td style="border: 1px solid #000; padding: 6px 12px; font-weight: bold;">EMD Details</td>
+    <td style="border: 1px solid #000; padding: 6px 12px;">
+      <strong>${bid.emdType || "________"} No:</strong> ${bid.emdNumber || "________"}<br/>
+      <strong>Date.:</strong>${fmtDateField(bid.emdIssuedDate)}<br/>
+      <strong>Valid Up to.:</strong> ${fmtDateField(bid.emdValidUpto)}<br/>
+      <strong>Bank:</strong> ${bid.emdBank || "________"}
+    </td>
   </tr>
 </table>
 
-<p>We request your kind cooperation in processing the refund at the earliest.</p>
+<p>In view of the above, we hereby request you to kindly issue the <strong>Letter of Acceptance (LOA)</strong> at the earliest convenience so that we may proceed with the necessary formalities and commence the work within the stipulated time frame.</p>
 
-<p style="margin-top: 40px;">Thanking you,</p>
+<p>Thanking you and assuring you of our best services,</p>
 
 <p>Yours faithfully,<br/>
-<strong>For M/s Sankalp Infracon Pvt. Ltd.</strong></p>
+<strong>For ${bidderName}</strong></p>
 
 <p style="margin-top: 48px;">
 <strong>Authorized Signatory</strong><br/>
 Name: ________________________<br/>
-Designation: ________________________<br/>
-Contact: ________________________
+Designation: ________________________
 </p>
 `.trim();
 }
