@@ -8,5 +8,12 @@ export const attachmentRepository = {
 
   findByFileName(fileName: string) {
     return prisma.attachment.findUnique({ where: { fileName } });
+  },
+
+  updateData(id: string, data: Buffer) {
+    return prisma.attachment.update({
+      where: { id },
+      data: { data }
+    });
   }
 };

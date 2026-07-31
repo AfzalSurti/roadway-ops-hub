@@ -1234,7 +1234,7 @@ function AttachmentUpload({
       onUrlChange(result.url);
       toast.success(`${label} uploaded`);
     } catch {
-      toast.error("Upload failed");
+      toast.error("Upload failed — try a smaller PDF or retry");
     } finally {
       setUploading(false);
     }
@@ -1261,7 +1261,7 @@ function AttachmentUpload({
           onClick={() => fileRef.current?.click()}
         >
           {uploading ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <><Loader2 className="h-4 w-4 animate-spin" /> Uploading…</>
           ) : (
             <><Paperclip className="h-4 w-4" /> {urlValue ? "Replace" : "Upload"}</>
           )}
@@ -1283,6 +1283,8 @@ function AttachmentUpload({
         <p className="text-[10px] text-emerald-600 mt-0.5 flex items-center gap-1">
           <Paperclip className="h-3 w-3" /> Uploaded
         </p>
+      ) : uploading ? (
+        <p className="text-[10px] text-muted-foreground mt-0.5">Please wait…</p>
       ) : null}
     </div>
   );
