@@ -40,6 +40,8 @@ export default function TenderDashboard() {
   const [clientFilter, setClientFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState<TenderBidStatus | "ALL">("ALL");
   const [stateFilter, setStateFilter] = useState("ALL");
+  const [bidderFilter, setBidderFilter] = useState("ALL");
+  const [authorityFilter, setAuthorityFilter] = useState("ALL");
   const [showAddForm, setShowAddForm] = useState(false);
   const [selectedBid, setSelectedBid] = useState<TenderBidItem | null>(null);
 
@@ -102,6 +104,9 @@ export default function TenderDashboard() {
     onError: (e) => toast.error(e.message)
   });
 
+  const uniqueBidders = useMemo(() => [...new Set(items.map((b) => b.nameOfBidder).filter(Boolean))].sort(), [items]);
+  const uniqueAuthorities = useMemo(() => [...new Set(items.map((b) => b.bidInvitingAuthority).filter(Boolean))].sort(), [items]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return items.filter((bid) => {
@@ -111,11 +116,13 @@ export default function TenderDashboard() {
         if (clientFilter !== "ALL" && bid.client !== clientFilter) return false;
         if (statusFilter !== "ALL" && bid.status !== statusFilter) return false;
         if (stateFilter !== "ALL" && bid.state !== stateFilter) return false;
+        if (bidderFilter !== "ALL" && bid.nameOfBidder !== bidderFilter) return false;
+        if (authorityFilter !== "ALL" && bid.bidInvitingAuthority !== authorityFilter) return false;
       }
       if (!q) return true;
-      return [bid.nameOfWork, bid.workCategory, bid.client, bid.state].join(" ").toLowerCase().includes(q);
+      return [bid.nameOfWork, bid.workCategory, bid.client, bid.state, bid.nameOfBidder, bid.bidInvitingAuthority].join(" ").toLowerCase().includes(q);
     });
-  }, [items, search, workCategoryFilter, clientFilter, statusFilter, stateFilter, tab]);
+  }, [items, search, workCategoryFilter, clientFilter, statusFilter, stateFilter, bidderFilter, authorityFilter, tab]);
 
   const clearFilters = () => {
     setSearch("");
@@ -123,6 +130,8 @@ export default function TenderDashboard() {
     setClientFilter("ALL");
     setStatusFilter("ALL");
     setStateFilter("ALL");
+    setBidderFilter("ALL");
+    setAuthorityFilter("ALL");
   };
 
   const allottedCount = useMemo(() => items.filter((b) => b.status === "ALLOTTED").length, [items]);
@@ -175,13 +184,23 @@ export default function TenderDashboard() {
       {tab === "bids" && (
         <>
           <div className="glass-panel p-4 space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              <div className="sm:col-span-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="sm:col-span-2 lg:col-span-3">
                 <label className="text-xs text-muted-foreground mb-1.5 block">Search</label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input className="pl-9" placeholder="Name of work, client, state..." value={search} onChange={(e) => setSearch(e.target.value)} />
+                  <Input className="pl-9" placeholder="Name of work, client, state, bidder..." value={search} onChange={(e) => setSearch(e.target.value)} />
                 </div>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1.5 block">Bid Inviting Authority</label>
+                <Select value={authorityFilter} onValueChange={setAuthorityFilter}>
+                  <SelectTrigger><SelectValue placeholder="All" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All</SelectItem>
+                    {uniqueAuthorities.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <label className="text-xs text-muted-foreground mb-1.5 block">Work Category</label>
@@ -204,13 +223,12 @@ export default function TenderDashboard() {
                 </Select>
               </div>
               <div>
-                <label className="text-xs text-muted-foreground mb-1.5 block">Status</label>
-                <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as TenderBidStatus | "ALL")}>
+                <label className="text-xs text-muted-foreground mb-1.5 block">Bidder</label>
+                <Select value={bidderFilter} onValueChange={setBidderFilter}>
                   <SelectTrigger><SelectValue placeholder="All" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ALL">All</SelectItem>
-                    <SelectItem value="ALLOTTED">Allotted</SelectItem>
-                    <SelectItem value="NOT_ALLOTTED">Not Allotted</SelectItem>
+                    {uniqueBidders.map((b) => <SelectItem key={b} value={b}>{b}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -224,6 +242,17 @@ export default function TenderDashboard() {
                   </SelectContent>
                 </Select>
               </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1.5 block">Status</label>
+                <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as TenderBidStatus | "ALL")}>
+                  <SelectTrigger><SelectValue placeholder="All" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All</SelectItem>
+                    <SelectItem value="ALLOTTED">Allotted</SelectItem>
+                    <SelectItem value="NOT_ALLOTTED">Not Allotted</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="flex justify-end">
               <Button size="sm" variant="ghost" className="gap-1" onClick={clearFilters}>
@@ -232,117 +261,15 @@ export default function TenderDashboard() {
             </div>
           </div>
 
+          {/* Add Bid Modal */}
           {showAddForm && (
-            <div className="glass-panel p-4 space-y-3">
-              <h3 className="font-semibold text-sm">New Tender Bid</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                <div className="sm:col-span-2 lg:col-span-3">
-                  <label className="text-xs text-muted-foreground mb-1 block">Name of Work *</label>
-                  <Input value={newBid.nameOfWork} onChange={(e) => setNewBid({ ...newBid, nameOfWork: e.target.value })} />
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">Name of Bidder</label>
-                  <Input value={newBid.nameOfBidder} onChange={(e) => setNewBid({ ...newBid, nameOfBidder: e.target.value })} />
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="text-xs text-muted-foreground mb-1 block">Name & Address of Bid Inviting Authority</label>
-                  <Input value={newBid.bidInvitingAuthority} onChange={(e) => setNewBid({ ...newBid, bidInvitingAuthority: e.target.value })} />
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">Tender ID</label>
-                  <Input value={newBid.tenderId} onChange={(e) => setNewBid({ ...newBid, tenderId: e.target.value })} />
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">Project Length (Km)</label>
-                  <Input type="number" value={newBid.projectLengthKm || ""} onChange={(e) => setNewBid({ ...newBid, projectLengthKm: Number(e.target.value) })} />
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">Work Category *</label>
-                  <Select value={newBid.workCategory} onValueChange={(v) => setNewBid({ ...newBid, workCategory: v })}>
-                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                    <SelectContent>
-                      {WORK_CATEGORY_OPTIONS.map((o) => <SelectItem key={o.code} value={o.code}>{o.code} — {o.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">Client *</label>
-                  <Select value={newBid.client} onValueChange={(v) => setNewBid({ ...newBid, client: v })}>
-                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                    <SelectContent>
-                      {CLIENT_OPTIONS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">State / Region *</label>
-                  <LocationCombobox value={newBid.state} onValueChange={(v) => setNewBid({ ...newBid, state: v })} />
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">EMD Amount</label>
-                  <Input type="number" value={newBid.emd || ""} onChange={(e) => setNewBid({ ...newBid, emd: Number(e.target.value) })} />
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">Type of EMD</label>
-                  <Select value={newBid.emdType || "NONE"} onValueChange={(v) => setNewBid({ ...newBid, emdType: v === "NONE" ? "" : v })}>
-                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="NONE">None</SelectItem>
-                      {EMD_TYPE_OPTIONS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {newBid.emdType && (
-                  <>
-                    <div>
-                      <label className="text-xs text-muted-foreground mb-1 block">EMD Bank</label>
-                      <Input value={newBid.emdBank} onChange={(e) => setNewBid({ ...newBid, emdBank: e.target.value })} />
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground mb-1 block">EMD Issued Date</label>
-                      <Input type="date" value={newBid.emdIssuedDate} onChange={(e) => setNewBid({ ...newBid, emdIssuedDate: e.target.value })} />
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground mb-1 block">EMD No.</label>
-                      <Input value={newBid.emdNumber} onChange={(e) => setNewBid({ ...newBid, emdNumber: e.target.value })} />
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground mb-1 block">EMD Valid Upto</label>
-                      <Input type="date" value={newBid.emdValidUpto} onChange={(e) => setNewBid({ ...newBid, emdValidUpto: e.target.value })} />
-                    </div>
-                  </>
-                )}
-                <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">Tender Fees</label>
-                  <Input type="number" value={newBid.tenderFees || ""} onChange={(e) => setNewBid({ ...newBid, tenderFees: Number(e.target.value) })} />
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">Infracon Fees</label>
-                  <Input type="number" value={newBid.infraconFees || ""} onChange={(e) => setNewBid({ ...newBid, infraconFees: Number(e.target.value) })} />
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">Status</label>
-                  <Select value={newBid.status} onValueChange={(v) => setNewBid({ ...newBid, status: v as TenderBidStatus })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ALLOTTED">Allotted</SelectItem>
-                      <SelectItem value="NOT_ALLOTTED">Not Allotted</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="flex gap-2 justify-end">
-                <Button size="sm" variant="outline" onClick={() => setShowAddForm(false)}>Cancel</Button>
-                <Button
-                  size="sm"
-                  disabled={!newBid.nameOfWork || !newBid.workCategory || !newBid.client || !newBid.state || createMutation.isPending}
-                  onClick={() => createMutation.mutate(newBid)}
-                >
-                  {createMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : null}
-                  Save
-                </Button>
-              </div>
-            </div>
+            <AddBidModal
+              newBid={newBid}
+              setNewBid={setNewBid}
+              isPending={createMutation.isPending}
+              onSave={() => createMutation.mutate(newBid)}
+              onClose={() => setShowAddForm(false)}
+            />
           )}
 
           {isLoading ? (
@@ -383,20 +310,18 @@ export default function TenderDashboard() {
                         onClick={() => setSelectedBid(bid)}
                       >
                         <td className="p-3 font-medium tabular-nums">{bid.srNo}</td>
-                        <td className="p-3 max-w-[200px]">
-                          <span className="line-clamp-2">{bid.nameOfWork}</span>
-                        </td>
-                        <td className="p-3 max-w-[140px]"><span className="line-clamp-1">{bid.nameOfBidder || "—"}</span></td>
-                        <td className="p-3 max-w-[180px]"><span className="line-clamp-1">{bid.bidInvitingAuthority || "—"}</span></td>
-                        <td className="p-3 text-xs font-mono">{bid.tenderId || "—"}</td>
-                        <td className="p-3 text-right tabular-nums">{bid.projectLengthKm || "—"}</td>
-                        <td className="p-3 font-mono text-xs">{bid.workCategory}</td>
-                        <td className="p-3">{bid.client}</td>
-                        <td className="p-3">{bid.state || "Not Selected"}</td>
-                        <td className="p-3 text-xs">{bid.emdType || "—"}</td>
-                        <td className="p-3 text-right tabular-nums">{formatCurrency(bid.emd)}</td>
-                        <td className="p-3 text-right tabular-nums">{formatCurrency(bid.tenderFees)}</td>
-                        <td className="p-3 text-right tabular-nums">{formatCurrency(bid.infraconFees)}</td>
+                        <td className="p-3">{bid.nameOfWork}</td>
+                        <td className="p-3">{bid.nameOfBidder || "—"}</td>
+                        <td className="p-3">{bid.bidInvitingAuthority || "—"}</td>
+                        <td className="p-3 text-xs font-mono whitespace-nowrap">{bid.tenderId || "—"}</td>
+                        <td className="p-3 text-right tabular-nums whitespace-nowrap">{bid.projectLengthKm || "—"}</td>
+                        <td className="p-3 font-mono text-xs whitespace-nowrap">{bid.workCategory}</td>
+                        <td className="p-3 whitespace-nowrap">{bid.client}</td>
+                        <td className="p-3 whitespace-nowrap">{bid.state || "Not Selected"}</td>
+                        <td className="p-3 text-xs whitespace-nowrap">{bid.emdType || "—"}</td>
+                        <td className="p-3 text-right tabular-nums whitespace-nowrap">{formatCurrency(bid.emd)}</td>
+                        <td className="p-3 text-right tabular-nums whitespace-nowrap">{formatCurrency(bid.tenderFees)}</td>
+                        <td className="p-3 text-right tabular-nums whitespace-nowrap">{formatCurrency(bid.infraconFees)}</td>
                         <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}>
                           <Select
                             value={bid.status}
@@ -867,6 +792,271 @@ function DateWithAttachment({
   );
 }
 
+/* ─── Add Bid Modal ─── */
+
+function AddBidModal({
+  newBid,
+  setNewBid,
+  isPending,
+  onSave,
+  onClose,
+}: {
+  newBid: Record<string, unknown>;
+  setNewBid: (bid: Record<string, unknown>) => void;
+  isPending: boolean;
+  onSave: () => void;
+  onClose: () => void;
+}) {
+  const emdFileRef = useRef<HTMLInputElement>(null);
+  const [emdUploading, setEmdUploading] = useState(false);
+
+  const handleEmdUpload = useCallback(async (file: File) => {
+    setEmdUploading(true);
+    try {
+      const result = await api.uploadFile(file);
+      setNewBid({ ...newBid, emdLetterUrl: result.url });
+      toast.success("EMD attachment uploaded");
+    } catch {
+      toast.error("Upload failed");
+    } finally {
+      setEmdUploading(false);
+    }
+  }, [newBid, setNewBid]);
+
+  const set = (field: string, value: unknown) => setNewBid({ ...newBid, [field]: value });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="w-full max-w-3xl rounded-2xl border border-border bg-card shadow-xl max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-card border-b border-border/40 px-5 py-4 flex items-center justify-between gap-3 z-10">
+          <p className="font-semibold">New Tender Bid</p>
+          <Button size="sm" variant="ghost" onClick={onClose}>
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+        <div className="p-5 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="sm:col-span-2 lg:col-span-3">
+              <label className="text-xs text-muted-foreground mb-1 block">Name of Work *</label>
+              <Input value={newBid.nameOfWork as string} onChange={(e) => set("nameOfWork", e.target.value)} />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Name of Bidder</label>
+              <Input value={newBid.nameOfBidder as string} onChange={(e) => set("nameOfBidder", e.target.value)} />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="text-xs text-muted-foreground mb-1 block">Name & Address of Bid Inviting Authority</label>
+              <Input value={newBid.bidInvitingAuthority as string} onChange={(e) => set("bidInvitingAuthority", e.target.value)} />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Tender ID</label>
+              <Input value={newBid.tenderId as string} onChange={(e) => set("tenderId", e.target.value)} />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Project Length (Km)</label>
+              <Input type="number" value={(newBid.projectLengthKm as number) || ""} onChange={(e) => set("projectLengthKm", Number(e.target.value))} />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Work Category *</label>
+              <Select value={newBid.workCategory as string} onValueChange={(v) => set("workCategory", v)}>
+                <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                <SelectContent>
+                  {WORK_CATEGORY_OPTIONS.map((o) => <SelectItem key={o.code} value={o.code}>{o.code} — {o.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Client *</label>
+              <Select value={newBid.client as string} onValueChange={(v) => set("client", v)}>
+                <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                <SelectContent>
+                  {CLIENT_OPTIONS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">State / Region *</label>
+              <LocationCombobox value={newBid.state as string} onValueChange={(v) => set("state", v)} />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">EMD Amount</label>
+              <Input type="number" value={(newBid.emd as number) || ""} onChange={(e) => set("emd", Number(e.target.value))} />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Type of EMD</label>
+              <div className="flex items-center gap-1.5">
+                <Select value={(newBid.emdType as string) || "NONE"} onValueChange={(v) => set("emdType", v === "NONE" ? "" : v)}>
+                  <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="NONE">None</SelectItem>
+                    {EMD_TYPE_OPTIONS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <input
+                  ref={emdFileRef}
+                  type="file"
+                  className="hidden"
+                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleEmdUpload(f); e.target.value = ""; }}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={(newBid.emdLetterUrl as string) ? "default" : "outline"}
+                  className="h-9 w-9 p-0 shrink-0"
+                  title={(newBid.emdLetterUrl as string) ? "EMD uploaded — click to replace" : "Upload EMD attachment"}
+                  disabled={emdUploading}
+                  onClick={() => emdFileRef.current?.click()}
+                >
+                  {emdUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
+                </Button>
+              </div>
+              {(newBid.emdLetterUrl as string) && (
+                <p className="text-[10px] text-emerald-600 mt-0.5 flex items-center gap-1">
+                  <Paperclip className="h-3 w-3" /> EMD attachment uploaded
+                </p>
+              )}
+            </div>
+            {(newBid.emdType as string) && (
+              <>
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">EMD Bank</label>
+                  <Input value={newBid.emdBank as string} onChange={(e) => set("emdBank", e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">EMD Issued Date</label>
+                  <Input type="date" value={newBid.emdIssuedDate as string} onChange={(e) => set("emdIssuedDate", e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">EMD No.</label>
+                  <Input value={newBid.emdNumber as string} onChange={(e) => set("emdNumber", e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">EMD Valid Upto</label>
+                  <Input type="date" value={newBid.emdValidUpto as string} onChange={(e) => set("emdValidUpto", e.target.value)} />
+                </div>
+              </>
+            )}
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Tender Fees</label>
+              <Input type="number" value={(newBid.tenderFees as number) || ""} onChange={(e) => set("tenderFees", Number(e.target.value))} />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Infracon Fees</label>
+              <Input type="number" value={(newBid.infraconFees as number) || ""} onChange={(e) => set("infraconFees", Number(e.target.value))} />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Status</label>
+              <Select value={newBid.status as string} onValueChange={(v) => set("status", v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALLOTTED">Allotted</SelectItem>
+                  <SelectItem value="NOT_ALLOTTED">Not Allotted</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+        <div className="sticky bottom-0 bg-card border-t border-border/40 px-5 py-3 flex gap-2 justify-end">
+          <Button size="sm" variant="outline" onClick={onClose}>Cancel</Button>
+          <Button
+            size="sm"
+            disabled={!(newBid.nameOfWork as string) || !(newBid.workCategory as string) || !(newBid.client as string) || !(newBid.state as string) || isPending}
+            onClick={onSave}
+          >
+            {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : null}
+            Save
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Attachment-only upload (no date field) ─── */
+
+function AttachmentUpload({
+  label,
+  urlValue,
+  onUrlChange,
+}: {
+  label: string;
+  urlValue?: string | null;
+  onUrlChange: (url: string | null) => void;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleUpload = useCallback(async (file: File) => {
+    setUploading(true);
+    try {
+      const result = await api.uploadFile(file);
+      onUrlChange(result.url);
+      toast.success(`${label} uploaded`);
+    } catch {
+      toast.error("Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  }, [label, onUrlChange]);
+
+  return (
+    <div>
+      <label className="text-xs text-muted-foreground mb-1 block">{label}</label>
+      <input
+        ref={fileRef}
+        type="file"
+        className="hidden"
+        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUpload(f); e.target.value = ""; }}
+      />
+      <div className="flex items-center gap-1.5">
+        <Button
+          type="button"
+          size="sm"
+          variant={urlValue ? "default" : "outline"}
+          className="h-9 gap-1.5"
+          disabled={uploading}
+          onClick={() => {
+            if (urlValue) {
+              window.open(`${API_BASE.replace("/api", "")}${urlValue}`, "_blank");
+            } else {
+              fileRef.current?.click();
+            }
+          }}
+        >
+          {uploading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : urlValue ? (
+            <><ExternalLink className="h-4 w-4" /> View</>
+          ) : (
+            <><Paperclip className="h-4 w-4" /> Upload</>
+          )}
+        </Button>
+        {urlValue && (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-9 w-9 p-0 shrink-0"
+            title="Replace attachment"
+            onClick={() => fileRef.current?.click()}
+          >
+            <Upload className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
+      {urlValue && (
+        <p className="text-[10px] text-emerald-600 mt-0.5 flex items-center gap-1">
+          <Paperclip className="h-3 w-3" /> Uploaded
+        </p>
+      )}
+    </div>
+  );
+}
+
+/* ─── Pre-Contract Form ─── */
+
 function PreContractForm({
   preContract,
   onUpdate,
@@ -1034,15 +1224,11 @@ function PreContractForm({
             <label className="text-xs text-muted-foreground mb-1 block">Date of Expiry</label>
             <Input type="date" defaultValue={preContract.piPlPolicyExpiryDate ? new Date(preContract.piPlPolicyExpiryDate).toISOString().split("T")[0] : ""} onChange={(e) => onUpdate("piPlPolicyExpiryDate", e.target.value || null)} />
           </div>
-          <div className="flex items-end">
-            <DateWithAttachment
-              label="Policy Attachment"
-              dateValue={null}
-              urlValue={preContract.piPlPolicyLetterUrl}
-              onDateChange={() => {}}
-              onUrlChange={(url) => onUpdate("piPlPolicyLetterUrl", url)}
-            />
-          </div>
+          <AttachmentUpload
+            label="Policy Attachment"
+            urlValue={preContract.piPlPolicyLetterUrl}
+            onUrlChange={(url) => onUpdate("piPlPolicyLetterUrl", url)}
+          />
         </div>
       </div>
 
@@ -1070,15 +1256,11 @@ function PreContractForm({
             <label className="text-xs text-muted-foreground mb-1 block">Date of Expiry</label>
             <Input type="date" defaultValue={preContract.wcPolicyExpiryDate ? new Date(preContract.wcPolicyExpiryDate).toISOString().split("T")[0] : ""} onChange={(e) => onUpdate("wcPolicyExpiryDate", e.target.value || null)} />
           </div>
-          <div className="flex items-end">
-            <DateWithAttachment
-              label="Policy Attachment"
-              dateValue={null}
-              urlValue={preContract.wcPolicyLetterUrl}
-              onDateChange={() => {}}
-              onUrlChange={(url) => onUpdate("wcPolicyLetterUrl", url)}
-            />
-          </div>
+          <AttachmentUpload
+            label="Policy Attachment"
+            urlValue={preContract.wcPolicyLetterUrl}
+            onUrlChange={(url) => onUpdate("wcPolicyLetterUrl", url)}
+          />
         </div>
       </div>
 
