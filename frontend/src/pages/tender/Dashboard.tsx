@@ -13,7 +13,7 @@ import { ALL_LOCATIONS } from "@/constants/locationOptions";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Eye, FileText, Gavel, Loader2, Plus, RefreshCcw, Search, Trash2, X,
-  Paperclip, ExternalLink, Upload, Cog, ClipboardList,
+  Paperclip, ExternalLink, Cog, ClipboardList,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -892,44 +892,32 @@ function DateWithAttachment({
         <Button
           type="button"
           size="sm"
-          variant={urlValue ? "default" : "outline"}
+          variant="outline"
           className="h-9 w-9 p-0 shrink-0"
-          title={urlValue ? "View / Replace attachment" : "Upload attachment"}
+          title={urlValue ? "Replace attachment" : "Upload attachment"}
           disabled={uploading}
-          onClick={() => {
-            if (urlValue) {
-              window.open(`${API_BASE.replace("/api", "")}${urlValue}`, "_blank");
-            } else {
-              fileRef.current?.click();
-            }
-          }}
+          onClick={() => fileRef.current?.click()}
         >
-          {uploading ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : urlValue ? (
-            <ExternalLink className="h-4 w-4" />
-          ) : (
-            <Paperclip className="h-4 w-4" />
-          )}
+          {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
         </Button>
-        {urlValue && (
+        {urlValue ? (
           <Button
             type="button"
             size="sm"
-            variant="outline"
+            variant="default"
             className="h-9 w-9 p-0 shrink-0"
-            title="Replace attachment"
-            onClick={() => fileRef.current?.click()}
+            title="View attachment"
+            onClick={() => openAttachment(urlValue)}
           >
-            <Upload className="h-4 w-4" />
+            <ExternalLink className="h-4 w-4" />
           </Button>
-        )}
+        ) : null}
       </div>
-      {urlValue && (
+      {urlValue ? (
         <p className="text-[10px] text-emerald-600 mt-0.5 flex items-center gap-1">
           <Paperclip className="h-3 w-3" /> Attachment uploaded
         </p>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -1048,20 +1036,32 @@ function AddBidModal({
                 <Button
                   type="button"
                   size="sm"
-                  variant={(newBid.emdLetterUrl as string) ? "default" : "outline"}
+                  variant="outline"
                   className="h-9 w-9 p-0 shrink-0"
-                  title={(newBid.emdLetterUrl as string) ? "EMD uploaded — click to replace" : "Upload EMD attachment"}
+                  title={(newBid.emdLetterUrl as string) ? "Replace EMD attachment" : "Upload EMD attachment"}
                   disabled={emdUploading}
                   onClick={() => emdFileRef.current?.click()}
                 >
                   {emdUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
                 </Button>
+                {(newBid.emdLetterUrl as string) ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="default"
+                    className="h-9 w-9 p-0 shrink-0"
+                    title="View EMD attachment"
+                    onClick={() => openAttachment(newBid.emdLetterUrl as string)}
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                  </Button>
+                ) : null}
               </div>
-              {(newBid.emdLetterUrl as string) && (
+              {(newBid.emdLetterUrl as string) ? (
                 <p className="text-[10px] text-emerald-600 mt-0.5 flex items-center gap-1">
                   <Paperclip className="h-3 w-3" /> EMD attachment uploaded
                 </p>
-              )}
+              ) : null}
             </div>
             {(newBid.emdType as string) && (
               <>
@@ -1160,43 +1160,36 @@ function AttachmentUpload({
         <Button
           type="button"
           size="sm"
-          variant={urlValue ? "default" : "outline"}
+          variant="outline"
           className="h-9 gap-1.5"
           disabled={uploading}
-          onClick={() => {
-            if (urlValue) {
-              window.open(`${API_BASE.replace("/api", "")}${urlValue}`, "_blank");
-            } else {
-              fileRef.current?.click();
-            }
-          }}
+          title={urlValue ? "Replace attachment" : "Upload attachment"}
+          onClick={() => fileRef.current?.click()}
         >
           {uploading ? (
             <Loader2 className="h-4 w-4 animate-spin" />
-          ) : urlValue ? (
-            <><ExternalLink className="h-4 w-4" /> View</>
           ) : (
-            <><Paperclip className="h-4 w-4" /> Upload</>
+            <><Paperclip className="h-4 w-4" /> {urlValue ? "Replace" : "Upload"}</>
           )}
         </Button>
-        {urlValue && (
+        {urlValue ? (
           <Button
             type="button"
             size="sm"
-            variant="outline"
+            variant="default"
             className="h-9 w-9 p-0 shrink-0"
-            title="Replace attachment"
-            onClick={() => fileRef.current?.click()}
+            title="View attachment"
+            onClick={() => openAttachment(urlValue)}
           >
-            <Upload className="h-4 w-4" />
+            <ExternalLink className="h-4 w-4" />
           </Button>
-        )}
+        ) : null}
       </div>
-      {urlValue && (
+      {urlValue ? (
         <p className="text-[10px] text-emerald-600 mt-0.5 flex items-center gap-1">
           <Paperclip className="h-3 w-3" /> Uploaded
         </p>
-      )}
+      ) : null}
     </div>
   );
 }
