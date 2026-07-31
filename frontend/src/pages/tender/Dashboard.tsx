@@ -31,14 +31,66 @@ function formatDate(value?: string | null) {
 
 function AttachmentViewer() {
   const [url, setUrl] = useState<string | null>(null);
-  const [loadError, setLoadError] = useState(false);
+  const [objectUrl, setObjectUrl] = useState<string | null>(null);
+  const [mimeType, setMimeType] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => registerAttachmentViewer((next) => {
-    setLoadError(false);
     setUrl(next);
   }), []);
 
-  const isImage = Boolean(url && /\.(png|jpe?g|gif|webp|bmp)($|\?)/i.test(url));
+  useEffect(() => {
+    let cancelled = false;
+    let created: string | null = null;
+
+    async function load() {
+      setLoadError(null);
+      setMimeType("");
+      setObjectUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
+      if (!url) return;
+
+      setLoading(true);
+      try {
+        const response = await fetch(url, { cache: "no-store" });
+        if (!response.ok) {
+          throw new Error(
+            response.status === 404
+              ? "File not found — re-upload the PDF (max 5 MB)"
+              : "Attachment could not be opened"
+          );
+        }
+        const blob = await response.blob();
+        if (cancelled) return;
+        const type = blob.type || response.headers.get("content-type") || "";
+        // Ensure PDFs get a proper MIME so the browser viewer can render them
+        const typed =
+          type.includes("pdf") || url.toLowerCase().includes(".pdf")
+            ? new Blob([blob], { type: "application/pdf" })
+            : blob;
+        created = URL.createObjectURL(typed);
+        setMimeType(typed.type);
+        setObjectUrl(created);
+      } catch (e) {
+        if (!cancelled) {
+          setLoadError(e instanceof Error ? e.message : "Attachment could not be opened");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    void load();
+    return () => {
+      cancelled = true;
+      if (created) URL.revokeObjectURL(created);
+    };
+  }, [url]);
+
+  const isImage = mimeType.startsWith("image/");
 
   return (
     <Dialog open={Boolean(url)} onOpenChange={(open) => { if (!open) setUrl(null); }}>
@@ -47,28 +99,22 @@ function AttachmentViewer() {
           <DialogTitle className="text-base">Attachment</DialogTitle>
         </DialogHeader>
         <div className="relative flex-1 min-h-0 bg-secondary/20">
-          {!url ? null : loadError ? (
+          {loading ? (
+            <div className="h-full flex items-center justify-center gap-2 text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin" /> Opening PDF…
+            </div>
+          ) : loadError ? (
             <div className="h-full flex flex-col items-center justify-center gap-2 text-sm text-destructive px-6 text-center">
-              <p>Attachment could not be opened.</p>
-              <p className="text-muted-foreground text-xs">Re-upload the file, then try again.</p>
+              <p>{loadError}</p>
+              <p className="text-muted-foreground text-xs">Upload a PDF up to 5 MB, then click View again.</p>
             </div>
-          ) : isImage ? (
+          ) : objectUrl && isImage ? (
             <div className="h-full overflow-auto flex items-center justify-center p-4">
-              <img
-                src={url}
-                alt="Attachment"
-                className="max-w-full max-h-full object-contain"
-                onError={() => setLoadError(true)}
-              />
+              <img src={objectUrl} alt="Attachment" className="max-w-full max-h-full object-contain" />
             </div>
-          ) : (
-            <iframe
-              title="Attachment"
-              src={url}
-              className="w-full h-full border-0 bg-white"
-              onError={() => setLoadError(true)}
-            />
-          )}
+          ) : objectUrl ? (
+            <iframe title="Attachment" src={objectUrl} className="w-full h-full border-0 bg-white" />
+          ) : null}
         </div>
       </DialogContent>
     </Dialog>

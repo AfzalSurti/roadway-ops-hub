@@ -8,6 +8,8 @@ import { logger } from "../config/logger.js";
 import { badRequest, notFound } from "../utils/errors.js";
 
 const uploadDir = path.resolve(process.cwd(), "uploads");
+/** Keep PDFs small enough for reliable remote BYTEA writes. */
+const MAX_PERSIST_BYTES = 5 * 1024 * 1024;
 
 function safeFileName(raw: string) {
   const base = path.basename(raw);
@@ -17,13 +19,20 @@ function safeFileName(raw: string) {
   return base;
 }
 
-async function persistBytesInBackground(attachmentId: string, file: Express.Multer.File) {
-  try {
-    const data = file.buffer?.length ? file.buffer : await fs.readFile(file.path);
-    await attachmentRepository.updateData(attachmentId, data);
-  } catch (error) {
-    logger.error({ err: error, attachmentId }, "Failed to persist attachment bytes");
+function resolveMimeType(file: Express.Multer.File) {
+  if (file.mimetype && file.mimetype !== "application/octet-stream") {
+    return file.mimetype;
   }
+  const ext = path.extname(file.originalname || file.filename).toLowerCase();
+  if (ext === ".pdf") return "application/pdf";
+  if (ext === ".png") return "image/png";
+  if (ext === ".jpg" || ext === ".jpeg") return "image/jpeg";
+  if (ext === ".webp") return "image/webp";
+  if (ext === ".doc") return "application/msword";
+  if (ext === ".docx") {
+    return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  }
+  return file.mimetype || "application/octet-stream";
 }
 
 export const uploadService = {
@@ -37,21 +46,30 @@ export const uploadService = {
       throw badRequest("No file uploaded");
     }
 
-    // Fast path: save metadata (+ disk file from multer). Persist DB bytes in background
-    // so the client is not blocked by a large remote BYTEA write.
+    if (args.file.size > MAX_PERSIST_BYTES) {
+      throw badRequest("Attachment must be 5 MB or smaller (compress the PDF and retry)");
+    }
+
+    // PDFs are binary — store raw bytes in Postgres BYTEA (Prisma Bytes).
+    // Await the write so viewing works after Render restarts (ephemeral disk).
+    const data = args.file.buffer?.length
+      ? Buffer.from(args.file.buffer)
+      : await fs.readFile(args.file.path);
+
+    const mimeType = resolveMimeType(args.file);
+
     const created = await attachmentRepository.create({
       fileName: args.file.filename,
       originalName: args.file.originalname,
-      mimeType: args.file.mimetype,
+      mimeType,
       size: args.file.size,
       path: args.file.path,
       url: `/uploads/${args.file.filename}`,
+      data,
       taskId: args.taskId,
       reportId: args.reportId,
       uploadedById: args.uploadedById
     });
-
-    void persistBytesInBackground(created.id, args.file);
 
     void auditService
       .log({
@@ -59,7 +77,7 @@ export const uploadService = {
         actorId: args.uploadedById,
         entityType: "Attachment",
         entityId: created.id,
-        meta: { taskId: args.taskId, reportId: args.reportId }
+        meta: { taskId: args.taskId, reportId: args.reportId, mimeType, size: args.file.size }
       })
       .catch((error) => logger.error({ err: error }, "Failed to write upload audit log"));
 
@@ -70,10 +88,10 @@ export const uploadService = {
     const fileName = safeFileName(fileNameRaw);
     const attachment = await attachmentRepository.findByFileName(fileName);
 
-    if (attachment?.data) {
+    if (attachment?.data && attachment.data.length > 0) {
       return {
         data: Buffer.from(attachment.data),
-        mimeType: attachment.mimeType,
+        mimeType: attachment.mimeType || "application/pdf",
         originalName: attachment.originalName
       };
     }
@@ -83,12 +101,12 @@ export const uploadService = {
       : path.join(uploadDir, fileName);
 
     if (!fsSync.existsSync(diskPath)) {
-      throw notFound("File not found");
+      throw notFound("File not found — please re-upload the attachment");
     }
 
     return {
       data: fsSync.readFileSync(diskPath),
-      mimeType: attachment?.mimeType || "application/octet-stream",
+      mimeType: attachment?.mimeType || "application/pdf",
       originalName: attachment?.originalName || fileName
     };
   }

@@ -19,6 +19,7 @@ const storage = multer.diskStorage({
 export const upload = multer({
   storage,
   limits: {
-    fileSize: 10 * 1024 * 1024
+    // Match uploadService MAX_PERSIST_BYTES — PDFs are stored as DB BYTEA
+    fileSize: 5 * 1024 * 1024
   }
 });
