@@ -785,10 +785,12 @@ model TenderBid {
   infraconFees      Float           @default(0)
   status            TenderBidStatus @default(NOT_ALLOTTED)
   letterPreviewUrl  String?
+  bidInvitingAuthorityAddress String @default("")
   remarks           String          @default("")
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
   preContract       PreContractActivity?
+  contract          ContractActivity?
 
   @@index([status])
   @@index([workCategory])
@@ -837,6 +839,57 @@ model PreContractActivity {
   wcPolicyExpiryDate        DateTime?
   wcPolicyLetterUrl         String?
   insurancePolicy           String              @default("")
+  remarks                   String              @default("")
+  createdAt                 DateTime            @default(now())
+  updatedAt                 DateTime            @updatedAt
+  tenderBid                 TenderBid?          @relation(fields: [tenderBidId], references: [id], onDelete: SetNull)
+
+  @@index([tenderBidId])
+  @@index([workCategory])
+  @@index([client])
+}
+
+/// Contract Activities — post award contract tracking (linked to allotted tenders)
+model ContractActivity {
+  id                        String              @id @default(cuid())
+  srNo                      Int
+  tenderBidId               String?             @unique
+  nameOfWork                String
+  nameOfBidder              String              @default("")
+  bidInvitingAuthority      String              @default("")
+  bidInvitingAuthorityAddress String            @default("")
+  workCategory              String
+  client                    String
+  state                     String              @default("")
+  securityDepositType       SecurityDepositType?
+  sdBank                    String              @default("")
+  sdIssuedDate              DateTime?
+  sdNumber                  String              @default("")
+  sdAmount                  Float               @default(0)
+  sdExpiryDate              DateTime?
+  sdLetterUrl               String?
+  additionalSdType          SecurityDepositType?
+  additionalSdBank          String              @default("")
+  additionalSdIssuedDate    DateTime?
+  additionalSdNumber        String              @default("")
+  additionalSdAmount        Float               @default(0)
+  additionalSdExpiryDate    DateTime?
+  additionalSdLetterUrl     String?
+  proceedingOrderDate       DateTime?
+  proceedingOrderLetterUrl  String?
+  woAmount                  Float               @default(0)
+  piPlPolicyNo              String              @default("")
+  piPlPolicyDate            DateTime?
+  piPlPolicyAmount          Float               @default(0)
+  piPlPolicyIssueDate       DateTime?
+  piPlPolicyExpiryDate      DateTime?
+  piPlPolicyLetterUrl       String?
+  wcPolicyNo                String              @default("")
+  wcPolicyDate              DateTime?
+  wcPolicyAmount            Float               @default(0)
+  wcPolicyIssueDate         DateTime?
+  wcPolicyExpiryDate        DateTime?
+  wcPolicyLetterUrl         String?
   remarks                   String              @default("")
   createdAt                 DateTime            @default(now())
   updatedAt                 DateTime            @updatedAt

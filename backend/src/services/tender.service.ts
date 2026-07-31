@@ -32,6 +32,7 @@ export const tenderService = {
       nameOfWork: data.nameOfWork,
       nameOfBidder: (data.nameOfBidder as string) ?? "",
       bidInvitingAuthority: (data.bidInvitingAuthority as string) ?? "",
+      bidInvitingAuthorityAddress: (data.bidInvitingAuthorityAddress as string) ?? "",
       tenderId: (data.tenderId as string) ?? "",
       projectLengthKm: (data.projectLengthKm as number) ?? 0,
       workCategory: data.workCategory,

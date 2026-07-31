@@ -34,6 +34,7 @@ import type {
   LetterEntryItem,
   LetterPendingReplyItem,
   LetterProjectItem,
+  ContractActivityItem,
   PreContractActivityItem,
   ProjectItem,
   ProjectRequisitionFormItem,
@@ -1622,5 +1623,33 @@ export const api = {
 
   deletePreContractActivity(id: string) {
     return request<{ deleted: boolean }>(`/operations/${id}`, { method: "DELETE" });
+  },
+
+  getContractActivities(params?: { page?: number; limit?: number; search?: string; workCategory?: string; client?: string }) {
+    const query = new URLSearchParams();
+    if (params?.page) query.set("page", String(params.page));
+    if (params?.limit) query.set("limit", String(params.limit));
+    if (params?.search) query.set("search", params.search);
+    if (params?.workCategory) query.set("workCategory", params.workCategory);
+    if (params?.client) query.set("client", params.client);
+    return request<{ items: ContractActivityItem[]; pagination: { page: number; limit: number; total: number; totalPages: number } }>(
+      `/contract${query.toString() ? `?${query.toString()}` : ""}`
+    );
+  },
+
+  getContractByTenderBidId(tenderBidId: string) {
+    return request<ContractActivityItem | null>(`/contract/by-tender/${tenderBidId}`);
+  },
+
+  createContractActivity(payload: Record<string, unknown>) {
+    return request<ContractActivityItem>("/contract", { method: "POST", body: JSON.stringify(payload) });
+  },
+
+  updateContractActivity(id: string, payload: Record<string, unknown>) {
+    return request<ContractActivityItem>(`/contract/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+  },
+
+  deleteContractActivity(id: string) {
+    return request<{ deleted: boolean }>(`/contract/${id}`, { method: "DELETE" });
   }
 };

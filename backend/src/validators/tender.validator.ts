@@ -6,6 +6,7 @@ const tenderBidFields = {
   nameOfWork: z.string().trim().min(1, "Name of work is required").max(500),
   nameOfBidder: z.string().trim().max(300).optional(),
   bidInvitingAuthority: z.string().trim().max(500).optional(),
+  bidInvitingAuthorityAddress: z.string().trim().max(1000).optional(),
   tenderId: z.string().trim().max(100).optional(),
   projectLengthKm: z.number().min(0).optional(),
   workCategory: z.string().trim().min(1).max(10),

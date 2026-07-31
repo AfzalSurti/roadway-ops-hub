@@ -218,6 +218,68 @@ SET
   "role" = EXCLUDED."role",
   "updatedAt" = CURRENT_TIMESTAMP;
 
+-- Add bidInvitingAuthorityAddress to TenderBid if missing
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='TenderBid' AND column_name='bidInvitingAuthorityAddress') THEN
+    ALTER TABLE "TenderBid" ADD COLUMN "bidInvitingAuthorityAddress" TEXT NOT NULL DEFAULT '';
+  END IF;
+END
+$$;
+
+-- ContractActivity table
+CREATE TABLE IF NOT EXISTS "ContractActivity" (
+  "id"                          TEXT NOT NULL DEFAULT gen_random_uuid()::TEXT,
+  "srNo"                        INTEGER NOT NULL,
+  "tenderBidId"                 TEXT,
+  "nameOfWork"                  TEXT NOT NULL,
+  "nameOfBidder"                TEXT NOT NULL DEFAULT '',
+  "bidInvitingAuthority"        TEXT NOT NULL DEFAULT '',
+  "bidInvitingAuthorityAddress" TEXT NOT NULL DEFAULT '',
+  "workCategory"                TEXT NOT NULL,
+  "client"                      TEXT NOT NULL,
+  "state"                       TEXT NOT NULL DEFAULT '',
+  "securityDepositType"         "SecurityDepositType",
+  "sdBank"                      TEXT NOT NULL DEFAULT '',
+  "sdIssuedDate"                TIMESTAMP(3),
+  "sdNumber"                    TEXT NOT NULL DEFAULT '',
+  "sdAmount"                    DOUBLE PRECISION NOT NULL DEFAULT 0,
+  "sdExpiryDate"                TIMESTAMP(3),
+  "sdLetterUrl"                 TEXT,
+  "additionalSdType"            "SecurityDepositType",
+  "additionalSdBank"            TEXT NOT NULL DEFAULT '',
+  "additionalSdIssuedDate"      TIMESTAMP(3),
+  "additionalSdNumber"          TEXT NOT NULL DEFAULT '',
+  "additionalSdAmount"          DOUBLE PRECISION NOT NULL DEFAULT 0,
+  "additionalSdExpiryDate"      TIMESTAMP(3),
+  "additionalSdLetterUrl"       TEXT,
+  "proceedingOrderDate"         TIMESTAMP(3),
+  "proceedingOrderLetterUrl"    TEXT,
+  "woAmount"                    DOUBLE PRECISION NOT NULL DEFAULT 0,
+  "piPlPolicyNo"                TEXT NOT NULL DEFAULT '',
+  "piPlPolicyDate"              TIMESTAMP(3),
+  "piPlPolicyAmount"            DOUBLE PRECISION NOT NULL DEFAULT 0,
+  "piPlPolicyIssueDate"         TIMESTAMP(3),
+  "piPlPolicyExpiryDate"        TIMESTAMP(3),
+  "piPlPolicyLetterUrl"         TEXT,
+  "wcPolicyNo"                  TEXT NOT NULL DEFAULT '',
+  "wcPolicyDate"                TIMESTAMP(3),
+  "wcPolicyAmount"              DOUBLE PRECISION NOT NULL DEFAULT 0,
+  "wcPolicyIssueDate"           TIMESTAMP(3),
+  "wcPolicyExpiryDate"          TIMESTAMP(3),
+  "wcPolicyLetterUrl"           TEXT,
+  "remarks"                     TEXT NOT NULL DEFAULT '',
+  "createdAt"                   TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt"                   TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "ContractActivity_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "ContractActivity_tenderBidId_key" UNIQUE ("tenderBidId"),
+  CONSTRAINT "ContractActivity_tenderBidId_fkey" FOREIGN KEY ("tenderBidId") REFERENCES "TenderBid"("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS "ContractActivity_tenderBidId_idx" ON "ContractActivity"("tenderBidId");
+CREATE INDEX IF NOT EXISTS "ContractActivity_workCategory_idx" ON "ContractActivity"("workCategory");
+CREATE INDEX IF NOT EXISTS "ContractActivity_client_idx" ON "ContractActivity"("client");
+
 -- Operations user (email: operations@sankalp.com, password: Operations@123)
 INSERT INTO "User" (
   "id", "name", "email", "passwordHash", "role", "createdAt", "updatedAt"

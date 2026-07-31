@@ -7,13 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LocationCombobox } from "@/components/LocationCombobox";
 import { api } from "@/lib/api";
-import type { TenderBidItem, TenderBidStatus, PreContractActivityItem, SecurityDepositType } from "@/lib/domain";
+import type { TenderBidItem, TenderBidStatus, PreContractActivityItem, ContractActivityItem, SecurityDepositType } from "@/lib/domain";
 import { WORK_CATEGORY_OPTIONS, CLIENT_OPTIONS, SECURITY_DEPOSIT_TYPE_OPTIONS, EMD_TYPE_OPTIONS } from "@/lib/domain";
 import { ALL_LOCATIONS } from "@/constants/locationOptions";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Eye, FileText, Gavel, Loader2, Plus, RefreshCcw, Search, Trash2, X,
-  Paperclip, ExternalLink, Upload, Cog,
+  Paperclip, ExternalLink, Upload, Cog, ClipboardList,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -29,7 +29,12 @@ function formatDate(value?: string | null) {
   return new Date(value).toLocaleDateString("en-IN");
 }
 
-type Tab = "bids" | "precontract";
+function openAttachment(url?: string | null) {
+  if (!url) return;
+  window.open(`${API_BASE.replace("/api", "")}${url}`, "_blank");
+}
+
+type Tab = "bids" | "precontract" | "contract";
 
 export default function TenderDashboard() {
   const navigate = useNavigate();
@@ -49,6 +54,7 @@ export default function TenderDashboard() {
     nameOfWork: "",
     nameOfBidder: "",
     bidInvitingAuthority: "",
+    bidInvitingAuthorityAddress: "",
     tenderId: "",
     projectLengthKm: 0,
     workCategory: "",
@@ -110,7 +116,7 @@ export default function TenderDashboard() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return items.filter((bid) => {
-      if (tab === "precontract" && bid.status !== "ALLOTTED") return false;
+      if ((tab === "precontract" || tab === "contract") && bid.status !== "ALLOTTED") return false;
       if (tab === "bids") {
         if (workCategoryFilter !== "ALL" && bid.workCategory !== workCategoryFilter) return false;
         if (clientFilter !== "ALL" && bid.client !== clientFilter) return false;
@@ -143,7 +149,7 @@ export default function TenderDashboard() {
           <h1 className="page-title inline-flex items-center gap-2">
             <Gavel className="h-6 w-6" /> Tender Management
           </h1>
-          <p className="page-subtitle">Manage tender bids, track status, and handle pre-contract activities.</p>
+          <p className="page-subtitle">Manage tender bids, pre-contract, and contract activities.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Badge variant="secondary" className="rounded-full">{filtered.length} item(s)</Badge>
@@ -175,6 +181,15 @@ export default function TenderDashboard() {
         >
           <span className="inline-flex items-center gap-1.5">
             <Cog className="h-4 w-4" /> Pre-Contract
+            {allottedCount > 0 && <Badge variant="secondary" className="rounded-full text-[10px] px-1.5 py-0">{allottedCount}</Badge>}
+          </span>
+        </button>
+        <button
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === "contract" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+          onClick={() => setTab("contract")}
+        >
+          <span className="inline-flex items-center gap-1.5">
+            <ClipboardList className="h-4 w-4" /> Contract
             {allottedCount > 0 && <Badge variant="secondary" className="rounded-full text-[10px] px-1.5 py-0">{allottedCount}</Badge>}
           </span>
         </button>
@@ -384,6 +399,11 @@ export default function TenderDashboard() {
         <PreContractSection allottedBids={items.filter((b) => b.status === "ALLOTTED")} />
       )}
 
+      {/* Contract Tab */}
+      {tab === "contract" && (
+        <ContractSection allottedBids={items.filter((b) => b.status === "ALLOTTED")} />
+      )}
+
       {/* Tender Detail Modal */}
       {selectedBid && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
@@ -417,6 +437,7 @@ export default function TenderDashboard() {
                 ["Name of Work", selectedBid.nameOfWork],
                 ["Name of Bidder", selectedBid.nameOfBidder],
                 ["Bid Inviting Authority", selectedBid.bidInvitingAuthority],
+                ["Authority Address", selectedBid.bidInvitingAuthorityAddress],
                 ["Tender ID", selectedBid.tenderId],
                 ["Project Length (Km)", selectedBid.projectLengthKm ? String(selectedBid.projectLengthKm) : ""],
                 ["Work Category", `${selectedBid.workCategory} — ${WORK_CATEGORY_OPTIONS.find((o) => o.code === selectedBid.workCategory)?.label ?? ""}`],
@@ -965,9 +986,13 @@ function AddBidModal({
               <label className="text-xs text-muted-foreground mb-1 block">Name of Bidder</label>
               <Input value={newBid.nameOfBidder as string} onChange={(e) => set("nameOfBidder", e.target.value)} />
             </div>
-            <div className="sm:col-span-2">
-              <label className="text-xs text-muted-foreground mb-1 block">Name & Address of Bid Inviting Authority</label>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Name of Bid Inviting Authority</label>
               <Input value={newBid.bidInvitingAuthority as string} onChange={(e) => set("bidInvitingAuthority", e.target.value)} />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="text-xs text-muted-foreground mb-1 block">Address of Bid Inviting Authority</label>
+              <Input value={(newBid.bidInvitingAuthorityAddress as string) || ""} onChange={(e) => set("bidInvitingAuthorityAddress", e.target.value)} />
             </div>
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">Tender ID</label>
@@ -1391,6 +1416,614 @@ function PreContractForm({
           defaultValue={preContract.remarks}
           onBlur={(e) => { if (e.target.value !== preContract.remarks) onUpdate("remarks", e.target.value); }}
         />
+      </div>
+    </div>
+  );
+}
+
+/* ─── Contract Section (table + filters + popup) ─── */
+
+function ContractSection({ allottedBids }: { allottedBids: TenderBidItem[] }) {
+  const queryClient = useQueryClient();
+  const [search, setSearch] = useState("");
+  const [wcFilter, setWcFilter] = useState("ALL");
+  const [clientFilter, setClientFilter] = useState("ALL");
+  const [stateFilter, setStateFilter] = useState("ALL");
+  const [bidderFilter, setBidderFilter] = useState("ALL");
+  const [authorityFilter, setAuthorityFilter] = useState("ALL");
+  const [selectedBid, setSelectedBid] = useState<TenderBidItem | null>(null);
+
+  const { data: contractData } = useQuery({
+    queryKey: ["contract-activities"],
+    queryFn: () => api.getContractActivities({ page: 1, limit: 500 }),
+    staleTime: 2 * 60 * 1000,
+  });
+
+  const { data: preContractData } = useQuery({
+    queryKey: ["pre-contract-activities"],
+    queryFn: () => api.getPreContractActivities({ page: 1, limit: 500 }),
+    staleTime: 2 * 60 * 1000,
+  });
+
+  const contractMap = useMemo(() => {
+    const map = new Map<string, ContractActivityItem>();
+    for (const c of contractData?.items ?? []) {
+      if (c.tenderBidId) map.set(c.tenderBidId, c);
+    }
+    return map;
+  }, [contractData]);
+
+  const preContractMap = useMemo(() => {
+    const map = new Map<string, PreContractActivityItem>();
+    for (const pc of preContractData?.items ?? []) {
+      if (pc.tenderBidId) map.set(pc.tenderBidId, pc);
+    }
+    return map;
+  }, [preContractData]);
+
+  const bidders = useMemo(() => [...new Set(allottedBids.map((b) => b.nameOfBidder).filter(Boolean))].sort(), [allottedBids]);
+  const authorities = useMemo(() => [...new Set(allottedBids.map((b) => b.bidInvitingAuthority).filter(Boolean))].sort(), [allottedBids]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return allottedBids.filter((bid) => {
+      if (wcFilter !== "ALL" && bid.workCategory !== wcFilter) return false;
+      if (clientFilter !== "ALL" && bid.client !== clientFilter) return false;
+      if (stateFilter !== "ALL" && bid.state !== stateFilter) return false;
+      if (bidderFilter !== "ALL" && bid.nameOfBidder !== bidderFilter) return false;
+      if (authorityFilter !== "ALL" && bid.bidInvitingAuthority !== authorityFilter) return false;
+      if (!q) return true;
+      return [bid.nameOfWork, bid.workCategory, bid.client, bid.state, bid.nameOfBidder, bid.bidInvitingAuthority, bid.bidInvitingAuthorityAddress].join(" ").toLowerCase().includes(q);
+    });
+  }, [allottedBids, search, wcFilter, clientFilter, stateFilter, bidderFilter, authorityFilter]);
+
+  const clearFilters = () => {
+    setSearch("");
+    setWcFilter("ALL");
+    setClientFilter("ALL");
+    setStateFilter("ALL");
+    setBidderFilter("ALL");
+    setAuthorityFilter("ALL");
+  };
+
+  if (allottedBids.length === 0) {
+    return <div className="glass-panel p-10 text-center text-muted-foreground">No allotted tenders yet. Change a bid&apos;s status to &quot;Allotted&quot; to see it here.</div>;
+  }
+
+  return (
+    <>
+      <div className="glass-panel p-4 space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="sm:col-span-2 lg:col-span-3">
+            <label className="text-xs text-muted-foreground mb-1.5 block">Search</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input className="pl-9" placeholder="Name of work, client, state, bidder..." value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1.5 block">Bid Inviting Authority</label>
+            <Select value={authorityFilter} onValueChange={setAuthorityFilter}>
+              <SelectTrigger><SelectValue placeholder="All" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All</SelectItem>
+                {authorities.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1.5 block">Work Category</label>
+            <Select value={wcFilter} onValueChange={setWcFilter}>
+              <SelectTrigger><SelectValue placeholder="All" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All</SelectItem>
+                {WORK_CATEGORY_OPTIONS.map((o) => <SelectItem key={o.code} value={o.code}>{o.code} — {o.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1.5 block">Client</label>
+            <Select value={clientFilter} onValueChange={setClientFilter}>
+              <SelectTrigger><SelectValue placeholder="All" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All</SelectItem>
+                {CLIENT_OPTIONS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1.5 block">Bidder</label>
+            <Select value={bidderFilter} onValueChange={setBidderFilter}>
+              <SelectTrigger><SelectValue placeholder="All" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All</SelectItem>
+                {bidders.map((b) => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1.5 block">State / Region</label>
+            <Select value={stateFilter} onValueChange={setStateFilter}>
+              <SelectTrigger><SelectValue placeholder="All" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All</SelectItem>
+                {ALL_LOCATIONS.map((loc) => <SelectItem key={loc} value={loc}>{loc}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className="flex justify-end">
+          <Button size="sm" variant="ghost" className="gap-1" onClick={clearFilters}>
+            <X className="h-3.5 w-3.5" /> Clear filters
+          </Button>
+        </div>
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="glass-panel p-10 text-center text-muted-foreground">No allotted bids match the filters.</div>
+      ) : (
+        <div className="glass-panel overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[1800px]">
+              <thead>
+                <tr className="text-muted-foreground border-b border-border/30">
+                  <th className="text-left font-medium p-3 w-12">Sr</th>
+                  <th className="text-left font-medium p-3">Name of Work</th>
+                  <th className="text-left font-medium p-3">Name of Bidder</th>
+                  <th className="text-left font-medium p-3">Bid Inviting Authority</th>
+                  <th className="text-left font-medium p-3">Authority Address</th>
+                  <th className="text-left font-medium p-3">Type of Performance SD</th>
+                  <th className="text-left font-medium p-3">SD Details</th>
+                  <th className="text-left font-medium p-3">Additional SD Type</th>
+                  <th className="text-left font-medium p-3">Additional SD Details</th>
+                  <th className="text-left font-medium p-3">Proceeding / WO</th>
+                  <th className="text-right font-medium p-3">WO Amount</th>
+                  <th className="text-left font-medium p-3">PI/PL Policy</th>
+                  <th className="text-left font-medium p-3">WC Policy</th>
+                  <th className="text-center font-medium p-3">Contract</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((bid) => {
+                  const c = contractMap.get(bid.id);
+                  const sdLabel = c?.securityDepositType
+                    ? SECURITY_DEPOSIT_TYPE_OPTIONS.find((o) => o.value === c.securityDepositType)?.label ?? c.securityDepositType
+                    : "—";
+                  const addSdLabel = c?.additionalSdType
+                    ? SECURITY_DEPOSIT_TYPE_OPTIONS.find((o) => o.value === c.additionalSdType)?.label ?? c.additionalSdType
+                    : "—";
+                  return (
+                    <tr
+                      key={bid.id}
+                      className="border-b border-border/20 hover:bg-secondary/20 cursor-pointer"
+                      onClick={() => setSelectedBid(bid)}
+                    >
+                      <td className="p-3 font-medium tabular-nums">{bid.srNo}</td>
+                      <td className="p-3">{bid.nameOfWork}</td>
+                      <td className="p-3">{bid.nameOfBidder || "—"}</td>
+                      <td className="p-3">{bid.bidInvitingAuthority || "—"}</td>
+                      <td className="p-3">{bid.bidInvitingAuthorityAddress || "—"}</td>
+                      <td className="p-3 text-xs whitespace-nowrap">{sdLabel}</td>
+                      <td className="p-3 text-xs">
+                        {c?.securityDepositType ? (
+                          <button
+                            type="button"
+                            className="text-left hover:underline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (c.sdLetterUrl) openAttachment(c.sdLetterUrl);
+                            }}
+                          >
+                            {c.sdBank || "—"} · {formatCurrency(c.sdAmount)}
+                            {c.sdExpiryDate ? ` · Exp ${formatDate(c.sdExpiryDate)}` : ""}
+                          </button>
+                        ) : "—"}
+                      </td>
+                      <td className="p-3 text-xs whitespace-nowrap">{addSdLabel}</td>
+                      <td className="p-3 text-xs">
+                        {c?.additionalSdType ? (
+                          <button
+                            type="button"
+                            className="text-left hover:underline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (c.additionalSdLetterUrl) openAttachment(c.additionalSdLetterUrl);
+                            }}
+                          >
+                            {c.additionalSdBank || "—"} · {formatCurrency(c.additionalSdAmount)}
+                          </button>
+                        ) : "—"}
+                      </td>
+                      <td className="p-3 text-xs whitespace-nowrap">
+                        {c?.proceedingOrderDate ? (
+                          <button
+                            type="button"
+                            className="hover:underline text-primary"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (c.proceedingOrderLetterUrl) openAttachment(c.proceedingOrderLetterUrl);
+                            }}
+                          >
+                            {formatDate(c.proceedingOrderDate)}
+                          </button>
+                        ) : "—"}
+                      </td>
+                      <td className="p-3 text-right tabular-nums whitespace-nowrap">{c ? formatCurrency(c.woAmount) : "—"}</td>
+                      <td className="p-3 text-xs">
+                        {c?.piPlPolicyNo ? (
+                          <button
+                            type="button"
+                            className="hover:underline text-primary"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (c.piPlPolicyLetterUrl) openAttachment(c.piPlPolicyLetterUrl);
+                            }}
+                          >
+                            {c.piPlPolicyNo}
+                          </button>
+                        ) : "—"}
+                      </td>
+                      <td className="p-3 text-xs">
+                        {c?.wcPolicyNo ? (
+                          <button
+                            type="button"
+                            className="hover:underline text-primary"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (c.wcPolicyLetterUrl) openAttachment(c.wcPolicyLetterUrl);
+                            }}
+                          >
+                            {c.wcPolicyNo}
+                          </button>
+                        ) : "—"}
+                      </td>
+                      <td className="p-3 text-center">
+                        <Badge variant={c ? "secondary" : "outline"} className="text-[10px]">
+                          {c ? "Active" : "Not Created"}
+                        </Badge>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {selectedBid && (
+        <ContractDetailModal
+          bid={selectedBid}
+          contract={contractMap.get(selectedBid.id) ?? null}
+          preContract={preContractMap.get(selectedBid.id) ?? null}
+          onClose={() => setSelectedBid(null)}
+          onRefresh={() => queryClient.invalidateQueries({ queryKey: ["contract-activities"] })}
+        />
+      )}
+    </>
+  );
+}
+
+function ContractDetailModal({
+  bid,
+  contract,
+  preContract,
+  onClose,
+  onRefresh,
+}: {
+  bid: TenderBidItem;
+  contract: ContractActivityItem | null;
+  preContract: PreContractActivityItem | null;
+  onClose: () => void;
+  onRefresh: () => void;
+}) {
+  const queryClient = useQueryClient();
+
+  const createMutation = useMutation({
+    mutationFn: () =>
+      api.createContractActivity({
+        tenderBidId: bid.id,
+        nameOfWork: bid.nameOfWork,
+        nameOfBidder: bid.nameOfBidder,
+        bidInvitingAuthority: bid.bidInvitingAuthority,
+        bidInvitingAuthorityAddress: bid.bidInvitingAuthorityAddress,
+        workCategory: bid.workCategory,
+        client: bid.client,
+        state: bid.state,
+        // Prefill from pre-contract when available
+        securityDepositType: preContract?.securityDepositType ?? null,
+        sdBank: preContract?.sdBank,
+        sdIssuedDate: preContract?.sdIssuedDate ?? null,
+        sdNumber: preContract?.sdNumber,
+        sdAmount: preContract?.sdAmount,
+        sdExpiryDate: preContract?.sdExpiryDate ?? null,
+        sdLetterUrl: preContract?.sdLetterUrl ?? null,
+        additionalSdType: preContract?.additionalSdType ?? null,
+        additionalSdBank: preContract?.additionalSdBank,
+        additionalSdIssuedDate: preContract?.additionalSdIssuedDate ?? null,
+        additionalSdNumber: preContract?.additionalSdNumber,
+        additionalSdAmount: preContract?.additionalSdAmount,
+        additionalSdExpiryDate: preContract?.additionalSdExpiryDate ?? null,
+        additionalSdLetterUrl: preContract?.additionalSdLetterUrl ?? null,
+        proceedingOrderDate: preContract?.proceedingOrderDate ?? null,
+        proceedingOrderLetterUrl: preContract?.proceedingOrderLetterUrl ?? null,
+        piPlPolicyNo: preContract?.piPlPolicyNo,
+        piPlPolicyDate: preContract?.piPlPolicyDate ?? null,
+        piPlPolicyAmount: preContract?.piPlPolicyAmount,
+        piPlPolicyIssueDate: preContract?.piPlPolicyIssueDate ?? null,
+        piPlPolicyExpiryDate: preContract?.piPlPolicyExpiryDate ?? null,
+        piPlPolicyLetterUrl: preContract?.piPlPolicyLetterUrl ?? null,
+        wcPolicyNo: preContract?.wcPolicyNo,
+        wcPolicyDate: preContract?.wcPolicyDate ?? null,
+        wcPolicyAmount: preContract?.wcPolicyAmount,
+        wcPolicyIssueDate: preContract?.wcPolicyIssueDate ?? null,
+        wcPolicyExpiryDate: preContract?.wcPolicyExpiryDate ?? null,
+        wcPolicyLetterUrl: preContract?.wcPolicyLetterUrl ?? null,
+      }),
+    onSuccess: () => {
+      toast.success("Contract activity created");
+      onRefresh();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) =>
+      api.updateContractActivity(id, payload),
+    onSuccess: () => {
+      toast.success("Updated");
+      queryClient.invalidateQueries({ queryKey: ["contract-activities"] });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const updateBidMutation = useMutation({
+    mutationFn: (payload: Record<string, unknown>) => api.updateTenderBid(bid.id, payload as Partial<TenderBidItem>),
+    onSuccess: () => {
+      toast.success("Tender details updated");
+      queryClient.invalidateQueries({ queryKey: ["tender-bids"] });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const onBidUpdate = (field: string, value: unknown) => updateBidMutation.mutate({ [field]: value });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="w-full max-w-5xl rounded-2xl border border-border bg-card shadow-xl max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-card border-b border-border/40 px-5 py-4 flex items-center justify-between gap-3 z-10">
+          <div>
+            <p className="font-semibold">Contract Activity Details</p>
+            <p className="text-xs text-muted-foreground">Sr #{bid.srNo} · {bid.client} · {bid.state || "No State"}</p>
+          </div>
+          <Button size="sm" variant="ghost" onClick={onClose}><X className="h-4 w-4" /></Button>
+        </div>
+        <div className="p-5 space-y-4">
+          <div className="rounded-xl border border-border/40 bg-secondary/10 p-4">
+            <p className="text-xs font-medium text-muted-foreground mb-3">Details from Tender</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="sm:col-span-2 lg:col-span-3">
+                <label className="text-xs text-muted-foreground mb-1 block">Name of Work</label>
+                <Input defaultValue={bid.nameOfWork} onBlur={(e) => { if (e.target.value !== bid.nameOfWork) onBidUpdate("nameOfWork", e.target.value); }} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Name of Bidder</label>
+                <Input defaultValue={bid.nameOfBidder} onBlur={(e) => { if (e.target.value !== bid.nameOfBidder) onBidUpdate("nameOfBidder", e.target.value); }} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Name of Bid Inviting Authority</label>
+                <Input defaultValue={bid.bidInvitingAuthority} onBlur={(e) => { if (e.target.value !== bid.bidInvitingAuthority) onBidUpdate("bidInvitingAuthority", e.target.value); }} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Address of Bid Inviting Authority</label>
+                <Input defaultValue={bid.bidInvitingAuthorityAddress} onBlur={(e) => { if (e.target.value !== bid.bidInvitingAuthorityAddress) onBidUpdate("bidInvitingAuthorityAddress", e.target.value); }} />
+              </div>
+            </div>
+          </div>
+
+          {!contract ? (
+            <div className="text-center py-6">
+              <p className="text-muted-foreground text-sm mb-3">
+                No contract activity yet. {preContract ? "Pre-contract data will be copied automatically." : "Create to start tracking contract details."}
+              </p>
+              <Button size="sm" className="gap-1.5" disabled={createMutation.isPending} onClick={() => createMutation.mutate()}>
+                {createMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                Create Contract Activity
+              </Button>
+            </div>
+          ) : (
+            <ContractForm
+              contract={contract}
+              onUpdate={(field, value) => updateMutation.mutate({ id: contract.id, payload: { [field]: value } })}
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ContractForm({
+  contract,
+  onUpdate,
+}: {
+  contract: ContractActivityItem;
+  onUpdate: (field: string, value: unknown) => void;
+}) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div>
+        <label className="text-xs text-muted-foreground mb-1 block">Type of Performance Security Deposit</label>
+        <Select
+          value={contract.securityDepositType ?? "NONE"}
+          onValueChange={(v) => onUpdate("securityDepositType", v === "NONE" ? null : v)}
+        >
+          <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="NONE">None</SelectItem>
+            {SECURITY_DEPOSIT_TYPE_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {contract.securityDepositType && (
+        <div className="col-span-1 sm:col-span-2 lg:col-span-3 rounded-xl border border-border/40 bg-secondary/10 p-4">
+          <p className="text-xs font-medium text-muted-foreground mb-3">
+            Details of Security Deposit — {SECURITY_DEPOSIT_TYPE_OPTIONS.find((o) => o.value === contract.securityDepositType)?.label}
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Bank</label>
+              <Input defaultValue={contract.sdBank} onBlur={(e) => { if (e.target.value !== contract.sdBank) onUpdate("sdBank", e.target.value); }} />
+            </div>
+            <DateWithAttachment
+              label="Issued Date"
+              dateValue={contract.sdIssuedDate}
+              urlValue={contract.sdLetterUrl}
+              onDateChange={(val) => onUpdate("sdIssuedDate", val)}
+              onUrlChange={(url) => onUpdate("sdLetterUrl", url)}
+            />
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">No.</label>
+              <Input defaultValue={contract.sdNumber} onBlur={(e) => { if (e.target.value !== contract.sdNumber) onUpdate("sdNumber", e.target.value); }} />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Amount</label>
+              <Input type="number" defaultValue={contract.sdAmount || ""} onBlur={(e) => { const v = Number(e.target.value); if (v !== contract.sdAmount) onUpdate("sdAmount", v); }} />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Date of Exp.</label>
+              <Input type="date" defaultValue={contract.sdExpiryDate ? new Date(contract.sdExpiryDate).toISOString().split("T")[0] : ""} onChange={(e) => onUpdate("sdExpiryDate", e.target.value || null)} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div>
+        <label className="text-xs text-muted-foreground mb-1 block">Type of Additional Performance Security Deposit</label>
+        <Select
+          value={contract.additionalSdType ?? "NONE"}
+          onValueChange={(v) => onUpdate("additionalSdType", v === "NONE" ? null : v)}
+        >
+          <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="NONE">None</SelectItem>
+            {SECURITY_DEPOSIT_TYPE_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {contract.additionalSdType && (
+        <div className="col-span-1 sm:col-span-2 lg:col-span-3 rounded-xl border border-border/40 bg-secondary/10 p-4">
+          <p className="text-xs font-medium text-muted-foreground mb-3">
+            Details of Additional Security Deposit — {SECURITY_DEPOSIT_TYPE_OPTIONS.find((o) => o.value === contract.additionalSdType)?.label}
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Bank</label>
+              <Input defaultValue={contract.additionalSdBank} onBlur={(e) => { if (e.target.value !== contract.additionalSdBank) onUpdate("additionalSdBank", e.target.value); }} />
+            </div>
+            <DateWithAttachment
+              label="Issued Date"
+              dateValue={contract.additionalSdIssuedDate}
+              urlValue={contract.additionalSdLetterUrl}
+              onDateChange={(val) => onUpdate("additionalSdIssuedDate", val)}
+              onUrlChange={(url) => onUpdate("additionalSdLetterUrl", url)}
+            />
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">No.</label>
+              <Input defaultValue={contract.additionalSdNumber} onBlur={(e) => { if (e.target.value !== contract.additionalSdNumber) onUpdate("additionalSdNumber", e.target.value); }} />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Amount</label>
+              <Input type="number" defaultValue={contract.additionalSdAmount || ""} onBlur={(e) => { const v = Number(e.target.value); if (v !== contract.additionalSdAmount) onUpdate("additionalSdAmount", v); }} />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Date of Exp.</label>
+              <Input type="date" defaultValue={contract.additionalSdExpiryDate ? new Date(contract.additionalSdExpiryDate).toISOString().split("T")[0] : ""} onChange={(e) => onUpdate("additionalSdExpiryDate", e.target.value || null)} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      <DateWithAttachment
+        label="Letter for Proceeding / Work Order"
+        dateValue={contract.proceedingOrderDate}
+        urlValue={contract.proceedingOrderLetterUrl}
+        onDateChange={(val) => onUpdate("proceedingOrderDate", val)}
+        onUrlChange={(url) => onUpdate("proceedingOrderLetterUrl", url)}
+      />
+
+      <div>
+        <label className="text-xs text-muted-foreground mb-1 block">WO Amount (BOQ Amount)</label>
+        <Input type="number" defaultValue={contract.woAmount || ""} onBlur={(e) => { const v = Number(e.target.value); if (v !== contract.woAmount) onUpdate("woAmount", v); }} />
+      </div>
+
+      <div className="col-span-1 sm:col-span-2 lg:col-span-3 rounded-xl border border-border/40 bg-secondary/10 p-4">
+        <p className="text-xs font-medium text-muted-foreground mb-3">PI/PL Insurance Policy Details</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">Policy No.</label>
+            <Input defaultValue={contract.piPlPolicyNo} onBlur={(e) => { if (e.target.value !== contract.piPlPolicyNo) onUpdate("piPlPolicyNo", e.target.value); }} />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">Date</label>
+            <Input type="date" defaultValue={contract.piPlPolicyDate ? new Date(contract.piPlPolicyDate).toISOString().split("T")[0] : ""} onChange={(e) => onUpdate("piPlPolicyDate", e.target.value || null)} />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">Amount</label>
+            <Input type="number" defaultValue={contract.piPlPolicyAmount || ""} onBlur={(e) => { const v = Number(e.target.value); if (v !== contract.piPlPolicyAmount) onUpdate("piPlPolicyAmount", v); }} />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">Date of Issue</label>
+            <Input type="date" defaultValue={contract.piPlPolicyIssueDate ? new Date(contract.piPlPolicyIssueDate).toISOString().split("T")[0] : ""} onChange={(e) => onUpdate("piPlPolicyIssueDate", e.target.value || null)} />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">Date of Expiry</label>
+            <Input type="date" defaultValue={contract.piPlPolicyExpiryDate ? new Date(contract.piPlPolicyExpiryDate).toISOString().split("T")[0] : ""} onChange={(e) => onUpdate("piPlPolicyExpiryDate", e.target.value || null)} />
+          </div>
+          <AttachmentUpload
+            label="Policy Attachment"
+            urlValue={contract.piPlPolicyLetterUrl}
+            onUrlChange={(url) => onUpdate("piPlPolicyLetterUrl", url)}
+          />
+        </div>
+      </div>
+
+      <div className="col-span-1 sm:col-span-2 lg:col-span-3 rounded-xl border border-border/40 bg-secondary/10 p-4">
+        <p className="text-xs font-medium text-muted-foreground mb-3">WC Insurance Policy Details</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">Policy No.</label>
+            <Input defaultValue={contract.wcPolicyNo} onBlur={(e) => { if (e.target.value !== contract.wcPolicyNo) onUpdate("wcPolicyNo", e.target.value); }} />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">Date</label>
+            <Input type="date" defaultValue={contract.wcPolicyDate ? new Date(contract.wcPolicyDate).toISOString().split("T")[0] : ""} onChange={(e) => onUpdate("wcPolicyDate", e.target.value || null)} />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">Amount</label>
+            <Input type="number" defaultValue={contract.wcPolicyAmount || ""} onBlur={(e) => { const v = Number(e.target.value); if (v !== contract.wcPolicyAmount) onUpdate("wcPolicyAmount", v); }} />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">Date of Issue</label>
+            <Input type="date" defaultValue={contract.wcPolicyIssueDate ? new Date(contract.wcPolicyIssueDate).toISOString().split("T")[0] : ""} onChange={(e) => onUpdate("wcPolicyIssueDate", e.target.value || null)} />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">Date of Expiry</label>
+            <Input type="date" defaultValue={contract.wcPolicyExpiryDate ? new Date(contract.wcPolicyExpiryDate).toISOString().split("T")[0] : ""} onChange={(e) => onUpdate("wcPolicyExpiryDate", e.target.value || null)} />
+          </div>
+          <AttachmentUpload
+            label="Policy Attachment"
+            urlValue={contract.wcPolicyLetterUrl}
+            onUrlChange={(url) => onUpdate("wcPolicyLetterUrl", url)}
+          />
+        </div>
+      </div>
+
+      <div className="sm:col-span-2">
+        <label className="text-xs text-muted-foreground mb-1 block">Remarks</label>
+        <Input defaultValue={contract.remarks} onBlur={(e) => { if (e.target.value !== contract.remarks) onUpdate("remarks", e.target.value); }} />
       </div>
     </div>
   );

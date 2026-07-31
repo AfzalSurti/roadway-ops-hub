@@ -17,6 +17,7 @@ import { infraRouter } from "./infra.routes.js";
 import { letterNumberingRouter } from "./letter-numbering.routes.js";
 import { tenderRouter } from "./tender.routes.js";
 import { operationsRouter } from "./operations.routes.js";
+import { contractRouter } from "./contract.routes.js";
 
 export const apiRouter = Router();
 
@@ -38,3 +39,4 @@ apiRouter.use("/infra", infraRouter);
 apiRouter.use("/letter-numbering", letterNumberingRouter);
 apiRouter.use("/tender", tenderRouter);
 apiRouter.use("/operations", operationsRouter);
+apiRouter.use("/contract", contractRouter);
