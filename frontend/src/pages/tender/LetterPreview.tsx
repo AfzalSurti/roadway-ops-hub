@@ -145,17 +145,15 @@ export default function LetterPreview() {
           </div>
         </div>
 
-        {/* A4 paper */}
+        {/* A4 paper — toolbar stays outside letterRef so PDF/print never include it */}
         <div className="flex justify-center bg-secondary/30 rounded-xl p-4 sm:p-8 min-h-[80vh]">
           <div className="w-full max-w-[210mm] bg-white shadow-xl rounded-lg border border-border/30 overflow-hidden">
-            {/* Editor toolbar rendered by LetterEditor */}
-            <div ref={letterRef}>
-              <LetterEditor
-                content={initialContent}
-                onUpdate={(html) => setLetterHtml(html)}
-                editable
-              />
-            </div>
+            <LetterEditor
+              content={initialContent}
+              onUpdate={(html) => setLetterHtml(html)}
+              editable
+              contentRef={letterRef}
+            />
           </div>
         </div>
       </div>

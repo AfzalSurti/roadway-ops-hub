@@ -20,11 +20,14 @@ import {
   Minus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { Ref } from "react";
 
 interface LetterEditorProps {
   content: string;
   onUpdate?: (html: string) => void;
   editable?: boolean;
+  /** Ref attached only to the letter body (excludes toolbar from PDF/print). */
+  contentRef?: Ref<HTMLDivElement>;
 }
 
 function ToolbarButton({
@@ -59,7 +62,7 @@ function Separator() {
   return <div className="w-px h-6 bg-border mx-0.5" />;
 }
 
-export function LetterEditor({ content, onUpdate, editable = true }: LetterEditorProps) {
+export function LetterEditor({ content, onUpdate, editable = true, contentRef }: LetterEditorProps) {
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -78,7 +81,7 @@ export function LetterEditor({ content, onUpdate, editable = true }: LetterEdito
     editorProps: {
       attributes: {
         class:
-          "prose prose-sm sm:prose max-w-none focus:outline-none min-h-[800px] px-[60px] py-[48px]",
+          "prose prose-sm sm:prose max-w-none focus:outline-none min-h-[800px] px-[60px] py-[48px] text-black bg-white",
       },
     },
   });
@@ -88,7 +91,10 @@ export function LetterEditor({ content, onUpdate, editable = true }: LetterEdito
   return (
     <div className="flex flex-col">
       {editable && (
-        <div className="sticky top-0 z-10 bg-card/95 backdrop-blur border-b border-border/40 px-4 py-2 flex flex-wrap items-center gap-0.5">
+        <div
+          data-html2canvas-ignore="true"
+          className="sticky top-0 z-10 bg-card/95 backdrop-blur border-b border-border/40 px-4 py-2 flex flex-wrap items-center gap-0.5"
+        >
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleBold().run()}
             active={editor.isActive("bold")}
@@ -202,7 +208,9 @@ export function LetterEditor({ content, onUpdate, editable = true }: LetterEdito
         </div>
       )}
 
-      <EditorContent editor={editor} />
+      <div ref={contentRef} className="bg-white text-black">
+        <EditorContent editor={editor} />
+      </div>
     </div>
   );
 }

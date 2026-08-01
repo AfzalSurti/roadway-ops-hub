@@ -9,7 +9,13 @@ export async function generatePdfFromElement(
     scale: 2,
     useCORS: true,
     logging: false,
-    backgroundColor: "#ffffff"
+    backgroundColor: "#ffffff",
+    // Never capture editor toolbars / UI chrome
+    ignoreElements: (el) =>
+      el instanceof HTMLElement &&
+      (el.hasAttribute("data-html2canvas-ignore") ||
+        el.classList.contains("letter-toolbar") ||
+        Boolean(el.closest("[data-html2canvas-ignore]")))
   });
 
   const imgData = canvas.toDataURL("image/png");

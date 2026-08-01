@@ -34,6 +34,40 @@ function getWorkCategoryLabel(code: string): string {
   return WORK_CATEGORY_OPTIONS.find((o) => o.code === code)?.label ?? code;
 }
 
+function formatBidderSignatory(name: string): string {
+  const trimmed = name.trim() || "Geo Designs & Research (P) Ltd.";
+  if (/^m\/?s\.?\s/i.test(trimmed)) return trimmed.endsWith(",") ? trimmed : `${trimmed},`;
+  return `M/s. ${trimmed.replace(/,?$/, "")},`;
+}
+
+/** Closing block: empty stamp space (no digital stamp image) + signatory + office footer */
+function letterClosing(bidderName: string): string {
+  const company = formatBidderSignatory(bidderName);
+  return `
+<p>Thanking you and assuring you of our best services,</p>
+
+<p>Yours faithfully,</p>
+
+<p><strong>${company}</strong></p>
+
+<!-- Blank area for physical company stamp / seal -->
+<div style="height: 110px; margin: 8px 0 16px;"></div>
+
+<p><strong>Authorized Signatory</strong></p>
+
+<p>If any query, please Contact to this number 91+ 9265322086</p>
+
+<hr style="border: none; border-top: 1px solid #111; margin: 28px 0 10px;" />
+
+<p style="font-size: 11px; line-height: 1.45; margin: 0;">
+<strong>Registered Office:</strong> GEO DESIGNS &amp; RESEARCH (P) LTD.<br/>
+B-10, Krishna Industrial Estate, Opp. B.I.D.C. Gorwa, Vadodara - 390 016. Gujarat, India.<br/>
+Tel: +91 82380 98214 and +91 97126 16960.<br/>
+E-mail: tender@geogroup.in, info@geogroup.in
+</p>
+`.trim();
+}
+
 export function generateEmdRefundLetter(bid: TenderBidItem): string {
   const today = fmtDate(new Date());
   const bidderName = bid.nameOfBidder || "M/s Sankalp Infracon Pvt. Ltd.";
@@ -77,16 +111,7 @@ ${authority}</p>
   </tr>
 </table>
 
-<p>Thanking you and assuring you of our best services,</p>
-
-<p>Yours faithfully,<br/>
-<strong>For ${bidderName}</strong></p>
-
-<p style="margin-top: 48px;">
-<strong>Authorized Signatory</strong><br/>
-Name: ________________________<br/>
-Designation: ________________________
-</p>
+${letterClosing(bidderName)}
 `.trim();
 }
 
@@ -138,16 +163,7 @@ ${authority}</p>
 
 <p>In view of the above, we hereby request you to kindly issue the <strong>Letter of Acceptance (LOA)</strong> at the earliest convenience so that we may proceed with the necessary formalities and commence the work within the stipulated time frame.</p>
 
-<p>Thanking you and assuring you of our best services,</p>
-
-<p>Yours faithfully,<br/>
-<strong>For ${bidderName}</strong></p>
-
-<p style="margin-top: 48px;">
-<strong>Authorized Signatory</strong><br/>
-Name: ________________________<br/>
-Designation: ________________________
-</p>
+${letterClosing(bidderName)}
 `.trim();
 }
 
