@@ -279,11 +279,11 @@ export default function TenderDashboard({
       <div className="page-header flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="page-title inline-flex items-center gap-2">
-            <Gavel className="h-6 w-6" /> {readOnly ? "Tender" : "Tender Management"}
+            <Gavel className="h-6 w-6" /> Tender Management
           </h1>
           <p className="page-subtitle">
             {readOnly
-              ? "Read-only view of tender bids, pre-contract, and contract activities."
+              ? "View tender bids, pre-contract, and contract activities."
               : "Manage tender bids, pre-contract, and contract activities."}
           </p>
         </div>

@@ -42,8 +42,7 @@ const administrativeNav = [
 const hodNav = [
   { to: "/hod/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/hod/assets", icon: Package, label: "Assets" },
-  { to: "/hod/tender", icon: Gavel, label: "Tender" },
-  { to: "/hod/operations", icon: Cog, label: "Operations" },
+  { to: "/hod/tender", icon: Gavel, label: "Tender Management" },
 ];
 
 const tenderNav = [

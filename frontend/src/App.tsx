@@ -44,7 +44,6 @@ import TenderDashboard from "./pages/tender/Dashboard";
 import TenderLetterPreview from "./pages/tender/LetterPreview";
 import OperationsDashboard from "./pages/operations/Dashboard";
 import HodTender from "./pages/hod/Tender";
-import HodOperations from "./pages/hod/Operations";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -168,7 +167,6 @@ function AppRoutes() {
         <Route path="assets" element={<HodAssets />} />
         <Route path="tender" element={<HodTender />} />
         <Route path="letter" element={<TenderLetterPreview />} />
-        <Route path="operations" element={<HodOperations />} />
       </Route>
 
       <Route path="/tender" element={<TenderRoute><AppLayout /></TenderRoute>}>
