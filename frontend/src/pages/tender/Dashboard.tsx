@@ -7,10 +7,12 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { LocationCombobox } from "@/components/LocationCombobox";
+import { CreatableSelect } from "@/components/CreatableSelect";
 import { api } from "@/lib/api";
 import { openAttachment, registerAttachmentViewer } from "@/lib/attachments";
 import type { TenderBidItem, TenderBidStatus, PreContractActivityItem, ContractActivityItem, SecurityDepositType } from "@/lib/domain";
 import { WORK_CATEGORY_OPTIONS, CLIENT_OPTIONS, SECURITY_DEPOSIT_TYPE_OPTIONS, EMD_TYPE_OPTIONS } from "@/lib/domain";
+import { DEFAULT_BIDDER_OPTIONS, rememberOption, TENDER_OPTION_STORAGE_KEYS } from "@/lib/tender-options";
 import { ALL_LOCATIONS } from "@/constants/locationOptions";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -170,7 +172,10 @@ export default function TenderDashboard() {
 
   const createMutation = useMutation({
     mutationFn: (payload: typeof newBid) => api.createTenderBid(payload),
-    onSuccess: () => {
+    onSuccess: (_data, payload) => {
+      rememberOption(TENDER_OPTION_STORAGE_KEYS.bidders, String(payload.nameOfBidder || ""));
+      rememberOption(TENDER_OPTION_STORAGE_KEYS.authorities, String(payload.bidInvitingAuthority || ""));
+      rememberOption(TENDER_OPTION_STORAGE_KEYS.authorityAddresses, String(payload.bidInvitingAuthorityAddress || ""));
       toast.success("Tender bid added");
       queryClient.invalidateQueries({ queryKey: ["tender-bids"] });
       setShowAddForm(false);
@@ -181,7 +186,13 @@ export default function TenderDashboard() {
 
   const updateMutation = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: Partial<TenderBidItem> }) => api.updateTenderBid(id, payload),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
+      const payload = variables.payload;
+      if (payload.nameOfBidder) rememberOption(TENDER_OPTION_STORAGE_KEYS.bidders, payload.nameOfBidder);
+      if (payload.bidInvitingAuthority) rememberOption(TENDER_OPTION_STORAGE_KEYS.authorities, payload.bidInvitingAuthority);
+      if (payload.bidInvitingAuthorityAddress) {
+        rememberOption(TENDER_OPTION_STORAGE_KEYS.authorityAddresses, payload.bidInvitingAuthorityAddress);
+      }
       toast.success("Updated");
       queryClient.invalidateQueries({ queryKey: ["tender-bids"] });
     },
@@ -199,6 +210,10 @@ export default function TenderDashboard() {
 
   const uniqueBidders = useMemo(() => [...new Set(items.map((b) => b.nameOfBidder).filter(Boolean))].sort(), [items]);
   const uniqueAuthorities = useMemo(() => [...new Set(items.map((b) => b.bidInvitingAuthority).filter(Boolean))].sort(), [items]);
+  const uniqueAuthorityAddresses = useMemo(
+    () => [...new Set(items.map((b) => b.bidInvitingAuthorityAddress).filter(Boolean))].sort(),
+    [items]
+  );
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -372,6 +387,9 @@ export default function TenderDashboard() {
               isPending={createMutation.isPending}
               onSave={() => createMutation.mutate(newBid)}
               onClose={() => setShowAddForm(false)}
+              bidderOptions={uniqueBidders}
+              authorityOptions={uniqueAuthorities}
+              authorityAddressOptions={uniqueAuthorityAddresses}
             />
           )}
 
@@ -808,6 +826,24 @@ function PreContractDetailModal({
   onRefresh: () => void;
 }) {
   const queryClient = useQueryClient();
+  const { data: tenderData } = useQuery({
+    queryKey: ["tender-bids"],
+    queryFn: () => api.getTenderBids({ page: 1, limit: 500 }),
+    staleTime: 2 * 60 * 1000,
+  });
+  const tenderItems = tenderData?.items ?? [];
+  const bidderOptions = useMemo(
+    () => [...new Set(tenderItems.map((b) => b.nameOfBidder).filter(Boolean))].sort(),
+    [tenderItems]
+  );
+  const authorityOptions = useMemo(
+    () => [...new Set(tenderItems.map((b) => b.bidInvitingAuthority).filter(Boolean))].sort(),
+    [tenderItems]
+  );
+  const authorityAddressOptions = useMemo(
+    () => [...new Set(tenderItems.map((b) => b.bidInvitingAuthorityAddress).filter(Boolean))].sort(),
+    [tenderItems]
+  );
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -868,11 +904,40 @@ function PreContractDetailModal({
               </div>
               <div>
                 <label className="text-xs text-muted-foreground mb-1 block">Name of Bidder</label>
-                <Input defaultValue={bid.nameOfBidder} onBlur={(e) => { if (e.target.value !== bid.nameOfBidder) onBidUpdate("nameOfBidder", e.target.value); }} />
+                <CreatableSelect
+                  value={bid.nameOfBidder || ""}
+                  onValueChange={(v) => { if (v !== bid.nameOfBidder) onBidUpdate("nameOfBidder", v); }}
+                  baseOptions={[...DEFAULT_BIDDER_OPTIONS]}
+                  learnedOptions={bidderOptions}
+                  storageKey={TENDER_OPTION_STORAGE_KEYS.bidders}
+                  placeholder="Select bidder"
+                  otherPlaceholder="Enter bidder name"
+                  liveOther={false}
+                />
               </div>
-              <div className="sm:col-span-2">
+              <div>
                 <label className="text-xs text-muted-foreground mb-1 block">Bid Inviting Authority</label>
-                <Input defaultValue={bid.bidInvitingAuthority} onBlur={(e) => { if (e.target.value !== bid.bidInvitingAuthority) onBidUpdate("bidInvitingAuthority", e.target.value); }} />
+                <CreatableSelect
+                  value={bid.bidInvitingAuthority || ""}
+                  onValueChange={(v) => { if (v !== bid.bidInvitingAuthority) onBidUpdate("bidInvitingAuthority", v); }}
+                  learnedOptions={authorityOptions}
+                  storageKey={TENDER_OPTION_STORAGE_KEYS.authorities}
+                  placeholder="Select authority"
+                  otherPlaceholder="Enter authority name"
+                  liveOther={false}
+                />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Address of Bid Inviting Authority</label>
+                <CreatableSelect
+                  value={bid.bidInvitingAuthorityAddress || ""}
+                  onValueChange={(v) => { if (v !== bid.bidInvitingAuthorityAddress) onBidUpdate("bidInvitingAuthorityAddress", v); }}
+                  learnedOptions={authorityAddressOptions}
+                  storageKey={TENDER_OPTION_STORAGE_KEYS.authorityAddresses}
+                  placeholder="Select address"
+                  otherPlaceholder="Enter authority address"
+                  liveOther={false}
+                />
               </div>
               <div>
                 <label className="text-xs text-muted-foreground mb-1 block">Tender ID</label>
@@ -1076,12 +1141,18 @@ function AddBidModal({
   isPending,
   onSave,
   onClose,
+  bidderOptions,
+  authorityOptions,
+  authorityAddressOptions,
 }: {
   newBid: Record<string, unknown>;
   setNewBid: (bid: Record<string, unknown>) => void;
   isPending: boolean;
   onSave: () => void;
   onClose: () => void;
+  bidderOptions: string[];
+  authorityOptions: string[];
+  authorityAddressOptions: string[];
 }) {
   const emdFileRef = useRef<HTMLInputElement>(null);
   const [emdUploading, setEmdUploading] = useState(false);
@@ -1118,15 +1189,37 @@ function AddBidModal({
             </div>
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">Name of Bidder</label>
-              <Input value={newBid.nameOfBidder as string} onChange={(e) => set("nameOfBidder", e.target.value)} />
+              <CreatableSelect
+                value={(newBid.nameOfBidder as string) || ""}
+                onValueChange={(v) => set("nameOfBidder", v)}
+                baseOptions={[...DEFAULT_BIDDER_OPTIONS]}
+                learnedOptions={bidderOptions}
+                storageKey={TENDER_OPTION_STORAGE_KEYS.bidders}
+                placeholder="Select bidder"
+                otherPlaceholder="Enter bidder name"
+              />
             </div>
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">Name of Bid Inviting Authority</label>
-              <Input value={newBid.bidInvitingAuthority as string} onChange={(e) => set("bidInvitingAuthority", e.target.value)} />
+              <CreatableSelect
+                value={(newBid.bidInvitingAuthority as string) || ""}
+                onValueChange={(v) => set("bidInvitingAuthority", v)}
+                learnedOptions={authorityOptions}
+                storageKey={TENDER_OPTION_STORAGE_KEYS.authorities}
+                placeholder="Select authority"
+                otherPlaceholder="Enter authority name"
+              />
             </div>
             <div className="sm:col-span-2">
               <label className="text-xs text-muted-foreground mb-1 block">Address of Bid Inviting Authority</label>
-              <Input value={(newBid.bidInvitingAuthorityAddress as string) || ""} onChange={(e) => set("bidInvitingAuthorityAddress", e.target.value)} />
+              <CreatableSelect
+                value={(newBid.bidInvitingAuthorityAddress as string) || ""}
+                onValueChange={(v) => set("bidInvitingAuthorityAddress", v)}
+                learnedOptions={authorityAddressOptions}
+                storageKey={TENDER_OPTION_STORAGE_KEYS.authorityAddresses}
+                placeholder="Select address"
+                otherPlaceholder="Enter authority address"
+              />
             </div>
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">Tender ID</label>
@@ -1880,6 +1973,24 @@ function ContractDetailModal({
   onRefresh: () => void;
 }) {
   const queryClient = useQueryClient();
+  const { data: tenderData } = useQuery({
+    queryKey: ["tender-bids"],
+    queryFn: () => api.getTenderBids({ page: 1, limit: 500 }),
+    staleTime: 2 * 60 * 1000,
+  });
+  const tenderItems = tenderData?.items ?? [];
+  const bidderOptions = useMemo(
+    () => [...new Set(tenderItems.map((b) => b.nameOfBidder).filter(Boolean))].sort(),
+    [tenderItems]
+  );
+  const authorityOptions = useMemo(
+    () => [...new Set(tenderItems.map((b) => b.bidInvitingAuthority).filter(Boolean))].sort(),
+    [tenderItems]
+  );
+  const authorityAddressOptions = useMemo(
+    () => [...new Set(tenderItems.map((b) => b.bidInvitingAuthorityAddress).filter(Boolean))].sort(),
+    [tenderItems]
+  );
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -1970,15 +2081,40 @@ function ContractDetailModal({
               </div>
               <div>
                 <label className="text-xs text-muted-foreground mb-1 block">Name of Bidder</label>
-                <Input defaultValue={bid.nameOfBidder} onBlur={(e) => { if (e.target.value !== bid.nameOfBidder) onBidUpdate("nameOfBidder", e.target.value); }} />
+                <CreatableSelect
+                  value={bid.nameOfBidder || ""}
+                  onValueChange={(v) => { if (v !== bid.nameOfBidder) onBidUpdate("nameOfBidder", v); }}
+                  baseOptions={[...DEFAULT_BIDDER_OPTIONS]}
+                  learnedOptions={bidderOptions}
+                  storageKey={TENDER_OPTION_STORAGE_KEYS.bidders}
+                  placeholder="Select bidder"
+                  otherPlaceholder="Enter bidder name"
+                  liveOther={false}
+                />
               </div>
               <div>
                 <label className="text-xs text-muted-foreground mb-1 block">Name of Bid Inviting Authority</label>
-                <Input defaultValue={bid.bidInvitingAuthority} onBlur={(e) => { if (e.target.value !== bid.bidInvitingAuthority) onBidUpdate("bidInvitingAuthority", e.target.value); }} />
+                <CreatableSelect
+                  value={bid.bidInvitingAuthority || ""}
+                  onValueChange={(v) => { if (v !== bid.bidInvitingAuthority) onBidUpdate("bidInvitingAuthority", v); }}
+                  learnedOptions={authorityOptions}
+                  storageKey={TENDER_OPTION_STORAGE_KEYS.authorities}
+                  placeholder="Select authority"
+                  otherPlaceholder="Enter authority name"
+                  liveOther={false}
+                />
               </div>
               <div>
                 <label className="text-xs text-muted-foreground mb-1 block">Address of Bid Inviting Authority</label>
-                <Input defaultValue={bid.bidInvitingAuthorityAddress} onBlur={(e) => { if (e.target.value !== bid.bidInvitingAuthorityAddress) onBidUpdate("bidInvitingAuthorityAddress", e.target.value); }} />
+                <CreatableSelect
+                  value={bid.bidInvitingAuthorityAddress || ""}
+                  onValueChange={(v) => { if (v !== bid.bidInvitingAuthorityAddress) onBidUpdate("bidInvitingAuthorityAddress", v); }}
+                  learnedOptions={authorityAddressOptions}
+                  storageKey={TENDER_OPTION_STORAGE_KEYS.authorityAddresses}
+                  placeholder="Select address"
+                  otherPlaceholder="Enter authority address"
+                  liveOther={false}
+                />
               </div>
             </div>
           </div>
