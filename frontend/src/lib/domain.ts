@@ -754,6 +754,9 @@ export type TenderBidItem = {
   emdLetterUrl?: string | null;
   tenderFees: number;
   infraconFees: number;
+  ecv: number;
+  bidAmount: number;
+  aboveBelowPercent: number;
   status: TenderBidStatus;
   letterPreviewUrl?: string | null;
   remarks: string;

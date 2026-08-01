@@ -224,6 +224,15 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='TenderBid' AND column_name='bidInvitingAuthorityAddress') THEN
     ALTER TABLE "TenderBid" ADD COLUMN "bidInvitingAuthorityAddress" TEXT NOT NULL DEFAULT '';
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='TenderBid' AND column_name='ecv') THEN
+    ALTER TABLE "TenderBid" ADD COLUMN "ecv" DOUBLE PRECISION NOT NULL DEFAULT 0;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='TenderBid' AND column_name='bidAmount') THEN
+    ALTER TABLE "TenderBid" ADD COLUMN "bidAmount" DOUBLE PRECISION NOT NULL DEFAULT 0;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='TenderBid' AND column_name='aboveBelowPercent') THEN
+    ALTER TABLE "TenderBid" ADD COLUMN "aboveBelowPercent" DOUBLE PRECISION NOT NULL DEFAULT 0;
+  END IF;
 END
 $$;
 

@@ -785,6 +785,11 @@ model TenderBid {
   emdLetterUrl      String?
   tenderFees        Float           @default(0)
   infraconFees      Float           @default(0)
+  /// Estimated Contract Value
+  ecv               Float           @default(0)
+  bidAmount         Float           @default(0)
+  /// ((bidAmount - ecv) / ecv) * 100
+  aboveBelowPercent Float           @default(0)
   status            TenderBidStatus @default(NOT_ALLOTTED)
   letterPreviewUrl  String?
   bidInvitingAuthorityAddress String @default("")

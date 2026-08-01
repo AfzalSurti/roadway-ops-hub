@@ -31,6 +31,16 @@ function formatDate(value?: string | null) {
   return new Date(value).toLocaleDateString("en-IN");
 }
 
+function calcAboveBelowPercent(ecv: number, bidAmount: number) {
+  if (!ecv || ecv <= 0) return 0;
+  return Number((((bidAmount - ecv) / ecv) * 100).toFixed(2));
+}
+
+function formatAboveBelow(value?: number | null) {
+  if (value == null || Number.isNaN(Number(value))) return "—";
+  return `${Number(value).toFixed(2)}%`;
+}
+
 function DetailField({ label, value }: { label: string; value?: string | null }) {
   return (
     <div className="rounded-xl border border-border/40 bg-secondary/20 px-3 py-2">
@@ -166,6 +176,9 @@ export default function TenderDashboard() {
     emdValidUpto: "" as string,
     tenderFees: 0,
     infraconFees: 0,
+    ecv: 0,
+    bidAmount: 0,
+    aboveBelowPercent: 0,
     status: "NOT_ALLOTTED" as TenderBidStatus,
     remarks: "",
   };
@@ -411,25 +424,28 @@ export default function TenderDashboard() {
           ) : (
             <div className="glass-panel overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm table-fixed min-w-[1180px]">
+                <table className="w-full text-sm table-fixed min-w-[1380px]">
                   <thead>
                     <tr className="text-muted-foreground border-b border-border/30">
                       <th className="text-left font-medium p-2.5 w-10">Sr</th>
-                      <th className="text-left font-medium p-2.5 w-[22%]">Name of Work</th>
-                      <th className="text-left font-medium p-2.5 w-[11%]">Bidder</th>
-                      <th className="text-left font-medium p-2.5 w-[13%]">Bid Inviting Authority</th>
-                      <th className="text-left font-medium p-2.5 w-[9%]">Tender ID</th>
-                      <th className="text-right font-medium p-2.5 w-[6%]">Length</th>
+                      <th className="text-left font-medium p-2.5 w-[18%]">Name of Work</th>
+                      <th className="text-left font-medium p-2.5 w-[10%]">Bidder</th>
+                      <th className="text-left font-medium p-2.5 w-[11%]">Bid Inviting Authority</th>
+                      <th className="text-left font-medium p-2.5 w-[8%]">Tender ID</th>
+                      <th className="text-right font-medium p-2.5 w-[5%]">Length</th>
                       <th className="text-left font-medium p-2.5 w-[4%]">W.C.</th>
-                      <th className="text-left font-medium p-2.5 w-[6%]">Client</th>
-                      <th className="text-left font-medium p-2.5 w-[8%]">State</th>
-                      <th className="text-left font-medium p-2.5 w-[7%]">EMD Type</th>
-                      <th className="text-right font-medium p-2.5 w-[8%]">EMD Amt</th>
-                      <th className="text-right font-medium p-2.5 w-[8%]">
+                      <th className="text-left font-medium p-2.5 w-[5%]">Client</th>
+                      <th className="text-left font-medium p-2.5 w-[6%]">State</th>
+                      <th className="text-left font-medium p-2.5 w-[6%]">EMD Type</th>
+                      <th className="text-right font-medium p-2.5 w-[7%]">EMD Amt</th>
+                      <th className="text-right font-medium p-2.5 w-[7%]">
                         <span className="block leading-tight">Tender Fees</span>
                         <span className="block text-[10px] font-normal text-muted-foreground leading-tight">Infracon</span>
                       </th>
-                      <th className="text-center font-medium p-2.5 w-[9%]">Status</th>
+                      <th className="text-right font-medium p-2.5 w-[7%]">ECV</th>
+                      <th className="text-right font-medium p-2.5 w-[7%]">Bid Amount</th>
+                      <th className="text-right font-medium p-2.5 w-[6%]">Above / Below</th>
+                      <th className="text-center font-medium p-2.5 w-[8%]">Status</th>
                       <th className="text-center font-medium p-2.5 w-24">Letter</th>
                       <th className="text-right font-medium p-2.5 w-20"></th>
                     </tr>
@@ -468,6 +484,9 @@ export default function TenderDashboard() {
                           <div className="tabular-nums">{formatCurrency(bid.tenderFees)}</div>
                           <div className="text-muted-foreground tabular-nums mt-0.5">{formatCurrency(bid.infraconFees)}</div>
                         </td>
+                        <td className="p-2.5 align-top text-right tabular-nums text-xs leading-snug">{formatCurrency(bid.ecv)}</td>
+                        <td className="p-2.5 align-top text-right tabular-nums text-xs leading-snug">{formatCurrency(bid.bidAmount)}</td>
+                        <td className="p-2.5 align-top text-right tabular-nums text-xs leading-snug">{formatAboveBelow(bid.aboveBelowPercent)}</td>
                         <td className="p-2.5 align-top text-center" onClick={(e) => e.stopPropagation()}>
                           <Select
                             value={bid.status}
@@ -578,7 +597,16 @@ function TenderBidDetailModal({
   }, [bid]);
 
   const set = (field: keyof TenderBidItem | string, value: unknown) => {
-    setDraft((prev) => ({ ...prev, [field]: value }));
+    setDraft((prev) => {
+      const next = { ...prev, [field]: value } as TenderBidItem;
+      if (field === "ecv" || field === "bidAmount") {
+        next.aboveBelowPercent = calcAboveBelowPercent(
+          Number(field === "ecv" ? value : next.ecv) || 0,
+          Number(field === "bidAmount" ? value : next.bidAmount) || 0
+        );
+      }
+      return next;
+    });
   };
 
   const saveMutation = useMutation({
@@ -602,6 +630,9 @@ function TenderBidDetailModal({
         emdLetterUrl: draft.emdLetterUrl ?? null,
         tenderFees: draft.tenderFees,
         infraconFees: draft.infraconFees,
+        ecv: draft.ecv,
+        bidAmount: draft.bidAmount,
+        aboveBelowPercent: draft.aboveBelowPercent,
         status: draft.status,
         remarks: draft.remarks,
       }),
@@ -671,6 +702,9 @@ function TenderBidDetailModal({
               <DetailField label="EMD Valid Upto" value={formatDate(bid.emdValidUpto)} />
               <DetailField label="Tender Fees" value={formatCurrency(bid.tenderFees)} />
               <DetailField label="Infracon Fees" value={formatCurrency(bid.infraconFees)} />
+              <DetailField label="ECV" value={formatCurrency(bid.ecv)} />
+              <DetailField label="Bid Amount" value={formatCurrency(bid.bidAmount)} />
+              <DetailField label="Above / Below" value={formatAboveBelow(bid.aboveBelowPercent)} />
               <DetailField label="Letter Type" value={bid.status === "ALLOTTED" ? "LOA Request Letter" : "EMD Refund Letter"} />
               <div className="sm:col-span-2"><DetailField label="Remarks" value={bid.remarks} /></div>
               {bid.emdLetterUrl ? (
@@ -827,6 +861,18 @@ function TenderBidDetailModal({
                 <label className="text-xs text-muted-foreground mb-1 block">Infracon Fees</label>
                 <Input type="number" value={draft.infraconFees || ""} onChange={(e) => set("infraconFees", Number(e.target.value))} />
               </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">ECV</label>
+                <Input type="number" value={draft.ecv || ""} onChange={(e) => set("ecv", Number(e.target.value))} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Bid Amount</label>
+                <Input type="number" value={draft.bidAmount || ""} onChange={(e) => set("bidAmount", Number(e.target.value))} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Above / Below</label>
+                <Input readOnly value={formatAboveBelow(draft.aboveBelowPercent)} className="bg-secondary/30" />
+              </div>
               <div className="sm:col-span-2 lg:col-span-3">
                 <label className="text-xs text-muted-foreground mb-1 block">Remarks</label>
                 <Input value={draft.remarks || ""} onChange={(e) => set("remarks", e.target.value)} />
@@ -973,25 +1019,28 @@ function PreContractSection({ allottedBids }: { allottedBids: TenderBidItem[] })
       ) : (
         <div className="glass-panel overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm table-fixed min-w-[1100px]">
+            <table className="w-full text-sm table-fixed min-w-[1300px]">
               <thead>
                 <tr className="text-muted-foreground border-b border-border/30">
                   <th className="text-left font-medium p-2.5 w-10">Sr</th>
-                  <th className="text-left font-medium p-2.5 w-[24%]">Name of Work</th>
-                  <th className="text-left font-medium p-2.5 w-[12%]">Bidder</th>
-                  <th className="text-left font-medium p-2.5 w-[14%]">Bid Inviting Authority</th>
-                  <th className="text-left font-medium p-2.5 w-[10%]">Tender ID</th>
-                  <th className="text-right font-medium p-2.5 w-[6%]">Length</th>
-                  <th className="text-left font-medium p-2.5 w-[5%]">W.C.</th>
-                  <th className="text-left font-medium p-2.5 w-[7%]">Client</th>
-                  <th className="text-left font-medium p-2.5 w-[8%]">State</th>
-                  <th className="text-left font-medium p-2.5 w-[7%]">EMD Type</th>
-                  <th className="text-right font-medium p-2.5 w-[8%]">EMD Amt</th>
-                  <th className="text-right font-medium p-2.5 w-[8%]">
+                  <th className="text-left font-medium p-2.5 w-[20%]">Name of Work</th>
+                  <th className="text-left font-medium p-2.5 w-[10%]">Bidder</th>
+                  <th className="text-left font-medium p-2.5 w-[12%]">Bid Inviting Authority</th>
+                  <th className="text-left font-medium p-2.5 w-[8%]">Tender ID</th>
+                  <th className="text-right font-medium p-2.5 w-[5%]">Length</th>
+                  <th className="text-left font-medium p-2.5 w-[4%]">W.C.</th>
+                  <th className="text-left font-medium p-2.5 w-[6%]">Client</th>
+                  <th className="text-left font-medium p-2.5 w-[6%]">State</th>
+                  <th className="text-left font-medium p-2.5 w-[6%]">EMD Type</th>
+                  <th className="text-right font-medium p-2.5 w-[7%]">EMD Amt</th>
+                  <th className="text-right font-medium p-2.5 w-[7%]">
                     <span className="block leading-tight">Tender Fees</span>
                     <span className="block text-[10px] font-normal text-muted-foreground leading-tight">Infracon</span>
                   </th>
-                  <th className="text-center font-medium p-2.5 w-[9%]">Pre-Contract</th>
+                  <th className="text-right font-medium p-2.5 w-[7%]">ECV</th>
+                  <th className="text-right font-medium p-2.5 w-[7%]">Bid Amount</th>
+                  <th className="text-right font-medium p-2.5 w-[6%]">Above / Below</th>
+                  <th className="text-center font-medium p-2.5 w-[8%]">Pre-Contract</th>
                 </tr>
               </thead>
               <tbody>
@@ -1030,6 +1079,9 @@ function PreContractSection({ allottedBids }: { allottedBids: TenderBidItem[] })
                         <div className="tabular-nums">{formatCurrency(bid.tenderFees)}</div>
                         <div className="text-muted-foreground tabular-nums mt-0.5">{formatCurrency(bid.infraconFees)}</div>
                       </td>
+                      <td className="p-2.5 align-top text-right tabular-nums text-xs leading-snug">{formatCurrency(bid.ecv)}</td>
+                      <td className="p-2.5 align-top text-right tabular-nums text-xs leading-snug">{formatCurrency(bid.bidAmount)}</td>
+                      <td className="p-2.5 align-top text-right tabular-nums text-xs leading-snug">{formatAboveBelow(bid.aboveBelowPercent)}</td>
                       <td className="p-2.5 align-top text-center">
                         <Badge variant={hasPC ? "secondary" : "outline"} className="text-[10px]">
                           {hasPC ? "Active" : "Not Created"}
@@ -1162,6 +1214,9 @@ function PreContractDetailModal({
                   <DetailField label="State / Region" value={bid.state} />
                   <DetailField label="EMD Amount" value={formatCurrency(bid.emd)} />
                   <DetailField label="Type of EMD" value={bid.emdType} />
+                  <DetailField label="ECV" value={formatCurrency(bid.ecv)} />
+                  <DetailField label="Bid Amount" value={formatCurrency(bid.bidAmount)} />
+                  <DetailField label="Above / Below" value={formatAboveBelow(bid.aboveBelowPercent)} />
                 </div>
               </div>
               {preContract ? (
@@ -1297,6 +1352,18 @@ function PreContractDetailModal({
               <div>
                 <label className="text-xs text-muted-foreground mb-1 block">Infracon Fees</label>
                 <Input type="number" defaultValue={bid.infraconFees || ""} onBlur={(e) => { const v = Number(e.target.value); if (v !== bid.infraconFees) onBidUpdate("infraconFees", v); }} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">ECV</label>
+                <Input type="number" defaultValue={bid.ecv || ""} onBlur={(e) => { const v = Number(e.target.value) || 0; if (v !== bid.ecv) onBidUpdate("ecv", v); }} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Bid Amount</label>
+                <Input type="number" defaultValue={bid.bidAmount || ""} onBlur={(e) => { const v = Number(e.target.value) || 0; if (v !== bid.bidAmount) onBidUpdate("bidAmount", v); }} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Above / Below</label>
+                <Input readOnly value={formatAboveBelow(bid.aboveBelowPercent)} className="bg-secondary/30" />
               </div>
             </div>
           </div>
@@ -1470,7 +1537,16 @@ function AddBidModal({
     }
   }, [newBid, setNewBid]);
 
-  const set = (field: string, value: unknown) => setNewBid({ ...newBid, [field]: value });
+  const set = (field: string, value: unknown) => {
+    const next = { ...newBid, [field]: value };
+    if (field === "ecv" || field === "bidAmount") {
+      next.aboveBelowPercent = calcAboveBelowPercent(
+        Number(field === "ecv" ? value : next.ecv) || 0,
+        Number(field === "bidAmount" ? value : next.bidAmount) || 0
+      );
+    }
+    setNewBid(next);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
@@ -1629,6 +1705,23 @@ function AddBidModal({
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">Infracon Fees</label>
               <Input type="number" value={(newBid.infraconFees as number) || ""} onChange={(e) => set("infraconFees", Number(e.target.value))} />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">ECV</label>
+              <Input type="number" value={(newBid.ecv as number) || ""} onChange={(e) => set("ecv", Number(e.target.value))} />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Bid Amount</label>
+              <Input type="number" value={(newBid.bidAmount as number) || ""} onChange={(e) => set("bidAmount", Number(e.target.value))} />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Above / Below</label>
+              <Input
+                readOnly
+                value={formatAboveBelow(newBid.aboveBelowPercent as number)}
+                className="bg-secondary/30"
+                title="Auto-calculated from Bid Amount and ECV"
+              />
             </div>
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">Status</label>
@@ -2389,6 +2482,9 @@ function ContractDetailModal({
                   <DetailField label="Name of Bidder" value={bid.nameOfBidder} />
                   <DetailField label="Bid Inviting Authority" value={bid.bidInvitingAuthority} />
                   <DetailField label="Authority Address" value={bid.bidInvitingAuthorityAddress} />
+                  <DetailField label="ECV" value={formatCurrency(bid.ecv)} />
+                  <DetailField label="Bid Amount" value={formatCurrency(bid.bidAmount)} />
+                  <DetailField label="Above / Below" value={formatAboveBelow(bid.aboveBelowPercent)} />
                 </div>
               </div>
               {contract ? (
@@ -2462,6 +2558,18 @@ function ContractDetailModal({
                   otherPlaceholder="Enter authority address"
                   liveOther={false}
                 />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">ECV</label>
+                <Input type="number" defaultValue={bid.ecv || ""} onBlur={(e) => { const v = Number(e.target.value) || 0; if (v !== bid.ecv) onBidUpdate("ecv", v); }} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Bid Amount</label>
+                <Input type="number" defaultValue={bid.bidAmount || ""} onBlur={(e) => { const v = Number(e.target.value) || 0; if (v !== bid.bidAmount) onBidUpdate("bidAmount", v); }} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Above / Below</label>
+                <Input readOnly value={formatAboveBelow(bid.aboveBelowPercent)} className="bg-secondary/30" />
               </div>
             </div>
           </div>

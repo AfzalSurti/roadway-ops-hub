@@ -1524,17 +1524,10 @@ export const api = {
     );
   },
 
-  createTenderBid(payload: {
+  createTenderBid(payload: Record<string, unknown> & {
     nameOfWork: string;
     workCategory: string;
     client: string;
-    state?: string;
-    emd?: number;
-    tenderFees?: number;
-    infraconFees?: number;
-    status?: TenderBidStatus;
-    letterPreviewUrl?: string | null;
-    remarks?: string;
   }) {
     return request<TenderBidItem>("/tender", { method: "POST", body: JSON.stringify(payload) });
   },
@@ -1558,6 +1551,9 @@ export const api = {
     emdLetterUrl: string | null;
     tenderFees: number;
     infraconFees: number;
+    ecv: number;
+    bidAmount: number;
+    aboveBelowPercent: number;
     status: TenderBidStatus;
     letterPreviewUrl: string | null;
     remarks: string;
