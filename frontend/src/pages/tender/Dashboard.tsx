@@ -16,7 +16,7 @@ import { DEFAULT_BIDDER_OPTIONS, rememberOption, TENDER_OPTION_STORAGE_KEYS } fr
 import { ALL_LOCATIONS } from "@/constants/locationOptions";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Eye, FileText, Gavel, Loader2, Plus, RefreshCcw, Search, Trash2, X,
+  Eye, FileText, Gavel, Loader2, Pencil, Plus, RefreshCcw, Search, Trash2, X,
   Paperclip, Cog, ClipboardList,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -29,6 +29,15 @@ function formatCurrency(value: number) {
 function formatDate(value?: string | null) {
   if (!value) return "—";
   return new Date(value).toLocaleDateString("en-IN");
+}
+
+function DetailField({ label, value }: { label: string; value?: string | null }) {
+  return (
+    <div className="rounded-xl border border-border/40 bg-secondary/20 px-3 py-2">
+      <p className="text-[11px] text-muted-foreground">{label}</p>
+      <p className="mt-0.5 break-words text-sm">{value?.trim() ? value : "—"}</p>
+    </div>
+  );
 }
 
 function AttachmentViewer() {
@@ -528,79 +537,315 @@ export default function TenderDashboard() {
 
       {/* Tender Detail Modal */}
       {selectedBid && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="w-full max-w-2xl rounded-2xl border border-border bg-card shadow-xl max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-card border-b border-border/40 px-5 py-4 flex items-center justify-between gap-3">
-              <div>
-                <p className="font-semibold">Tender Bid Details</p>
-                <p className="text-xs text-muted-foreground">Sr #{selectedBid.srNo}</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="gap-1"
-                  onClick={() => {
-                    setSelectedBid(null);
-                    navigate(`/tender/letter?id=${selectedBid.id}`);
-                  }}
-                >
-                  <FileText className="h-3.5 w-3.5" />
-                  {selectedBid.status === "ALLOTTED" ? "LOA Letter" : "EMD Return Letter"}
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => setSelectedBid(null)}>
-                  Close
-                </Button>
-              </div>
-            </div>
-            <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-              {([
-                ["Sr No", String(selectedBid.srNo)],
-                ["Name of Work", selectedBid.nameOfWork],
-                ["Name of Bidder", selectedBid.nameOfBidder],
-                ["Bid Inviting Authority", selectedBid.bidInvitingAuthority],
-                ["Authority Address", selectedBid.bidInvitingAuthorityAddress],
-                ["Tender ID", selectedBid.tenderId],
-                ["Project Length (Km)", selectedBid.projectLengthKm ? String(selectedBid.projectLengthKm) : ""],
-                ["Work Category", `${selectedBid.workCategory} — ${WORK_CATEGORY_OPTIONS.find((o) => o.code === selectedBid.workCategory)?.label ?? ""}`],
-                ["Client", selectedBid.client],
-                ["State / Region", selectedBid.state || "Not Selected"],
-                ["Type of EMD", selectedBid.emdType],
-                ["EMD Amount", formatCurrency(selectedBid.emd)],
-                ["EMD Bank", selectedBid.emdBank],
-                ["EMD Issued Date", formatDate(selectedBid.emdIssuedDate)],
-                ["EMD No.", selectedBid.emdNumber],
-                ["EMD Valid Upto", formatDate(selectedBid.emdValidUpto)],
-                ["Tender Fees", formatCurrency(selectedBid.tenderFees)],
-                ["Infracon Fees", formatCurrency(selectedBid.infraconFees)],
-                ["Status", selectedBid.status === "ALLOTTED" ? "Allotted" : "Not Allotted"],
-                ["Letter Type", selectedBid.status === "ALLOTTED" ? "LOA Request Letter" : "EMD Refund Letter"],
-                ["Remarks", selectedBid.remarks],
-                ["Created", formatDate(selectedBid.createdAt)],
-                ["Updated", formatDate(selectedBid.updatedAt)],
-              ] as const).map(([label, value]) => (
-                <div key={label} className="rounded-xl border border-border/40 bg-secondary/20 px-3 py-2">
-                  <p className="text-[11px] text-muted-foreground">{label}</p>
-                  <p className="mt-0.5 break-words">{value || "—"}</p>
-                </div>
-              ))}
-              {selectedBid.emdLetterUrl && (
+        <TenderBidDetailModal
+          bid={selectedBid}
+          bidderOptions={uniqueBidders}
+          authorityOptions={uniqueAuthorities}
+          authorityAddressOptions={uniqueAuthorityAddresses}
+          onClose={() => setSelectedBid(null)}
+          onUpdated={(updated) => setSelectedBid(updated)}
+        />
+      )}
+    </PageWrapper>
+  );
+}
+
+function TenderBidDetailModal({
+  bid,
+  bidderOptions,
+  authorityOptions,
+  authorityAddressOptions,
+  onClose,
+  onUpdated,
+}: {
+  bid: TenderBidItem;
+  bidderOptions: string[];
+  authorityOptions: string[];
+  authorityAddressOptions: string[];
+  onClose: () => void;
+  onUpdated: (bid: TenderBidItem) => void;
+}) {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(bid);
+  const emdFileRef = useRef<HTMLInputElement>(null);
+  const [emdUploading, setEmdUploading] = useState(false);
+
+  useEffect(() => {
+    setDraft(bid);
+    setEditing(false);
+  }, [bid]);
+
+  const set = (field: keyof TenderBidItem | string, value: unknown) => {
+    setDraft((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: () =>
+      api.updateTenderBid(bid.id, {
+        nameOfWork: draft.nameOfWork,
+        nameOfBidder: draft.nameOfBidder,
+        bidInvitingAuthority: draft.bidInvitingAuthority,
+        bidInvitingAuthorityAddress: draft.bidInvitingAuthorityAddress,
+        tenderId: draft.tenderId,
+        projectLengthKm: draft.projectLengthKm,
+        workCategory: draft.workCategory,
+        client: draft.client,
+        state: draft.state,
+        emd: draft.emd,
+        emdType: draft.emdType,
+        emdBank: draft.emdBank,
+        emdIssuedDate: draft.emdIssuedDate ?? null,
+        emdNumber: draft.emdNumber,
+        emdValidUpto: draft.emdValidUpto ?? null,
+        emdLetterUrl: draft.emdLetterUrl ?? null,
+        tenderFees: draft.tenderFees,
+        infraconFees: draft.infraconFees,
+        status: draft.status,
+        remarks: draft.remarks,
+      }),
+    onSuccess: (updated) => {
+      rememberOption(TENDER_OPTION_STORAGE_KEYS.bidders, updated.nameOfBidder);
+      rememberOption(TENDER_OPTION_STORAGE_KEYS.authorities, updated.bidInvitingAuthority);
+      rememberOption(TENDER_OPTION_STORAGE_KEYS.authorityAddresses, updated.bidInvitingAuthorityAddress);
+      toast.success("Tender bid updated");
+      queryClient.invalidateQueries({ queryKey: ["tender-bids"] });
+      onUpdated(updated);
+      setEditing(false);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const wcLabel = WORK_CATEGORY_OPTIONS.find((o) => o.code === bid.workCategory)?.label ?? bid.workCategory;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="w-full max-w-3xl rounded-2xl border border-border bg-card shadow-xl max-h-[90vh] flex flex-col overflow-hidden">
+        <div className="shrink-0 bg-card border-b border-border/40 px-5 py-4 flex items-center justify-between gap-3">
+          <div>
+            <p className="font-semibold">Tender Bid Details</p>
+            <p className="text-xs text-muted-foreground">Sr #{bid.srNo}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {!editing ? (
+              <Button size="sm" variant="outline" className="gap-1" onClick={() => setEditing(true)}>
+                <Pencil className="h-3.5 w-3.5" /> Edit
+              </Button>
+            ) : null}
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1"
+              onClick={() => {
+                onClose();
+                navigate(`/tender/letter?id=${bid.id}`);
+              }}
+            >
+              <FileText className="h-3.5 w-3.5" />
+              {bid.status === "ALLOTTED" ? "LOA Letter" : "EMD Return Letter"}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={onClose}>Close</Button>
+          </div>
+        </div>
+
+        <div className="p-5 overflow-y-auto flex-1">
+          {!editing ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <DetailField label="Sr No" value={String(bid.srNo)} />
+              <DetailField label="Status" value={bid.status === "ALLOTTED" ? "Allotted" : "Not Allotted"} />
+              <div className="sm:col-span-2"><DetailField label="Name of Work" value={bid.nameOfWork} /></div>
+              <DetailField label="Name of Bidder" value={bid.nameOfBidder} />
+              <DetailField label="Bid Inviting Authority" value={bid.bidInvitingAuthority} />
+              <div className="sm:col-span-2"><DetailField label="Authority Address" value={bid.bidInvitingAuthorityAddress} /></div>
+              <DetailField label="Tender ID" value={bid.tenderId} />
+              <DetailField label="Project Length (Km)" value={bid.projectLengthKm ? String(bid.projectLengthKm) : ""} />
+              <DetailField label="Work Category" value={`${bid.workCategory} — ${wcLabel}`} />
+              <DetailField label="Client" value={bid.client} />
+              <DetailField label="State / Region" value={bid.state || "Not Selected"} />
+              <DetailField label="Type of EMD" value={bid.emdType} />
+              <DetailField label="EMD Amount" value={formatCurrency(bid.emd)} />
+              <DetailField label="EMD Bank" value={bid.emdBank} />
+              <DetailField label="EMD Issued Date" value={formatDate(bid.emdIssuedDate)} />
+              <DetailField label="EMD No." value={bid.emdNumber} />
+              <DetailField label="EMD Valid Upto" value={formatDate(bid.emdValidUpto)} />
+              <DetailField label="Tender Fees" value={formatCurrency(bid.tenderFees)} />
+              <DetailField label="Infracon Fees" value={formatCurrency(bid.infraconFees)} />
+              <DetailField label="Letter Type" value={bid.status === "ALLOTTED" ? "LOA Request Letter" : "EMD Refund Letter"} />
+              <div className="sm:col-span-2"><DetailField label="Remarks" value={bid.remarks} /></div>
+              {bid.emdLetterUrl ? (
                 <div className="rounded-xl border border-border/40 bg-secondary/20 px-3 py-2">
                   <p className="text-[11px] text-muted-foreground">EMD Attachment</p>
-                  <button
-                    type="button"
-                    onClick={() => openAttachment(selectedBid.emdLetterUrl)}
-                    className="mt-0.5 text-primary underline inline-flex items-center gap-1"
-                  >
+                  <button type="button" onClick={() => openAttachment(bid.emdLetterUrl)} className="mt-0.5 text-primary underline inline-flex items-center gap-1 text-sm">
                     <Eye className="h-3 w-3" /> View
                   </button>
                 </div>
-              )}
+              ) : null}
             </div>
-          </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="sm:col-span-2 lg:col-span-3">
+                <label className="text-xs text-muted-foreground mb-1 block">Name of Work</label>
+                <Input value={draft.nameOfWork} onChange={(e) => set("nameOfWork", e.target.value)} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Name of Bidder</label>
+                <CreatableSelect
+                  value={draft.nameOfBidder || ""}
+                  onValueChange={(v) => set("nameOfBidder", v)}
+                  baseOptions={[...DEFAULT_BIDDER_OPTIONS]}
+                  learnedOptions={bidderOptions}
+                  storageKey={TENDER_OPTION_STORAGE_KEYS.bidders}
+                  placeholder="Select bidder"
+                  otherPlaceholder="Enter bidder name"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Bid Inviting Authority</label>
+                <CreatableSelect
+                  value={draft.bidInvitingAuthority || ""}
+                  onValueChange={(v) => set("bidInvitingAuthority", v)}
+                  learnedOptions={authorityOptions}
+                  storageKey={TENDER_OPTION_STORAGE_KEYS.authorities}
+                  placeholder="Select authority"
+                  otherPlaceholder="Enter authority name"
+                />
+              </div>
+              <div className="sm:col-span-2 lg:col-span-1">
+                <label className="text-xs text-muted-foreground mb-1 block">Authority Address</label>
+                <CreatableSelect
+                  value={draft.bidInvitingAuthorityAddress || ""}
+                  onValueChange={(v) => set("bidInvitingAuthorityAddress", v)}
+                  learnedOptions={authorityAddressOptions}
+                  storageKey={TENDER_OPTION_STORAGE_KEYS.authorityAddresses}
+                  placeholder="Select address"
+                  otherPlaceholder="Enter authority address"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Tender ID</label>
+                <Input value={draft.tenderId || ""} onChange={(e) => set("tenderId", e.target.value)} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Project Length (Km)</label>
+                <Input type="number" value={draft.projectLengthKm || ""} onChange={(e) => set("projectLengthKm", Number(e.target.value))} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Work Category</label>
+                <Select value={draft.workCategory} onValueChange={(v) => set("workCategory", v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{WORK_CATEGORY_OPTIONS.map((o) => <SelectItem key={o.code} value={o.code}>{o.code} — {o.label}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Client</label>
+                <Select value={draft.client} onValueChange={(v) => set("client", v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{CLIENT_OPTIONS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">State / Region</label>
+                <LocationCombobox value={draft.state} onValueChange={(v) => set("state", v)} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Status</label>
+                <Select value={draft.status} onValueChange={(v) => set("status", v as TenderBidStatus)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALLOTTED">Allotted</SelectItem>
+                    <SelectItem value="NOT_ALLOTTED">Not Allotted</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">EMD Amount</label>
+                <Input type="number" value={draft.emd || ""} onChange={(e) => set("emd", Number(e.target.value))} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Type of EMD</label>
+                <div className="flex items-center gap-1.5">
+                  <Select value={draft.emdType || "NONE"} onValueChange={(v) => set("emdType", v === "NONE" ? "" : v)}>
+                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="NONE">None</SelectItem>
+                      {EMD_TYPE_OPTIONS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <input
+                    ref={emdFileRef}
+                    type="file"
+                    className="hidden"
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                    onChange={async (e) => {
+                      const f = e.target.files?.[0];
+                      e.target.value = "";
+                      if (!f) return;
+                      setEmdUploading(true);
+                      try {
+                        const result = await api.uploadFile(f);
+                        set("emdLetterUrl", result.url);
+                        toast.success("EMD attachment uploaded");
+                      } catch {
+                        toast.error("Upload failed");
+                      } finally {
+                        setEmdUploading(false);
+                      }
+                    }}
+                  />
+                  <Button type="button" size="sm" variant="outline" className="h-9 w-9 p-0 shrink-0" disabled={emdUploading} onClick={() => emdFileRef.current?.click()}>
+                    {emdUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
+                  </Button>
+                  {draft.emdLetterUrl ? (
+                    <Button type="button" size="sm" variant="default" className="h-9 w-9 p-0 shrink-0" onClick={() => openAttachment(draft.emdLetterUrl)}>
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">EMD Bank</label>
+                <Input value={draft.emdBank || ""} onChange={(e) => set("emdBank", e.target.value)} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">EMD Issued Date</label>
+                <Input type="date" value={draft.emdIssuedDate ? new Date(draft.emdIssuedDate).toISOString().split("T")[0] : ""} onChange={(e) => set("emdIssuedDate", e.target.value || null)} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">EMD No.</label>
+                <Input value={draft.emdNumber || ""} onChange={(e) => set("emdNumber", e.target.value)} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">EMD Valid Upto</label>
+                <Input type="date" value={draft.emdValidUpto ? new Date(draft.emdValidUpto).toISOString().split("T")[0] : ""} onChange={(e) => set("emdValidUpto", e.target.value || null)} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Tender Fees</label>
+                <Input type="number" value={draft.tenderFees || ""} onChange={(e) => set("tenderFees", Number(e.target.value))} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Infracon Fees</label>
+                <Input type="number" value={draft.infraconFees || ""} onChange={(e) => set("infraconFees", Number(e.target.value))} />
+              </div>
+              <div className="sm:col-span-2 lg:col-span-3">
+                <label className="text-xs text-muted-foreground mb-1 block">Remarks</label>
+                <Input value={draft.remarks || ""} onChange={(e) => set("remarks", e.target.value)} />
+              </div>
+            </div>
+          )}
         </div>
-      )}
-    </PageWrapper>
+
+        {editing ? (
+          <div className="shrink-0 bg-card border-t border-border/40 px-5 py-3 flex gap-2 justify-end">
+            <Button size="sm" variant="outline" onClick={() => { setDraft(bid); setEditing(false); }}>Cancel</Button>
+            <Button size="sm" disabled={saveMutation.isPending} onClick={() => saveMutation.mutate()}>
+              {saveMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : null}
+              Save
+            </Button>
+          </div>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
@@ -880,6 +1125,7 @@ function PreContractDetailModal({
     onError: (e) => toast.error(e.message),
   });
 
+  const [editing, setEditing] = useState(false);
   const onBidUpdate = (field: string, value: unknown) => updateBidMutation.mutate({ [field]: value });
   const wcLabel = WORK_CATEGORY_OPTIONS.find((o) => o.code === bid.workCategory)?.label ?? bid.workCategory;
 
@@ -891,9 +1137,61 @@ function PreContractDetailModal({
             <p className="font-semibold">Pre-Contract Details</p>
             <p className="text-xs text-muted-foreground">Sr #{bid.srNo} · {wcLabel} ({bid.workCategory}) · {bid.client} · {bid.state || "No State"}</p>
           </div>
-          <Button size="sm" variant="ghost" onClick={onClose}><X className="h-4 w-4" /></Button>
+          <div className="flex items-center gap-2">
+            {!editing ? (
+              <Button size="sm" variant="outline" className="gap-1" onClick={() => setEditing(true)}>
+                <Pencil className="h-3.5 w-3.5" /> Edit
+              </Button>
+            ) : null}
+            <Button size="sm" variant="ghost" onClick={onClose}><X className="h-4 w-4" /></Button>
+          </div>
         </div>
         <div className="p-5 space-y-4 overflow-y-auto flex-1">
+          {!editing ? (
+            <div className="space-y-4">
+              <div className="rounded-xl border border-border/40 bg-secondary/10 p-4">
+                <p className="text-xs font-medium text-muted-foreground mb-3">Tender Bid Details</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div className="sm:col-span-2 lg:col-span-3"><DetailField label="Name of Work" value={bid.nameOfWork} /></div>
+                  <DetailField label="Name of Bidder" value={bid.nameOfBidder} />
+                  <DetailField label="Bid Inviting Authority" value={bid.bidInvitingAuthority} />
+                  <DetailField label="Authority Address" value={bid.bidInvitingAuthorityAddress} />
+                  <DetailField label="Tender ID" value={bid.tenderId} />
+                  <DetailField label="Work Category" value={`${bid.workCategory} — ${wcLabel}`} />
+                  <DetailField label="Client" value={bid.client} />
+                  <DetailField label="State / Region" value={bid.state} />
+                  <DetailField label="EMD Amount" value={formatCurrency(bid.emd)} />
+                  <DetailField label="Type of EMD" value={bid.emdType} />
+                </div>
+              </div>
+              {preContract ? (
+                <div className="rounded-xl border border-border/40 bg-secondary/10 p-4">
+                  <p className="text-xs font-medium text-muted-foreground mb-3">Pre-Contract Activity</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <DetailField label="Award / LOA Date" value={formatDate(preContract.awardOfProjectDate)} />
+                    <DetailField label="Security Deposit Type" value={preContract.securityDepositType ? (SECURITY_DEPOSIT_TYPE_OPTIONS.find((o) => o.value === preContract.securityDepositType)?.label ?? preContract.securityDepositType) : ""} />
+                    <DetailField label="SD Bank" value={preContract.sdBank} />
+                    <DetailField label="SD Amount" value={formatCurrency(preContract.sdAmount)} />
+                    <DetailField label="SD Expiry" value={formatDate(preContract.sdExpiryDate)} />
+                    <DetailField label="Signing Agreement" value={formatDate(preContract.signingAgreementDate)} />
+                    <DetailField label="Proceeding / WO" value={formatDate(preContract.proceedingOrderDate)} />
+                    <DetailField label="PI/PL Policy No." value={preContract.piPlPolicyNo} />
+                    <DetailField label="WC Policy No." value={preContract.wcPolicyNo} />
+                    <div className="sm:col-span-2 lg:col-span-3"><DetailField label="Remarks" value={preContract.remarks} /></div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-6">
+                  <p className="text-muted-foreground text-sm mb-3">No pre-contract activity linked to this tender yet.</p>
+                  <Button size="sm" className="gap-1.5" disabled={createMutation.isPending} onClick={() => createMutation.mutate()}>
+                    {createMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                    Create Pre-Contract Activity
+                  </Button>
+                </div>
+              )}
+            </div>
+          ) : (
+          <>
           {/* Tender Bid Details — Editable */}
           <div className="rounded-xl border border-border/40 bg-secondary/10 p-4">
             <p className="text-xs font-medium text-muted-foreground mb-3">Tender Bid Details</p>
@@ -1018,16 +1316,18 @@ function PreContractDetailModal({
               onUpdate={(field, value) => updateMutation.mutate({ id: preContract.id, payload: { [field]: value } })}
             />
           )}
+          </>
+          )}
         </div>
-        {preContract && (
+        {editing && (
           <div className="shrink-0 bg-card border-t border-border/40 px-5 py-3 flex gap-2 justify-end">
-            <Button size="sm" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button size="sm" variant="outline" onClick={() => setEditing(false)}>Cancel</Button>
             <Button
               size="sm"
               disabled={updateMutation.isPending}
               onClick={() => {
                 toast.success("Pre-contract details saved");
-                onClose();
+                setEditing(false);
               }}
             >
               {updateMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : null}
@@ -2059,6 +2359,7 @@ function ContractDetailModal({
     onError: (e) => toast.error(e.message),
   });
 
+  const [editing, setEditing] = useState(false);
   const onBidUpdate = (field: string, value: unknown) => updateBidMutation.mutate({ [field]: value });
 
   return (
@@ -2069,9 +2370,55 @@ function ContractDetailModal({
             <p className="font-semibold">Contract Activity Details</p>
             <p className="text-xs text-muted-foreground">Sr #{bid.srNo} · {bid.client} · {bid.state || "No State"}</p>
           </div>
-          <Button size="sm" variant="ghost" onClick={onClose}><X className="h-4 w-4" /></Button>
+          <div className="flex items-center gap-2">
+            {!editing ? (
+              <Button size="sm" variant="outline" className="gap-1" onClick={() => setEditing(true)}>
+                <Pencil className="h-3.5 w-3.5" /> Edit
+              </Button>
+            ) : null}
+            <Button size="sm" variant="ghost" onClick={onClose}><X className="h-4 w-4" /></Button>
+          </div>
         </div>
         <div className="p-5 space-y-4 overflow-y-auto flex-1">
+          {!editing ? (
+            <div className="space-y-4">
+              <div className="rounded-xl border border-border/40 bg-secondary/10 p-4">
+                <p className="text-xs font-medium text-muted-foreground mb-3">Details from Tender</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div className="sm:col-span-2 lg:col-span-3"><DetailField label="Name of Work" value={bid.nameOfWork} /></div>
+                  <DetailField label="Name of Bidder" value={bid.nameOfBidder} />
+                  <DetailField label="Bid Inviting Authority" value={bid.bidInvitingAuthority} />
+                  <DetailField label="Authority Address" value={bid.bidInvitingAuthorityAddress} />
+                </div>
+              </div>
+              {contract ? (
+                <div className="rounded-xl border border-border/40 bg-secondary/10 p-4">
+                  <p className="text-xs font-medium text-muted-foreground mb-3">Contract Activity</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <DetailField label="Performance SD Type" value={contract.securityDepositType ? (SECURITY_DEPOSIT_TYPE_OPTIONS.find((o) => o.value === contract.securityDepositType)?.label ?? contract.securityDepositType) : ""} />
+                    <DetailField label="SD Bank" value={contract.sdBank} />
+                    <DetailField label="SD Amount" value={formatCurrency(contract.sdAmount)} />
+                    <DetailField label="Proceeding / WO" value={formatDate(contract.proceedingOrderDate)} />
+                    <DetailField label="WO Amount" value={formatCurrency(contract.woAmount)} />
+                    <DetailField label="PI/PL Policy No." value={contract.piPlPolicyNo} />
+                    <DetailField label="WC Policy No." value={contract.wcPolicyNo} />
+                    <div className="sm:col-span-2 lg:col-span-3"><DetailField label="Remarks" value={contract.remarks} /></div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-6">
+                  <p className="text-muted-foreground text-sm mb-3">
+                    No contract activity yet. {preContract ? "Pre-contract data will be copied automatically." : "Create to start tracking contract details."}
+                  </p>
+                  <Button size="sm" className="gap-1.5" disabled={createMutation.isPending} onClick={() => createMutation.mutate()}>
+                    {createMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                    Create Contract Activity
+                  </Button>
+                </div>
+              )}
+            </div>
+          ) : (
+          <>
           <div className="rounded-xl border border-border/40 bg-secondary/10 p-4">
             <p className="text-xs font-medium text-muted-foreground mb-3">Details from Tender</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -2135,16 +2482,18 @@ function ContractDetailModal({
               onUpdate={(field, value) => updateMutation.mutate({ id: contract.id, payload: { [field]: value } })}
             />
           )}
+          </>
+          )}
         </div>
-        {contract && (
+        {editing && (
           <div className="shrink-0 bg-card border-t border-border/40 px-5 py-3 flex gap-2 justify-end">
-            <Button size="sm" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button size="sm" variant="outline" onClick={() => setEditing(false)}>Cancel</Button>
             <Button
               size="sm"
               disabled={updateMutation.isPending}
               onClick={() => {
                 toast.success("Contract details saved");
-                onClose();
+                setEditing(false);
               }}
             >
               {updateMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : null}

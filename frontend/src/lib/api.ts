@@ -1541,10 +1541,21 @@ export const api = {
 
   updateTenderBid(id: string, payload: Partial<{
     nameOfWork: string;
+    nameOfBidder: string;
+    bidInvitingAuthority: string;
+    bidInvitingAuthorityAddress: string;
+    tenderId: string;
+    projectLengthKm: number;
     workCategory: string;
     client: string;
     state: string;
     emd: number;
+    emdType: string;
+    emdBank: string;
+    emdIssuedDate: string | null;
+    emdNumber: string;
+    emdValidUpto: string | null;
+    emdLetterUrl: string | null;
     tenderFees: number;
     infraconFees: number;
     status: TenderBidStatus;
