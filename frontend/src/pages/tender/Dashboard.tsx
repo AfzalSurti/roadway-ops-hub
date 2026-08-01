@@ -144,10 +144,17 @@ function AttachmentViewer() {
 
 type Tab = "bids" | "precontract" | "contract";
 
-export default function TenderDashboard() {
+export default function TenderDashboard({
+  readOnly = false,
+  initialTab = "bids",
+}: {
+  readOnly?: boolean;
+  initialTab?: Tab;
+} = {}) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<Tab>("bids");
+  const letterPath = readOnly ? "/hod/letter" : "/tender/letter";
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [search, setSearch] = useState("");
   const [workCategoryFilter, setWorkCategoryFilter] = useState("ALL");
   const [clientFilter, setClientFilter] = useState("ALL");
@@ -272,9 +279,13 @@ export default function TenderDashboard() {
       <div className="page-header flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="page-title inline-flex items-center gap-2">
-            <Gavel className="h-6 w-6" /> Tender Management
+            <Gavel className="h-6 w-6" /> {readOnly ? "Tender" : "Tender Management"}
           </h1>
-          <p className="page-subtitle">Manage tender bids, pre-contract, and contract activities.</p>
+          <p className="page-subtitle">
+            {readOnly
+              ? "Read-only view of tender bids, pre-contract, and contract activities."
+              : "Manage tender bids, pre-contract, and contract activities."}
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Badge variant="secondary" className="rounded-full">{filtered.length} item(s)</Badge>
@@ -282,7 +293,7 @@ export default function TenderDashboard() {
             {isFetching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCcw className="h-3.5 w-3.5" />}
             Refresh
           </Button>
-          {tab === "bids" && (
+          {!readOnly && tab === "bids" && (
             <Button size="sm" className="gap-1" onClick={() => setShowAddForm(!showAddForm)}>
               <Plus className="h-3.5 w-3.5" /> Add Bid
             </Button>
@@ -402,7 +413,7 @@ export default function TenderDashboard() {
           </div>
 
           {/* Add Bid Modal */}
-          {showAddForm && (
+          {!readOnly && showAddForm && (
             <AddBidModal
               newBid={newBid}
               setNewBid={(bid) => setNewBid(bid as typeof newBid)}
@@ -488,25 +499,31 @@ export default function TenderDashboard() {
                         <td className="p-2.5 align-top text-right tabular-nums text-xs leading-snug">{formatCurrency(bid.bidAmount)}</td>
                         <td className="p-2.5 align-top text-right tabular-nums text-xs leading-snug">{formatAboveBelow(bid.aboveBelowPercent)}</td>
                         <td className="p-2.5 align-top text-center" onClick={(e) => e.stopPropagation()}>
-                          <Select
-                            value={bid.status}
-                            onValueChange={(v) => updateMutation.mutate({ id: bid.id, payload: { status: v as TenderBidStatus } })}
-                          >
-                            <SelectTrigger className="h-7 w-full max-w-[120px] mx-auto text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="ALLOTTED">Allotted</SelectItem>
-                              <SelectItem value="NOT_ALLOTTED">Not Allotted</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          {readOnly ? (
+                            <Badge variant={bid.status === "ALLOTTED" ? "secondary" : "outline"}>
+                              {bid.status === "ALLOTTED" ? "Allotted" : "Not Allotted"}
+                            </Badge>
+                          ) : (
+                            <Select
+                              value={bid.status}
+                              onValueChange={(v) => updateMutation.mutate({ id: bid.id, payload: { status: v as TenderBidStatus } })}
+                            >
+                              <SelectTrigger className="h-7 w-full max-w-[120px] mx-auto text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="ALLOTTED">Allotted</SelectItem>
+                                <SelectItem value="NOT_ALLOTTED">Not Allotted</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          )}
                         </td>
                         <td className="p-2.5 align-top text-center" onClick={(e) => e.stopPropagation()}>
                           <Button
                             size="sm"
                             variant="outline"
                             className="h-7 gap-1 text-xs"
-                            onClick={() => navigate(`/tender/letter?id=${bid.id}`)}
+                            onClick={() => navigate(`${letterPath}?id=${bid.id}`)}
                           >
                             <FileText className="h-3 w-3" />
                             Preview
@@ -522,16 +539,18 @@ export default function TenderDashboard() {
                             >
                               <Eye className="h-3.5 w-3.5" />
                             </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-7 w-7 p-0 text-destructive"
-                              onClick={() => {
-                                if (window.confirm("Delete this bid?")) deleteMutation.mutate(bid.id);
-                              }}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
+                            {!readOnly && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 w-7 p-0 text-destructive"
+                                onClick={() => {
+                                  if (window.confirm("Delete this bid?")) deleteMutation.mutate(bid.id);
+                                }}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -546,18 +565,20 @@ export default function TenderDashboard() {
 
       {/* Pre-Contract Tab */}
       {tab === "precontract" && (
-        <PreContractSection allottedBids={items.filter((b) => b.status === "ALLOTTED")} />
+        <PreContractSection readOnly={readOnly} allottedBids={items.filter((b) => b.status === "ALLOTTED")} />
       )}
 
       {/* Contract Tab */}
       {tab === "contract" && (
-        <ContractSection allottedBids={items.filter((b) => b.status === "ALLOTTED")} />
+        <ContractSection readOnly={readOnly} allottedBids={items.filter((b) => b.status === "ALLOTTED")} />
       )}
 
       {/* Tender Detail Modal */}
       {selectedBid && (
         <TenderBidDetailModal
           bid={selectedBid}
+          readOnly={readOnly}
+          letterPath={letterPath}
           bidderOptions={uniqueBidders}
           authorityOptions={uniqueAuthorities}
           authorityAddressOptions={uniqueAuthorityAddresses}
@@ -571,6 +592,8 @@ export default function TenderDashboard() {
 
 function TenderBidDetailModal({
   bid,
+  readOnly = false,
+  letterPath = "/tender/letter",
   bidderOptions,
   authorityOptions,
   authorityAddressOptions,
@@ -578,6 +601,8 @@ function TenderBidDetailModal({
   onUpdated,
 }: {
   bid: TenderBidItem;
+  readOnly?: boolean;
+  letterPath?: string;
   bidderOptions: string[];
   authorityOptions: string[];
   authorityAddressOptions: string[];
@@ -655,11 +680,11 @@ function TenderBidDetailModal({
       <div className="w-full max-w-3xl rounded-2xl border border-border bg-card shadow-xl max-h-[90vh] flex flex-col overflow-hidden">
         <div className="shrink-0 bg-card border-b border-border/40 px-5 py-4 flex items-center justify-between gap-3">
           <div>
-            <p className="font-semibold">Tender Bid Details</p>
+            <p className="font-semibold">Tender Bid Details{readOnly ? " (read-only)" : ""}</p>
             <p className="text-xs text-muted-foreground">Sr #{bid.srNo}</p>
           </div>
           <div className="flex items-center gap-2">
-            {!editing ? (
+            {!readOnly && !editing ? (
               <Button size="sm" variant="outline" className="gap-1" onClick={() => setEditing(true)}>
                 <Pencil className="h-3.5 w-3.5" /> Edit
               </Button>
@@ -670,7 +695,7 @@ function TenderBidDetailModal({
               className="gap-1"
               onClick={() => {
                 onClose();
-                navigate(`/tender/letter?id=${bid.id}`);
+                navigate(`${letterPath}?id=${bid.id}`);
               }}
             >
               <FileText className="h-3.5 w-3.5" />
@@ -897,7 +922,7 @@ function TenderBidDetailModal({
 
 /* ─── Pre-Contract Section (table view like bids) ─── */
 
-function PreContractSection({ allottedBids }: { allottedBids: TenderBidItem[] }) {
+function PreContractSection({ allottedBids, readOnly = false }: { allottedBids: TenderBidItem[]; readOnly?: boolean }) {
   const queryClient = useQueryClient();
   const [pcSearch, setPcSearch] = useState("");
   const [pcWcFilter, setPcWcFilter] = useState("ALL");
@@ -1100,6 +1125,7 @@ function PreContractSection({ allottedBids }: { allottedBids: TenderBidItem[] })
       {selectedPcBid && (
         <PreContractDetailModal
           bid={selectedPcBid}
+          readOnly={readOnly}
           preContract={preContractMap.get(selectedPcBid.id) ?? null}
           onClose={() => setSelectedPcBid(null)}
           onRefresh={() => queryClient.invalidateQueries({ queryKey: ["pre-contract-activities"] })}
@@ -1113,11 +1139,13 @@ function PreContractSection({ allottedBids }: { allottedBids: TenderBidItem[] })
 
 function PreContractDetailModal({
   bid,
+  readOnly = false,
   preContract,
   onClose,
   onRefresh,
 }: {
   bid: TenderBidItem;
+  readOnly?: boolean;
   preContract: PreContractActivityItem | null;
   onClose: () => void;
   onRefresh: () => void;
@@ -1186,11 +1214,11 @@ function PreContractDetailModal({
       <div className="w-full max-w-6xl rounded-2xl border border-border bg-card shadow-xl max-h-[90vh] flex flex-col overflow-hidden">
         <div className="shrink-0 bg-card border-b border-border/40 px-5 py-4 flex items-center justify-between gap-3">
           <div>
-            <p className="font-semibold">Pre-Contract Details</p>
+            <p className="font-semibold">Pre-Contract Details{readOnly ? " (read-only)" : ""}</p>
             <p className="text-xs text-muted-foreground">Sr #{bid.srNo} · {wcLabel} ({bid.workCategory}) · {bid.client} · {bid.state || "No State"}</p>
           </div>
           <div className="flex items-center gap-2">
-            {!editing ? (
+            {!readOnly && !editing ? (
               <Button size="sm" variant="outline" className="gap-1" onClick={() => setEditing(true)}>
                 <Pencil className="h-3.5 w-3.5" /> Edit
               </Button>
@@ -1238,10 +1266,12 @@ function PreContractDetailModal({
               ) : (
                 <div className="text-center py-6">
                   <p className="text-muted-foreground text-sm mb-3">No pre-contract activity linked to this tender yet.</p>
-                  <Button size="sm" className="gap-1.5" disabled={createMutation.isPending} onClick={() => createMutation.mutate()}>
-                    {createMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
-                    Create Pre-Contract Activity
-                  </Button>
+                  {!readOnly && (
+                    <Button size="sm" className="gap-1.5" disabled={createMutation.isPending} onClick={() => createMutation.mutate()}>
+                      {createMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                      Create Pre-Contract Activity
+                    </Button>
+                  )}
                 </div>
               )}
             </div>
@@ -2061,7 +2091,7 @@ function PreContractForm({
 
 /* ─── Contract Section (table + filters + popup) ─── */
 
-function ContractSection({ allottedBids }: { allottedBids: TenderBidItem[] }) {
+function ContractSection({ allottedBids, readOnly = false }: { allottedBids: TenderBidItem[]; readOnly?: boolean }) {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [wcFilter, setWcFilter] = useState("ALL");
@@ -2342,6 +2372,7 @@ function ContractSection({ allottedBids }: { allottedBids: TenderBidItem[] }) {
       {selectedBid && (
         <ContractDetailModal
           bid={selectedBid}
+          readOnly={readOnly}
           contract={contractMap.get(selectedBid.id) ?? null}
           preContract={preContractMap.get(selectedBid.id) ?? null}
           onClose={() => setSelectedBid(null)}
@@ -2354,12 +2385,14 @@ function ContractSection({ allottedBids }: { allottedBids: TenderBidItem[] }) {
 
 function ContractDetailModal({
   bid,
+  readOnly = false,
   contract,
   preContract,
   onClose,
   onRefresh,
 }: {
   bid: TenderBidItem;
+  readOnly?: boolean;
   contract: ContractActivityItem | null;
   preContract: PreContractActivityItem | null;
   onClose: () => void;
@@ -2460,11 +2493,11 @@ function ContractDetailModal({
       <div className="w-full max-w-6xl rounded-2xl border border-border bg-card shadow-xl max-h-[90vh] flex flex-col overflow-hidden">
         <div className="shrink-0 bg-card border-b border-border/40 px-5 py-4 flex items-center justify-between gap-3">
           <div>
-            <p className="font-semibold">Contract Activity Details</p>
+            <p className="font-semibold">Contract Activity Details{readOnly ? " (read-only)" : ""}</p>
             <p className="text-xs text-muted-foreground">Sr #{bid.srNo} · {bid.client} · {bid.state || "No State"}</p>
           </div>
           <div className="flex items-center gap-2">
-            {!editing ? (
+            {!readOnly && !editing ? (
               <Button size="sm" variant="outline" className="gap-1" onClick={() => setEditing(true)}>
                 <Pencil className="h-3.5 w-3.5" /> Edit
               </Button>
@@ -2506,10 +2539,12 @@ function ContractDetailModal({
                   <p className="text-muted-foreground text-sm mb-3">
                     No contract activity yet. {preContract ? "Pre-contract data will be copied automatically." : "Create to start tracking contract details."}
                   </p>
-                  <Button size="sm" className="gap-1.5" disabled={createMutation.isPending} onClick={() => createMutation.mutate()}>
-                    {createMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
-                    Create Contract Activity
-                  </Button>
+                  {!readOnly && (
+                    <Button size="sm" className="gap-1.5" disabled={createMutation.isPending} onClick={() => createMutation.mutate()}>
+                      {createMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                      Create Contract Activity
+                    </Button>
+                  )}
                 </div>
               )}
             </div>

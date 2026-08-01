@@ -167,6 +167,7 @@ function AppRoutes() {
         <Route path="dashboard" element={<HodDashboard />} />
         <Route path="assets" element={<HodAssets />} />
         <Route path="tender" element={<HodTender />} />
+        <Route path="letter" element={<TenderLetterPreview />} />
         <Route path="operations" element={<HodOperations />} />
       </Route>
 
