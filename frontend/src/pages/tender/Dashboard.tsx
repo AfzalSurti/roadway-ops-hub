@@ -392,7 +392,7 @@ export default function TenderDashboard() {
           {showAddForm && (
             <AddBidModal
               newBid={newBid}
-              setNewBid={setNewBid}
+              setNewBid={(bid) => setNewBid(bid as typeof newBid)}
               isPending={createMutation.isPending}
               onSave={() => createMutation.mutate(newBid)}
               onClose={() => setShowAddForm(false)}
