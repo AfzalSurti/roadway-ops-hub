@@ -48,24 +48,28 @@ function letterClosing(bidderName: string): string {
 
 <p>Yours faithfully,</p>
 
-<p><strong>${company}</strong></p>
+<p style="margin-bottom: 0;"><strong>${company}</strong></p>
 
 <!-- Blank area for physical company stamp / seal -->
-<div style="height: 110px; margin: 8px 0 16px;"></div>
+<div style="height: 140px; min-height: 140px;"></div>
 
-<p><strong>Authorized Signatory</strong></p>
+<p style="margin-top: 0;"><strong>Authorized Signatory</strong></p>
 
 <p>If any query, please Contact to this number 91+ 9265322086</p>
 
-<hr style="border: none; border-top: 1px solid #111; margin: 28px 0 10px;" />
-
-<p style="font-size: 11px; line-height: 1.45; margin: 0;">
-<strong>Registered Office:</strong> GEO DESIGNS &amp; RESEARCH (P) LTD.<br/>
-B-10, Krishna Industrial Estate, Opp. B.I.D.C. Gorwa, Vadodara - 390 016. Gujarat, India.<br/>
-Tel: +91 82380 98214 and +91 97126 16960.<br/>
-E-mail: tender@geogroup.in, info@geogroup.in
+<p style="font-size: 11px; line-height: 1.5; margin-top: 28px;">
+<strong>Registered Office: GEO DESIGNS &amp; RESEARCH (P) LTD.</strong><br/>
+B-10, Krishna Industrial Estate, Opp. B.I.D.C. Gorwa, Vadodara - 390 016.<br/>
+Gujarat, India. Tel: +91 82380 98214 and +91 97126 16960.<br/>
+E-mail: <a href="mailto:tender@geogroup.in">tender@geogroup.in</a>, <a href="mailto:info@geogroup.in">info@geogroup.in</a>
 </p>
 `.trim();
+}
+
+function formatToBlock(authority: string, address?: string | null): string {
+  const lines = [authority || "________"];
+  if (address?.trim()) lines.push(address.trim());
+  return lines.join("<br/>");
 }
 
 export function generateEmdRefundLetter(bid: TenderBidItem): string {
@@ -79,7 +83,7 @@ export function generateEmdRefundLetter(bid: TenderBidItem): string {
 <span style="float:right;"><strong>Date:</strong> ${today}</span></p>
 
 <p><strong>To,</strong><br/>
-${authority}</p>
+${formatToBlock(authority, bid.bidInvitingAuthorityAddress)}</p>
 
 <p><strong>Tender No. :</strong> ${tenderId}</p>
 
@@ -127,7 +131,7 @@ export function generateLoaRequestLetter(bid: TenderBidItem): string {
 <span style="float:right;"><strong>Date:</strong> ${today}</span></p>
 
 <p><strong>To,</strong><br/>
-${authority}</p>
+${formatToBlock(authority, bid.bidInvitingAuthorityAddress)}</p>
 
 <p><strong>Tender No. :</strong> ${tenderId}</p>
 
@@ -160,8 +164,6 @@ ${authority}</p>
     </td>
   </tr>
 </table>
-
-<p>In view of the above, we hereby request you to kindly issue the <strong>Letter of Acceptance (LOA)</strong> at the earliest convenience so that we may proceed with the necessary formalities and commence the work within the stipulated time frame.</p>
 
 ${letterClosing(bidderName)}
 `.trim();
