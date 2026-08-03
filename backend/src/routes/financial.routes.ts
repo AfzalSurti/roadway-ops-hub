@@ -11,7 +11,7 @@ export const financialRouter = Router();
 financialRouter.use(requireAuth);
 financialRouter.get(
   "/bill-status/projects",
-  requireRole("ADMIN", "HOD"),
+  requireRole("ADMIN", "HOD", "INFRA"),
   asyncHandler(financialController.getAllProjectsBillStatus)
 );
 financialRouter.use(requireRole("ADMIN"));

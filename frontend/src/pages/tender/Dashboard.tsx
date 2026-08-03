@@ -273,6 +273,19 @@ export default function TenderDashboard({
 
   const allottedCount = useMemo(() => items.filter((b) => b.status === "ALLOTTED").length, [items]);
 
+  const bidAmountTotals = useMemo(() => {
+    return filtered.reduce(
+      (acc, bid) => ({
+        emd: acc.emd + (Number(bid.emd) || 0),
+        tenderFees: acc.tenderFees + (Number(bid.tenderFees) || 0),
+        infraconFees: acc.infraconFees + (Number(bid.infraconFees) || 0),
+        ecv: acc.ecv + (Number(bid.ecv) || 0),
+        bidAmount: acc.bidAmount + (Number(bid.bidAmount) || 0),
+      }),
+      { emd: 0, tenderFees: 0, infraconFees: 0, ecv: 0, bidAmount: 0 }
+    );
+  }, [filtered]);
+
   return (
     <PageWrapper>
       <AttachmentViewer />
@@ -288,7 +301,9 @@ export default function TenderDashboard({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Badge variant="secondary" className="rounded-full">{filtered.length} item(s)</Badge>
+          <Badge variant="secondary" className="rounded-full">
+            Showing {filtered.length} of {items.length}
+          </Badge>
           <Button size="sm" variant="outline" className="gap-1" disabled={isFetching} onClick={() => refetch()}>
             {isFetching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCcw className="h-3.5 w-3.5" />}
             Refresh
@@ -556,6 +571,19 @@ export default function TenderDashboard({
                       </tr>
                     ))}
                   </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 border-border/50 bg-secondary/30 font-semibold text-xs">
+                      <td className="p-2.5" colSpan={10}>Total ({filtered.length})</td>
+                      <td className="p-2.5 text-right tabular-nums">{formatCurrency(bidAmountTotals.emd)}</td>
+                      <td className="p-2.5 text-right tabular-nums leading-snug">
+                        <div>{formatCurrency(bidAmountTotals.tenderFees)}</div>
+                        <div className="text-muted-foreground font-normal mt-0.5">{formatCurrency(bidAmountTotals.infraconFees)}</div>
+                      </td>
+                      <td className="p-2.5 text-right tabular-nums">{formatCurrency(bidAmountTotals.ecv)}</td>
+                      <td className="p-2.5 text-right tabular-nums">{formatCurrency(bidAmountTotals.bidAmount)}</td>
+                      <td className="p-2.5" colSpan={3}></td>
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
             </div>
@@ -962,6 +990,19 @@ function PreContractSection({ allottedBids, readOnly = false }: { allottedBids: 
     });
   }, [allottedBids, pcSearch, pcWcFilter, pcClientFilter, pcStateFilter, pcBidderFilter, pcAuthorityFilter]);
 
+  const pcAmountTotals = useMemo(() => {
+    return filtered.reduce(
+      (acc, bid) => ({
+        emd: acc.emd + (Number(bid.emd) || 0),
+        tenderFees: acc.tenderFees + (Number(bid.tenderFees) || 0),
+        infraconFees: acc.infraconFees + (Number(bid.infraconFees) || 0),
+        ecv: acc.ecv + (Number(bid.ecv) || 0),
+        bidAmount: acc.bidAmount + (Number(bid.bidAmount) || 0),
+      }),
+      { emd: 0, tenderFees: 0, infraconFees: 0, ecv: 0, bidAmount: 0 }
+    );
+  }, [filtered]);
+
   const clearPcFilters = () => { setPcSearch(""); setPcWcFilter("ALL"); setPcClientFilter("ALL"); setPcStateFilter("ALL"); setPcBidderFilter("ALL"); setPcAuthorityFilter("ALL"); };
 
   if (allottedBids.length === 0) {
@@ -970,6 +1011,11 @@ function PreContractSection({ allottedBids, readOnly = false }: { allottedBids: 
 
   return (
     <>
+      <div className="flex justify-end">
+        <Badge variant="secondary" className="rounded-full">
+          Showing {filtered.length} of {allottedBids.length}
+        </Badge>
+      </div>
       {/* Filters */}
       <div className="glass-panel p-4 space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -1116,6 +1162,19 @@ function PreContractSection({ allottedBids, readOnly = false }: { allottedBids: 
                   );
                 })}
               </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-border/50 bg-secondary/30 font-semibold text-xs">
+                  <td className="p-2.5" colSpan={10}>Total ({filtered.length})</td>
+                  <td className="p-2.5 text-right tabular-nums">{formatCurrency(pcAmountTotals.emd)}</td>
+                  <td className="p-2.5 text-right tabular-nums leading-snug">
+                    <div>{formatCurrency(pcAmountTotals.tenderFees)}</div>
+                    <div className="text-muted-foreground font-normal mt-0.5">{formatCurrency(pcAmountTotals.infraconFees)}</div>
+                  </td>
+                  <td className="p-2.5 text-right tabular-nums">{formatCurrency(pcAmountTotals.ecv)}</td>
+                  <td className="p-2.5 text-right tabular-nums">{formatCurrency(pcAmountTotals.bidAmount)}</td>
+                  <td className="p-2.5"></td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </div>
@@ -2145,6 +2204,20 @@ function ContractSection({ allottedBids, readOnly = false }: { allottedBids: Ten
     });
   }, [allottedBids, search, wcFilter, clientFilter, stateFilter, bidderFilter, authorityFilter]);
 
+  const contractAmountTotals = useMemo(() => {
+    return filtered.reduce(
+      (acc, bid) => {
+        const c = contractMap.get(bid.id);
+        return {
+          sdAmount: acc.sdAmount + (Number(c?.sdAmount) || 0),
+          additionalSdAmount: acc.additionalSdAmount + (Number(c?.additionalSdAmount) || 0),
+          woAmount: acc.woAmount + (Number(c?.woAmount) || 0),
+        };
+      },
+      { sdAmount: 0, additionalSdAmount: 0, woAmount: 0 }
+    );
+  }, [filtered, contractMap]);
+
   const clearFilters = () => {
     setSearch("");
     setWcFilter("ALL");
@@ -2160,6 +2233,11 @@ function ContractSection({ allottedBids, readOnly = false }: { allottedBids: Ten
 
   return (
     <>
+      <div className="flex justify-end">
+        <Badge variant="secondary" className="rounded-full">
+          Showing {filtered.length} of {allottedBids.length}
+        </Badge>
+      </div>
       <div className="glass-panel p-4 space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           <div className="sm:col-span-2 lg:col-span-3">
@@ -2364,6 +2442,17 @@ function ContractSection({ allottedBids, readOnly = false }: { allottedBids: Ten
                   );
                 })}
               </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-border/50 bg-secondary/30 font-semibold text-xs">
+                  <td className="p-2.5" colSpan={5}>Total ({filtered.length})</td>
+                  <td className="p-2.5"></td>
+                  <td className="p-2.5 text-right tabular-nums">{formatCurrency(contractAmountTotals.sdAmount)}</td>
+                  <td className="p-2.5 text-right tabular-nums">{formatCurrency(contractAmountTotals.additionalSdAmount)}</td>
+                  <td className="p-2.5"></td>
+                  <td className="p-2.5 text-right tabular-nums">{formatCurrency(contractAmountTotals.woAmount)}</td>
+                  <td className="p-2.5" colSpan={2}></td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </div>

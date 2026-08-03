@@ -44,6 +44,9 @@ import TenderDashboard from "./pages/tender/Dashboard";
 import TenderLetterPreview from "./pages/tender/LetterPreview";
 import OperationsDashboard from "./pages/operations/Dashboard";
 import HodTender from "./pages/hod/Tender";
+import HodAdmin from "./pages/hod/Admin";
+import HodAccount from "./pages/hod/Account";
+import InfraBilling from "./pages/infra/Billing";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -164,8 +167,10 @@ function AppRoutes() {
 
       <Route path="/hod" element={<HodRoute><AppLayout /></HodRoute>}>
         <Route path="dashboard" element={<HodDashboard />} />
+        <Route path="admin" element={<HodAdmin />} />
         <Route path="assets" element={<HodAssets />} />
         <Route path="tender" element={<HodTender />} />
+        <Route path="account" element={<HodAccount />} />
         <Route path="letter" element={<TenderLetterPreview />} />
       </Route>
 
@@ -183,6 +188,7 @@ function AppRoutes() {
         <Route path="projects" element={<InfraProjects />} />
         <Route path="team" element={<InfraTeam />} />
         <Route path="financial" element={<InfraFinancial />} />
+        <Route path="billing" element={<InfraBilling />} />
       </Route>
 
       {/* Employee Routes */}

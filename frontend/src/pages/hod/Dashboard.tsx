@@ -195,6 +195,9 @@ export default function HodDashboard() {
   const totals = useMemo(() => {
     let completed = 0;
     let ongoing = 0;
+    let woAmountExclGst = 0;
+    let receivedAmountExclGst = 0;
+    let billingAmount = 0;
 
     for (const row of projectRows) {
       if (row.lifecycle === "COMPLETED") {
@@ -202,12 +205,18 @@ export default function HodDashboard() {
       } else {
         ongoing += 1;
       }
+      woAmountExclGst += Number(row.woAmountExclGst) || 0;
+      receivedAmountExclGst += Number(row.receivedAmountExclGst) || 0;
+      billingAmount += Number(row.billingAmount) || 0;
     }
 
     return {
       total: projectRows.length,
       completed,
-      ongoing
+      ongoing,
+      woAmountExclGst,
+      receivedAmountExclGst,
+      billingAmount
     };
   }, [projectRows]);
 
@@ -542,7 +551,7 @@ export default function HodDashboard() {
             </SelectContent>
           </Select>
           <Badge variant="outline" className="rounded-full self-center">
-            {filteredInfraProjects.length} {subTechnicalUnitFilter} project(s)
+            Showing {filteredInfraProjects.length} {subTechnicalUnitFilter} project(s)
           </Badge>
           <Button
             variant="outline"
@@ -711,7 +720,7 @@ export default function HodDashboard() {
             </p>
           </div>
           <Badge variant="secondary" className="rounded-full">
-            {projectRows.length} project(s)
+            Showing {projectRows.length} of {projects.length}
           </Badge>
         </div>
 
@@ -795,6 +804,20 @@ export default function HodDashboard() {
                   ))
                 : null}
             </tbody>
+            {!isLoading && projectRows.length > 0 ? (
+              <tfoot>
+                <tr className="border-t-2 border-border/50 bg-secondary/30 font-semibold text-xs">
+                  <td className="py-3 pr-4" colSpan={2}>
+                    Total ({projectRows.length})
+                  </td>
+                  <td className="py-3 px-4 text-right tabular-nums">{formatHodCurrency(totals.woAmountExclGst)}</td>
+                  <td className="py-3 px-4 text-right tabular-nums">{formatHodCurrency(totals.receivedAmountExclGst)}</td>
+                  <td className="py-3 px-4"></td>
+                  <td className="py-3 px-4 text-right tabular-nums">{formatHodCurrency(totals.billingAmount)}</td>
+                  <td className="py-3 px-4" colSpan={5}></td>
+                </tr>
+              </tfoot>
+            ) : null}
           </table>
         </div>
 

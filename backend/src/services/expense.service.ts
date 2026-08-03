@@ -46,7 +46,7 @@ async function syncVoucherForEntry(entryId: string, billAvailable: boolean) {
 }
 
 function assertCanViewSheet(sheet: { employeeId: string }, user: AuthUser) {
-  if (user.role === "ADMIN") return;
+  if (user.role === "ADMIN" || user.role === "HOD" || user.role === "INFRA") return;
   if (sheet.employeeId !== user.id) {
     throw forbidden("You can only access your own expense sheets");
   }

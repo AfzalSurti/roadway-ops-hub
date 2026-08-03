@@ -41,8 +41,9 @@ const administrativeNav = [
 
 const hodNav = [
   { to: "/hod/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-  { to: "/hod/assets", icon: Package, label: "Assets" },
+  { to: "/hod/admin", icon: Package, label: "Admin" },
   { to: "/hod/tender", icon: Gavel, label: "Tender Management" },
+  { to: "/hod/account", icon: Landmark, label: "Accounts" },
 ];
 
 const tenderNav = [
@@ -58,6 +59,7 @@ const infraNav = [
   { to: "/infra/projects", icon: FolderKanban, label: "Projects" },
   { to: "/infra/team", icon: Users, label: "Team" },
   { to: "/infra/financial", icon: Landmark, label: "Financial" },
+  { to: "/infra/billing", icon: Receipt, label: "Billing" },
 ];
 
 const employeeNav = [
