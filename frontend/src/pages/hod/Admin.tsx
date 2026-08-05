@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ExportButtons } from "@/components/ExportButtons";
 import { HodProjectDetailDialog } from "@/components/hod/HodProjectDetailDialog";
 import { api } from "@/lib/api";
 import { ASSET_CLASS_OPTIONS } from "@/lib/asset-catalog";
@@ -27,6 +28,7 @@ import {
   HOD_TECHNICAL_UNIT_OPTIONS,
   summarizeProjectTasks
 } from "@/lib/hod-dashboard";
+import { downloadTableExcel, downloadTablePdf, type TableExportColumn } from "@/lib/table-export";
 import { useQuery } from "@tanstack/react-query";
 import { Eye, FolderKanban, Loader2, Package, RefreshCcw, Search, X } from "lucide-react";
 
@@ -263,6 +265,35 @@ export default function HodAdmin() {
     ? projectRows.find((row) => row.project.id === selectedProjectId) ?? null
     : null;
 
+  const assetExportColumns: TableExportColumn<AssetItem>[] = useMemo(
+    () => [
+      { header: "Asset ID", value: (a) => a.assetId || a.itAssetId },
+      { header: "Class", value: (a) => a.assetClass },
+      { header: "Type", value: (a) => a.assetType },
+      { header: "Model", value: (a) => a.markModel },
+      { header: "User", value: (a) => a.assignedUser },
+      { header: "Status", value: (a) => a.status },
+      { header: "Project Number", value: (a) => a.projectNumber },
+      { header: "Project Name", value: (a) => a.projectName },
+      { header: "Purchase", value: (a) => a.totalAmountWithGst ?? a.purchaseAmount },
+      { header: "Current Value", value: (a) => a.currentValue },
+    ],
+    []
+  );
+
+  const projectExportColumns: TableExportColumn<(typeof projectRows)[number]>[] = useMemo(
+    () => [
+      { header: "Project Number", value: (r) => r.project.projectNumber },
+      { header: "Project Name", value: (r) => r.project.name },
+      { header: "Lifecycle", value: (r) => r.lifecycle },
+      { header: "Tasks", value: (r) => r.summary.total },
+      { header: "Approved", value: (r) => r.summary.approved },
+      { header: "Pending", value: (r) => r.summary.pending },
+      { header: "Completed", value: (r) => r.summary.completed },
+    ],
+    []
+  );
+
   const clearFilters = () => {
     setSearch("");
     setOrganizationFilter("ALL");
@@ -303,6 +334,52 @@ export default function HodAdmin() {
               {projectGroups.length} project group(s)
             </Badge>
           ) : null}
+          {tab === "assets" ? (
+            <ExportButtons
+              disabled={filteredAssets.length === 0}
+              onExcel={() =>
+                downloadTableExcel({
+                  filename: `HOD-Assets-${new Date().toISOString().slice(0, 10)}`,
+                  sheetName: "Assets",
+                  title: "HOD Admin — Assets (filtered)",
+                  columns: assetExportColumns,
+                  rows: filteredAssets,
+                })
+              }
+              onPdf={() =>
+                downloadTablePdf({
+                  filename: `HOD-Assets-${new Date().toISOString().slice(0, 10)}`,
+                  title: "HOD Admin — Assets",
+                  subtitle: "Filtered rows",
+                  columns: assetExportColumns,
+                  rows: filteredAssets,
+                  landscape: true,
+                })
+              }
+            />
+          ) : (
+            <ExportButtons
+              disabled={projectRows.length === 0}
+              onExcel={() =>
+                downloadTableExcel({
+                  filename: `HOD-Projects-${new Date().toISOString().slice(0, 10)}`,
+                  sheetName: "Projects",
+                  title: "HOD Admin — Projects (filtered)",
+                  columns: projectExportColumns,
+                  rows: projectRows,
+                })
+              }
+              onPdf={() =>
+                downloadTablePdf({
+                  filename: `HOD-Projects-${new Date().toISOString().slice(0, 10)}`,
+                  title: "HOD Admin — Projects",
+                  subtitle: "Filtered rows",
+                  columns: projectExportColumns,
+                  rows: projectRows,
+                })
+              }
+            />
+          )}
           <Button
             size="sm"
             variant="outline"

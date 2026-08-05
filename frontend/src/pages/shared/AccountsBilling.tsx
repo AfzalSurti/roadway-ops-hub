@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ExpenseStatusBadge } from "@/components/expense/ExpenseStatusBadge";
+import { ExportButtons } from "@/components/ExportButtons";
 import { api } from "@/lib/api";
 import type { ExpenseSheetItem, ExpenseSheetStatus, FinancialProjectBillStatusRow } from "@/lib/domain";
 import {
@@ -16,6 +17,7 @@ import {
   HOD_COMPANY_OPTIONS,
   collectHodFinancialYearOptions,
 } from "@/lib/hod-dashboard";
+import { downloadTableExcel, downloadTablePdf, type TableExportColumn } from "@/lib/table-export";
 import { Eye, Landmark, Loader2, Receipt, RefreshCcw, Search, X } from "lucide-react";
 
 type Tab = "ra-bills" | "expenses";
@@ -151,6 +153,33 @@ export default function AccountsBilling({
     [filteredExpenses]
   );
 
+  const billExportColumns: TableExportColumn<FinancialProjectBillStatusRow>[] = useMemo(
+    () => [
+      { header: "Project No", value: (r) => r.projectNo },
+      { header: "Project / Work", value: (r) => r.dprProject },
+      { header: "WO Amt (Excl. GST)", value: (r) => r.workOrderAmountExclGst },
+      { header: "Received", value: (r) => r.receivedAmountExclGst },
+      { header: "Financial Progress %", value: (r) => r.financialProgressPct },
+      { header: "RA Bill Raised", value: (r) => r.raBillRaisedClaim },
+      { header: "Excess Raised", value: (r) => r.excessBillRaisedClaim },
+      { header: "Remark", value: (r) => r.remark },
+    ],
+    []
+  );
+
+  const expenseExportColumns: TableExportColumn<ExpenseSheetItem>[] = useMemo(
+    () => [
+      { header: "Employee", value: (s) => s.employeeName || s.employee?.name },
+      { header: "Site", value: (s) => s.siteName },
+      { header: "Project No", value: (s) => s.projectNumber },
+      { header: "Project Name", value: (s) => s.projectName },
+      { header: "Expense Date", value: (s) => formatDate(s.expenseDate) },
+      { header: "Status", value: (s) => s.status },
+      { header: "Amount", value: (s) => s.totalAmount },
+    ],
+    []
+  );
+
   const clearFilters = () => {
     setSearch("");
     setOrganizationFilter("ALL");
@@ -180,6 +209,53 @@ export default function AccountsBilling({
               ? `Showing ${filteredBills.length} of ${billRows.length}`
               : `Showing ${filteredExpenses.length} of ${expenseSheets.length}`}
           </Badge>
+          {tab === "ra-bills" ? (
+            <ExportButtons
+              disabled={filteredBills.length === 0}
+              onExcel={() =>
+                downloadTableExcel({
+                  filename: `RA-Bills-${new Date().toISOString().slice(0, 10)}`,
+                  sheetName: "RA Bills",
+                  title: `${title} — RA Bills (filtered)`,
+                  columns: billExportColumns,
+                  rows: filteredBills,
+                })
+              }
+              onPdf={() =>
+                downloadTablePdf({
+                  filename: `RA-Bills-${new Date().toISOString().slice(0, 10)}`,
+                  title: `${title} — RA Bills`,
+                  subtitle: "Filtered rows",
+                  columns: billExportColumns,
+                  rows: filteredBills,
+                  landscape: true,
+                })
+              }
+            />
+          ) : (
+            <ExportButtons
+              disabled={filteredExpenses.length === 0}
+              onExcel={() =>
+                downloadTableExcel({
+                  filename: `Expenses-${new Date().toISOString().slice(0, 10)}`,
+                  sheetName: "Expenses",
+                  title: `${title} — Expenses (filtered)`,
+                  columns: expenseExportColumns,
+                  rows: filteredExpenses,
+                })
+              }
+              onPdf={() =>
+                downloadTablePdf({
+                  filename: `Expenses-${new Date().toISOString().slice(0, 10)}`,
+                  title: `${title} — Expenses`,
+                  subtitle: "Filtered rows",
+                  columns: expenseExportColumns,
+                  rows: filteredExpenses,
+                  landscape: true,
+                })
+              }
+            />
+          )}
           <Button size="sm" variant="outline" className="gap-1" disabled={isFetching} onClick={refetch}>
             {isFetching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCcw className="h-3.5 w-3.5" />}
             Refresh

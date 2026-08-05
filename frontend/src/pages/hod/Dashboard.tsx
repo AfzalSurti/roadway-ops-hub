@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ExportButtons } from "@/components/ExportButtons";
 import { HodActivityChartDialog } from "@/components/hod/HodActivityChartDialog";
 import { HodDprOverviewSection } from "@/components/hod/HodDprOverviewSection";
 import { HodInfraProjectDetailDialog } from "@/components/hod/HodInfraProjectDetailDialog";
@@ -32,6 +33,7 @@ import {
   HOD_TECHNICAL_UNIT_OPTIONS,
   summarizeProjectTasks
 } from "@/lib/hod-dashboard";
+import { downloadTableExcel, downloadTablePdf, type TableExportColumn } from "@/lib/table-export";
 import { BarChart3, CheckCircle2, ClipboardList, Eye, FileSpreadsheet, FileText, FolderKanban, Loader2, RefreshCcw, Search, Timer } from "lucide-react";
 import {
   downloadInfraProjectBillPdf,
@@ -719,9 +721,57 @@ export default function HodDashboard() {
               Task activity from DPR Admin; financial progress from DPR Financial. Filtered by project number section above.
             </p>
           </div>
-          <Badge variant="secondary" className="rounded-full">
-            Showing {projectRows.length} of {projects.length}
-          </Badge>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="secondary" className="rounded-full">
+              Showing {projectRows.length} of {projects.length}
+            </Badge>
+            <ExportButtons
+              disabled={projectRows.length === 0}
+              onExcel={() => {
+                const columns: TableExportColumn<(typeof projectRows)[number]>[] = [
+                  { header: "Project Number", value: (r) => r.project.projectNumber },
+                  { header: "Project Name", value: (r) => r.project.name },
+                  { header: "WO Amt (Excl. GST)", value: (r) => r.woAmountExclGst },
+                  { header: "Received Amount", value: (r) => r.receivedAmountExclGst },
+                  { header: "Financial Progress %", value: (r) => r.financialProgressPct },
+                  { header: "Billing Amount", value: (r) => r.billingAmount },
+                  { header: "Tasks", value: (r) => r.summary.total },
+                  { header: "Under Preparation", value: (r) => r.summary.pending },
+                  { header: "Draft Submitted", value: (r) => r.summary.completed },
+                  { header: "Approved", value: (r) => r.summary.approved },
+                  { header: "Lifecycle", value: (r) => r.lifecycle },
+                ];
+                downloadTableExcel({
+                  filename: `HOD-DPR-Projects-${new Date().toISOString().slice(0, 10)}`,
+                  sheetName: "DPR Projects",
+                  title: "HOD Dashboard — DPR Projects (filtered)",
+                  columns,
+                  rows: projectRows,
+                });
+              }}
+              onPdf={() => {
+                const columns: TableExportColumn<(typeof projectRows)[number]>[] = [
+                  { header: "Project Number", value: (r) => r.project.projectNumber },
+                  { header: "Project Name", value: (r) => r.project.name },
+                  { header: "WO Amt", value: (r) => r.woAmountExclGst },
+                  { header: "Received", value: (r) => r.receivedAmountExclGst },
+                  { header: "Progress %", value: (r) => r.financialProgressPct },
+                  { header: "Billing", value: (r) => r.billingAmount },
+                  { header: "Tasks", value: (r) => r.summary.total },
+                  { header: "Approved", value: (r) => r.summary.approved },
+                  { header: "Lifecycle", value: (r) => r.lifecycle },
+                ];
+                downloadTablePdf({
+                  filename: `HOD-DPR-Projects-${new Date().toISOString().slice(0, 10)}`,
+                  title: "HOD Dashboard — DPR Projects",
+                  subtitle: "Filtered rows",
+                  columns,
+                  rows: projectRows,
+                  landscape: true,
+                });
+              }}
+            />
+          </div>
         </div>
 
         <div className="overflow-x-auto">

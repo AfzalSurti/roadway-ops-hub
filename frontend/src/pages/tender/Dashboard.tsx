@@ -8,10 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { LocationCombobox } from "@/components/LocationCombobox";
 import { CreatableSelect } from "@/components/CreatableSelect";
+import { ExportButtons } from "@/components/ExportButtons";
 import { api } from "@/lib/api";
 import { openAttachment, registerAttachmentViewer } from "@/lib/attachments";
 import type { TenderBidItem, TenderBidStatus, PreContractActivityItem, ContractActivityItem, SecurityDepositType } from "@/lib/domain";
 import { WORK_CATEGORY_OPTIONS, CLIENT_OPTIONS, SECURITY_DEPOSIT_TYPE_OPTIONS, EMD_TYPE_OPTIONS } from "@/lib/domain";
+import { downloadTableExcel, downloadTablePdf, type TableExportColumn } from "@/lib/table-export";
 import { DEFAULT_BIDDER_OPTIONS, rememberOption, TENDER_OPTION_STORAGE_KEYS } from "@/lib/tender-options";
 import { ALL_LOCATIONS } from "@/constants/locationOptions";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -39,6 +41,49 @@ function calcAboveBelowPercent(ecv: number, bidAmount: number) {
 function formatAboveBelow(value?: number | null) {
   if (value == null || Number.isNaN(Number(value))) return "—";
   return `${Number(value).toFixed(2)}%`;
+}
+
+const TENDER_BID_EXPORT_COLUMNS: TableExportColumn<TenderBidItem>[] = [
+  { header: "Sr", value: (b) => b.srNo },
+  { header: "Name of Work", value: (b) => b.nameOfWork },
+  { header: "Bidder", value: (b) => b.nameOfBidder },
+  { header: "Bid Inviting Authority", value: (b) => b.bidInvitingAuthority },
+  { header: "Tender ID", value: (b) => b.tenderId },
+  { header: "Length (Km)", value: (b) => b.projectLengthKm },
+  { header: "W.C.", value: (b) => b.workCategory },
+  { header: "Client", value: (b) => b.client },
+  { header: "State", value: (b) => b.state },
+  { header: "EMD Type", value: (b) => b.emdType },
+  { header: "EMD Amt", value: (b) => b.emd },
+  { header: "Tender Fees", value: (b) => b.tenderFees },
+  { header: "Infracon Fees", value: (b) => b.infraconFees },
+  { header: "ECV", value: (b) => b.ecv },
+  { header: "Bid Amount", value: (b) => b.bidAmount },
+  { header: "Above / Below %", value: (b) => formatAboveBelow(b.aboveBelowPercent) },
+  { header: "Status", value: (b) => (b.status === "ALLOTTED" ? "Allotted" : "Not Allotted") },
+];
+
+function exportTenderBids(rows: TenderBidItem[], label: string) {
+  const filename = `${label}-${new Date().toISOString().slice(0, 10)}`;
+  return {
+    excel: () =>
+      downloadTableExcel({
+        filename,
+        sheetName: label,
+        title: `Tender — ${label} (filtered)`,
+        columns: TENDER_BID_EXPORT_COLUMNS,
+        rows,
+      }),
+    pdf: () =>
+      downloadTablePdf({
+        filename,
+        title: `Tender — ${label}`,
+        subtitle: "Filtered rows",
+        columns: TENDER_BID_EXPORT_COLUMNS,
+        rows,
+        landscape: true,
+      }),
+  };
 }
 
 function DetailField({ label, value }: { label: string; value?: string | null }) {
@@ -304,6 +349,13 @@ export default function TenderDashboard({
           <Badge variant="secondary" className="rounded-full">
             Showing {filtered.length} of {items.length}
           </Badge>
+          {tab === "bids" ? (
+            <ExportButtons
+              disabled={filtered.length === 0}
+              onExcel={exportTenderBids(filtered, "Submitted-Bids").excel}
+              onPdf={exportTenderBids(filtered, "Submitted-Bids").pdf}
+            />
+          ) : null}
           <Button size="sm" variant="outline" className="gap-1" disabled={isFetching} onClick={() => refetch()}>
             {isFetching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCcw className="h-3.5 w-3.5" />}
             Refresh
@@ -1011,10 +1063,15 @@ function PreContractSection({ allottedBids, readOnly = false }: { allottedBids: 
 
   return (
     <>
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2 flex-wrap">
         <Badge variant="secondary" className="rounded-full">
           Showing {filtered.length} of {allottedBids.length}
         </Badge>
+        <ExportButtons
+          disabled={filtered.length === 0}
+          onExcel={exportTenderBids(filtered, "Pre-Contract").excel}
+          onPdf={exportTenderBids(filtered, "Pre-Contract").pdf}
+        />
       </div>
       {/* Filters */}
       <div className="glass-panel p-4 space-y-3">
@@ -2227,16 +2284,66 @@ function ContractSection({ allottedBids, readOnly = false }: { allottedBids: Ten
     setAuthorityFilter("ALL");
   };
 
+  const contractExportColumns: TableExportColumn<TenderBidItem>[] = useMemo(
+    () => [
+      { header: "Sr", value: (b) => b.srNo },
+      { header: "Name of Work", value: (b) => b.nameOfWork },
+      { header: "Bidder", value: (b) => b.nameOfBidder },
+      { header: "Authority", value: (b) => b.bidInvitingAuthority },
+      { header: "Client", value: (b) => b.client },
+      { header: "State", value: (b) => b.state },
+      {
+        header: "SD Amount",
+        value: (b) => contractMap.get(b.id)?.sdAmount ?? "",
+      },
+      {
+        header: "Addl. SD Amount",
+        value: (b) => contractMap.get(b.id)?.additionalSdAmount ?? "",
+      },
+      {
+        header: "WO Amount",
+        value: (b) => contractMap.get(b.id)?.woAmount ?? "",
+      },
+      {
+        header: "Contract",
+        value: (b) => (contractMap.has(b.id) ? "Active" : "Not Created"),
+      },
+    ],
+    [contractMap]
+  );
+
   if (allottedBids.length === 0) {
     return <div className="glass-panel p-10 text-center text-muted-foreground">No allotted tenders yet. Change a bid&apos;s status to &quot;Allotted&quot; to see it here.</div>;
   }
 
   return (
     <>
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2 flex-wrap">
         <Badge variant="secondary" className="rounded-full">
           Showing {filtered.length} of {allottedBids.length}
         </Badge>
+        <ExportButtons
+          disabled={filtered.length === 0}
+          onExcel={() =>
+            downloadTableExcel({
+              filename: `Contract-${new Date().toISOString().slice(0, 10)}`,
+              sheetName: "Contract",
+              title: "Tender — Contract (filtered)",
+              columns: contractExportColumns,
+              rows: filtered,
+            })
+          }
+          onPdf={() =>
+            downloadTablePdf({
+              filename: `Contract-${new Date().toISOString().slice(0, 10)}`,
+              title: "Tender — Contract",
+              subtitle: "Filtered rows",
+              columns: contractExportColumns,
+              rows: filtered,
+              landscape: true,
+            })
+          }
+        />
       </div>
       <div className="glass-panel p-4 space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
