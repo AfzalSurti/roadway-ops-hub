@@ -158,9 +158,9 @@ export const letterNumberingRepository = {
   },
 
   listMainProjects() {
+    // All Sankalp / main Project section rows (AE, IR, PC, etc.) — not IR-only.
     return prisma.project.findMany({
-      where: { subTechnicalUnitCode: "IR" },
-      orderBy: { name: "asc" },
+      orderBy: [{ projectNumber: "asc" }, { name: "asc" }],
       select: {
         id: true,
         name: true,

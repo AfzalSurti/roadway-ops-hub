@@ -127,14 +127,12 @@ export default function LetterNumbering() {
         return await api.getLetterMainProjects();
       } catch {
         const projects = await api.getProjects();
-        return projects
-          .filter((p) => p.subTechnicalUnitCode === "IR")
-          .map((project) => ({
-            id: project.id,
-            name: project.name,
-            description: project.description ?? null,
-            projectNumber: project.projectNumber ?? null
-          }));
+        return projects.map((project) => ({
+          id: project.id,
+          name: project.name,
+          description: project.description ?? null,
+          projectNumber: project.projectNumber ?? null
+        }));
       }
     }
   });
@@ -513,6 +511,10 @@ export default function LetterNumbering() {
                   Project data already exists in the Sankalp Database. Select a project, fill letter-only
                   details (Letter No., coordinator, engineer), then add it to Letter Data Base.
                 </p>
+                <p className="text-xs text-muted-foreground mt-2 rounded-lg border border-border/40 bg-secondary/20 px-3 py-2">
+                  To add <strong>many letters at once</strong> (Excel): open <strong>Letter Data Base</strong>,
+                  select a project, then use <strong>Sample Excel</strong> / <strong>Import Excel</strong>.
+                </p>
               </div>
 
               <div className="space-y-3">
@@ -551,7 +553,15 @@ export default function LetterNumbering() {
                     <p className="text-xs text-muted-foreground mt-1.5">
                       {mainProjects.length === 0
                         ? "No projects in Sankalp Project section yet. Create one under Projects first."
-                        : "All existing projects are already linked in Letter Numbering."}
+                        : "All Sankalp projects are already linked in Letter Numbering."}
+                    </p>
+                  ) : !loadingMainProjects && importableMainProjects.length > 0 ? (
+                    <p className="text-xs text-muted-foreground mt-1.5">
+                      {importableMainProjects.length} project(s) available to import
+                      {mainProjects.length > importableMainProjects.length
+                        ? ` (${mainProjects.length - importableMainProjects.length} already linked)`
+                        : ""}
+                      .
                     </p>
                   ) : null}
                 </div>
@@ -1313,7 +1323,15 @@ export default function LetterNumbering() {
                   </p>
                 </>
               ) : (
-                <p className="text-sm text-muted-foreground">Select a project above to manage letters.</p>
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Search and select a project above to manage letters.
+                  </p>
+                  <p className="text-xs text-muted-foreground rounded-lg border border-border/40 bg-secondary/20 px-3 py-2">
+                    After you select a project, use <strong>Sample Excel</strong> and{" "}
+                    <strong>Import Excel</strong> to add bulk letters for that project.
+                  </p>
+                </div>
               )}
             </div>
           ) : null}

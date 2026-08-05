@@ -37,8 +37,10 @@ Work only on the Letter Numbering module and its sync with Projects:
 3. **Sync with Project section**
    - Letter projects link to main `Project` via `linkedProjectId`.
    - Import from Sankalp: `POST /letter-numbering/projects/import` (primary “New Project Add”).
+   - `GET /letter-numbering/main-projects` lists **all** main Projects (not IR-only).
    - Push letter-only projects into Projects: `POST /letter-numbering/projects/:id/sync-to-main`.
    - Never orphan UI from API — keep sync buttons wired.
+   - Bulk letter Excel import is under **Letter Data Base** after a project is selected (`Sample Excel` / `Import Excel`).
 
 4. **Letter number auto-generation**
    - **Inward / Other** → letter number = Sr. No (`01`, `02`, `3a`…).
