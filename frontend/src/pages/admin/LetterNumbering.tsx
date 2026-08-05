@@ -4,11 +4,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { LetterImportDialog } from "@/components/admin/LetterImportDialog";
 import { api } from "@/lib/api";
 import type { LetterCategory, LetterEntryItem, LetterProjectItem } from "@/lib/domain";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Link2, Loader2, Mail, MailWarning, Plus, Trash2 } from "lucide-react";
+import { CheckCircle2, Download, FileUp, Link2, Loader2, Mail, MailWarning, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { downloadLetterImportTemplate } from "@/lib/letter-import";
 
 type ViewMode = "new" | "list" | "database" | "pending";
 
@@ -106,6 +108,7 @@ export default function LetterNumbering() {
     projectCoordinator: "",
     projectEngineer: ""
   });
+  const [letterImportOpen, setLetterImportOpen] = useState(false);
 
   const { data: letterProjects = [], isLoading } = useQuery({
     queryKey: ["letter-projects"],
@@ -941,6 +944,22 @@ export default function LetterNumbering() {
                     >
                       Add Other
                     </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1"
+                      onClick={() => downloadLetterImportTemplate()}
+                    >
+                      <Download className="h-3.5 w-3.5" /> Sample Excel
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="gap-1"
+                      onClick={() => setLetterImportOpen(true)}
+                    >
+                      <FileUp className="h-3.5 w-3.5" /> Import Excel
+                    </Button>
                     {pendingReplyLetters.length > 0 ? (
                       <Badge variant="secondary" className="rounded-full self-center gap-1">
                         <MailWarning className="h-3.5 w-3.5" />
@@ -1300,6 +1319,19 @@ export default function LetterNumbering() {
           ) : null}
         </div>
       </div>
+
+      {selectedProjectId ? (
+        <LetterImportDialog
+          open={letterImportOpen}
+          onOpenChange={setLetterImportOpen}
+          letterProjectId={selectedProjectId}
+          projectLabel={
+            selectedProject
+              ? `${selectedProject.projectNumber} · ${selectedProject.shortName}`
+              : undefined
+          }
+        />
+      ) : null}
     </PageWrapper>
   );
 }

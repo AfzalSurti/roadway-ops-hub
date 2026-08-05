@@ -97,6 +97,13 @@ export const insertLetterEntrySchema = createLetterEntryObjectSchema
   })
   .superRefine(refineReplyTracking);
 
+export const bulkImportLettersSchema = z.object({
+  rows: z
+    .array(createLetterEntryObjectSchema.superRefine(refineReplyTracking))
+    .min(1, "At least one letter row is required")
+    .max(500, "Maximum 500 letters per import")
+});
+
 export const letterSuggestionsQuerySchema = z.object({
   field: z.enum(["sentBy", "sentTo", "subject", "ccTo"]),
   q: z.string().optional(),

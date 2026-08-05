@@ -452,6 +452,55 @@ export const letterNumberingService = {
     return created;
   },
 
+  async bulkImportLetters(
+    letterProjectId: string,
+    rows: Array<{
+      category: LetterCategory;
+      letterDate?: string | null;
+      sentBy?: string;
+      sentTo?: string;
+      subject?: string;
+      ccTo?: string;
+      subjectCategory?: string;
+      letterLinkUrl?: string | null;
+      needsReply?: boolean | null;
+      replied?: boolean;
+      replyOfSerial?: string | null;
+      remark?: string;
+    }>
+  ) {
+    await this.getProject(letterProjectId);
+
+    const created: Array<{ row: number; id: string; serialLabel: string; letterNumber: string; category: LetterCategory }> =
+      [];
+    const errors: Array<{ row: number; message: string }> = [];
+
+    for (let index = 0; index < rows.length; index += 1) {
+      const rowNumber = index + 1;
+      const row = rows[index];
+      try {
+        const letter = await this.addLetter(letterProjectId, row);
+        created.push({
+          row: rowNumber,
+          id: letter.id,
+          serialLabel: letter.serialLabel,
+          letterNumber: letter.letterNumber,
+          category: letter.category
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to import letter row";
+        errors.push({ row: rowNumber, message });
+      }
+    }
+
+    return {
+      createdCount: created.length,
+      failedCount: errors.length,
+      created,
+      errors
+    };
+  },
+
   async insertLetterAfter(
     letterProjectId: string,
     afterLetterId: string,

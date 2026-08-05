@@ -7,6 +7,7 @@ import { validate } from "../middleware/validate.js";
 import {
   createLetterEntrySchema,
   createLetterProjectSchema,
+  bulkImportLettersSchema,
   importLetterProjectSchema,
   insertLetterEntrySchema,
   updateLetterEntrySchema,
@@ -45,6 +46,11 @@ letterNumberingRouter.post(
   "/projects/:id/letters",
   validate(createLetterEntrySchema),
   asyncHandler(letterNumberingController.addLetter)
+);
+letterNumberingRouter.post(
+  "/projects/:id/letters/bulk",
+  validate(bulkImportLettersSchema),
+  asyncHandler(letterNumberingController.bulkImportLetters)
 );
 letterNumberingRouter.post(
   "/projects/:id/letters/insert",

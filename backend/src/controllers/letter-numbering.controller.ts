@@ -52,6 +52,14 @@ export const letterNumberingController = {
     return sendSuccess(res, await letterNumberingService.addLetter(req.params.id, req.body), 201);
   },
 
+  async bulkImportLetters(req: Request, res: Response) {
+    return sendSuccess(
+      res,
+      await letterNumberingService.bulkImportLetters(req.params.id, req.body.rows),
+      201
+    );
+  },
+
   async insertLetter(req: Request, res: Response) {
     const { afterLetterId, ...payload } = req.body;
     return sendSuccess(

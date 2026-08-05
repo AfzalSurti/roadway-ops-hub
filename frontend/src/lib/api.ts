@@ -647,6 +647,40 @@ export const api = {
     });
   },
 
+  bulkImportLetterEntries(
+    letterProjectId: string,
+    rows: Array<{
+      category: LetterCategory;
+      letterDate?: string | null;
+      sentBy?: string;
+      sentTo?: string;
+      subject?: string;
+      ccTo?: string;
+      subjectCategory?: string;
+      letterLinkUrl?: string | null;
+      needsReply?: boolean | null;
+      replied?: boolean;
+      replyOfSerial?: string | null;
+      remark?: string;
+    }>
+  ) {
+    return request<{
+      createdCount: number;
+      failedCount: number;
+      created: Array<{
+        row: number;
+        id: string;
+        serialLabel: string;
+        letterNumber: string;
+        category: LetterCategory;
+      }>;
+      errors: Array<{ row: number; message: string }>;
+    }>(`/letter-numbering/projects/${letterProjectId}/letters/bulk`, {
+      method: "POST",
+      body: JSON.stringify({ rows })
+    });
+  },
+
   insertLetterEntry(
     letterProjectId: string,
     payload: {
