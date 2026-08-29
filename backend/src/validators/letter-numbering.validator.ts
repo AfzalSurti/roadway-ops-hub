@@ -125,7 +125,8 @@ export const updateLetterEntrySchema = z
     needsReply: z.boolean().nullable().optional(),
     replied: z.boolean().optional(),
     replyOfSerial: z.string().trim().max(40).nullable().optional(),
-    remark: z.string().trim().max(4000).optional()
+    remark: z.string().trim().max(4000).optional(),
+    letterNumber: z.string().trim().max(200).nullable().optional()
   })
   .superRefine(refineReplyTracking);
 

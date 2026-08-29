@@ -1698,8 +1698,30 @@ export default function LetterNumbering() {
                                     }}
                                   />
                                 </td>
-                                <td className="p-2 font-mono text-[11px] whitespace-normal break-all">
-                                  {letter.letterNumber || "-"}
+                                <td className="p-2">
+                                  {letter.category === "OUTWARD" ? (
+                                    <span className="font-mono text-[11px] whitespace-normal break-all">
+                                      {letter.letterNumber || "-"}
+                                    </span>
+                                  ) : (
+                                    <Input
+                                      className="h-8 text-xs font-mono min-w-[140px]"
+                                      placeholder="Enter letter number"
+                                      defaultValue={letter.letterNumber || ""}
+                                      key={`${letter.id}-ln-${letter.category}-${letter.letterNumber || ""}`}
+                                      onBlur={(e) => {
+                                        const next = e.target.value.trim();
+                                        if (next === (letter.letterNumber || "").trim()) return;
+                                        updateLetterMutation.mutate({
+                                          letterId: letter.id,
+                                          payload: { letterNumber: next }
+                                        });
+                                      }}
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter") e.currentTarget.blur();
+                                      }}
+                                    />
+                                  )}
                                 </td>
                                 <td className="p-2">
                                   <Select
@@ -1867,13 +1889,12 @@ export default function LetterNumbering() {
                     </div>
                   )}
                   <p className="text-xs text-muted-foreground">
-                    Numbering: Inward/Other use Sr. No. Outward uses{" "}
+                    Numbering: Inward/Other — enter Letter Number manually. Outward uses{" "}
                     <span className="font-mono">
                       {selectedProject.projectNumber}/{selectedProject.projectCode}/Sr/OutwardSeq
-                    </span>
-                    . Use + on a row to insert a back-dated letter (3a, 5a…). Inserted Outward rows get a
-                    position-based sequence (e.g. after 02 → 02a). Enter Sr. in “Reply Letter of” to
-                    auto-clear that letter from pending.
+                    </span>{" "}
+                    (auto). Use + on a row to insert a back-dated letter (3a, 5a…). Enter Sr. in
+                    “Reply Letter of” to auto-clear that letter from pending.
                   </p>
                 </>
               ) : (
@@ -1982,9 +2003,17 @@ export default function LetterNumbering() {
             ) : null}
 
             <div className={`space-y-1.5 ${oldLetterForm.category === "OUTWARD" ? "" : "sm:col-span-2"}`}>
-              <Label>Letter Number (optional)</Label>
+              <Label>
+                {oldLetterForm.category === "OUTWARD"
+                  ? "Letter Number (auto if blank)"
+                  : "Letter Number"}
+              </Label>
               <Input
-                placeholder="Leave blank to auto-build"
+                placeholder={
+                  oldLetterForm.category === "OUTWARD"
+                    ? "Leave blank to auto-build"
+                    : "Enter letter number"
+                }
                 value={oldLetterForm.letterNumber}
                 onChange={(e) => setOldLetterForm((prev) => ({ ...prev, letterNumber: e.target.value }))}
               />

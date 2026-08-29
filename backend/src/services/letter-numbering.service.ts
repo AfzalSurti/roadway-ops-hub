@@ -139,13 +139,8 @@ async function resequenceOutwardLetters(
           id: letter.id,
           data: {
             outwardSequence: null,
-            letterNumber: buildLetterNumber({
-              projectNumber: project.projectNumber,
-              projectCode: project.projectCode,
-              serialLabel: letter.serialLabel,
-              category: letter.category,
-              outwardSequence: null
-            })
+            // Keep manual Inward/Other letter numbers — do not overwrite with Sr.
+            letterNumber: letter.letterNumber
           }
         });
       }
@@ -495,13 +490,15 @@ export const letterNumberingService = {
     const providedLetterNumber = payload.letterNumber?.trim() || "";
     const letterNumber =
       providedLetterNumber ||
-      buildLetterNumber({
-        projectNumber: project.projectNumber,
-        projectCode: project.projectCode,
-        serialLabel,
-        category: payload.category,
-        outwardSequence
-      });
+      (payload.category === "OUTWARD"
+        ? buildLetterNumber({
+            projectNumber: project.projectNumber,
+            projectCode: project.projectCode,
+            serialLabel,
+            category: payload.category,
+            outwardSequence
+          })
+        : "");
 
     const replyFields = resolveReplyFields(payload.category, {
       needsReply: payload.needsReply,
@@ -638,13 +635,16 @@ export const letterNumberingService = {
       );
     }
 
-    const letterNumber = buildLetterNumber({
-      projectNumber: project.projectNumber,
-      projectCode: project.projectCode,
-      serialLabel,
-      category: payload.category,
-      outwardSequence
-    });
+    const letterNumber =
+      payload.category === "OUTWARD"
+        ? buildLetterNumber({
+            projectNumber: project.projectNumber,
+            projectCode: project.projectCode,
+            serialLabel,
+            category: payload.category,
+            outwardSequence
+          })
+        : "";
 
     const replyFields = resolveReplyFields(payload.category, {
       needsReply: payload.needsReply,
@@ -755,6 +755,7 @@ export const letterNumberingService = {
       replied: boolean;
       replyOfSerial: string | null;
       remark: string;
+      letterNumber: string | null;
     }>
   ) {
     const letter = await letterNumberingRepository.findLetterById(letterId);
@@ -787,13 +788,21 @@ export const letterNumberingService = {
       }
     }
 
-    const letterNumber = buildLetterNumber({
-      projectNumber: letter.letterProject.projectNumber,
-      projectCode: letter.letterProject.projectCode,
-      serialLabel: letter.serialLabel,
-      category,
-      outwardSequence
-    });
+    let letterNumber = letter.letterNumber;
+    if (category === "OUTWARD") {
+      letterNumber = buildLetterNumber({
+        projectNumber: letter.letterProject.projectNumber,
+        projectCode: letter.letterProject.projectCode,
+        serialLabel: letter.serialLabel,
+        category,
+        outwardSequence
+      });
+    } else if (payload.letterNumber !== undefined) {
+      letterNumber = payload.letterNumber?.trim() || "";
+    } else if (payload.category && payload.category !== letter.category) {
+      // Switched to Inward/Other — clear auto Outward number for manual entry
+      letterNumber = "";
+    }
 
     const replyFields = resolveReplyFields(category, {
       needsReply: payload.needsReply,

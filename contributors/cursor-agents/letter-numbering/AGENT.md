@@ -42,9 +42,9 @@ Work only on the Letter Numbering module and its sync with Projects:
    - Never orphan UI from API — keep sync buttons wired.
    - Bulk letter Excel import is under **Letter Data Base** after a project is selected (`Sample Excel` / `Import Excel`).
 
-4. **Letter number auto-generation**
-   - **Inward / Other** → letter number = Sr. No (`01`, `02`, `3a`…).
-   - **Outward** → `{projectNumber}/{projectCode}/{serial}/{outwardSeq}`  
+4. **Letter number**
+   - **Inward / Other** → Letter Number is **manual** (user types it).
+   - **Outward** → auto `{projectNumber}/{projectCode}/{serial}/{outwardSeq}`  
      Example: `376/GSIR2305R/01/01`.
    - Outward sequence increments only among Outward rows (`01`, `02`…).
    - Back-date insert (`+` under a row): serial becomes `3a`, `3b`…; outward may become `02a`.

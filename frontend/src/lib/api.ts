@@ -726,6 +726,7 @@ export const api = {
       replied: boolean;
       replyOfSerial: string | null;
       remark: string;
+      letterNumber: string | null;
     }>
   ) {
     return request<LetterEntryItem>(`/letter-numbering/letters/${letterId}`, {
