@@ -170,6 +170,8 @@ function LetterDateField({
   const [open, setOpen] = useState(false);
   const [text, setText] = useState(() => toDateInput(value));
   const selected = pickerDateFromIso(value);
+  const currentYear = new Date().getFullYear();
+  const month = selected && selected.getFullYear() >= 1990 ? selected : new Date();
 
   useEffect(() => {
     setText(toDateInput(value));
@@ -222,7 +224,10 @@ function LetterDateField({
           <Calendar
             mode="single"
             selected={selected}
-            defaultMonth={selected}
+            defaultMonth={month}
+            captionLayout="dropdown-buttons"
+            fromYear={1990}
+            toYear={currentYear + 2}
             onSelect={(date) => {
               if (!date) {
                 onChange(null);

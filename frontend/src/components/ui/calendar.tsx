@@ -8,6 +8,9 @@ import { buttonVariants } from "@/components/ui/button";
 export type CalendarProps = React.ComponentProps<typeof DayPicker>;
 
 function Calendar({ className, classNames, showOutsideDays = true, ...props }: CalendarProps) {
+  const hasDropdown =
+    props.captionLayout === "dropdown" || props.captionLayout === "dropdown-buttons";
+
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
@@ -15,15 +18,27 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
       classNames={{
         months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
         month: "space-y-4",
-        caption: "flex justify-center pt-1 relative items-center",
-        caption_label: "text-sm font-medium",
+        caption: cn(
+          "flex justify-center pt-1 relative items-center",
+          hasDropdown && "flex-col gap-2"
+        ),
+        caption_label: cn("text-sm font-medium", hasDropdown && "hidden"),
+        caption_dropdowns: "flex items-center justify-center gap-2",
+        dropdown_month: "relative inline-flex items-center",
+        dropdown_year: "relative inline-flex items-center",
+        dropdown: cn(
+          "h-8 appearance-none rounded-md border border-input bg-background px-2 pr-6 text-xs font-medium",
+          "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        ),
+        dropdown_icon: "hidden",
+        vhidden: "hidden",
         nav: "space-x-1 flex items-center",
         nav_button: cn(
           buttonVariants({ variant: "outline" }),
-          "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100",
+          "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100"
         ),
-        nav_button_previous: "absolute left-1",
-        nav_button_next: "absolute right-1",
+        nav_button_previous: "absolute left-1 top-1",
+        nav_button_next: "absolute right-1 top-1",
         table: "w-full border-collapse space-y-1",
         head_row: "flex",
         head_cell: "text-muted-foreground rounded-md w-9 font-normal text-[0.8rem]",
@@ -39,11 +54,11 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
         day_disabled: "text-muted-foreground opacity-50",
         day_range_middle: "aria-selected:bg-accent aria-selected:text-accent-foreground",
         day_hidden: "invisible",
-        ...classNames,
+        ...classNames
       }}
       components={{
         IconLeft: ({ ..._props }) => <ChevronLeft className="h-4 w-4" />,
-        IconRight: ({ ..._props }) => <ChevronRight className="h-4 w-4" />,
+        IconRight: ({ ..._props }) => <ChevronRight className="h-4 w-4" />
       }}
       {...props}
     />
