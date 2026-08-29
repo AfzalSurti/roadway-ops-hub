@@ -158,7 +158,7 @@ export function downloadLetterImportTemplate() {
       "Sent To": "Client Authority",
       Subject: "Old LOA acknowledgement",
       "CC To": "HOD",
-      "Subject Category": "Work Order",
+      "Subject Category": "Tender",
       "Letter Link URL": "",
       "Needs Reply": "",
       "Reply Of Serial": "",

@@ -15,11 +15,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarIcon, CheckCircle2, Download, FileUp, Link2, Loader2, Mail, MailWarning, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { downloadLetterImportTemplate } from "@/lib/letter-import";
+import {
+  isLetterSubjectCategoryOtherOption,
+  mergeLetterSubjectCategories,
+  saveCustomLetterSubjectCategory
+} from "@/lib/letter-subject-categories";
 import { cn } from "@/lib/utils";
 
 type ViewMode = "new" | "list" | "database" | "pending";
-
-const SUBJECT_CATEGORIES = ["Utility", "Tender", "LAQ", "Work Order", "Other"];
 
 function normalizeSerialLabel(value: string) {
   const trimmed = value.trim().toLowerCase();
@@ -240,6 +243,101 @@ function LetterDateField({
   );
 }
 
+function SubjectCategoryField({
+  value,
+  options,
+  onChange,
+  onCustomAdded,
+  className
+}: {
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+  onCustomAdded?: () => void;
+  className?: string;
+}) {
+  const [customOpen, setCustomOpen] = useState(false);
+  const [customParent, setCustomParent] = useState("Other");
+  const [customText, setCustomText] = useState("");
+
+  useEffect(() => {
+    if (!isLetterSubjectCategoryOtherOption(value)) {
+      setCustomOpen(false);
+    }
+  }, [value]);
+
+  const selectValue = value.trim() ? value : "__none__";
+  const optionList = value.trim() && !options.includes(value.trim()) ? [...options, value.trim()] : options;
+
+  const commitCustom = () => {
+    const trimmed = customText.trim();
+    if (!trimmed) {
+      onChange(customParent);
+      setCustomOpen(false);
+      return;
+    }
+    saveCustomLetterSubjectCategory(trimmed);
+    onCustomAdded?.();
+    onChange(trimmed);
+    setCustomOpen(false);
+    setCustomText("");
+  };
+
+  return (
+    <div className={cn("space-y-1 min-w-[140px]", className)}>
+      <Select
+        value={selectValue}
+        onValueChange={(next) => {
+          if (next === "__none__") {
+            setCustomOpen(false);
+            setCustomText("");
+            onChange("");
+            return;
+          }
+          if (isLetterSubjectCategoryOtherOption(next)) {
+            setCustomParent(next);
+            setCustomText("");
+            setCustomOpen(true);
+            return;
+          }
+          setCustomOpen(false);
+          setCustomText("");
+          onChange(next);
+        }}
+      >
+        <SelectTrigger className="h-8 text-xs">
+          <SelectValue placeholder="Category" />
+        </SelectTrigger>
+        <SelectContent className="max-h-72">
+          <SelectItem value="__none__">-</SelectItem>
+          {optionList.map((item) => (
+            <SelectItem key={item} value={item}>
+              {item}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {customOpen ? (
+        <Input
+          autoFocus
+          className="h-8 text-xs"
+          placeholder={`Enter ${customParent}…`}
+          value={customText}
+          onChange={(e) => setCustomText(e.target.value)}
+          onBlur={commitCustom}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.currentTarget.blur();
+            if (e.key === "Escape") {
+              setCustomOpen(false);
+              setCustomText("");
+            }
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
 export default function LetterNumbering() {
   const queryClient = useQueryClient();
   const [view, setView] = useState<ViewMode>("list");
@@ -258,6 +356,7 @@ export default function LetterNumbering() {
   });
   const [letterImportOpen, setLetterImportOpen] = useState(false);
   const [oldLetterOpen, setOldLetterOpen] = useState(false);
+  const [customCategoryTick, setCustomCategoryTick] = useState(0);
   const [letterFilters, setLetterFilters] = useState({
     serial: "",
     date: "",
@@ -323,6 +422,11 @@ export default function LetterNumbering() {
   });
 
   const letters = selectedProject?.letters ?? [];
+
+  const subjectCategoryOptions = useMemo(() => {
+    void customCategoryTick;
+    return mergeLetterSubjectCategories(letters.map((letter) => letter.subjectCategory));
+  }, [letters, customCategoryTick]);
 
   const emptyLetterFilters = {
     serial: "",
@@ -1363,7 +1467,7 @@ export default function LetterNumbering() {
                             <th className="p-2 text-left font-medium min-w-[180px]">Sent To</th>
                             <th className="p-2 text-left font-medium min-w-[200px]">Subject</th>
                             <th className="p-2 text-left font-medium min-w-[160px]">CC To</th>
-                            <th className="p-2 text-left font-medium w-36">Subject Cat.</th>
+                            <th className="p-2 text-left font-medium min-w-[180px]">Subject Cat.</th>
                             <th className="p-2 text-left font-medium w-28">Linked</th>
                             <th className="p-2 text-left font-medium w-28">Reply Letter of</th>
                             <th className="p-2 text-left font-medium min-w-[160px]">Remark if Any</th>
@@ -1690,27 +1794,18 @@ export default function LetterNumbering() {
                                   </td>
                                 ))}
                                 <td className="p-2">
-                                  <Select
-                                    value={letter.subjectCategory || "__none__"}
-                                    onValueChange={(value) =>
+                                  <SubjectCategoryField
+                                    value={letter.subjectCategory || ""}
+                                    options={subjectCategoryOptions}
+                                    onCustomAdded={() => setCustomCategoryTick((tick) => tick + 1)}
+                                    onChange={(next) => {
+                                      if ((letter.subjectCategory || "") === next) return;
                                       updateLetterMutation.mutate({
                                         letterId: letter.id,
-                                        payload: { subjectCategory: value === "__none__" ? "" : value }
-                                      })
-                                    }
-                                  >
-                                    <SelectTrigger className="h-8 text-xs">
-                                      <SelectValue placeholder="Category" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="__none__">-</SelectItem>
-                                      {SUBJECT_CATEGORIES.map((item) => (
-                                        <SelectItem key={item} value={item}>
-                                          {item}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
+                                        payload: { subjectCategory: next }
+                                      });
+                                    }}
+                                  />
                                 </td>
                                 <td className="p-2">
                                   {letter.letterLinkUrl ? (
@@ -1968,27 +2063,17 @@ export default function LetterNumbering() {
 
             <div className="space-y-1.5">
               <Label>Subject Category</Label>
-              <Select
-                value={oldLetterForm.subjectCategory || "__none__"}
-                onValueChange={(value) =>
+              <SubjectCategoryField
+                value={oldLetterForm.subjectCategory}
+                options={subjectCategoryOptions}
+                onCustomAdded={() => setCustomCategoryTick((tick) => tick + 1)}
+                onChange={(value) =>
                   setOldLetterForm((prev) => ({
                     ...prev,
-                    subjectCategory: value === "__none__" ? "" : value
+                    subjectCategory: value
                   }))
                 }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Optional" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">—</SelectItem>
-                  {SUBJECT_CATEGORIES.map((item) => (
-                    <SelectItem key={item} value={item}>
-                      {item}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              />
             </div>
 
             {oldLetterForm.category !== "OUTWARD" ? (
