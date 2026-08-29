@@ -222,6 +222,7 @@ function LetterDateField({
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="start">
           <Calendar
+            key={`${month.getFullYear()}-${month.getMonth()}-${open ? "open" : "closed"}`}
             mode="single"
             selected={selected}
             defaultMonth={month}
