@@ -32,10 +32,21 @@ const optionalDate = z
   .transform((value, ctx) => {
     if (value === undefined) return undefined;
     if (value === null || value === "") return null;
-    const normalized = value.includes("T") ? value : `${value}T00:00:00.000Z`;
+    const text = String(value).trim();
+    const dmy = text.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+    if (dmy) {
+      const iso = `${dmy[3]}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}T00:00:00.000Z`;
+      const date = new Date(iso);
+      if (Number.isNaN(date.getTime())) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Invalid letter date (use dd/mm/yyyy)" });
+        return z.NEVER;
+      }
+      return date.toISOString();
+    }
+    const normalized = text.includes("T") ? text : `${text}T00:00:00.000Z`;
     const date = new Date(normalized);
     if (Number.isNaN(date.getTime())) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Invalid letter date" });
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Invalid letter date (use dd/mm/yyyy)" });
       return z.NEVER;
     }
     return date.toISOString();
@@ -69,7 +80,13 @@ const createLetterEntryObjectSchema = z.object({
   replied: z.boolean().optional(),
   /** Serial of the letter this row replies to (e.g. "2a") */
   replyOfSerial: z.string().trim().max(40).nullable().optional(),
-  remark: z.string().trim().max(4000).optional()
+  remark: z.string().trim().max(4000).optional(),
+  /** Existing Sr No when importing old letters */
+  serialLabel: z.string().trim().max(40).nullable().optional(),
+  /** Existing outward sequence for old outward letters */
+  outwardSequence: z.string().trim().max(40).nullable().optional(),
+  /** Existing letter number as already assigned */
+  letterNumber: z.string().trim().max(200).nullable().optional()
 });
 
 export const createLetterEntrySchema = createLetterEntryObjectSchema.superRefine(refineReplyTracking);

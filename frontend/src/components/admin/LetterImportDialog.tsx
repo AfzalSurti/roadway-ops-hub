@@ -123,8 +123,9 @@ export function LetterImportDialog({
         <DialogHeader>
           <DialogTitle>Import letters from Excel</DialogTitle>
           <DialogDescription>
-            Bulk-add letters for {projectLabel || "this project"}. Download the sample file for the
-            correct columns. Valid rows are saved; problem rows are skipped and listed with reasons.
+            Bulk-add new or historical letters for {projectLabel || "this project"}. Use Sr No,
+            Outward Seq, and Letter Number columns for old numbering; dates as dd/mm/yyyy. Download
+            the sample for the correct columns. Valid rows are saved; problem rows are skipped.
           </DialogDescription>
         </DialogHeader>
 

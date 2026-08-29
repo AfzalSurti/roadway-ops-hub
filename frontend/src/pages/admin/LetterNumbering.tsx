@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LetterImportDialog } from "@/components/admin/LetterImportDialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api";
 import type { LetterCategory, LetterEntryItem, LetterProjectItem } from "@/lib/domain";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -89,7 +91,31 @@ function SuggestField({
 
 function toDateInput(value?: string | null) {
   if (!value) return "";
-  return value.slice(0, 10);
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const dd = String(date.getUTCDate()).padStart(2, "0");
+  const mm = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const yyyy = date.getUTCFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+}
+
+/** Parse dd/mm/yyyy (or dd-mm-yyyy / yyyy-mm-dd) to ISO string, or null if empty/invalid. */
+function parseManualDate(value: string): string | null | undefined {
+  const text = value.trim();
+  if (!text) return null;
+  const dmy = text.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  if (dmy) {
+    const iso = `${dmy[3]}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}T00:00:00.000Z`;
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return undefined;
+    return date.toISOString();
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    const date = new Date(`${text}T00:00:00.000Z`);
+    if (Number.isNaN(date.getTime())) return undefined;
+    return date.toISOString();
+  }
+  return undefined;
 }
 
 export default function LetterNumbering() {
@@ -109,6 +135,22 @@ export default function LetterNumbering() {
     projectEngineer: ""
   });
   const [letterImportOpen, setLetterImportOpen] = useState(false);
+  const [oldLetterOpen, setOldLetterOpen] = useState(false);
+  const [oldLetterForm, setOldLetterForm] = useState({
+    category: "OUTWARD" as LetterCategory,
+    serialLabel: "",
+    outwardSequence: "",
+    letterNumber: "",
+    letterDate: "",
+    sentBy: "",
+    sentTo: "",
+    subject: "",
+    ccTo: "",
+    subjectCategory: "",
+    needsReply: "" as "" | "yes" | "no",
+    replyOfSerial: "",
+    remark: ""
+  });
 
   const { data: letterProjects = [], isLoading } = useQuery({
     queryKey: ["letter-projects"],
@@ -268,6 +310,61 @@ export default function LetterNumbering() {
       await refresh();
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to add letter")
+  });
+
+  const addOldLetterMutation = useMutation({
+    mutationFn: () => {
+      if (!oldLetterForm.serialLabel.trim()) {
+        throw new Error("Sr No is required for old letters");
+      }
+      const parsedDate = parseManualDate(oldLetterForm.letterDate);
+      if (oldLetterForm.letterDate.trim() && parsedDate === undefined) {
+        throw new Error("Letter Date must be dd/mm/yyyy");
+      }
+      return api.createLetterEntry(selectedProjectId!, {
+        category: oldLetterForm.category,
+        serialLabel: oldLetterForm.serialLabel.trim(),
+        outwardSequence: oldLetterForm.outwardSequence.trim() || null,
+        letterNumber: oldLetterForm.letterNumber.trim() || null,
+        letterDate: parsedDate ?? null,
+        sentBy: oldLetterForm.sentBy || undefined,
+        sentTo: oldLetterForm.sentTo || undefined,
+        subject: oldLetterForm.subject || undefined,
+        ccTo: oldLetterForm.ccTo || undefined,
+        subjectCategory: oldLetterForm.subjectCategory || undefined,
+        needsReply:
+          oldLetterForm.category === "OUTWARD"
+            ? null
+            : oldLetterForm.needsReply === "yes"
+              ? true
+              : oldLetterForm.needsReply === "no"
+                ? false
+                : null,
+        replyOfSerial: oldLetterForm.replyOfSerial.trim() || null,
+        remark: oldLetterForm.remark || undefined
+      });
+    },
+    onSuccess: async () => {
+      toast.success("Old letter added with existing number");
+      setOldLetterOpen(false);
+      setOldLetterForm({
+        category: "OUTWARD",
+        serialLabel: "",
+        outwardSequence: "",
+        letterNumber: "",
+        letterDate: "",
+        sentBy: "",
+        sentTo: "",
+        subject: "",
+        ccTo: "",
+        subjectCategory: "",
+        needsReply: "",
+        replyOfSerial: "",
+        remark: ""
+      });
+      await refresh();
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to add old letter")
   });
 
   const insertLetterMutation = useMutation({
@@ -956,6 +1053,14 @@ export default function LetterNumbering() {
                     </Button>
                     <Button
                       size="sm"
+                      variant="secondary"
+                      className="gap-1"
+                      onClick={() => setOldLetterOpen(true)}
+                    >
+                      <Plus className="h-3.5 w-3.5" /> Add Old Letter
+                    </Button>
+                    <Button
+                      size="sm"
                       variant="outline"
                       className="gap-1"
                       onClick={() => downloadLetterImportTemplate()}
@@ -1062,7 +1167,7 @@ export default function LetterNumbering() {
                           {letters.length === 0 ? (
                             <tr>
                               <td colSpan={14} className="p-8 text-center text-muted-foreground">
-                                No letters yet. Add Inward / Outward / Other.
+                                No letters yet. Add Inward / Outward / Other, or Add Old Letter / Import Excel for existing numbers.
                               </td>
                             </tr>
                           ) : null}
@@ -1076,19 +1181,29 @@ export default function LetterNumbering() {
                                 <td className="p-2 font-medium">{letter.serialLabel}</td>
                                 <td className="p-2">
                                   <Input
-                                    type="date"
+                                    type="text"
+                                    inputMode="numeric"
                                     className="h-8 text-xs"
-                                    value={toDateInput(letter.letterDate)}
-                                    onChange={(e) =>
+                                    placeholder="dd/mm/yyyy"
+                                    defaultValue={toDateInput(letter.letterDate)}
+                                    key={`${letter.id}-${letter.letterDate ?? "empty"}`}
+                                    onBlur={(e) => {
+                                      const parsed = parseManualDate(e.target.value);
+                                      if (e.target.value.trim() && parsed === undefined) {
+                                        toast.error("Use date format dd/mm/yyyy");
+                                        e.target.value = toDateInput(letter.letterDate);
+                                        return;
+                                      }
+                                      const nextIso = parsed ?? null;
+                                      const current = letter.letterDate
+                                        ? new Date(letter.letterDate).toISOString()
+                                        : null;
+                                      if (nextIso === current || (!nextIso && !current)) return;
                                       updateLetterMutation.mutate({
                                         letterId: letter.id,
-                                        payload: {
-                                          letterDate: e.target.value
-                                            ? new Date(`${e.target.value}T00:00:00`).toISOString()
-                                            : null
-                                        }
-                                      })
-                                    }
+                                        payload: { letterDate: nextIso }
+                                      });
+                                    }}
                                   />
                                 </td>
                                 <td className="p-2 font-mono text-[11px] whitespace-normal break-all">
@@ -1328,8 +1443,10 @@ export default function LetterNumbering() {
                     Search and select a project above to manage letters.
                   </p>
                   <p className="text-xs text-muted-foreground rounded-lg border border-border/40 bg-secondary/20 px-3 py-2">
-                    After you select a project, use <strong>Sample Excel</strong> and{" "}
-                    <strong>Import Excel</strong> to add bulk letters for that project.
+                    After you select a project, use <strong>Add Old Letter</strong> for one historical
+                    letter with an existing number, or <strong>Sample Excel</strong> /{" "}
+                    <strong>Import Excel</strong> for bulk push (include Sr No, Outward Seq, Letter Number;
+                    dates as dd/mm/yyyy).
                   </p>
                 </div>
               )}
@@ -1350,6 +1467,205 @@ export default function LetterNumbering() {
           }
         />
       ) : null}
+
+      <Dialog open={oldLetterOpen} onOpenChange={setOldLetterOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add Old Letter</DialogTitle>
+            <DialogDescription>
+              Push a historical letter that already has a number. Enter the existing Sr No (required).
+              Letter Number is optional — leave blank to build from project format. Dates use dd/mm/yyyy.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>Category</Label>
+              <Select
+                value={oldLetterForm.category}
+                onValueChange={(value) =>
+                  setOldLetterForm((prev) => ({
+                    ...prev,
+                    category: value as LetterCategory,
+                    needsReply: value === "OUTWARD" ? "" : prev.needsReply,
+                    outwardSequence: value === "OUTWARD" ? prev.outwardSequence : ""
+                  }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="OUTWARD">OUTWARD</SelectItem>
+                  <SelectItem value="INWARD">INWARD</SelectItem>
+                  <SelectItem value="OTHER">OTHER</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Sr No *</Label>
+              <Input
+                placeholder="e.g. 01 or 3a"
+                value={oldLetterForm.serialLabel}
+                onChange={(e) => setOldLetterForm((prev) => ({ ...prev, serialLabel: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Letter Date</Label>
+              <Input
+                type="text"
+                inputMode="numeric"
+                placeholder="dd/mm/yyyy"
+                value={oldLetterForm.letterDate}
+                onChange={(e) => setOldLetterForm((prev) => ({ ...prev, letterDate: e.target.value }))}
+              />
+            </div>
+
+            {oldLetterForm.category === "OUTWARD" ? (
+              <div className="space-y-1.5">
+                <Label>Outward Seq</Label>
+                <Input
+                  placeholder="e.g. 01 or 02a"
+                  value={oldLetterForm.outwardSequence}
+                  onChange={(e) =>
+                    setOldLetterForm((prev) => ({ ...prev, outwardSequence: e.target.value }))
+                  }
+                />
+              </div>
+            ) : null}
+
+            <div className={`space-y-1.5 ${oldLetterForm.category === "OUTWARD" ? "" : "sm:col-span-2"}`}>
+              <Label>Letter Number (optional)</Label>
+              <Input
+                placeholder="Leave blank to auto-build"
+                value={oldLetterForm.letterNumber}
+                onChange={(e) => setOldLetterForm((prev) => ({ ...prev, letterNumber: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Sent By</Label>
+              <Input
+                value={oldLetterForm.sentBy}
+                onChange={(e) => setOldLetterForm((prev) => ({ ...prev, sentBy: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Sent To</Label>
+              <Input
+                value={oldLetterForm.sentTo}
+                onChange={(e) => setOldLetterForm((prev) => ({ ...prev, sentTo: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>Subject</Label>
+              <Input
+                value={oldLetterForm.subject}
+                onChange={(e) => setOldLetterForm((prev) => ({ ...prev, subject: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>CC To</Label>
+              <Input
+                value={oldLetterForm.ccTo}
+                onChange={(e) => setOldLetterForm((prev) => ({ ...prev, ccTo: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Subject Category</Label>
+              <Select
+                value={oldLetterForm.subjectCategory || "__none__"}
+                onValueChange={(value) =>
+                  setOldLetterForm((prev) => ({
+                    ...prev,
+                    subjectCategory: value === "__none__" ? "" : value
+                  }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Optional" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">—</SelectItem>
+                  {SUBJECT_CATEGORIES.map((item) => (
+                    <SelectItem key={item} value={item}>
+                      {item}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {oldLetterForm.category !== "OUTWARD" ? (
+              <div className="space-y-1.5">
+                <Label>Needs Reply</Label>
+                <Select
+                  value={oldLetterForm.needsReply || "__none__"}
+                  onValueChange={(value) =>
+                    setOldLetterForm((prev) => ({
+                      ...prev,
+                      needsReply: value === "__none__" ? "" : (value as "yes" | "no")
+                    }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Optional" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">—</SelectItem>
+                    <SelectItem value="yes">Yes</SelectItem>
+                    <SelectItem value="no">No</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
+
+            <div className="space-y-1.5">
+              <Label>Reply Letter of (Sr)</Label>
+              <Input
+                placeholder="e.g. 5"
+                value={oldLetterForm.replyOfSerial}
+                onChange={(e) =>
+                  setOldLetterForm((prev) => ({ ...prev, replyOfSerial: e.target.value }))
+                }
+              />
+            </div>
+
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>Remark</Label>
+              <Input
+                value={oldLetterForm.remark}
+                onChange={(e) => setOldLetterForm((prev) => ({ ...prev, remark: e.target.value }))}
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="ghost" onClick={() => setOldLetterOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={addOldLetterMutation.isPending || !selectedProjectId}
+              onClick={() => addOldLetterMutation.mutate()}
+            >
+              {addOldLetterMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-1" /> Saving…
+                </>
+              ) : (
+                "Save Old Letter"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageWrapper>
   );
 }

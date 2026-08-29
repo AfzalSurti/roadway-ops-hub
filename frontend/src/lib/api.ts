@@ -639,6 +639,9 @@ export const api = {
       replied?: boolean;
       replyOfSerial?: string | null;
       remark?: string;
+      serialLabel?: string | null;
+      outwardSequence?: string | null;
+      letterNumber?: string | null;
     }
   ) {
     return request<LetterEntryItem>(`/letter-numbering/projects/${letterProjectId}/letters`, {
@@ -662,6 +665,9 @@ export const api = {
       replied?: boolean;
       replyOfSerial?: string | null;
       remark?: string;
+      serialLabel?: string | null;
+      outwardSequence?: string | null;
+      letterNumber?: string | null;
     }>
   ) {
     return request<{

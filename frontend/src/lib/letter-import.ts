@@ -4,6 +4,9 @@ import { parseExcelDate } from "./asset-import";
 
 export const LETTER_IMPORT_HEADERS = [
   "Category*",
+  "Sr No",
+  "Outward Seq",
+  "Letter Number",
   "Letter Date",
   "Sent By",
   "Sent To",
@@ -18,6 +21,9 @@ export const LETTER_IMPORT_HEADERS = [
 
 export type LetterImportRowPayload = {
   category: LetterCategory;
+  serialLabel?: string | null;
+  outwardSequence?: string | null;
+  letterNumber?: string | null;
   letterDate?: string | null;
   sentBy?: string;
   sentTo?: string;
@@ -48,6 +54,20 @@ const HEADER_ALIASES: Record<string, FieldKey | "ignore"> = {
   "letter type": "category",
   "letter type*": "category",
   type: "category",
+  "sr no": "serialLabel",
+  "sr no.": "serialLabel",
+  "sr. no": "serialLabel",
+  "sr. no.": "serialLabel",
+  serial: "serialLabel",
+  "serial label": "serialLabel",
+  "serial no": "serialLabel",
+  "outward seq": "outwardSequence",
+  "outward sequence": "outwardSequence",
+  "outward no": "outwardSequence",
+  "letter number": "letterNumber",
+  "letter no": "letterNumber",
+  "letter no.": "letterNumber",
+  "existing letter number": "letterNumber",
   "letter date": "letterDate",
   date: "letterDate",
   "sent by": "sentBy",
@@ -105,47 +125,72 @@ function isRowEmpty(values: unknown[]) {
   return values.every((value) => cellString(value) === "");
 }
 
-/** Sample Excel for Letter Numbering bulk entry. */
+function parseLetterDateCell(value: unknown): { date: string | null; error?: string } {
+  if (value === null || value === undefined || value === "") return { date: null };
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return { date: value.toISOString().slice(0, 10) };
+  }
+  const text = cellString(value);
+  const dmy = text.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  if (dmy) {
+    return { date: `${dmy[3]}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}` };
+  }
+  const parsed = parseExcelDate(value);
+  if (parsed) return { date: parsed };
+  if (text) return { date: null, error: `Invalid Letter Date "${text}" — use dd/mm/yyyy` };
+  return { date: null };
+}
+
+/** Sample Excel for Letter Numbering bulk entry (new + old numbered letters). */
 export function downloadLetterImportTemplate() {
   const sampleRows = [
     {
       "Category*": "OUTWARD",
-      "Letter Date": "2026-04-01",
+      "Sr No": "01",
+      "Outward Seq": "01",
+      "Letter Number": "376/GSIR2305R/01/01",
+      "Letter Date": "01/04/2024",
       "Sent By": "Project Coordinator",
       "Sent To": "Client Authority",
-      "Subject": "Submission of monthly progress report",
+      Subject: "Old LOA acknowledgement",
       "CC To": "HOD",
       "Subject Category": "Work Order",
       "Letter Link URL": "",
       "Needs Reply": "",
       "Reply Of Serial": "",
-      Remark: "",
+      Remark: "Historical letter — keep existing number",
     },
     {
       "Category*": "INWARD",
-      "Letter Date": "2026-04-05",
+      "Sr No": "02",
+      "Outward Seq": "",
+      "Letter Number": "02",
+      "Letter Date": "15/04/2024",
       "Sent By": "Client Authority",
       "Sent To": "Project Office",
-      "Subject": "Query on progress report",
+      Subject: "Query on progress report",
       "CC To": "",
       "Subject Category": "Other",
       "Letter Link URL": "",
       "Needs Reply": "Yes",
       "Reply Of Serial": "",
-      Remark: "Awaiting clarification",
+      Remark: "",
     },
     {
-      "Category*": "OTHER",
-      "Letter Date": "2026-04-08",
-      "Sent By": "Internal",
-      "Sent To": "File",
-      "Subject": "Internal note",
+      "Category*": "OUTWARD",
+      "Sr No": "",
+      "Outward Seq": "",
+      "Letter Number": "",
+      "Letter Date": "05/08/2026",
+      "Sent By": "Project Coordinator",
+      "Sent To": "Client Authority",
+      Subject: "New letter — auto number",
       "CC To": "",
       "Subject Category": "Other",
       "Letter Link URL": "",
-      "Needs Reply": "No",
+      "Needs Reply": "",
       "Reply Of Serial": "",
-      Remark: "",
+      Remark: "Leave Sr No / Letter Number blank to auto-generate",
     },
   ];
 
@@ -160,21 +205,26 @@ export function downloadLetterImportTemplate() {
     ["Letter Numbering — Excel Import Guide"],
     [],
     ["Required"],
-    ["Category*", "INWARD, OUTWARD, or OTHER (also: I / O / Inward / Outward)"],
+    ["Category*", "INWARD, OUTWARD, or OTHER"],
     [],
-    ["Optional"],
-    ["Letter Date", "YYYY-MM-DD or DD/MM/YYYY (Excel date cells also work)"],
+    ["For old / historical letters (already numbered)"],
+    ["Sr No", "Existing serial, e.g. 01, 2, 3a — required if you want to keep old numbering"],
+    ["Outward Seq", "Existing outward sequence for OUTWARD, e.g. 01 or 02a"],
+    ["Letter Number", "Existing full letter number (paste as already assigned)"],
+    [],
+    ["For new letters"],
+    ["Sr No / Outward Seq / Letter Number", "Leave blank — system auto-generates"],
+    [],
+    ["Other columns"],
+    ["Letter Date", "dd/mm/yyyy (preferred) or Excel date cell"],
     ["Sent By / Sent To / Subject / CC To", "Free text"],
     ["Subject Category", "e.g. Utility, Tender, LAQ, Work Order, Other"],
-    ["Letter Link URL", "Optional attachment / drive link"],
-    ["Needs Reply", "Yes / No — only for INWARD or OTHER (leave blank for OUTWARD)"],
-    ["Reply Of Serial", "Serial this letter replies to, e.g. 2 or 2a"],
-    ["Remark", "Optional note"],
+    ["Needs Reply", "Yes / No — only for INWARD or OTHER"],
+    ["Reply Of Serial", "Serial this letter replies to, e.g. 2a"],
     [],
     ["Import behaviour"],
-    ["1", "Download this sample, fill rows, upload in Letter Data Base for a project."],
-    ["2", "Valid rows are saved; invalid rows are skipped and listed with the reason."],
-    ["3", "Letter numbers / serials are generated automatically (same as Add Outward / Inward / Other)."],
+    ["1", "Valid rows are saved; invalid rows are skipped with reason."],
+    ["2", "If Sr No already exists in the project, that row fails and others continue."],
   ]);
   XLSX.utils.book_append_sheet(workbook, guide, "Guide");
   XLSX.writeFile(workbook, "letter-numbering-import-sample.xlsx");
@@ -238,20 +288,19 @@ export function readLetterImportFile(file: ArrayBuffer): {
       continue;
     }
 
-    let letterDate: string | null | undefined;
-    if (raw.letterDate !== undefined && raw.letterDate !== "") {
-      if (raw.letterDate instanceof Date && !Number.isNaN(raw.letterDate.getTime())) {
-        letterDate = raw.letterDate.toISOString().slice(0, 10);
-      } else {
-        letterDate = parseExcelDate(raw.letterDate);
-        if (!letterDate && cellString(raw.letterDate)) {
-          errors.push({
-            excelRow,
-            message: `Invalid Letter Date "${cellString(raw.letterDate)}" — use YYYY-MM-DD or DD/MM/YYYY`,
-          });
-          continue;
-        }
-      }
+    const serialLabel = cellString(raw.serialLabel) || null;
+    if (serialLabel && !/^(\d+)([a-z]*)$/i.test(serialLabel)) {
+      errors.push({
+        excelRow,
+        message: `Invalid Sr No "${serialLabel}" — use 01, 2, or 3a`,
+      });
+      continue;
+    }
+
+    const dateResult = parseLetterDateCell(raw.letterDate);
+    if (dateResult.error) {
+      errors.push({ excelRow, message: dateResult.error });
+      continue;
     }
 
     const needsReplyParsed = parseYesNo(raw.needsReply);
@@ -272,7 +321,10 @@ export function readLetterImportFile(file: ArrayBuffer): {
 
     const payload: LetterImportRowPayload = {
       category,
-      letterDate: letterDate ?? null,
+      serialLabel,
+      outwardSequence: cellString(raw.outwardSequence) || null,
+      letterNumber: cellString(raw.letterNumber) || null,
+      letterDate: dateResult.date,
       sentBy: cellString(raw.sentBy) || undefined,
       sentTo: cellString(raw.sentTo) || undefined,
       subject: cellString(raw.subject) || undefined,

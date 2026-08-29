@@ -12,9 +12,31 @@ import type { LetterCategory } from "@prisma/client";
 function parseDate(value?: string | null) {
   if (value === undefined) return undefined;
   if (value === null || value === "") return null;
-  const date = new Date(value);
+
+  const text = String(value).trim();
+  const dmy = text.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  if (dmy) {
+    const iso = `${dmy[3]}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}T00:00:00.000Z`;
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) throw badRequest("Invalid letter date");
+    return date;
+  }
+
+  const date = new Date(text.includes("T") ? text : `${text}T00:00:00.000Z`);
   if (Number.isNaN(date.getTime())) throw badRequest("Invalid letter date");
   return date;
+}
+
+function sortOrderFromSerial(serialLabel: string): number {
+  const match = serialLabel.trim().match(/^(\d+)([a-z]*)$/i);
+  if (!match) return Date.now() % 1_000_000;
+  const base = Number(match[1]) * 1000;
+  const suffix = match[2].toLowerCase();
+  let extra = 0;
+  for (let i = 0; i < suffix.length; i += 1) {
+    extra = extra * 26 + (suffix.charCodeAt(i) - 96);
+  }
+  return base + extra;
 }
 
 function normalizeSerialLabel(value: string) {
@@ -392,28 +414,68 @@ export const letterNumberingService = {
       replied?: boolean;
       replyOfSerial?: string | null;
       remark?: string;
+      /** Existing Sr No when pushing old letters (e.g. 01, 2a) */
+      serialLabel?: string | null;
+      /** Existing outward sequence when pushing old outward letters */
+      outwardSequence?: string | null;
+      /** Existing letter number as already assigned (optional override) */
+      letterNumber?: string | null;
     }
   ) {
     const project = await this.getProject(letterProjectId);
     const letters = project.letters;
-    const serialLabel = String(nextWholeSerial(letters.map((item) => item.serialLabel)));
-    const sortOrder =
-      letters.length === 0 ? 1 : Math.max(...letters.map((item) => item.sortOrder)) + 1;
+
+    const providedSerial = payload.serialLabel?.trim() || "";
+    let serialLabel: string;
+    if (providedSerial) {
+      if (!/^(\d+)([a-z]*)$/i.test(providedSerial)) {
+        throw badRequest("Sr No must look like 01, 2, or 3a");
+      }
+      const key = normalizeSerialLabel(providedSerial);
+      const duplicate = letters.find((item) => normalizeSerialLabel(item.serialLabel) === key);
+      if (duplicate) {
+        throw conflict(`Sr No "${providedSerial}" already exists in this project`);
+      }
+      serialLabel = /^\d+$/.test(providedSerial)
+        ? String(Number(providedSerial))
+        : providedSerial.toLowerCase();
+    } else {
+      serialLabel = String(nextWholeSerial(letters.map((item) => item.serialLabel)));
+    }
+
+    const sortOrder = providedSerial
+      ? sortOrderFromSerial(serialLabel)
+      : letters.length === 0
+        ? 1
+        : Math.max(...letters.map((item) => item.sortOrder)) + 1;
 
     let outwardSequence: string | null = null;
     if (payload.category === "OUTWARD") {
-      outwardSequence = nextOutwardSequence(
-        letters.filter((item) => item.category === "OUTWARD").map((item) => item.outwardSequence || "")
-      );
+      const providedOutward = payload.outwardSequence?.trim() || "";
+      if (providedOutward) {
+        outwardSequence = providedOutward;
+      } else if (payload.letterNumber?.trim()) {
+        // Try extract outward seq from full letter number: PN/CODE/SR/OUT
+        const parts = payload.letterNumber.trim().split("/");
+        outwardSequence = parts.length >= 4 ? parts[parts.length - 1] : null;
+      }
+      if (!outwardSequence) {
+        outwardSequence = nextOutwardSequence(
+          letters.filter((item) => item.category === "OUTWARD").map((item) => item.outwardSequence || "")
+        );
+      }
     }
 
-    const letterNumber = buildLetterNumber({
-      projectNumber: project.projectNumber,
-      projectCode: project.projectCode,
-      serialLabel,
-      category: payload.category,
-      outwardSequence
-    });
+    const providedLetterNumber = payload.letterNumber?.trim() || "";
+    const letterNumber =
+      providedLetterNumber ||
+      buildLetterNumber({
+        projectNumber: project.projectNumber,
+        projectCode: project.projectCode,
+        serialLabel,
+        category: payload.category,
+        outwardSequence
+      });
 
     const replyFields = resolveReplyFields(payload.category, {
       needsReply: payload.needsReply,
@@ -467,6 +529,9 @@ export const letterNumberingService = {
       replied?: boolean;
       replyOfSerial?: string | null;
       remark?: string;
+      serialLabel?: string | null;
+      outwardSequence?: string | null;
+      letterNumber?: string | null;
     }>
   ) {
     await this.getProject(letterProjectId);
