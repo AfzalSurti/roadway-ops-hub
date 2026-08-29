@@ -193,11 +193,11 @@ function LetterDateField({
   };
 
   return (
-    <div className={cn("flex items-center gap-1", className)}>
+    <div className={cn("flex items-center gap-1 min-w-[148px]", className)}>
       <Input
         type="text"
         inputMode="numeric"
-        className="h-8 text-xs"
+        className="h-8 w-[118px] min-w-[118px] shrink-0 text-xs"
         placeholder={placeholder}
         value={text}
         onChange={(e) => setText(e.target.value)}
@@ -397,9 +397,7 @@ export default function LetterNumbering() {
     subject: "",
     ccTo: "",
     subjectCategory: "",
-    linked: "ALL",
-    replyOfSerial: "",
-    remark: ""
+    replyOfSerial: ""
   });
   const [oldLetterForm, setOldLetterForm] = useState({
     category: "OUTWARD" as LetterCategory,
@@ -468,15 +466,13 @@ export default function LetterNumbering() {
     subject: "",
     ccTo: "",
     subjectCategory: "",
-    linked: "ALL",
-    replyOfSerial: "",
-    remark: ""
+    replyOfSerial: ""
   };
 
   const hasLetterFilters = useMemo(
     () =>
       Object.entries(letterFilters).some(([key, value]) => {
-        if (key === "category" || key === "needsReply" || key === "linked") {
+        if (key === "category" || key === "needsReply") {
           return value !== "ALL";
         }
         return Boolean(String(value).trim());
@@ -511,10 +507,7 @@ export default function LetterNumbering() {
       if (!includes(letter.subject, letterFilters.subject)) return false;
       if (!includes(letter.ccTo, letterFilters.ccTo)) return false;
       if (!includes(letter.subjectCategory, letterFilters.subjectCategory)) return false;
-      if (letterFilters.linked === "yes" && !letter.letterLinkUrl) return false;
-      if (letterFilters.linked === "no" && letter.letterLinkUrl) return false;
       if (!includes(letter.replyOfSerial, letterFilters.replyOfSerial)) return false;
-      if (!includes(letter.remark, letterFilters.remark)) return false;
       return true;
     });
   }, [letters, letterFilters]);
@@ -1496,11 +1489,11 @@ export default function LetterNumbering() {
                     </p>
                   ) : (
                     <div className="overflow-x-auto rounded-xl border border-border/40">
-                      <table className="w-full text-xs min-w-[1700px] table-auto">
+                      <table className="w-full text-xs min-w-[1500px] table-auto">
                         <thead>
                           <tr className="bg-secondary/40 text-muted-foreground">
                             <th className="p-2 text-left font-medium w-14">Sr.</th>
-                            <th className="p-2 text-left font-medium w-32">Date</th>
+                            <th className="p-2 text-left font-medium min-w-[160px] w-[160px]">Date</th>
                             <th className="p-2 text-left font-medium w-48">Letter Number</th>
                             <th className="p-2 text-left font-medium w-32">Category</th>
                             <th className="p-2 text-left font-medium w-36">Need reply?</th>
@@ -1509,9 +1502,7 @@ export default function LetterNumbering() {
                             <th className="p-2 text-left font-medium min-w-[200px]">Subject</th>
                             <th className="p-2 text-left font-medium min-w-[160px]">CC To</th>
                             <th className="p-2 text-left font-medium min-w-[180px]">Subject Cat.</th>
-                            <th className="p-2 text-left font-medium w-28">Linked</th>
                             <th className="p-2 text-left font-medium w-28">Reply Letter of</th>
-                            <th className="p-2 text-left font-medium min-w-[160px]">Remark if Any</th>
                             <th className="p-2 text-right font-medium w-24"> </th>
                           </tr>
                           <tr className="bg-secondary/25 border-t border-border/20">
@@ -1527,7 +1518,7 @@ export default function LetterNumbering() {
                             </th>
                             <th className="p-1.5">
                               <Input
-                                className="h-7 text-[11px]"
+                                className="h-7 w-full min-w-[120px] text-[11px]"
                                 placeholder="dd/mm/yyyy"
                                 value={letterFilters.date}
                                 onChange={(e) =>
@@ -1638,23 +1629,6 @@ export default function LetterNumbering() {
                               />
                             </th>
                             <th className="p-1.5">
-                              <Select
-                                value={letterFilters.linked}
-                                onValueChange={(value) =>
-                                  setLetterFilters((prev) => ({ ...prev, linked: value }))
-                                }
-                              >
-                                <SelectTrigger className="h-7 text-[11px]">
-                                  <SelectValue placeholder="All" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="ALL">All</SelectItem>
-                                  <SelectItem value="yes">Yes</SelectItem>
-                                  <SelectItem value="no">No</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </th>
-                            <th className="p-1.5">
                               <Input
                                 className="h-7 text-[11px]"
                                 placeholder="Filter"
@@ -1664,16 +1638,6 @@ export default function LetterNumbering() {
                                     ...prev,
                                     replyOfSerial: e.target.value
                                   }))
-                                }
-                              />
-                            </th>
-                            <th className="p-1.5">
-                              <Input
-                                className="h-7 text-[11px]"
-                                placeholder="Filter"
-                                value={letterFilters.remark}
-                                onChange={(e) =>
-                                  setLetterFilters((prev) => ({ ...prev, remark: e.target.value }))
                                 }
                               />
                             </th>
@@ -1695,14 +1659,14 @@ export default function LetterNumbering() {
                         <tbody>
                           {letters.length === 0 ? (
                             <tr>
-                              <td colSpan={14} className="p-8 text-center text-muted-foreground">
+                              <td colSpan={12} className="p-8 text-center text-muted-foreground">
                                 No letters yet. Add Inward / Outward / Other, or Add Old Letter / Import Excel for existing numbers.
                               </td>
                             </tr>
                           ) : null}
                           {letters.length > 0 && filteredLetters.length === 0 ? (
                             <tr>
-                              <td colSpan={14} className="p-8 text-center text-muted-foreground">
+                              <td colSpan={12} className="p-8 text-center text-muted-foreground">
                                 No letters match the filters.{" "}
                                 <button
                                   type="button"
@@ -1849,33 +1813,6 @@ export default function LetterNumbering() {
                                   />
                                 </td>
                                 <td className="p-2">
-                                  {letter.letterLinkUrl ? (
-                                    <a
-                                      href={letter.letterLinkUrl}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className="text-primary underline"
-                                    >
-                                      Preview
-                                    </a>
-                                  ) : (
-                                    <Input
-                                      className="h-8 text-xs"
-                                      placeholder="URL"
-                                      defaultValue=""
-                                      onBlur={(e) => {
-                                        const url = e.target.value.trim();
-                                        if (url) {
-                                          updateLetterMutation.mutate({
-                                            letterId: letter.id,
-                                            payload: { letterLinkUrl: url }
-                                          });
-                                        }
-                                      }}
-                                    />
-                                  )}
-                                </td>
-                                <td className="p-2">
                                   <Input
                                     className="h-8 text-xs font-medium"
                                     placeholder="e.g. 2a"
@@ -1895,23 +1832,6 @@ export default function LetterNumbering() {
                                         payload: { replyOfSerial: next || null }
                                       });
                                     }}
-                                  />
-                                </td>
-                                <td className="p-2 align-top">
-                                  <textarea
-                                    rows={2}
-                                    placeholder="Optional"
-                                    defaultValue={letter.remark ?? ""}
-                                    key={`${letter.id}-remark-${letter.updatedAt}`}
-                                    onBlur={(e) => {
-                                      const next = e.target.value.trim();
-                                      if (next === (letter.remark ?? "").trim()) return;
-                                      updateLetterMutation.mutate({
-                                        letterId: letter.id,
-                                        payload: { remark: next }
-                                      });
-                                    }}
-                                    className="w-full min-h-[2.5rem] min-w-[140px] resize-y rounded-md border border-input bg-transparent px-2 py-1.5 text-xs leading-snug whitespace-pre-wrap break-words outline-none focus-visible:ring-1 focus-visible:ring-ring"
                                   />
                                 </td>
                                 <td className="p-2 text-right">
@@ -2149,14 +2069,6 @@ export default function LetterNumbering() {
                 onChange={(e) =>
                   setOldLetterForm((prev) => ({ ...prev, replyOfSerial: e.target.value }))
                 }
-              />
-            </div>
-
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label>Remark</Label>
-              <Input
-                value={oldLetterForm.remark}
-                onChange={(e) => setOldLetterForm((prev) => ({ ...prev, remark: e.target.value }))}
               />
             </div>
           </div>
