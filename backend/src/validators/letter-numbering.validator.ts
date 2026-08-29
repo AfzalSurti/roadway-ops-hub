@@ -35,19 +35,40 @@ const optionalDate = z
     const text = String(value).trim();
     const dmy = text.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
     if (dmy) {
-      const iso = `${dmy[3]}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}T00:00:00.000Z`;
-      const date = new Date(iso);
-      if (Number.isNaN(date.getTime())) {
+      const day = Number(dmy[1]);
+      const month = Number(dmy[2]);
+      const year = Number(dmy[3]);
+      const date = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+      if (
+        Number.isNaN(date.getTime()) ||
+        date.getUTCFullYear() !== year ||
+        date.getUTCMonth() !== month - 1 ||
+        date.getUTCDate() !== day
+      ) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Invalid letter date (use dd/mm/yyyy)" });
         return z.NEVER;
       }
       return date.toISOString();
     }
-    const normalized = text.includes("T") ? text : `${text}T00:00:00.000Z`;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+      const [year, month, day] = text.split("-").map(Number);
+      return new Date(Date.UTC(year, month - 1, day, 12, 0, 0)).toISOString();
+    }
+    const normalized = text.includes("T") ? text : `${text}T12:00:00.000Z`;
     const date = new Date(normalized);
     if (Number.isNaN(date.getTime())) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Invalid letter date (use dd/mm/yyyy)" });
       return z.NEVER;
+    }
+    if (
+      date.getUTCHours() === 0 &&
+      date.getUTCMinutes() === 0 &&
+      date.getUTCSeconds() === 0 &&
+      date.getUTCMilliseconds() === 0
+    ) {
+      return new Date(
+        Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 12, 0, 0)
+      ).toISOString();
     }
     return date.toISOString();
   });

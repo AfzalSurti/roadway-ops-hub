@@ -5,14 +5,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LetterImportDialog } from "@/components/admin/LetterImportDialog";
+import { Calendar } from "@/components/ui/calendar";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { api } from "@/lib/api";
 import type { LetterCategory, LetterEntryItem, LetterProjectItem } from "@/lib/domain";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Download, FileUp, Link2, Loader2, Mail, MailWarning, Plus, Trash2 } from "lucide-react";
+import { CalendarIcon, CheckCircle2, Download, FileUp, Link2, Loader2, Mail, MailWarning, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { downloadLetterImportTemplate } from "@/lib/letter-import";
+import { cn } from "@/lib/utils";
 
 type ViewMode = "new" | "list" | "database" | "pending";
 
@@ -89,14 +92,38 @@ function SuggestField({
   );
 }
 
-function toDateInput(value?: string | null) {
-  if (!value) return "";
+function calendarParts(value?: string | null): { y: number; m: number; d: number } | null {
+  if (!value) return null;
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const dd = String(date.getUTCDate()).padStart(2, "0");
-  const mm = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const yyyy = date.getUTCFullYear();
-  return `${dd}/${mm}/${yyyy}`;
+  if (Number.isNaN(date.getTime())) return null;
+  return { y: date.getUTCFullYear(), m: date.getUTCMonth() + 1, d: date.getUTCDate() };
+}
+
+/** Display letter date as dd/mm/yyyy using the stored calendar day (UTC parts). */
+function toDateInput(value?: string | null) {
+  const parts = calendarParts(value);
+  if (!parts) return "";
+  return `${String(parts.d).padStart(2, "0")}/${String(parts.m).padStart(2, "0")}/${parts.y}`;
+}
+
+/** Store calendar days at UTC noon so IST/other zones never shift the day. */
+function toLetterDateIso(year: number, month: number, day: number): string {
+  return new Date(Date.UTC(year, month - 1, day, 12, 0, 0)).toISOString();
+}
+
+function sameCalendarDay(a?: string | null, b?: string | null) {
+  const left = calendarParts(a);
+  const right = calendarParts(b);
+  if (!left && !right) return true;
+  if (!left || !right) return false;
+  return left.y === right.y && left.m === right.m && left.d === right.d;
+}
+
+/** Local Date for DayPicker from stored ISO (uses UTC calendar day). */
+function pickerDateFromIso(value?: string | null): Date | undefined {
+  const parts = calendarParts(value);
+  if (!parts) return undefined;
+  return new Date(parts.y, parts.m - 1, parts.d);
 }
 
 /** Parse dd/mm/yyyy (or dd-mm-yyyy / yyyy-mm-dd) to ISO string, or null if empty/invalid. */
@@ -105,17 +132,112 @@ function parseManualDate(value: string): string | null | undefined {
   if (!text) return null;
   const dmy = text.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
   if (dmy) {
-    const iso = `${dmy[3]}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}T00:00:00.000Z`;
-    const date = new Date(iso);
-    if (Number.isNaN(date.getTime())) return undefined;
-    return date.toISOString();
+    const day = Number(dmy[1]);
+    const month = Number(dmy[2]);
+    const year = Number(dmy[3]);
+    const probe = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+    if (
+      Number.isNaN(probe.getTime()) ||
+      probe.getUTCFullYear() !== year ||
+      probe.getUTCMonth() !== month - 1 ||
+      probe.getUTCDate() !== day
+    ) {
+      return undefined;
+    }
+    return toLetterDateIso(year, month, day);
   }
   if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
-    const date = new Date(`${text}T00:00:00.000Z`);
-    if (Number.isNaN(date.getTime())) return undefined;
-    return date.toISOString();
+    const [year, month, day] = text.split("-").map(Number);
+    return toLetterDateIso(year, month, day);
   }
   return undefined;
+}
+
+function LetterDateField({
+  value,
+  onChange,
+  className,
+  placeholder = "dd/mm/yyyy"
+}: {
+  value?: string | null;
+  onChange: (iso: string | null) => void;
+  className?: string;
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState(() => toDateInput(value));
+  const selected = pickerDateFromIso(value);
+
+  useEffect(() => {
+    setText(toDateInput(value));
+  }, [value]);
+
+  const commitText = () => {
+    const parsed = parseManualDate(text);
+    if (text.trim() && parsed === undefined) {
+      toast.error("Use date format dd/mm/yyyy");
+      setText(toDateInput(value));
+      return;
+    }
+    const next = parsed ?? null;
+    if (sameCalendarDay(value, next)) {
+      setText(toDateInput(value));
+      return;
+    }
+    onChange(next);
+  };
+
+  return (
+    <div className={cn("flex items-center gap-1", className)}>
+      <Input
+        type="text"
+        inputMode="numeric"
+        className="h-8 text-xs"
+        placeholder={placeholder}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={commitText}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.currentTarget.blur();
+          }
+        }}
+      />
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-8 w-8 shrink-0"
+            title="Pick date"
+          >
+            <CalendarIcon className="h-3.5 w-3.5" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <Calendar
+            mode="single"
+            selected={selected}
+            defaultMonth={selected}
+            onSelect={(date) => {
+              if (!date) {
+                onChange(null);
+                setText("");
+                setOpen(false);
+                return;
+              }
+              const iso = toLetterDateIso(date.getFullYear(), date.getMonth() + 1, date.getDate());
+              setText(toDateInput(iso));
+              onChange(iso);
+              setOpen(false);
+            }}
+            initialFocus
+          />
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
 }
 
 export default function LetterNumbering() {
@@ -376,11 +498,16 @@ export default function LetterNumbering() {
     onError: (error) => toast.error(error instanceof Error ? error.message : "Delete failed")
   });
 
+  const todayLetterDateIso = () => {
+    const now = new Date();
+    return toLetterDateIso(now.getFullYear(), now.getMonth() + 1, now.getDate());
+  };
+
   const addLetterMutation = useMutation({
     mutationFn: (category: LetterCategory) =>
       api.createLetterEntry(selectedProjectId!, {
         category,
-        letterDate: new Date().toISOString()
+        letterDate: todayLetterDateIso()
       }),
     onSuccess: async () => {
       toast.success("Letter row added");
@@ -449,7 +576,7 @@ export default function LetterNumbering() {
       api.insertLetterEntry(selectedProjectId!, {
         afterLetterId,
         category: "OTHER",
-        letterDate: new Date().toISOString()
+        letterDate: todayLetterDateIso()
       }),
     onSuccess: async () => {
       toast.success("Back-dated row inserted");
@@ -967,9 +1094,7 @@ export default function LetterNumbering() {
                           </Badge>
                         </p>
                         <p className="text-xs text-muted-foreground mt-1 whitespace-normal break-words">
-                          {letter.letterDate
-                            ? new Date(letter.letterDate).toLocaleDateString("en-IN")
-                            : "No date"}
+                          {letter.letterDate ? toDateInput(letter.letterDate) : "No date"}
                           {" · From: "}
                           {letter.sentBy || "-"}
                           {" · "}
@@ -1193,9 +1318,7 @@ export default function LetterNumbering() {
                                 </Badge>
                               </p>
                               <p className="text-xs text-muted-foreground mt-1 whitespace-normal break-words">
-                                {letter.letterDate
-                                  ? new Date(letter.letterDate).toLocaleDateString("en-IN")
-                                  : "No date"}
+                                {letter.letterDate ? toDateInput(letter.letterDate) : "No date"}
                                 {" · From: "}
                                 {letter.sentBy || "-"}
                                 {" · "}
@@ -1455,25 +1578,10 @@ export default function LetterNumbering() {
                               >
                                 <td className="p-2 font-medium">{letter.serialLabel}</td>
                                 <td className="p-2">
-                                  <Input
-                                    type="text"
-                                    inputMode="numeric"
-                                    className="h-8 text-xs"
-                                    placeholder="dd/mm/yyyy"
-                                    defaultValue={toDateInput(letter.letterDate)}
-                                    key={`${letter.id}-${letter.letterDate ?? "empty"}`}
-                                    onBlur={(e) => {
-                                      const parsed = parseManualDate(e.target.value);
-                                      if (e.target.value.trim() && parsed === undefined) {
-                                        toast.error("Use date format dd/mm/yyyy");
-                                        e.target.value = toDateInput(letter.letterDate);
-                                        return;
-                                      }
-                                      const nextIso = parsed ?? null;
-                                      const current = letter.letterDate
-                                        ? new Date(letter.letterDate).toISOString()
-                                        : null;
-                                      if (nextIso === current || (!nextIso && !current)) return;
+                                  <LetterDateField
+                                    value={letter.letterDate}
+                                    onChange={(nextIso) => {
+                                      if (sameCalendarDay(letter.letterDate, nextIso)) return;
                                       updateLetterMutation.mutate({
                                         letterId: letter.id,
                                         payload: { letterDate: nextIso }
@@ -1789,12 +1897,18 @@ export default function LetterNumbering() {
 
             <div className="space-y-1.5">
               <Label>Letter Date</Label>
-              <Input
-                type="text"
-                inputMode="numeric"
-                placeholder="dd/mm/yyyy"
-                value={oldLetterForm.letterDate}
-                onChange={(e) => setOldLetterForm((prev) => ({ ...prev, letterDate: e.target.value }))}
+              <LetterDateField
+                value={
+                  oldLetterForm.letterDate
+                    ? parseManualDate(oldLetterForm.letterDate) ?? null
+                    : null
+                }
+                onChange={(iso) =>
+                  setOldLetterForm((prev) => ({
+                    ...prev,
+                    letterDate: iso ? toDateInput(iso) : ""
+                  }))
+                }
               />
             </div>
 

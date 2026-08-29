@@ -128,7 +128,11 @@ function isRowEmpty(values: unknown[]) {
 function parseLetterDateCell(value: unknown): { date: string | null; error?: string } {
   if (value === null || value === undefined || value === "") return { date: null };
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return { date: value.toISOString().slice(0, 10) };
+    // Prefer local calendar day from Excel cells (avoids UTC off-by-one).
+    const y = value.getFullYear();
+    const m = String(value.getMonth() + 1).padStart(2, "0");
+    const d = String(value.getDate()).padStart(2, "0");
+    return { date: `${y}-${m}-${d}` };
   }
   const text = cellString(value);
   const dmy = text.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
