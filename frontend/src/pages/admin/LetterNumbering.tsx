@@ -136,6 +136,21 @@ export default function LetterNumbering() {
   });
   const [letterImportOpen, setLetterImportOpen] = useState(false);
   const [oldLetterOpen, setOldLetterOpen] = useState(false);
+  const [letterFilters, setLetterFilters] = useState({
+    serial: "",
+    date: "",
+    letterNumber: "",
+    category: "ALL",
+    needsReply: "ALL",
+    sentBy: "",
+    sentTo: "",
+    subject: "",
+    ccTo: "",
+    subjectCategory: "",
+    linked: "ALL",
+    replyOfSerial: "",
+    remark: ""
+  });
   const [oldLetterForm, setOldLetterForm] = useState({
     category: "OUTWARD" as LetterCategory,
     serialLabel: "",
@@ -186,6 +201,68 @@ export default function LetterNumbering() {
   });
 
   const letters = selectedProject?.letters ?? [];
+
+  const emptyLetterFilters = {
+    serial: "",
+    date: "",
+    letterNumber: "",
+    category: "ALL",
+    needsReply: "ALL",
+    sentBy: "",
+    sentTo: "",
+    subject: "",
+    ccTo: "",
+    subjectCategory: "",
+    linked: "ALL",
+    replyOfSerial: "",
+    remark: ""
+  };
+
+  const hasLetterFilters = useMemo(
+    () =>
+      Object.entries(letterFilters).some(([key, value]) => {
+        if (key === "category" || key === "needsReply" || key === "linked") {
+          return value !== "ALL";
+        }
+        return Boolean(String(value).trim());
+      }),
+    [letterFilters]
+  );
+
+  const filteredLetters = useMemo(() => {
+    const includes = (value: string | null | undefined, query: string) => {
+      const q = query.trim().toLowerCase();
+      if (!q) return true;
+      return (value ?? "").toLowerCase().includes(q);
+    };
+
+    return letters.filter((letter) => {
+      if (!includes(letter.serialLabel, letterFilters.serial)) return false;
+      if (letterFilters.date.trim()) {
+        const display = toDateInput(letter.letterDate);
+        if (!display.toLowerCase().includes(letterFilters.date.trim().toLowerCase())) return false;
+      }
+      if (!includes(letter.letterNumber, letterFilters.letterNumber)) return false;
+      if (letterFilters.category !== "ALL" && letter.category !== letterFilters.category) return false;
+      if (letterFilters.needsReply === "yes") {
+        if (letter.needsReply !== true) return false;
+      } else if (letterFilters.needsReply === "no") {
+        if (letter.needsReply !== false) return false;
+      } else if (letterFilters.needsReply === "na") {
+        if (letter.needsReply !== null && letter.needsReply !== undefined) return false;
+      }
+      if (!includes(letter.sentBy, letterFilters.sentBy)) return false;
+      if (!includes(letter.sentTo, letterFilters.sentTo)) return false;
+      if (!includes(letter.subject, letterFilters.subject)) return false;
+      if (!includes(letter.ccTo, letterFilters.ccTo)) return false;
+      if (!includes(letter.subjectCategory, letterFilters.subjectCategory)) return false;
+      if (letterFilters.linked === "yes" && !letter.letterLinkUrl) return false;
+      if (letterFilters.linked === "no" && letter.letterLinkUrl) return false;
+      if (!includes(letter.replyOfSerial, letterFilters.replyOfSerial)) return false;
+      if (!includes(letter.remark, letterFilters.remark)) return false;
+      return true;
+    });
+  }, [letters, letterFilters]);
 
   const repliedByLinkKeys = useMemo(() => {
     const keys = new Set<string>();
@@ -516,6 +593,7 @@ export default function LetterNumbering() {
 
   const selectLetterProject = (projectId: string) => {
     setSelectedProjectId(projectId);
+    setLetterFilters(emptyLetterFilters);
     // Clear search so list collapses to only the selected project
     setFilterNumber("");
     setFilterShortName("");
@@ -523,6 +601,7 @@ export default function LetterNumbering() {
 
   const changeLetterProject = () => {
     setSelectedProjectId(null);
+    setLetterFilters(emptyLetterFilters);
     setFilterNumber("");
     setFilterShortName("");
   };
@@ -1081,6 +1160,11 @@ export default function LetterNumbering() {
                         {pendingReplyLetters.length} to reply
                       </Badge>
                     ) : null}
+                    {hasLetterFilters ? (
+                      <Badge variant="outline" className="rounded-full self-center text-[11px]">
+                        Showing {filteredLetters.length} of {letters.length}
+                      </Badge>
+                    ) : null}
                   </div>
 
                   {!loadingSelected && pendingReplyLetters.length > 0 ? (
@@ -1162,6 +1246,183 @@ export default function LetterNumbering() {
                             <th className="p-2 text-left font-medium min-w-[160px]">Remark if Any</th>
                             <th className="p-2 text-right font-medium w-24"> </th>
                           </tr>
+                          <tr className="bg-secondary/25 border-t border-border/20">
+                            <th className="p-1.5">
+                              <Input
+                                className="h-7 text-[11px]"
+                                placeholder="Filter"
+                                value={letterFilters.serial}
+                                onChange={(e) =>
+                                  setLetterFilters((prev) => ({ ...prev, serial: e.target.value }))
+                                }
+                              />
+                            </th>
+                            <th className="p-1.5">
+                              <Input
+                                className="h-7 text-[11px]"
+                                placeholder="dd/mm/yyyy"
+                                value={letterFilters.date}
+                                onChange={(e) =>
+                                  setLetterFilters((prev) => ({ ...prev, date: e.target.value }))
+                                }
+                              />
+                            </th>
+                            <th className="p-1.5">
+                              <Input
+                                className="h-7 text-[11px]"
+                                placeholder="Filter"
+                                value={letterFilters.letterNumber}
+                                onChange={(e) =>
+                                  setLetterFilters((prev) => ({
+                                    ...prev,
+                                    letterNumber: e.target.value
+                                  }))
+                                }
+                              />
+                            </th>
+                            <th className="p-1.5">
+                              <Select
+                                value={letterFilters.category}
+                                onValueChange={(value) =>
+                                  setLetterFilters((prev) => ({ ...prev, category: value }))
+                                }
+                              >
+                                <SelectTrigger className="h-7 text-[11px]">
+                                  <SelectValue placeholder="All" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="ALL">All</SelectItem>
+                                  <SelectItem value="INWARD">Inward</SelectItem>
+                                  <SelectItem value="OUTWARD">Outward</SelectItem>
+                                  <SelectItem value="OTHER">Other</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </th>
+                            <th className="p-1.5">
+                              <Select
+                                value={letterFilters.needsReply}
+                                onValueChange={(value) =>
+                                  setLetterFilters((prev) => ({ ...prev, needsReply: value }))
+                                }
+                              >
+                                <SelectTrigger className="h-7 text-[11px]">
+                                  <SelectValue placeholder="All" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="ALL">All</SelectItem>
+                                  <SelectItem value="yes">Yes</SelectItem>
+                                  <SelectItem value="no">No</SelectItem>
+                                  <SelectItem value="na">N/A</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </th>
+                            <th className="p-1.5">
+                              <Input
+                                className="h-7 text-[11px]"
+                                placeholder="Filter"
+                                value={letterFilters.sentBy}
+                                onChange={(e) =>
+                                  setLetterFilters((prev) => ({ ...prev, sentBy: e.target.value }))
+                                }
+                              />
+                            </th>
+                            <th className="p-1.5">
+                              <Input
+                                className="h-7 text-[11px]"
+                                placeholder="Filter"
+                                value={letterFilters.sentTo}
+                                onChange={(e) =>
+                                  setLetterFilters((prev) => ({ ...prev, sentTo: e.target.value }))
+                                }
+                              />
+                            </th>
+                            <th className="p-1.5">
+                              <Input
+                                className="h-7 text-[11px]"
+                                placeholder="Filter"
+                                value={letterFilters.subject}
+                                onChange={(e) =>
+                                  setLetterFilters((prev) => ({ ...prev, subject: e.target.value }))
+                                }
+                              />
+                            </th>
+                            <th className="p-1.5">
+                              <Input
+                                className="h-7 text-[11px]"
+                                placeholder="Filter"
+                                value={letterFilters.ccTo}
+                                onChange={(e) =>
+                                  setLetterFilters((prev) => ({ ...prev, ccTo: e.target.value }))
+                                }
+                              />
+                            </th>
+                            <th className="p-1.5">
+                              <Input
+                                className="h-7 text-[11px]"
+                                placeholder="Filter"
+                                value={letterFilters.subjectCategory}
+                                onChange={(e) =>
+                                  setLetterFilters((prev) => ({
+                                    ...prev,
+                                    subjectCategory: e.target.value
+                                  }))
+                                }
+                              />
+                            </th>
+                            <th className="p-1.5">
+                              <Select
+                                value={letterFilters.linked}
+                                onValueChange={(value) =>
+                                  setLetterFilters((prev) => ({ ...prev, linked: value }))
+                                }
+                              >
+                                <SelectTrigger className="h-7 text-[11px]">
+                                  <SelectValue placeholder="All" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="ALL">All</SelectItem>
+                                  <SelectItem value="yes">Yes</SelectItem>
+                                  <SelectItem value="no">No</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </th>
+                            <th className="p-1.5">
+                              <Input
+                                className="h-7 text-[11px]"
+                                placeholder="Filter"
+                                value={letterFilters.replyOfSerial}
+                                onChange={(e) =>
+                                  setLetterFilters((prev) => ({
+                                    ...prev,
+                                    replyOfSerial: e.target.value
+                                  }))
+                                }
+                              />
+                            </th>
+                            <th className="p-1.5">
+                              <Input
+                                className="h-7 text-[11px]"
+                                placeholder="Filter"
+                                value={letterFilters.remark}
+                                onChange={(e) =>
+                                  setLetterFilters((prev) => ({ ...prev, remark: e.target.value }))
+                                }
+                              />
+                            </th>
+                            <th className="p-1.5 text-right">
+                              {hasLetterFilters ? (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 px-2 text-[11px]"
+                                  onClick={() => setLetterFilters(emptyLetterFilters)}
+                                >
+                                  Clear
+                                </Button>
+                              ) : null}
+                            </th>
+                          </tr>
                         </thead>
                         <tbody>
                           {letters.length === 0 ? (
@@ -1171,7 +1432,21 @@ export default function LetterNumbering() {
                               </td>
                             </tr>
                           ) : null}
-                          {letters.map((letter: LetterEntryItem) => {
+                          {letters.length > 0 && filteredLetters.length === 0 ? (
+                            <tr>
+                              <td colSpan={14} className="p-8 text-center text-muted-foreground">
+                                No letters match the filters.{" "}
+                                <button
+                                  type="button"
+                                  className="underline underline-offset-2"
+                                  onClick={() => setLetterFilters(emptyLetterFilters)}
+                                >
+                                  Clear filters
+                                </button>
+                              </td>
+                            </tr>
+                          ) : null}
+                          {filteredLetters.map((letter: LetterEntryItem) => {
                             const isInsert = /[a-z]/i.test(letter.serialLabel);
                             return (
                               <tr
