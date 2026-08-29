@@ -49,6 +49,11 @@ Work only on the Letter Numbering module and its sync with Projects:
    - Outward sequence increments only among Outward rows (`01`, `02`…).
    - Back-date insert (`+` under a row): serial becomes `3a`, `3b`…; outward may become `02a`.
 
+4b. **Letter grid UX**
+   - Table is a **read-only records list** with filters.
+   - Actions per row: **Edit**, insert (+), **Delete**.
+   - Click row or Edit → **popup** with all details; **Save** persists; Delete also in popup.
+
 5. **Reply tracking**
    - Inward/Other: `needsReply` + `repliedAt`; pending section + Reply Pending menu.
    - `replyOfSerial` on a row (e.g. `2a`) auto-marks that serial as replied.

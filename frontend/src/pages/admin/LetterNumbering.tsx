@@ -12,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { api } from "@/lib/api";
 import type { LetterCategory, LetterEntryItem, LetterProjectItem } from "@/lib/domain";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarIcon, CheckCircle2, Download, FileUp, Link2, Loader2, Mail, MailWarning, Plus, Trash2 } from "lucide-react";
+import { CalendarIcon, CheckCircle2, Download, FileUp, Link2, Loader2, Mail, MailWarning, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { downloadLetterImportTemplate } from "@/lib/letter-import";
 import {
@@ -385,6 +385,20 @@ export default function LetterNumbering() {
   });
   const [letterImportOpen, setLetterImportOpen] = useState(false);
   const [oldLetterOpen, setOldLetterOpen] = useState(false);
+  const [letterDialogId, setLetterDialogId] = useState<string | null>(null);
+  const [letterDialogForm, setLetterDialogForm] = useState({
+    category: "OUTWARD" as LetterCategory,
+    letterDate: null as string | null,
+    letterNumber: "",
+    sentBy: "",
+    sentTo: "",
+    subject: "",
+    ccTo: "",
+    subjectCategory: "",
+    needsReply: "" as "" | "yes" | "no",
+    replyOfSerial: "",
+    remark: ""
+  });
   const [customCategoryTick, setCustomCategoryTick] = useState(0);
   const [letterFilters, setLetterFilters] = useState({
     serial: "",
@@ -629,15 +643,39 @@ export default function LetterNumbering() {
     return toLetterDateIso(now.getFullYear(), now.getMonth() + 1, now.getDate());
   };
 
+  const openLetterDialog = (letter: LetterEntryItem) => {
+    setLetterDialogForm({
+      category: letter.category,
+      letterDate: letter.letterDate ?? null,
+      letterNumber: letter.letterNumber || "",
+      sentBy: letter.sentBy || "",
+      sentTo: letter.sentTo || "",
+      subject: letter.subject || "",
+      ccTo: letter.ccTo || "",
+      subjectCategory: letter.subjectCategory || "",
+      needsReply:
+        letter.needsReply === true ? "yes" : letter.needsReply === false ? "no" : "",
+      replyOfSerial: letter.replyOfSerial || "",
+      remark: letter.remark || ""
+    });
+    setLetterDialogId(letter.id);
+  };
+
+  const dialogLetter = useMemo(
+    () => letters.find((letter) => letter.id === letterDialogId) ?? null,
+    [letters, letterDialogId]
+  );
+
   const addLetterMutation = useMutation({
     mutationFn: (category: LetterCategory) =>
       api.createLetterEntry(selectedProjectId!, {
         category,
         letterDate: todayLetterDateIso()
       }),
-    onSuccess: async () => {
-      toast.success("Letter row added");
+    onSuccess: async (created) => {
+      toast.success("Letter added — fill details and Save");
       await refresh();
+      openLetterDialog(created);
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to add letter")
   });
@@ -704,9 +742,10 @@ export default function LetterNumbering() {
         category: "OTHER",
         letterDate: todayLetterDateIso()
       }),
-    onSuccess: async () => {
-      toast.success("Back-dated row inserted");
+    onSuccess: async (created) => {
+      toast.success("Back-dated letter inserted — fill details and Save");
       await refresh();
+      openLetterDialog(created);
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Insert failed")
   });
@@ -804,12 +843,58 @@ export default function LetterNumbering() {
 
   const deleteLetterMutation = useMutation({
     mutationFn: (letterId: string) => api.deleteLetterEntry(letterId),
-    onSuccess: async () => {
+    onSuccess: async (_data, letterId) => {
       toast.success("Letter deleted");
+      if (letterDialogId === letterId) setLetterDialogId(null);
       await refresh();
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Delete failed")
   });
+
+  const saveLetterDialog = () => {
+    if (!letterDialogId) return;
+    if (
+      letterDialogForm.category !== "OUTWARD" &&
+      !letterDialogForm.letterNumber.trim()
+    ) {
+      toast.error("Enter Letter Number for Inward / Other");
+      return;
+    }
+    updateLetterMutation.mutate(
+      {
+        letterId: letterDialogId,
+        payload: {
+          category: letterDialogForm.category,
+          letterDate: letterDialogForm.letterDate,
+          letterNumber:
+            letterDialogForm.category === "OUTWARD"
+              ? null
+              : letterDialogForm.letterNumber.trim(),
+          sentBy: letterDialogForm.sentBy,
+          sentTo: letterDialogForm.sentTo,
+          subject: letterDialogForm.subject,
+          ccTo: letterDialogForm.ccTo,
+          subjectCategory: letterDialogForm.subjectCategory,
+          needsReply:
+            letterDialogForm.category === "OUTWARD"
+              ? null
+              : letterDialogForm.needsReply === "yes"
+                ? true
+                : letterDialogForm.needsReply === "no"
+                  ? false
+                  : null,
+          replyOfSerial: letterDialogForm.replyOfSerial.trim() || null,
+          remark: letterDialogForm.remark
+        }
+      },
+      {
+        onSuccess: () => {
+          toast.success("Letter saved");
+          setLetterDialogId(null);
+        }
+      }
+    );
+  };
 
   const filteredListProjects = useMemo(() => {
     const q = listFilter.trim().toLowerCase();
@@ -1503,7 +1588,7 @@ export default function LetterNumbering() {
                             <th className="p-2 text-left font-medium min-w-[160px]">CC To</th>
                             <th className="p-2 text-left font-medium min-w-[180px]">Subject Cat.</th>
                             <th className="p-2 text-left font-medium w-28">Reply Letter of</th>
-                            <th className="p-2 text-right font-medium w-24"> </th>
+                            <th className="p-2 text-right font-medium w-36">Actions</th>
                           </tr>
                           <tr className="bg-secondary/25 border-t border-border/20">
                             <th className="p-1.5">
@@ -1680,184 +1765,81 @@ export default function LetterNumbering() {
                           ) : null}
                           {filteredLetters.map((letter: LetterEntryItem) => {
                             const isInsert = /[a-z]/i.test(letter.serialLabel);
+                            const replyStatus =
+                              letter.category === "OUTWARD"
+                                ? "—"
+                                : letter.needsReply === true && isLetterReplyDone(letter)
+                                  ? "Reply Done"
+                                  : letter.needsReply === true
+                                    ? "Yes — Pending"
+                                    : letter.needsReply === false
+                                      ? "No"
+                                      : "—";
                             return (
                               <tr
                                 key={letter.id}
-                                className={`border-t border-border/20 align-top ${isInsert ? "bg-sky-500/5" : ""}`}
+                                className={`border-t border-border/20 align-top cursor-pointer hover:bg-secondary/30 ${
+                                  isInsert ? "bg-sky-500/5" : ""
+                                }`}
+                                onClick={() => openLetterDialog(letter)}
                               >
                                 <td className="p-2 font-medium">{letter.serialLabel}</td>
-                                <td className="p-2">
-                                  <LetterDateField
-                                    value={letter.letterDate}
-                                    onChange={(nextIso) => {
-                                      if (sameCalendarDay(letter.letterDate, nextIso)) return;
-                                      updateLetterMutation.mutate({
-                                        letterId: letter.id,
-                                        payload: { letterDate: nextIso }
-                                      });
-                                    }}
-                                  />
+                                <td className="p-2 whitespace-nowrap">
+                                  {letter.letterDate ? toDateInput(letter.letterDate) : "—"}
                                 </td>
-                                <td className="p-2">
-                                  {letter.category === "OUTWARD" ? (
-                                    <span className="font-mono text-[11px] whitespace-normal break-all">
-                                      {letter.letterNumber || "-"}
-                                    </span>
-                                  ) : (
-                                    <Input
-                                      className="h-8 text-xs font-mono min-w-[140px]"
-                                      placeholder="Enter letter number"
-                                      defaultValue={letter.letterNumber || ""}
-                                      key={`${letter.id}-ln-${letter.category}-${letter.letterNumber || ""}`}
-                                      onBlur={(e) => {
-                                        const next = e.target.value.trim();
-                                        if (next === (letter.letterNumber || "").trim()) return;
-                                        updateLetterMutation.mutate({
-                                          letterId: letter.id,
-                                          payload: { letterNumber: next }
-                                        });
-                                      }}
-                                      onKeyDown={(e) => {
-                                        if (e.key === "Enter") e.currentTarget.blur();
-                                      }}
-                                    />
-                                  )}
+                                <td className="p-2 font-mono text-[11px] whitespace-normal break-all">
+                                  {letter.letterNumber || "—"}
                                 </td>
+                                <td className="p-2">{letter.category}</td>
                                 <td className="p-2">
-                                  <Select
-                                    value={letter.category}
-                                    onValueChange={(value: LetterCategory) =>
-                                      updateLetterMutation.mutate({
-                                        letterId: letter.id,
-                                        payload: { category: value }
-                                      })
+                                  <span
+                                    className={
+                                      replyStatus.includes("Pending")
+                                        ? "text-amber-600"
+                                        : replyStatus.includes("Done")
+                                          ? "text-emerald-600"
+                                          : undefined
                                     }
                                   >
-                                    <SelectTrigger className="h-8 text-xs">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="INWARD">Inward</SelectItem>
-                                      <SelectItem value="OUTWARD">Outward</SelectItem>
-                                      <SelectItem value="OTHER">Other</SelectItem>
-                                    </SelectContent>
-                                  </Select>
+                                    {replyStatus}
+                                  </span>
                                 </td>
-                                <td className="p-2">
-                                  {letter.category === "OUTWARD" ? (
-                                    <span className="text-muted-foreground">—</span>
-                                  ) : (
-                                    <div className="space-y-1">
-                                      <Select
-                                        value={
-                                          letter.needsReply === true
-                                            ? "yes"
-                                            : letter.needsReply === false
-                                              ? "no"
-                                              : "__unset__"
-                                        }
-                                        onValueChange={(value) =>
-                                          updateLetterMutation.mutate({
-                                            letterId: letter.id,
-                                            payload: {
-                                              needsReply:
-                                                value === "yes" ? true : value === "no" ? false : null,
-                                              ...(value !== "yes" ? { replied: false } : {})
-                                            }
-                                          })
-                                        }
-                                      >
-                                        <SelectTrigger className="h-8 text-xs">
-                                          <SelectValue placeholder="Select" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          <SelectItem value="__unset__">Select…</SelectItem>
-                                          <SelectItem value="yes">Yes — need reply</SelectItem>
-                                          <SelectItem value="no">No</SelectItem>
-                                        </SelectContent>
-                                      </Select>
-                                      {letter.needsReply === true && isLetterReplyDone(letter) ? (
-                                        <p className="text-[10px] text-emerald-600 font-medium">Reply Done</p>
-                                      ) : letter.needsReply === true ? (
-                                        <p className="text-[10px] text-amber-600">Pending reply</p>
-                                      ) : null}
-                                    </div>
-                                  )}
+                                <td className="p-2 max-w-[180px]">
+                                  <p className="line-clamp-2 whitespace-pre-wrap break-words">
+                                    {letter.sentBy || "—"}
+                                  </p>
                                 </td>
-                                {(
-                                  [
-                                    ["sentBy", suggestionQueries.sentBy.data ?? []],
-                                    ["sentTo", suggestionQueries.sentTo.data ?? []],
-                                    ["subject", suggestionQueries.subject.data ?? []],
-                                    ["ccTo", suggestionQueries.ccTo.data ?? []]
-                                  ] as const
-                                ).map(([field, suggestions]) => (
-                                  <td key={field} className="p-2 align-top">
-                                    <SuggestField
-                                      value={letter[field]}
-                                      suggestions={suggestions}
-                                      placeholder={field}
-                                      onChange={(value) => {
-                                        queryClient.setQueryData(
-                                          ["letter-project", selectedProjectId],
-                                          (prev: LetterProjectItem | null | undefined) => {
-                                            if (!prev) return prev;
-                                            return {
-                                              ...prev,
-                                              letters: (prev.letters ?? []).map((item) =>
-                                                item.id === letter.id ? { ...item, [field]: value } : item
-                                              )
-                                            };
-                                          }
-                                        );
-                                      }}
-                                      onBlur={(nextValue) =>
-                                        updateLetterMutation.mutate({
-                                          letterId: letter.id,
-                                          payload: { [field]: nextValue }
-                                        })
-                                      }
-                                    />
-                                  </td>
-                                ))}
-                                <td className="p-2">
-                                  <SubjectCategoryField
-                                    value={letter.subjectCategory || ""}
-                                    options={subjectCategoryOptions}
-                                    onCustomAdded={() => setCustomCategoryTick((tick) => tick + 1)}
-                                    onChange={(next) => {
-                                      if ((letter.subjectCategory || "") === next) return;
-                                      updateLetterMutation.mutate({
-                                        letterId: letter.id,
-                                        payload: { subjectCategory: next }
-                                      });
-                                    }}
-                                  />
+                                <td className="p-2 max-w-[180px]">
+                                  <p className="line-clamp-2 whitespace-pre-wrap break-words">
+                                    {letter.sentTo || "—"}
+                                  </p>
                                 </td>
-                                <td className="p-2">
-                                  <Input
-                                    className="h-8 text-xs font-medium"
-                                    placeholder="e.g. 2a"
-                                    defaultValue={letter.replyOfSerial ?? ""}
-                                    key={`${letter.id}-replyOf-${letter.replyOfSerial ?? ""}`}
-                                    title="Enter Sr. of the letter you are replying to (auto-clears pending)"
-                                    onKeyDown={(e) => {
-                                      if (e.key !== "Enter") return;
-                                      e.currentTarget.blur();
-                                    }}
-                                    onBlur={(e) => {
-                                      const next = e.target.value.trim();
-                                      const prev = (letter.replyOfSerial ?? "").trim();
-                                      if (next === prev) return;
-                                      updateLetterMutation.mutate({
-                                        letterId: letter.id,
-                                        payload: { replyOfSerial: next || null }
-                                      });
-                                    }}
-                                  />
+                                <td className="p-2 max-w-[200px]">
+                                  <p className="line-clamp-2 whitespace-pre-wrap break-words">
+                                    {letter.subject || "—"}
+                                  </p>
                                 </td>
+                                <td className="p-2 max-w-[160px]">
+                                  <p className="line-clamp-2 whitespace-pre-wrap break-words">
+                                    {letter.ccTo || "—"}
+                                  </p>
+                                </td>
+                                <td className="p-2">{letter.subjectCategory || "—"}</td>
+                                <td className="p-2">{letter.replyOfSerial || "—"}</td>
                                 <td className="p-2 text-right">
-                                  <div className="inline-flex gap-1">
+                                  <div
+                                    className="inline-flex gap-1"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 gap-1 px-2 text-[11px]"
+                                      title="Edit letter"
+                                      onClick={() => openLetterDialog(letter)}
+                                    >
+                                      <Pencil className="h-3 w-3" /> Edit
+                                    </Button>
                                     <Button
                                       size="sm"
                                       variant="ghost"
@@ -1871,8 +1853,9 @@ export default function LetterNumbering() {
                                       size="sm"
                                       variant="ghost"
                                       className="h-7 w-7 p-0"
+                                      title="Delete letter"
                                       onClick={() => {
-                                        if (window.confirm("Delete this letter row?")) {
+                                        if (window.confirm("Delete this letter record?")) {
                                           deleteLetterMutation.mutate(letter.id);
                                         }
                                       }}
@@ -1889,12 +1872,12 @@ export default function LetterNumbering() {
                     </div>
                   )}
                   <p className="text-xs text-muted-foreground">
-                    Numbering: Inward/Other — enter Letter Number manually. Outward uses{" "}
+                    Records show in the table. Click a row or Edit to open details, then Save.
+                    Inward/Other letter numbers are manual; Outward is auto (
                     <span className="font-mono">
                       {selectedProject.projectNumber}/{selectedProject.projectCode}/Sr/OutwardSeq
-                    </span>{" "}
-                    (auto). Use + on a row to insert a back-dated letter (3a, 5a…). Enter Sr. in
-                    “Reply Letter of” to auto-clear that letter from pending.
+                    </span>
+                    ). Use + to insert a back-dated letter (3a, 5a…).
                   </p>
                 </>
               ) : (
@@ -1927,6 +1910,209 @@ export default function LetterNumbering() {
           }
         />
       ) : null}
+
+      <Dialog
+        open={Boolean(letterDialogId)}
+        onOpenChange={(open) => {
+          if (!open) setLetterDialogId(null);
+        }}
+      >
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Letter details
+              {dialogLetter ? ` — Sr. ${dialogLetter.serialLabel}` : ""}
+            </DialogTitle>
+            <DialogDescription>
+              View and edit this letter record. Click Save to keep changes.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label>Category</Label>
+              <Select
+                value={letterDialogForm.category}
+                onValueChange={(value) =>
+                  setLetterDialogForm((prev) => ({
+                    ...prev,
+                    category: value as LetterCategory,
+                    needsReply: value === "OUTWARD" ? "" : prev.needsReply
+                  }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="OUTWARD">OUTWARD</SelectItem>
+                  <SelectItem value="INWARD">INWARD</SelectItem>
+                  <SelectItem value="OTHER">OTHER</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Letter Date</Label>
+              <LetterDateField
+                value={letterDialogForm.letterDate}
+                onChange={(iso) =>
+                  setLetterDialogForm((prev) => ({ ...prev, letterDate: iso }))
+                }
+              />
+            </div>
+
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>
+                {letterDialogForm.category === "OUTWARD"
+                  ? "Letter Number (auto)"
+                  : "Letter Number *"}
+              </Label>
+              {letterDialogForm.category === "OUTWARD" ? (
+                <Input
+                  readOnly
+                  className="bg-secondary/40 font-mono"
+                  value={
+                    dialogLetter?.category === "OUTWARD"
+                      ? dialogLetter.letterNumber || "Auto on Save"
+                      : "Auto on Save"
+                  }
+                />
+              ) : (
+                <Input
+                  className="font-mono"
+                  placeholder="Enter letter number"
+                  value={letterDialogForm.letterNumber}
+                  onChange={(e) =>
+                    setLetterDialogForm((prev) => ({ ...prev, letterNumber: e.target.value }))
+                  }
+                />
+              )}
+            </div>
+
+            {letterDialogForm.category !== "OUTWARD" ? (
+              <div className="space-y-1.5">
+                <Label>Need reply?</Label>
+                <Select
+                  value={letterDialogForm.needsReply || "__none__"}
+                  onValueChange={(value) =>
+                    setLetterDialogForm((prev) => ({
+                      ...prev,
+                      needsReply: value === "__none__" ? "" : (value as "yes" | "no")
+                    }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">—</SelectItem>
+                    <SelectItem value="yes">Yes — need reply</SelectItem>
+                    <SelectItem value="no">No</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
+
+            <div className="space-y-1.5">
+              <Label>Reply Letter of (Sr)</Label>
+              <Input
+                placeholder="e.g. 2a"
+                value={letterDialogForm.replyOfSerial}
+                onChange={(e) =>
+                  setLetterDialogForm((prev) => ({ ...prev, replyOfSerial: e.target.value }))
+                }
+              />
+            </div>
+
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>Sent By</Label>
+              <SuggestField
+                value={letterDialogForm.sentBy}
+                suggestions={suggestionQueries.sentBy.data ?? []}
+                placeholder="Sent By"
+                onChange={(value) => setLetterDialogForm((prev) => ({ ...prev, sentBy: value }))}
+              />
+            </div>
+
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>Sent To</Label>
+              <SuggestField
+                value={letterDialogForm.sentTo}
+                suggestions={suggestionQueries.sentTo.data ?? []}
+                placeholder="Sent To"
+                onChange={(value) => setLetterDialogForm((prev) => ({ ...prev, sentTo: value }))}
+              />
+            </div>
+
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>Subject</Label>
+              <SuggestField
+                value={letterDialogForm.subject}
+                suggestions={suggestionQueries.subject.data ?? []}
+                placeholder="Subject"
+                onChange={(value) => setLetterDialogForm((prev) => ({ ...prev, subject: value }))}
+              />
+            </div>
+
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>CC To</Label>
+              <SuggestField
+                value={letterDialogForm.ccTo}
+                suggestions={suggestionQueries.ccTo.data ?? []}
+                placeholder="CC To"
+                onChange={(value) => setLetterDialogForm((prev) => ({ ...prev, ccTo: value }))}
+              />
+            </div>
+
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>Subject Category</Label>
+              <SubjectCategoryField
+                value={letterDialogForm.subjectCategory}
+                options={subjectCategoryOptions}
+                onCustomAdded={() => setCustomCategoryTick((tick) => tick + 1)}
+                onChange={(value) =>
+                  setLetterDialogForm((prev) => ({ ...prev, subjectCategory: value }))
+                }
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:justify-between">
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={deleteLetterMutation.isPending || !letterDialogId}
+              onClick={() => {
+                if (!letterDialogId) return;
+                if (window.confirm("Delete this letter record?")) {
+                  deleteLetterMutation.mutate(letterDialogId);
+                }
+              }}
+            >
+              Delete
+            </Button>
+            <div className="flex gap-2">
+              <Button type="button" variant="ghost" onClick={() => setLetterDialogId(null)}>
+                Close
+              </Button>
+              <Button
+                type="button"
+                disabled={updateLetterMutation.isPending}
+                onClick={saveLetterDialog}
+              >
+                {updateLetterMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-1" /> Saving…
+                  </>
+                ) : (
+                  "Save"
+                )}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={oldLetterOpen} onOpenChange={setOldLetterOpen}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
