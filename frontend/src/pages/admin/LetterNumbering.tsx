@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { PageWrapper } from "@/components/PageWrapper";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -256,59 +256,78 @@ function SubjectCategoryField({
   onCustomAdded?: () => void;
   className?: string;
 }) {
-  const [customOpen, setCustomOpen] = useState(false);
-  const [customParent, setCustomParent] = useState("Other");
-  const [customText, setCustomText] = useState("");
+  const [localValue, setLocalValue] = useState(value);
+  const [otherMode, setOtherMode] = useState(false);
+  const [otherParent, setOtherParent] = useState("Other");
+  const [otherText, setOtherText] = useState("");
+  const otherInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!isLetterSubjectCategoryOtherOption(value)) {
-      setCustomOpen(false);
-    }
+    setLocalValue(value);
   }, [value]);
 
-  const selectValue = value.trim() ? value : "__none__";
-  const optionList = value.trim() && !options.includes(value.trim()) ? [...options, value.trim()] : options;
+  useEffect(() => {
+    if (!otherMode) return;
+    const timer = window.setTimeout(() => otherInputRef.current?.focus(), 50);
+    return () => window.clearTimeout(timer);
+  }, [otherMode, otherParent]);
 
-  const commitCustom = () => {
-    const trimmed = customText.trim();
+  const selectValue = otherMode
+    ? otherParent
+    : localValue.trim()
+      ? localValue
+      : "__none__";
+
+  const optionList =
+    localValue.trim() && !options.includes(localValue.trim())
+      ? [...options, localValue.trim()]
+      : options;
+
+  const commitOther = () => {
+    const trimmed = otherText.trim();
     if (!trimmed) {
-      onChange(customParent);
-      setCustomOpen(false);
+      setLocalValue(otherParent);
+      setOtherMode(false);
+      onChange(otherParent);
       return;
     }
     saveCustomLetterSubjectCategory(trimmed);
     onCustomAdded?.();
+    setLocalValue(trimmed);
+    setOtherMode(false);
+    setOtherText("");
     onChange(trimmed);
-    setCustomOpen(false);
-    setCustomText("");
   };
 
   return (
-    <div className={cn("space-y-1 min-w-[140px]", className)}>
+    <div className={cn("space-y-1 min-w-[160px]", className)}>
       <Select
         value={selectValue}
         onValueChange={(next) => {
           if (next === "__none__") {
-            setCustomOpen(false);
-            setCustomText("");
+            setOtherMode(false);
+            setOtherText("");
+            setLocalValue("");
             onChange("");
             return;
           }
           if (isLetterSubjectCategoryOtherOption(next)) {
-            setCustomParent(next);
-            setCustomText("");
-            setCustomOpen(true);
+            setOtherParent(next);
+            setLocalValue(next);
+            setOtherText("");
+            setOtherMode(true);
             return;
           }
-          setCustomOpen(false);
-          setCustomText("");
+          setOtherMode(false);
+          setOtherText("");
+          setLocalValue(next);
           onChange(next);
         }}
       >
         <SelectTrigger className="h-8 text-xs">
           <SelectValue placeholder="Category" />
         </SelectTrigger>
-        <SelectContent className="max-h-72">
+        <SelectContent className="max-h-72 z-[80]">
           <SelectItem value="__none__">-</SelectItem>
           {optionList.map((item) => (
             <SelectItem key={item} value={item}>
@@ -317,19 +336,23 @@ function SubjectCategoryField({
           ))}
         </SelectContent>
       </Select>
-      {customOpen ? (
+      {otherMode ? (
         <Input
-          autoFocus
+          ref={otherInputRef}
           className="h-8 text-xs"
-          placeholder={`Enter ${customParent}…`}
-          value={customText}
-          onChange={(e) => setCustomText(e.target.value)}
-          onBlur={commitCustom}
+          placeholder={`Type custom ${otherParent}…`}
+          value={otherText}
+          onChange={(e) => setOtherText(e.target.value)}
+          onBlur={commitOther}
           onKeyDown={(e) => {
-            if (e.key === "Enter") e.currentTarget.blur();
+            if (e.key === "Enter") {
+              e.preventDefault();
+              e.currentTarget.blur();
+            }
             if (e.key === "Escape") {
-              setCustomOpen(false);
-              setCustomText("");
+              setOtherMode(false);
+              setOtherText("");
+              setLocalValue(value);
             }
           }}
         />
@@ -697,6 +720,30 @@ export default function LetterNumbering() {
       letterId: string;
       payload: Parameters<typeof api.updateLetterEntry>[1];
     }) => api.updateLetterEntry(letterId, payload),
+    onMutate: async ({ letterId, payload }) => {
+      if (!selectedProjectId) return {};
+      await queryClient.cancelQueries({ queryKey: ["letter-project", selectedProjectId] });
+      const previous = queryClient.getQueryData<LetterProjectItem>(["letter-project", selectedProjectId]);
+
+      const { replied, ...fieldPatch } = payload;
+      const optimisticPatch: Partial<LetterEntryItem> = { ...fieldPatch };
+      if (replied === true) optimisticPatch.repliedAt = new Date().toISOString();
+      if (replied === false) optimisticPatch.repliedAt = null;
+
+      queryClient.setQueryData(
+        ["letter-project", selectedProjectId],
+        (prev: LetterProjectItem | null | undefined) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            letters: (prev.letters ?? []).map((item) =>
+              item.id === letterId ? { ...item, ...optimisticPatch } : item
+            )
+          };
+        }
+      );
+      return { previous };
+    },
     onSuccess: async (data, variables) => {
       const extra =
         data && typeof data === "object"
@@ -722,50 +769,38 @@ export default function LetterNumbering() {
       } else if (variables.payload.needsReply === true) toast.success("Added to reply list");
       else if (variables.payload.needsReply === false) toast.success("Reply not required");
 
-      // Optimistic cache update for reply-of link / unlink
-      if ("replyOfSerial" in variables.payload && selectedProjectId) {
-        const nextSerial = (variables.payload.replyOfSerial ?? "").trim();
-        const targetKey = nextSerial ? normalizeSerialLabel(nextSerial) : "";
-        const reopenKey = reopened ? normalizeSerialLabel(reopened) : "";
-
+      if (selectedProjectId && data && typeof data === "object" && "id" in data) {
         queryClient.setQueryData(
           ["letter-project", selectedProjectId],
           (prev: LetterProjectItem | null | undefined) => {
             if (!prev) return prev;
             return {
               ...prev,
-              letters: (prev.letters ?? []).map((item) => {
-                if (item.id === variables.letterId) {
-                  return { ...item, replyOfSerial: nextSerial || null };
-                }
-                if (
-                  targetKey &&
-                  (item.category === "INWARD" || item.category === "OTHER") &&
-                  normalizeSerialLabel(item.serialLabel) === targetKey
-                ) {
-                  return {
-                    ...item,
-                    needsReply: true,
-                    repliedAt: item.repliedAt ?? new Date().toISOString()
-                  };
-                }
-                if (
-                  reopenKey &&
-                  (item.category === "INWARD" || item.category === "OTHER") &&
-                  normalizeSerialLabel(item.serialLabel) === reopenKey
-                ) {
-                  return { ...item, needsReply: true, repliedAt: null };
-                }
-                return item;
-              })
+              letters: (prev.letters ?? []).map((item) =>
+                item.id === variables.letterId ? { ...item, ...(data as LetterEntryItem) } : item
+              )
             };
           }
         );
       }
 
-      await refresh();
+      // Reply-tracking needs a fuller refresh; simple field edits stay optimistic.
+      const needsFullRefresh =
+        variables.payload.replied !== undefined ||
+        "replyOfSerial" in variables.payload ||
+        variables.payload.needsReply !== undefined ||
+        variables.payload.category !== undefined;
+
+      if (needsFullRefresh) {
+        await refresh();
+      }
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Update failed")
+    onError: (error, _variables, context) => {
+      if (selectedProjectId && context && "previous" in context && context.previous) {
+        queryClient.setQueryData(["letter-project", selectedProjectId], context.previous);
+      }
+      toast.error(error instanceof Error ? error.message : "Update failed");
+    }
   });
 
   const deleteLetterMutation = useMutation({
