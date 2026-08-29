@@ -394,6 +394,7 @@ export default function LetterNumbering() {
     sentTo: "",
     subject: "",
     ccTo: "",
+    referredTo: "",
     subjectCategory: "",
     needsReply: "" as "" | "yes" | "no",
     replyOfSerial: "",
@@ -410,6 +411,7 @@ export default function LetterNumbering() {
     sentTo: "",
     subject: "",
     ccTo: "",
+    referredTo: "",
     subjectCategory: "",
     replyOfSerial: ""
   });
@@ -423,6 +425,7 @@ export default function LetterNumbering() {
     sentTo: "",
     subject: "",
     ccTo: "",
+    referredTo: "",
     subjectCategory: "",
     needsReply: "" as "" | "yes" | "no",
     replyOfSerial: "",
@@ -479,6 +482,7 @@ export default function LetterNumbering() {
     sentTo: "",
     subject: "",
     ccTo: "",
+    referredTo: "",
     subjectCategory: "",
     replyOfSerial: ""
   };
@@ -520,6 +524,7 @@ export default function LetterNumbering() {
       if (!includes(letter.sentTo, letterFilters.sentTo)) return false;
       if (!includes(letter.subject, letterFilters.subject)) return false;
       if (!includes(letter.ccTo, letterFilters.ccTo)) return false;
+      if (!includes(letter.referredTo, letterFilters.referredTo)) return false;
       if (!includes(letter.subjectCategory, letterFilters.subjectCategory)) return false;
       if (!includes(letter.replyOfSerial, letterFilters.replyOfSerial)) return false;
       return true;
@@ -572,6 +577,12 @@ export default function LetterNumbering() {
     ccTo: useQuery({
       queryKey: ["letter-suggestions", "ccTo", selectedProjectId],
       queryFn: () => api.getLetterSuggestions({ field: "ccTo", letterProjectId: selectedProjectId ?? undefined }),
+      enabled: view === "database" && Boolean(selectedProjectId)
+    }),
+    referredTo: useQuery({
+      queryKey: ["letter-suggestions", "referredTo", selectedProjectId],
+      queryFn: () =>
+        api.getLetterSuggestions({ field: "referredTo", letterProjectId: selectedProjectId ?? undefined }),
       enabled: view === "database" && Boolean(selectedProjectId)
     })
   };
@@ -652,6 +663,7 @@ export default function LetterNumbering() {
       sentTo: letter.sentTo || "",
       subject: letter.subject || "",
       ccTo: letter.ccTo || "",
+      referredTo: letter.referredTo || "",
       subjectCategory: letter.subjectCategory || "",
       needsReply:
         letter.needsReply === true ? "yes" : letter.needsReply === false ? "no" : "",
@@ -699,6 +711,7 @@ export default function LetterNumbering() {
         sentTo: oldLetterForm.sentTo || undefined,
         subject: oldLetterForm.subject || undefined,
         ccTo: oldLetterForm.ccTo || undefined,
+        referredTo: oldLetterForm.referredTo || undefined,
         subjectCategory: oldLetterForm.subjectCategory || undefined,
         needsReply:
           oldLetterForm.category === "OUTWARD"
@@ -725,6 +738,7 @@ export default function LetterNumbering() {
         sentTo: "",
         subject: "",
         ccTo: "",
+        referredTo: "",
         subjectCategory: "",
         needsReply: "",
         replyOfSerial: "",
@@ -874,6 +888,7 @@ export default function LetterNumbering() {
           sentTo: letterDialogForm.sentTo,
           subject: letterDialogForm.subject,
           ccTo: letterDialogForm.ccTo,
+          referredTo: letterDialogForm.referredTo,
           subjectCategory: letterDialogForm.subjectCategory,
           needsReply:
             letterDialogForm.category === "OUTWARD"
@@ -1586,6 +1601,7 @@ export default function LetterNumbering() {
                             <th className="p-2 text-left font-medium min-w-[180px]">Sent To</th>
                             <th className="p-2 text-left font-medium min-w-[200px]">Subject</th>
                             <th className="p-2 text-left font-medium min-w-[160px]">CC To</th>
+                            <th className="p-2 text-left font-medium min-w-[160px]">Referred To</th>
                             <th className="p-2 text-left font-medium min-w-[180px]">Subject Cat.</th>
                             <th className="p-2 text-left font-medium w-28">Reply Letter of</th>
                             <th className="p-2 text-right font-medium w-36">Actions</th>
@@ -1704,6 +1720,16 @@ export default function LetterNumbering() {
                               <Input
                                 className="h-7 text-[11px]"
                                 placeholder="Filter"
+                                value={letterFilters.referredTo}
+                                onChange={(e) =>
+                                  setLetterFilters((prev) => ({ ...prev, referredTo: e.target.value }))
+                                }
+                              />
+                            </th>
+                            <th className="p-1.5">
+                              <Input
+                                className="h-7 text-[11px]"
+                                placeholder="Filter"
                                 value={letterFilters.subjectCategory}
                                 onChange={(e) =>
                                   setLetterFilters((prev) => ({
@@ -1744,14 +1770,14 @@ export default function LetterNumbering() {
                         <tbody>
                           {letters.length === 0 ? (
                             <tr>
-                              <td colSpan={12} className="p-8 text-center text-muted-foreground">
+                              <td colSpan={13} className="p-8 text-center text-muted-foreground">
                                 No letters yet. Add Inward / Outward / Other, or Add Old Letter / Import Excel for existing numbers.
                               </td>
                             </tr>
                           ) : null}
                           {letters.length > 0 && filteredLetters.length === 0 ? (
                             <tr>
-                              <td colSpan={12} className="p-8 text-center text-muted-foreground">
+                              <td colSpan={13} className="p-8 text-center text-muted-foreground">
                                 No letters match the filters.{" "}
                                 <button
                                   type="button"
@@ -1822,6 +1848,11 @@ export default function LetterNumbering() {
                                 <td className="p-2 max-w-[160px]">
                                   <p className="line-clamp-2 whitespace-pre-wrap break-words">
                                     {letter.ccTo || "—"}
+                                  </p>
+                                </td>
+                                <td className="p-2 max-w-[160px]">
+                                  <p className="line-clamp-2 whitespace-pre-wrap break-words">
+                                    {letter.referredTo || "—"}
                                   </p>
                                 </td>
                                 <td className="p-2">{letter.subjectCategory || "—"}</td>
@@ -2066,6 +2097,16 @@ export default function LetterNumbering() {
             </div>
 
             <div className="space-y-1.5 sm:col-span-2">
+              <Label>Referred To</Label>
+              <SuggestField
+                value={letterDialogForm.referredTo}
+                suggestions={suggestionQueries.referredTo.data ?? []}
+                placeholder="Referred To"
+                onChange={(value) => setLetterDialogForm((prev) => ({ ...prev, referredTo: value }))}
+              />
+            </div>
+
+            <div className="space-y-1.5 sm:col-span-2">
               <Label>Subject Category</Label>
               <SubjectCategoryField
                 value={letterDialogForm.subjectCategory}
@@ -2234,6 +2275,14 @@ export default function LetterNumbering() {
               <Input
                 value={oldLetterForm.ccTo}
                 onChange={(e) => setOldLetterForm((prev) => ({ ...prev, ccTo: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Referred To</Label>
+              <Input
+                value={oldLetterForm.referredTo}
+                onChange={(e) => setOldLetterForm((prev) => ({ ...prev, referredTo: e.target.value }))}
               />
             </div>
 

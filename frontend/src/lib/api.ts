@@ -633,6 +633,7 @@ export const api = {
       sentTo?: string;
       subject?: string;
       ccTo?: string;
+      referredTo?: string;
       subjectCategory?: string;
       letterLinkUrl?: string | null;
       needsReply?: boolean | null;
@@ -659,6 +660,7 @@ export const api = {
       sentTo?: string;
       subject?: string;
       ccTo?: string;
+      referredTo?: string;
       subjectCategory?: string;
       letterLinkUrl?: string | null;
       needsReply?: boolean | null;
@@ -697,6 +699,7 @@ export const api = {
       sentTo?: string;
       subject?: string;
       ccTo?: string;
+      referredTo?: string;
       subjectCategory?: string;
       letterLinkUrl?: string | null;
       needsReply?: boolean | null;
@@ -720,6 +723,7 @@ export const api = {
       sentTo: string;
       subject: string;
       ccTo: string;
+      referredTo: string;
       subjectCategory: string;
       letterLinkUrl: string | null;
       needsReply: boolean | null;
@@ -740,7 +744,7 @@ export const api = {
   },
 
   getLetterSuggestions(args: {
-    field: "sentBy" | "sentTo" | "subject" | "ccTo";
+    field: "sentBy" | "sentTo" | "subject" | "ccTo" | "referredTo";
     q?: string;
     letterProjectId?: string;
   }) {

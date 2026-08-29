@@ -81,7 +81,7 @@ export const letterNumberingController = {
     return sendSuccess(
       res,
       await letterNumberingService.suggestions({
-        field: req.query.field as "sentBy" | "sentTo" | "subject" | "ccTo",
+        field: req.query.field as "sentBy" | "sentTo" | "subject" | "ccTo" | "referredTo",
         q: typeof req.query.q === "string" ? req.query.q : "",
         letterProjectId: typeof req.query.letterProjectId === "string" ? req.query.letterProjectId : undefined
       })

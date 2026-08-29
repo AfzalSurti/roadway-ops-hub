@@ -731,6 +731,8 @@ model LetterEntry {
   sentTo            String         @default("")
   subject           String         @default("")
   ccTo              String         @default("")
+  /// Who the letter was referred to
+  referredTo        String         @default("")
   subjectCategory   String         @default("")
   letterLinkUrl     String?
   outwardSequence   String?

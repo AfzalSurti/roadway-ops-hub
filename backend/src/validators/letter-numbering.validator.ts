@@ -93,6 +93,7 @@ const createLetterEntryObjectSchema = z.object({
   sentTo: z.string().trim().max(500).optional(),
   subject: z.string().trim().max(2000).optional(),
   ccTo: z.string().trim().max(1000).optional(),
+  referredTo: z.string().trim().max(1000).optional(),
   subjectCategory: z.string().trim().max(200).optional(),
   letterLinkUrl: z.string().trim().max(2000).nullable().optional(),
   /** Inward/Other only: must we reply to this letter? */
@@ -120,6 +121,7 @@ export const updateLetterEntrySchema = z
     sentTo: z.string().trim().max(500).optional(),
     subject: z.string().trim().max(2000).optional(),
     ccTo: z.string().trim().max(1000).optional(),
+    referredTo: z.string().trim().max(1000).optional(),
     subjectCategory: z.string().trim().max(200).optional(),
     letterLinkUrl: z.string().trim().max(2000).nullable().optional(),
     needsReply: z.boolean().nullable().optional(),
@@ -144,7 +146,7 @@ export const bulkImportLettersSchema = z.object({
 });
 
 export const letterSuggestionsQuerySchema = z.object({
-  field: z.enum(["sentBy", "sentTo", "subject", "ccTo"]),
+  field: z.enum(["sentBy", "sentTo", "subject", "ccTo", "referredTo"]),
   q: z.string().optional(),
   letterProjectId: z.string().optional()
 });

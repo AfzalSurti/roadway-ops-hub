@@ -124,7 +124,7 @@ export const letterNumberingRepository = {
     );
   },
 
-  async suggestions(letterProjectId: string | undefined, field: "sentBy" | "sentTo" | "subject" | "ccTo", q: string) {
+  async suggestions(letterProjectId: string | undefined, field: "sentBy" | "sentTo" | "subject" | "ccTo" | "referredTo", q: string) {
     const where: Prisma.LetterEntryWhereInput = {
       ...(letterProjectId ? { letterProjectId } : {}),
       [field]: { contains: q, mode: "insensitive" }

@@ -175,6 +175,7 @@ export type LetterEntryItem = {
   sentTo: string;
   subject: string;
   ccTo: string;
+  referredTo?: string;
   subjectCategory: string;
   letterLinkUrl?: string | null;
   outwardSequence?: string | null;

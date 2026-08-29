@@ -12,6 +12,7 @@ export const LETTER_IMPORT_HEADERS = [
   "Sent To",
   "Subject",
   "CC To",
+  "Referred To",
   "Subject Category",
   "Letter Link URL",
   "Needs Reply",
@@ -29,6 +30,7 @@ export type LetterImportRowPayload = {
   sentTo?: string;
   subject?: string;
   ccTo?: string;
+  referredTo?: string;
   subjectCategory?: string;
   letterLinkUrl?: string | null;
   needsReply?: boolean | null;
@@ -77,6 +79,9 @@ const HEADER_ALIASES: Record<string, FieldKey | "ignore"> = {
   subject: "subject",
   "cc to": "ccTo",
   cc: "ccTo",
+  "referred to": "referredTo",
+  referred: "referredTo",
+  "refered to": "referredTo",
   "subject category": "subjectCategory",
   "letter link url": "letterLinkUrl",
   "letter link": "letterLinkUrl",
@@ -158,6 +163,7 @@ export function downloadLetterImportTemplate() {
       "Sent To": "Client Authority",
       Subject: "Old LOA acknowledgement",
       "CC To": "HOD",
+      "Referred To": "Project Engineer",
       "Subject Category": "Tender",
       "Letter Link URL": "",
       "Needs Reply": "",
@@ -174,6 +180,7 @@ export function downloadLetterImportTemplate() {
       "Sent To": "Project Office",
       Subject: "Query on progress report",
       "CC To": "",
+      "Referred To": "",
       "Subject Category": "Other",
       "Letter Link URL": "",
       "Needs Reply": "Yes",
@@ -190,6 +197,7 @@ export function downloadLetterImportTemplate() {
       "Sent To": "Client Authority",
       Subject: "New letter — auto number",
       "CC To": "",
+      "Referred To": "",
       "Subject Category": "Other",
       "Letter Link URL": "",
       "Needs Reply": "",
@@ -221,7 +229,7 @@ export function downloadLetterImportTemplate() {
     [],
     ["Other columns"],
     ["Letter Date", "dd/mm/yyyy (preferred) or Excel date cell"],
-    ["Sent By / Sent To / Subject / CC To", "Free text"],
+    ["Sent By / Sent To / Subject / CC To / Referred To", "Free text"],
     ["Subject Category", "e.g. Utility, Tender, LAQ, Work Order, Other"],
     ["Needs Reply", "Yes / No — only for INWARD or OTHER"],
     ["Reply Of Serial", "Serial this letter replies to, e.g. 2a"],
@@ -333,6 +341,7 @@ export function readLetterImportFile(file: ArrayBuffer): {
       sentTo: cellString(raw.sentTo) || undefined,
       subject: cellString(raw.subject) || undefined,
       ccTo: cellString(raw.ccTo) || undefined,
+      referredTo: cellString(raw.referredTo) || undefined,
       subjectCategory: cellString(raw.subjectCategory) || undefined,
       letterLinkUrl: cellString(raw.letterLinkUrl) || null,
       needsReply: category === "OUTWARD" ? null : needsReplyParsed ?? null,

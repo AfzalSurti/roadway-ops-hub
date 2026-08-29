@@ -429,6 +429,7 @@ export const letterNumberingService = {
       sentTo?: string;
       subject?: string;
       ccTo?: string;
+      referredTo?: string;
       subjectCategory?: string;
       letterLinkUrl?: string | null;
       needsReply?: boolean | null;
@@ -521,6 +522,7 @@ export const letterNumberingService = {
       sentTo: payload.sentTo?.trim() || "",
       subject: payload.subject?.trim() || "",
       ccTo: payload.ccTo?.trim() || "",
+      referredTo: payload.referredTo?.trim() || "",
       subjectCategory: payload.subjectCategory?.trim() || "",
       letterLinkUrl: payload.letterLinkUrl?.trim() || null,
       outwardSequence,
@@ -546,6 +548,7 @@ export const letterNumberingService = {
       sentTo?: string;
       subject?: string;
       ccTo?: string;
+      referredTo?: string;
       subjectCategory?: string;
       letterLinkUrl?: string | null;
       needsReply?: boolean | null;
@@ -599,6 +602,7 @@ export const letterNumberingService = {
       sentTo?: string;
       subject?: string;
       ccTo?: string;
+      referredTo?: string;
       subjectCategory?: string;
       letterLinkUrl?: string | null;
       needsReply?: boolean | null;
@@ -667,6 +671,7 @@ export const letterNumberingService = {
       sentTo: payload.sentTo?.trim() || "",
       subject: payload.subject?.trim() || "",
       ccTo: payload.ccTo?.trim() || "",
+      referredTo: payload.referredTo?.trim() || "",
       subjectCategory: payload.subjectCategory?.trim() || "",
       letterLinkUrl: payload.letterLinkUrl?.trim() || null,
       outwardSequence,
@@ -749,6 +754,7 @@ export const letterNumberingService = {
       sentTo: string;
       subject: string;
       ccTo: string;
+      referredTo: string;
       subjectCategory: string;
       letterLinkUrl: string | null;
       needsReply: boolean | null;
@@ -824,6 +830,7 @@ export const letterNumberingService = {
       sentTo: payload.sentTo?.trim(),
       subject: payload.subject?.trim(),
       ccTo: payload.ccTo?.trim(),
+      referredTo: payload.referredTo?.trim(),
       subjectCategory: payload.subjectCategory?.trim(),
       letterLinkUrl:
         payload.letterLinkUrl === undefined ? undefined : payload.letterLinkUrl?.trim() || null,
@@ -888,7 +895,7 @@ export const letterNumberingService = {
 
   suggestions(args: {
     letterProjectId?: string;
-    field: "sentBy" | "sentTo" | "subject" | "ccTo";
+    field: "sentBy" | "sentTo" | "subject" | "ccTo" | "referredTo";
     q?: string;
   }) {
     return letterNumberingRepository.suggestions(args.letterProjectId, args.field, args.q?.trim() || "");
