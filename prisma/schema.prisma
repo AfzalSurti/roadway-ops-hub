@@ -105,6 +105,7 @@ model User {
   notifications Notification[]
   expenseSheets   ExpenseSheet[]
   expenseReviews  ExpenseApproval[] @relation("ExpenseReviewer")
+  referredLetters LetterEntry[]     @relation("LetterReferredTo")
 }
 
 model RefreshToken {
@@ -731,8 +732,10 @@ model LetterEntry {
   sentTo            String         @default("")
   subject           String         @default("")
   ccTo              String         @default("")
-  /// Who the letter was referred to
+  /// Who the letter was referred to (display name — kept in sync with referredToUser when set)
   referredTo        String         @default("")
+  /// Employee this letter is referred to — drives the employee's own Letter Numbering / Reply Pending view
+  referredToUserId  String?
   subjectCategory   String         @default("")
   letterLinkUrl     String?
   outwardSequence   String?
@@ -747,11 +750,13 @@ model LetterEntry {
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
   letterProject     LetterProject  @relation(fields: [letterProjectId], references: [id], onDelete: Cascade)
+  referredToUser    User?          @relation("LetterReferredTo", fields: [referredToUserId], references: [id], onDelete: SetNull)
 
   @@index([letterProjectId, sortOrder])
   @@index([letterProjectId, category])
   @@index([letterProjectId, needsReply, repliedAt])
   @@index([letterProjectId, replyOfSerial])
+  @@index([referredToUserId, needsReply, repliedAt])
 }
 
 enum TenderBidStatus {

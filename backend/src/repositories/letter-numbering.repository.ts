@@ -67,12 +67,13 @@ export const letterNumberingRepository = {
     });
   },
 
-  listPendingReplies() {
+  listPendingReplies(referredToUserId?: string) {
     return prisma.letterEntry.findMany({
       where: {
         needsReply: true,
         repliedAt: null,
-        category: { in: ["INWARD", "OTHER"] }
+        category: { in: ["INWARD", "OTHER"] },
+        ...(referredToUserId ? { referredToUserId } : {})
       },
       include: {
         letterProject: {
@@ -86,6 +87,18 @@ export const letterNumberingRepository = {
       },
       orderBy: [{ letterDate: "asc" }, { sortOrder: "asc" }]
     });
+  },
+
+  listEmployees() {
+    return prisma.user.findMany({
+      where: { role: "EMPLOYEE" },
+      select: { id: true, name: true, email: true },
+      orderBy: { name: "asc" }
+    });
+  },
+
+  findUserById(id: string) {
+    return prisma.user.findUnique({ where: { id }, select: { id: true, name: true } });
   },
 
   listReplyOfLinks() {

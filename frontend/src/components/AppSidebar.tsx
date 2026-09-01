@@ -66,6 +66,7 @@ const employeeNav = [
   { to: "/app/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/app/tasks", icon: ListTodo, label: "My Tasks" },
   { to: "/app/reports", icon: FileCheck, label: "My Reports" },
+  { to: "/app/letter-numbering", icon: Mail, label: "Letter Numbering" },
   { to: "/app/expenses", icon: Receipt, label: "Expenses" },
   { to: "/app/profile", icon: UserCircle, label: "My Profile" },
 ];

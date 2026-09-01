@@ -11,6 +11,22 @@ export const letterNumberingController = {
     return sendSuccess(res, await letterNumberingService.listPendingReplies());
   },
 
+  async listEmployees(_req: Request, res: Response) {
+    return sendSuccess(res, await letterNumberingService.listEmployees());
+  },
+
+  async listMyPendingReplies(req: Request, res: Response) {
+    return sendSuccess(res, await letterNumberingService.listPendingReplies(req.user!.id));
+  },
+
+  async markMyReplyDone(req: Request, res: Response) {
+    const replied = req.body.replied !== false;
+    return sendSuccess(
+      res,
+      await letterNumberingService.markOwnReply(req.user!.id, req.params.letterId, replied)
+    );
+  },
+
   async getProject(req: Request, res: Response) {
     return sendSuccess(res, await letterNumberingService.getProject(req.params.id));
   },

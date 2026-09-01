@@ -31,6 +31,7 @@ import type {
   InfraProjectItem,
   InfraTeamMemberItem,
   LetterCategory,
+  LetterEmployeeItem,
   LetterEntryItem,
   LetterPendingReplyItem,
   LetterProjectItem,
@@ -634,6 +635,7 @@ export const api = {
       subject?: string;
       ccTo?: string;
       referredTo?: string;
+      referredToUserId?: string | null;
       subjectCategory?: string;
       letterLinkUrl?: string | null;
       needsReply?: boolean | null;
@@ -661,6 +663,7 @@ export const api = {
       subject?: string;
       ccTo?: string;
       referredTo?: string;
+      referredToUserId?: string | null;
       subjectCategory?: string;
       letterLinkUrl?: string | null;
       needsReply?: boolean | null;
@@ -700,6 +703,7 @@ export const api = {
       subject?: string;
       ccTo?: string;
       referredTo?: string;
+      referredToUserId?: string | null;
       subjectCategory?: string;
       letterLinkUrl?: string | null;
       needsReply?: boolean | null;
@@ -724,6 +728,7 @@ export const api = {
       subject: string;
       ccTo: string;
       referredTo: string;
+      referredToUserId: string | null;
       subjectCategory: string;
       letterLinkUrl: string | null;
       needsReply: boolean | null;
@@ -752,6 +757,21 @@ export const api = {
     if (args.q) params.set("q", args.q);
     if (args.letterProjectId) params.set("letterProjectId", args.letterProjectId);
     return request<string[]>(`/letter-numbering/suggestions?${params.toString()}`);
+  },
+
+  getLetterEmployees() {
+    return request<LetterEmployeeItem[]>("/letter-numbering/employees");
+  },
+
+  getMyLetterPendingReplies() {
+    return request<LetterPendingReplyItem[]>("/letter-numbering/my/pending-replies");
+  },
+
+  markMyLetterReply(letterId: string, replied: boolean) {
+    return request<LetterEntryItem>(`/letter-numbering/my/letters/${letterId}/reply`, {
+      method: "PATCH",
+      body: JSON.stringify({ replied })
+    });
   },
 
   getProjectRequisitionForms() {

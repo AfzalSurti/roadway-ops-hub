@@ -176,6 +176,8 @@ export type LetterEntryItem = {
   subject: string;
   ccTo: string;
   referredTo?: string;
+  /** Employee this letter is referred to (drives their own Letter Numbering view) */
+  referredToUserId?: string | null;
   subjectCategory: string;
   letterLinkUrl?: string | null;
   outwardSequence?: string | null;
@@ -198,6 +200,12 @@ export type LetterPendingReplyItem = LetterEntryItem & {
     projectCode: string;
     shortName: string;
   };
+};
+
+export type LetterEmployeeItem = {
+  id: string;
+  name: string;
+  email: string;
 };
 
 export type ProjectDprOverviewItem = {

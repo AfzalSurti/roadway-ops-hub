@@ -94,6 +94,8 @@ const createLetterEntryObjectSchema = z.object({
   subject: z.string().trim().max(2000).optional(),
   ccTo: z.string().trim().max(1000).optional(),
   referredTo: z.string().trim().max(1000).optional(),
+  /** Employee this letter is referred to (overrides referredTo with the employee's name) */
+  referredToUserId: z.string().min(1).nullable().optional(),
   subjectCategory: z.string().trim().max(200).optional(),
   letterLinkUrl: z.string().trim().max(2000).nullable().optional(),
   /** Inward/Other only: must we reply to this letter? */
@@ -122,6 +124,7 @@ export const updateLetterEntrySchema = z
     subject: z.string().trim().max(2000).optional(),
     ccTo: z.string().trim().max(1000).optional(),
     referredTo: z.string().trim().max(1000).optional(),
+    referredToUserId: z.string().min(1).nullable().optional(),
     subjectCategory: z.string().trim().max(200).optional(),
     letterLinkUrl: z.string().trim().max(2000).nullable().optional(),
     needsReply: z.boolean().nullable().optional(),
@@ -149,4 +152,8 @@ export const letterSuggestionsQuerySchema = z.object({
   field: z.enum(["sentBy", "sentTo", "subject", "ccTo", "referredTo"]),
   q: z.string().optional(),
   letterProjectId: z.string().optional()
+});
+
+export const myLetterReplySchema = z.object({
+  replied: z.boolean().optional()
 });

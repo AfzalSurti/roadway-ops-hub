@@ -1,5 +1,5 @@
 import { letterNumberingRepository } from "../repositories/letter-numbering.repository.js";
-import { badRequest, conflict, notFound } from "../utils/errors.js";
+import { badRequest, conflict, forbidden, notFound } from "../utils/errors.js";
 import {
   buildLetterNumber,
   nextInsertSerial,
@@ -100,6 +100,32 @@ function resolveReplyFields(
   return { needsReply, repliedAt };
 }
 
+/** Resolve Referred To for a new letter: employee id (if given) wins and snapshots the employee's name. */
+async function resolveReferredToForCreate(payload: { referredTo?: string; referredToUserId?: string | null }) {
+  if (payload.referredToUserId) {
+    const employee = await letterNumberingRepository.findUserById(payload.referredToUserId);
+    if (!employee) throw notFound("Employee not found");
+    return { referredTo: employee.name, referredToUser: { connect: { id: employee.id } } } as const;
+  }
+  return { referredTo: payload.referredTo?.trim() || "", referredToUser: undefined } as const;
+}
+
+/** Resolve Referred To for an update: undefined leaves both fields untouched. */
+async function resolveReferredToForUpdate(payload: { referredTo?: string; referredToUserId?: string | null }) {
+  if (payload.referredToUserId !== undefined) {
+    if (payload.referredToUserId === null) {
+      return { referredTo: "", referredToUser: { disconnect: true } } as const;
+    }
+    const employee = await letterNumberingRepository.findUserById(payload.referredToUserId);
+    if (!employee) throw notFound("Employee not found");
+    return { referredTo: employee.name, referredToUser: { connect: { id: employee.id } } } as const;
+  }
+  if (payload.referredTo !== undefined) {
+    return { referredTo: payload.referredTo.trim(), referredToUser: undefined } as const;
+  }
+  return { referredTo: undefined, referredToUser: undefined } as const;
+}
+
 function regenerateNumbers(
   project: { projectNumber: string; projectCode: string },
   letters: Array<{
@@ -174,9 +200,13 @@ export const letterNumberingService = {
     return letterNumberingRepository.listProjects();
   },
 
-  async listPendingReplies() {
+  listEmployees() {
+    return letterNumberingRepository.listEmployees();
+  },
+
+  async listPendingReplies(referredToUserId?: string) {
     const [pending, replyLinks] = await Promise.all([
-      letterNumberingRepository.listPendingReplies(),
+      letterNumberingRepository.listPendingReplies(referredToUserId),
       letterNumberingRepository.listReplyOfLinks()
     ]);
 
@@ -430,6 +460,7 @@ export const letterNumberingService = {
       subject?: string;
       ccTo?: string;
       referredTo?: string;
+      referredToUserId?: string | null;
       subjectCategory?: string;
       letterLinkUrl?: string | null;
       needsReply?: boolean | null;
@@ -511,6 +542,8 @@ export const letterNumberingService = {
     const replyOfSerial =
       payload.replyOfSerial === undefined ? null : payload.replyOfSerial?.trim() || null;
 
+    const referredToFields = await resolveReferredToForCreate(payload);
+
     const created = await letterNumberingRepository.createLetter({
       letterProject: { connect: { id: letterProjectId } },
       sortOrder,
@@ -522,7 +555,8 @@ export const letterNumberingService = {
       sentTo: payload.sentTo?.trim() || "",
       subject: payload.subject?.trim() || "",
       ccTo: payload.ccTo?.trim() || "",
-      referredTo: payload.referredTo?.trim() || "",
+      referredTo: referredToFields.referredTo,
+      referredToUser: referredToFields.referredToUser,
       subjectCategory: payload.subjectCategory?.trim() || "",
       letterLinkUrl: payload.letterLinkUrl?.trim() || null,
       outwardSequence,
@@ -549,6 +583,7 @@ export const letterNumberingService = {
       subject?: string;
       ccTo?: string;
       referredTo?: string;
+      referredToUserId?: string | null;
       subjectCategory?: string;
       letterLinkUrl?: string | null;
       needsReply?: boolean | null;
@@ -603,6 +638,7 @@ export const letterNumberingService = {
       subject?: string;
       ccTo?: string;
       referredTo?: string;
+      referredToUserId?: string | null;
       subjectCategory?: string;
       letterLinkUrl?: string | null;
       needsReply?: boolean | null;
@@ -660,6 +696,8 @@ export const letterNumberingService = {
     const replyOfSerial =
       payload.replyOfSerial === undefined ? null : payload.replyOfSerial?.trim() || null;
 
+    const referredToFields = await resolveReferredToForCreate(payload);
+
     const created = await letterNumberingRepository.createLetter({
       letterProject: { connect: { id: letterProjectId } },
       sortOrder,
@@ -671,7 +709,8 @@ export const letterNumberingService = {
       sentTo: payload.sentTo?.trim() || "",
       subject: payload.subject?.trim() || "",
       ccTo: payload.ccTo?.trim() || "",
-      referredTo: payload.referredTo?.trim() || "",
+      referredTo: referredToFields.referredTo,
+      referredToUser: referredToFields.referredToUser,
       subjectCategory: payload.subjectCategory?.trim() || "",
       letterLinkUrl: payload.letterLinkUrl?.trim() || null,
       outwardSequence,
@@ -755,6 +794,7 @@ export const letterNumberingService = {
       subject: string;
       ccTo: string;
       referredTo: string;
+      referredToUserId: string | null;
       subjectCategory: string;
       letterLinkUrl: string | null;
       needsReply: boolean | null;
@@ -823,6 +863,8 @@ export const letterNumberingService = {
         ? undefined
         : payload.replyOfSerial?.trim() || null;
 
+    const referredToFields = await resolveReferredToForUpdate(payload);
+
     const updated = await letterNumberingRepository.updateLetter(letterId, {
       category: payload.category,
       letterDate: parseDate(payload.letterDate),
@@ -830,7 +872,8 @@ export const letterNumberingService = {
       sentTo: payload.sentTo?.trim(),
       subject: payload.subject?.trim(),
       ccTo: payload.ccTo?.trim(),
-      referredTo: payload.referredTo?.trim(),
+      referredTo: referredToFields.referredTo,
+      referredToUser: referredToFields.referredToUser,
       subjectCategory: payload.subjectCategory?.trim(),
       letterLinkUrl:
         payload.letterLinkUrl === undefined ? undefined : payload.letterLinkUrl?.trim() || null,
@@ -891,6 +934,14 @@ export const letterNumberingService = {
     await letterNumberingRepository.deleteLetter(letterId);
     await resequenceOutwardLetters(letterProjectId, projectMeta);
     return { deleted: true };
+  },
+
+  /** Employee marks/reopens a reply on a letter referred to them — scoped so they can't touch others' letters. */
+  async markOwnReply(userId: string, letterId: string, replied: boolean) {
+    const letter = await letterNumberingRepository.findLetterById(letterId);
+    if (!letter) throw notFound("Letter not found");
+    if (letter.referredToUserId !== userId) throw forbidden("This letter is not referred to you");
+    return this.updateLetter(letterId, { replied });
   },
 
   suggestions(args: {

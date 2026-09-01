@@ -21,6 +21,7 @@ import EmployeeDashboard from "./pages/employee/Dashboard";
 import EmployeeTasks from "./pages/employee/Tasks";
 import TaskDetail from "./pages/employee/TaskDetail";
 import EmployeeReports from "./pages/employee/Reports";
+import EmployeeLetterNumbering from "./pages/employee/LetterNumbering";
 import EmployeeProfile from "./pages/employee/Profile";
 import NotFound from "./pages/NotFound";
 import AdministrativeDashboard from "./pages/administrative/Dashboard";
@@ -197,6 +198,7 @@ function AppRoutes() {
         <Route path="tasks" element={<EmployeeTasks />} />
         <Route path="task/:id" element={<TaskDetail />} />
         <Route path="reports" element={<EmployeeReports />} />
+        <Route path="letter-numbering" element={<EmployeeLetterNumbering />} />
         <Route path="profile" element={<EmployeeProfile />} />
         <Route path="expenses" element={<EmployeeExpenses />} />
         <Route path="expenses/:id" element={<EmployeeExpenseDetail />} />

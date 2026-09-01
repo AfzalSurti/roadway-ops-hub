@@ -10,16 +10,31 @@ import {
   bulkImportLettersSchema,
   importLetterProjectSchema,
   insertLetterEntrySchema,
+  myLetterReplySchema,
   updateLetterEntrySchema,
   updateLetterProjectSchema
 } from "../validators/letter-numbering.validator.js";
 
 export const letterNumberingRouter = Router();
 
+// Employee-facing: any authenticated user manages only letters referred to themselves.
+letterNumberingRouter.get(
+  "/my/pending-replies",
+  requireAuth,
+  asyncHandler(letterNumberingController.listMyPendingReplies)
+);
+letterNumberingRouter.patch(
+  "/my/letters/:letterId/reply",
+  requireAuth,
+  validate(myLetterReplySchema),
+  asyncHandler(letterNumberingController.markMyReplyDone)
+);
+
 letterNumberingRouter.use(requireAuth, requireRole("ADMIN", "PMO"));
 
 letterNumberingRouter.get("/projects", asyncHandler(letterNumberingController.listProjects));
 letterNumberingRouter.get("/pending-replies", asyncHandler(letterNumberingController.listPendingReplies));
+letterNumberingRouter.get("/employees", asyncHandler(letterNumberingController.listEmployees));
 letterNumberingRouter.get("/main-projects", asyncHandler(letterNumberingController.listMainProjects));
 letterNumberingRouter.get("/suggestions", asyncHandler(letterNumberingController.suggestions));
 letterNumberingRouter.post(

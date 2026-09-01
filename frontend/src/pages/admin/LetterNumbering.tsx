@@ -395,6 +395,7 @@ export default function LetterNumbering() {
     subject: "",
     ccTo: "",
     referredTo: "",
+    referredToUserId: null as string | null,
     subjectCategory: "",
     needsReply: "" as "" | "yes" | "no",
     replyOfSerial: "",
@@ -426,6 +427,7 @@ export default function LetterNumbering() {
     subject: "",
     ccTo: "",
     referredTo: "",
+    referredToUserId: null as string | null,
     subjectCategory: "",
     needsReply: "" as "" | "yes" | "no",
     replyOfSerial: "",
@@ -440,6 +442,11 @@ export default function LetterNumbering() {
   const { data: pendingReplies = [], isLoading: loadingPending } = useQuery({
     queryKey: ["letter-pending-replies"],
     queryFn: () => api.getLetterPendingReplies()
+  });
+
+  const { data: letterEmployees = [] } = useQuery({
+    queryKey: ["letter-employees"],
+    queryFn: () => api.getLetterEmployees()
   });
 
   const { data: mainProjects = [], isError: mainProjectsError, isLoading: loadingMainProjects } = useQuery({
@@ -664,6 +671,7 @@ export default function LetterNumbering() {
       subject: letter.subject || "",
       ccTo: letter.ccTo || "",
       referredTo: letter.referredTo || "",
+      referredToUserId: letter.referredToUserId ?? null,
       subjectCategory: letter.subjectCategory || "",
       needsReply:
         letter.needsReply === true ? "yes" : letter.needsReply === false ? "no" : "",
@@ -712,6 +720,10 @@ export default function LetterNumbering() {
         subject: oldLetterForm.subject || undefined,
         ccTo: oldLetterForm.ccTo || undefined,
         referredTo: oldLetterForm.referredTo || undefined,
+        referredToUserId:
+          oldLetterForm.category !== "OUTWARD" && oldLetterForm.needsReply === "yes"
+            ? oldLetterForm.referredToUserId || undefined
+            : undefined,
         subjectCategory: oldLetterForm.subjectCategory || undefined,
         needsReply:
           oldLetterForm.category === "OUTWARD"
@@ -739,6 +751,7 @@ export default function LetterNumbering() {
         subject: "",
         ccTo: "",
         referredTo: "",
+        referredToUserId: null,
         subjectCategory: "",
         needsReply: "",
         replyOfSerial: "",
@@ -865,6 +878,9 @@ export default function LetterNumbering() {
     onError: (error) => toast.error(error instanceof Error ? error.message : "Delete failed")
   });
 
+  const showReferredToDropdown =
+    letterDialogForm.category !== "OUTWARD" && letterDialogForm.needsReply === "yes";
+
   const saveLetterDialog = () => {
     if (!letterDialogId) return;
     if (
@@ -889,6 +905,9 @@ export default function LetterNumbering() {
           subject: letterDialogForm.subject,
           ccTo: letterDialogForm.ccTo,
           referredTo: letterDialogForm.referredTo,
+          ...(showReferredToDropdown
+            ? { referredToUserId: letterDialogForm.referredToUserId || null }
+            : {}),
           subjectCategory: letterDialogForm.subjectCategory,
           needsReply:
             letterDialogForm.category === "OUTWARD"
@@ -2096,15 +2115,41 @@ export default function LetterNumbering() {
               />
             </div>
 
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label>Referred To</Label>
-              <SuggestField
-                value={letterDialogForm.referredTo}
-                suggestions={suggestionQueries.referredTo.data ?? []}
-                placeholder="Referred To"
-                onChange={(value) => setLetterDialogForm((prev) => ({ ...prev, referredTo: value }))}
-              />
-            </div>
+            {showReferredToDropdown ? (
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label>Referred To</Label>
+                <Select
+                  value={letterDialogForm.referredToUserId || "__none__"}
+                  onValueChange={(value) => {
+                    if (value === "__none__") {
+                      setLetterDialogForm((prev) => ({ ...prev, referredToUserId: null, referredTo: "" }));
+                      return;
+                    }
+                    const employee = letterEmployees.find((item) => item.id === value);
+                    setLetterDialogForm((prev) => ({
+                      ...prev,
+                      referredToUserId: value,
+                      referredTo: employee?.name ?? prev.referredTo
+                    }));
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select employee" />
+                  </SelectTrigger>
+                  <SelectContent className="z-[80]">
+                    <SelectItem value="__none__">—</SelectItem>
+                    {letterEmployees.map((employee) => (
+                      <SelectItem key={employee.id} value={employee.id}>
+                        {employee.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground">
+                  Shows in this employee&apos;s Letter Numbering until they mark it replied.
+                </p>
+              </div>
+            ) : null}
 
             <div className="space-y-1.5 sm:col-span-2">
               <Label>Subject Category</Label>
@@ -2278,13 +2323,38 @@ export default function LetterNumbering() {
               />
             </div>
 
-            <div className="space-y-1.5">
-              <Label>Referred To</Label>
-              <Input
-                value={oldLetterForm.referredTo}
-                onChange={(e) => setOldLetterForm((prev) => ({ ...prev, referredTo: e.target.value }))}
-              />
-            </div>
+            {oldLetterForm.category !== "OUTWARD" && oldLetterForm.needsReply === "yes" ? (
+              <div className="space-y-1.5">
+                <Label>Referred To</Label>
+                <Select
+                  value={oldLetterForm.referredToUserId || "__none__"}
+                  onValueChange={(value) => {
+                    if (value === "__none__") {
+                      setOldLetterForm((prev) => ({ ...prev, referredToUserId: null, referredTo: "" }));
+                      return;
+                    }
+                    const employee = letterEmployees.find((item) => item.id === value);
+                    setOldLetterForm((prev) => ({
+                      ...prev,
+                      referredToUserId: value,
+                      referredTo: employee?.name ?? prev.referredTo
+                    }));
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select employee" />
+                  </SelectTrigger>
+                  <SelectContent className="z-[80]">
+                    <SelectItem value="__none__">—</SelectItem>
+                    {letterEmployees.map((employee) => (
+                      <SelectItem key={employee.id} value={employee.id}>
+                        {employee.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
 
             <div className="space-y-1.5">
               <Label>Subject Category</Label>
