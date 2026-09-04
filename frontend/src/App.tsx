@@ -17,11 +17,13 @@ import AdminFinancial from "./pages/admin/Financial";
 import AdminTeam from "./pages/admin/Team";
 import AdminProjects from "./pages/admin/Projects";
 import LetterNumbering from "./pages/admin/LetterNumbering";
+import EmployeeOvertime from "./pages/admin/EmployeeOvertime";
 import EmployeeDashboard from "./pages/employee/Dashboard";
 import EmployeeTasks from "./pages/employee/Tasks";
 import TaskDetail from "./pages/employee/TaskDetail";
 import EmployeeReports from "./pages/employee/Reports";
 import EmployeeLetterNumbering from "./pages/employee/LetterNumbering";
+import CalculateHours from "./pages/employee/CalculateHours";
 import EmployeeProfile from "./pages/employee/Profile";
 import NotFound from "./pages/NotFound";
 import AdministrativeDashboard from "./pages/administrative/Dashboard";
@@ -145,6 +147,7 @@ function AppRoutes() {
         <Route path="team" element={<AdminTeam />} />
         <Route path="projects" element={<AdminProjects />} />
         <Route path="letter-numbering" element={<LetterNumbering />} />
+        <Route path="employee-overtime" element={<EmployeeOvertime />} />
         <Route path="expenses">
           <Route index element={<ExpenseDashboard />} />
           <Route path="my">
@@ -199,6 +202,7 @@ function AppRoutes() {
         <Route path="task/:id" element={<TaskDetail />} />
         <Route path="reports" element={<EmployeeReports />} />
         <Route path="letter-numbering" element={<EmployeeLetterNumbering />} />
+        <Route path="calculate-hours" element={<CalculateHours />} />
         <Route path="profile" element={<EmployeeProfile />} />
         <Route path="expenses" element={<EmployeeExpenses />} />
         <Route path="expenses/:id" element={<EmployeeExpenseDetail />} />

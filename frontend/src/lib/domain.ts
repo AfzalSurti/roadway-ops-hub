@@ -917,3 +917,107 @@ export const EMD_TYPE_OPTIONS = [
   "NEFT",
   "RTGS",
 ] as const;
+
+// ─── Calculate Hours (Leave + Overtime) ───────────────────────────────────
+
+export type LeaveType = "FULL_DAY" | "HALF_DAY" | "SHORT_LEAVE";
+export type HoursRequestStatus = "PENDING" | "APPROVED" | "REJECTED";
+export type CalculationPeriodStatus = "ACTIVE" | "CLOSED";
+
+export type CalculationPeriodItem = {
+  id: string;
+  startDate: string;
+  endDate: string;
+  status: CalculationPeriodStatus;
+  createdAt: string;
+  closedAt?: string | null;
+};
+
+export type HoursEmployeeRef = { id: string; name: string; email: string };
+
+type HoursRequestBase = {
+  id: string;
+  employeeId: string;
+  employee: HoursEmployeeRef;
+  calculationPeriodId: string;
+  date: string;
+  durationMinutes: number;
+  durationLabel: string;
+  status: HoursRequestStatus;
+  approvedById?: string | null;
+  approvedAt?: string | null;
+  rejectionReason?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type LeaveRequestItem = HoursRequestBase & {
+  requestType: "LEAVE";
+  leaveType: LeaveType;
+};
+
+export type OvertimeRequestItem = HoursRequestBase & {
+  requestType: "OVERTIME";
+};
+
+export type HoursAdminRequestItem = LeaveRequestItem | OvertimeRequestItem;
+
+export type HoursLeaveBucket = { count: number; minutes: number; label: string };
+
+export type HoursSummaryItem = {
+  period: { id: string; startDate: string; endDate: string; status: CalculationPeriodStatus };
+  leave: {
+    fullDay: HoursLeaveBucket;
+    halfDay: HoursLeaveBucket;
+    shortLeave: HoursLeaveBucket;
+    totalCount: number;
+    totalMinutes: number;
+    totalLabel: string;
+  };
+  approvedOvertimeMinutes: number;
+  approvedOvertimeLabel: string;
+  remainingMinutes: number;
+  remainingLabel: string;
+  pendingCount: number;
+};
+
+export type HoursLeaveBreakdownRow = {
+  id: string;
+  date: string;
+  leaveType: LeaveType;
+  durationMinutes: number;
+  durationLabel: string;
+  coveredMinutes: number;
+  coveredLabel: string;
+  remainingMinutes: number;
+  coverageStatus: "COVERED" | "PARTIALLY_COVERED" | "NOT_COVERED";
+};
+
+export type HoursOvertimeBreakdownRow = {
+  id: string;
+  date: string;
+  durationMinutes: number;
+  durationLabel: string;
+  appliedMinutes: number;
+  appliedLabel: string;
+  extraMinutes: number;
+  extraLabel: string;
+};
+
+export type HoursAllocationRow = {
+  leaveId: string;
+  leaveDate: string;
+  leaveType: LeaveType;
+  overtimeId: string;
+  overtimeDate: string;
+  minutesApplied: number;
+  minutesAppliedLabel: string;
+};
+
+export type HoursBreakdownItem = {
+  leaveBreakdown: HoursLeaveBreakdownRow[];
+  overtimeBreakdown: HoursOvertimeBreakdownRow[];
+  allocations: HoursAllocationRow[];
+};
+
+export type HoursReportItem = HoursSummaryItem & HoursBreakdownItem;

@@ -1,0 +1,391 @@
+import { useMemo, useState } from "react";
+import { PageWrapper } from "@/components/PageWrapper";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { api } from "@/lib/api";
+import type { LeaveRequestItem, LeaveType, OvertimeRequestItem } from "@/lib/domain";
+import {
+  LEAVE_TYPE_OPTIONS,
+  dateKey,
+  formatDisplayDate,
+  leaveTypeLabel,
+  statusBadgeVariant,
+  statusLabel,
+  toRequestDateInput
+} from "@/lib/hours-format";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { CalendarClock, CheckCircle2, Clock3, Loader2, MailWarning } from "lucide-react";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+
+/** Per date, pick the request that matters most: the active (pending/approved) one, else the latest rejected one. */
+function pickLatestByDate<T extends { date: string; status: string; createdAt: string }>(items: T[]): Map<string, T> {
+  const map = new Map<string, T>();
+  for (const item of items) {
+    const key = dateKey(item.date);
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, item);
+      continue;
+    }
+    const existingActive = existing.status !== "REJECTED";
+    const itemActive = item.status !== "REJECTED";
+    if (itemActive && !existingActive) {
+      map.set(key, item);
+    } else if (itemActive === existingActive && new Date(item.createdAt) > new Date(existing.createdAt)) {
+      map.set(key, item);
+    }
+  }
+  return map;
+}
+
+function dotClass(status: string, kind: "leave" | "overtime") {
+  if (status === "REJECTED") return "bg-red-400";
+  if (status === "PENDING") return "bg-amber-500";
+  return kind === "leave" ? "bg-emerald-500" : "bg-sky-500";
+}
+
+export default function CalculateHours() {
+  const queryClient = useQueryClient();
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [leaveType, setLeaveType] = useState<LeaveType | "">("");
+  const [otHours, setOtHours] = useState("");
+  const [otMinutes, setOtMinutes] = useState("");
+
+  const { data: summary, isLoading: loadingSummary } = useQuery({
+    queryKey: ["hours-my-summary"],
+    queryFn: () => api.getMyHoursSummary()
+  });
+
+  const { data: leaveRequests = [], isLoading: loadingLeave } = useQuery({
+    queryKey: ["hours-my-leave"],
+    queryFn: () => api.getMyLeaveRequests()
+  });
+
+  const { data: overtimeRequests = [], isLoading: loadingOvertime } = useQuery({
+    queryKey: ["hours-my-overtime"],
+    queryFn: () => api.getMyOvertimeRequests()
+  });
+
+  const leaveByDate = useMemo(() => pickLatestByDate(leaveRequests), [leaveRequests]);
+  const overtimeByDate = useMemo(() => pickLatestByDate(overtimeRequests), [overtimeRequests]);
+
+  const refresh = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["hours-my-summary"] }),
+      queryClient.invalidateQueries({ queryKey: ["hours-my-leave"] }),
+      queryClient.invalidateQueries({ queryKey: ["hours-my-overtime"] })
+    ]);
+  };
+
+  const createLeaveMutation = useMutation({
+    mutationFn: () => api.createLeaveRequest({ date: toRequestDateInput(selectedDate!), leaveType: leaveType as LeaveType }),
+    onSuccess: async () => {
+      toast.success("Leave request submitted");
+      setLeaveType("");
+      setSelectedDate(null);
+      await refresh();
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to submit leave request")
+  });
+
+  const createOvertimeMutation = useMutation({
+    mutationFn: () =>
+      api.createOvertimeRequest({
+        date: toRequestDateInput(selectedDate!),
+        hours: Number(otHours) || 0,
+        minutes: Number(otMinutes) || 0
+      }),
+    onSuccess: async () => {
+      toast.success("Overtime request submitted");
+      setOtHours("");
+      setOtMinutes("");
+      setSelectedDate(null);
+      await refresh();
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to submit overtime request")
+  });
+
+  const period = summary?.period;
+  const periodStart = period ? new Date(period.startDate) : undefined;
+  const periodEnd = period ? new Date(period.endDate) : undefined;
+
+  const selectedKey = selectedDate ? dateKey(selectedDate) : null;
+  const selectedLeave = selectedKey ? leaveByDate.get(selectedKey) : undefined;
+  const selectedOvertime = selectedKey ? overtimeByDate.get(selectedKey) : undefined;
+  const canRequestLeave = !selectedLeave || selectedLeave.status === "REJECTED";
+  const canRequestOvertime = !selectedOvertime || selectedOvertime.status === "REJECTED";
+
+  const timelineItems = useMemo(() => {
+    const items: Array<{ id: string; date: string; label: string; status: string; rejectionReason?: string | null }> = [
+      ...leaveRequests.map((item) => ({
+        id: `leave-${item.id}`,
+        date: item.date,
+        label: `${leaveTypeLabel(item.leaveType)} Leave — ${item.durationLabel}`,
+        status: item.status,
+        rejectionReason: item.rejectionReason
+      })),
+      ...overtimeRequests.map((item) => ({
+        id: `overtime-${item.id}`,
+        date: item.date,
+        label: `Overtime — ${item.durationLabel}`,
+        status: item.status,
+        rejectionReason: item.rejectionReason
+      }))
+    ];
+    return items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [leaveRequests, overtimeRequests]);
+
+  const isLoading = loadingSummary || loadingLeave || loadingOvertime;
+
+  return (
+    <PageWrapper>
+      <div className="page-header flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <h1 className="page-title">Calculate Hours</h1>
+          <p className="page-subtitle">
+            {period
+              ? `Cycle: ${formatDisplayDate(period.startDate)} – ${formatDisplayDate(period.endDate)}`
+              : "Leave and overtime for the current calculation cycle."}
+          </p>
+        </div>
+        {summary ? (
+          <div className="flex flex-wrap gap-2 self-start">
+            <Badge variant="secondary" className="rounded-full">
+              Total Leave {summary.leave.totalLabel}
+            </Badge>
+            <Badge variant="secondary" className="rounded-full">
+              Approved OT {summary.approvedOvertimeLabel}
+            </Badge>
+            <Badge variant="secondary" className="rounded-full">
+              Remaining {summary.remainingLabel}
+            </Badge>
+            {summary.pendingCount > 0 ? (
+              <Badge variant="outline" className="rounded-full gap-1">
+                <MailWarning className="h-3.5 w-3.5" />
+                {summary.pendingCount} pending
+              </Badge>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-[auto_1fr] gap-4">
+        <div className="glass-panel p-4 w-fit mx-auto xl:mx-0">
+          {isLoading ? (
+            <p className="text-sm text-muted-foreground inline-flex items-center gap-2 p-6">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading calendar...
+            </p>
+          ) : (
+            <>
+              <Calendar
+                defaultMonth={periodStart}
+                fromDate={periodStart}
+                toDate={periodEnd}
+                onDayClick={(date) => setSelectedDate(date)}
+                components={{
+                  DayContent: ({ date }) => {
+                    const key = dateKey(date);
+                    const leave = leaveByDate.get(key);
+                    const overtime = overtimeByDate.get(key);
+                    return (
+                      <div className="relative flex h-9 w-9 items-center justify-center">
+                        <span>{date.getDate()}</span>
+                        {leave || overtime ? (
+                          <div className="absolute bottom-0.5 flex gap-0.5">
+                            {leave ? (
+                              <span className={cn("h-1.5 w-1.5 rounded-full", dotClass(leave.status, "leave"))} />
+                            ) : null}
+                            {overtime ? (
+                              <span className={cn("h-1.5 w-1.5 rounded-full", dotClass(overtime.status, "overtime"))} />
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  }
+                }}
+              />
+              <div className="flex flex-wrap gap-3 px-2 pb-1 text-[11px] text-muted-foreground">
+                <span className="inline-flex items-center gap-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Leave approved
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-sky-500" /> Overtime approved
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> Pending
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-red-400" /> Rejected
+                </span>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="glass-panel p-5 space-y-3">
+          <h2 className="text-lg font-semibold inline-flex items-center gap-2">
+            <CalendarClock className="h-5 w-5" />
+            Your Requests
+          </h2>
+          {timelineItems.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-8 text-center">
+              No leave or overtime requests yet. Click a date on the calendar to add one.
+            </p>
+          ) : (
+            <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
+              {timelineItems.map((item) => (
+                <div
+                  key={item.id}
+                  className="rounded-lg border border-border/40 bg-card/60 p-3 flex items-center justify-between gap-3"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">
+                      {formatDisplayDate(item.date)} · {item.label}
+                    </p>
+                    {item.status === "REJECTED" && item.rejectionReason ? (
+                      <p className="text-xs text-muted-foreground mt-0.5">Reason: {item.rejectionReason}</p>
+                    ) : null}
+                  </div>
+                  <Badge variant={statusBadgeVariant(item.status as never)} className="shrink-0">
+                    {statusLabel(item.status as never)}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <Dialog open={Boolean(selectedDate)} onOpenChange={(open) => !open && setSelectedDate(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{selectedDate ? formatDisplayDate(selectedDate.toISOString()) : ""}</DialogTitle>
+            <DialogDescription>Request leave or overtime for this date.</DialogDescription>
+          </DialogHeader>
+
+          <Tabs defaultValue="leave">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="leave">Leave</TabsTrigger>
+              <TabsTrigger value="overtime">Overtime</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="leave" className="space-y-3 pt-3">
+              {selectedLeave ? (
+                <div className="rounded-lg border border-border/40 bg-secondary/20 p-3 space-y-1">
+                  <p className="text-sm font-medium">
+                    {leaveTypeLabel(selectedLeave.leaveType)} — {selectedLeave.durationLabel}
+                  </p>
+                  <Badge variant={statusBadgeVariant(selectedLeave.status)}>{statusLabel(selectedLeave.status)}</Badge>
+                  {selectedLeave.status === "REJECTED" && selectedLeave.rejectionReason ? (
+                    <p className="text-xs text-muted-foreground">Reason: {selectedLeave.rejectionReason}</p>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {canRequestLeave ? (
+                <div className="space-y-2">
+                  <Label>Leave Type</Label>
+                  <Select value={leaveType} onValueChange={(value) => setLeaveType(value as LeaveType)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select leave type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {LEAVE_TYPE_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label} — {option.minutes / 60}h
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    className="w-full gap-1"
+                    disabled={!leaveType || createLeaveMutation.isPending}
+                    onClick={() => createLeaveMutation.mutate()}
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    {createLeaveMutation.isPending ? "Submitting..." : "Request Leave"}
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  This date already has a {statusLabel(selectedLeave!.status).toLowerCase()} leave request.
+                </p>
+              )}
+            </TabsContent>
+
+            <TabsContent value="overtime" className="space-y-3 pt-3">
+              {selectedOvertime ? (
+                <div className="rounded-lg border border-border/40 bg-secondary/20 p-3 space-y-1">
+                  <p className="text-sm font-medium">Overtime — {selectedOvertime.durationLabel}</p>
+                  <Badge variant={statusBadgeVariant(selectedOvertime.status)}>
+                    {statusLabel(selectedOvertime.status)}
+                  </Badge>
+                  {selectedOvertime.status === "REJECTED" && selectedOvertime.rejectionReason ? (
+                    <p className="text-xs text-muted-foreground">Reason: {selectedOvertime.rejectionReason}</p>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {canRequestOvertime ? (
+                <div className="space-y-2">
+                  <Label>Duration</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min={0}
+                      max={23}
+                      placeholder="Hours"
+                      value={otHours}
+                      onChange={(e) => setOtHours(e.target.value)}
+                      className="w-24"
+                    />
+                    <span className="text-sm text-muted-foreground">h</span>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={59}
+                      placeholder="Minutes"
+                      value={otMinutes}
+                      onChange={(e) => setOtMinutes(e.target.value)}
+                      className="w-24"
+                    />
+                    <span className="text-sm text-muted-foreground">m</span>
+                  </div>
+                  <Button
+                    className="w-full gap-1"
+                    disabled={
+                      createOvertimeMutation.isPending ||
+                      ((Number(otHours) || 0) === 0 && (Number(otMinutes) || 0) === 0)
+                    }
+                    onClick={() => createOvertimeMutation.mutate()}
+                  >
+                    <Clock3 className="h-3.5 w-3.5" />
+                    {createOvertimeMutation.isPending ? "Submitting..." : "Request Overtime"}
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  This date already has a {statusLabel(selectedOvertime!.status).toLowerCase()} overtime request.
+                </p>
+              )}
+            </TabsContent>
+          </Tabs>
+        </DialogContent>
+      </Dialog>
+    </PageWrapper>
+  );
+}

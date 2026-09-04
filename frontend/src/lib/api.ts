@@ -30,12 +30,21 @@ import type {
   InfraOverviewItem,
   InfraProjectItem,
   InfraTeamMemberItem,
+  CalculationPeriodItem,
+  HoursAdminRequestItem,
+  HoursBreakdownItem,
+  HoursRequestStatus,
+  HoursReportItem,
+  HoursSummaryItem,
+  LeaveRequestItem,
+  LeaveType,
   LetterActionType,
   LetterCategory,
   LetterEmployeeItem,
   LetterEntryItem,
   LetterPendingReplyItem,
   LetterProjectItem,
+  OvertimeRequestItem,
   ContractActivityItem,
   PreContractActivityItem,
   ProjectItem,
@@ -784,6 +793,95 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify({ approve })
     });
+  },
+
+  // ─── Calculate Hours (Leave + Overtime) ─────────────────────────────────
+
+  createLeaveRequest(payload: { date: string; leaveType: LeaveType }) {
+    return request<LeaveRequestItem>("/hours/leave-requests", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+  },
+
+  getMyLeaveRequests() {
+    return request<LeaveRequestItem[]>("/hours/leave-requests/me");
+  },
+
+  createOvertimeRequest(payload: { date: string; hours: number; minutes: number }) {
+    return request<OvertimeRequestItem>("/hours/overtime-requests", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+  },
+
+  getMyOvertimeRequests() {
+    return request<OvertimeRequestItem[]>("/hours/overtime-requests/me");
+  },
+
+  getMyHoursSummary() {
+    return request<HoursReportItem>("/hours/me/summary");
+  },
+
+  getHoursPeriods() {
+    return request<CalculationPeriodItem[]>("/hours/admin/periods");
+  },
+
+  getAdminHoursRequests(filters: {
+    employeeId?: string;
+    periodId?: string;
+    leaveType?: LeaveType;
+    requestType?: "LEAVE" | "OVERTIME";
+    status?: HoursRequestStatus;
+    dateFrom?: string;
+    dateTo?: string;
+  }) {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value) params.set(key, value);
+    });
+    const query = params.toString();
+    return request<HoursAdminRequestItem[]>(`/hours/admin/requests${query ? `?${query}` : ""}`);
+  },
+
+  approveLeaveRequest(id: string) {
+    return request<LeaveRequestItem>(`/hours/admin/leave-requests/${id}/approve`, { method: "PATCH" });
+  },
+
+  rejectLeaveRequest(id: string, rejectionReason?: string) {
+    return request<LeaveRequestItem>(`/hours/admin/leave-requests/${id}/reject`, {
+      method: "PATCH",
+      body: JSON.stringify({ rejectionReason })
+    });
+  },
+
+  approveOvertimeRequest(id: string) {
+    return request<OvertimeRequestItem>(`/hours/admin/overtime-requests/${id}/approve`, { method: "PATCH" });
+  },
+
+  rejectOvertimeRequest(id: string, rejectionReason?: string) {
+    return request<OvertimeRequestItem>(`/hours/admin/overtime-requests/${id}/reject`, {
+      method: "PATCH",
+      body: JSON.stringify({ rejectionReason })
+    });
+  },
+
+  getEmployeeHoursSummary(employeeId: string, periodId?: string) {
+    return request<HoursSummaryItem>(
+      `/hours/admin/employees/${employeeId}/summary${periodId ? `?periodId=${periodId}` : ""}`
+    );
+  },
+
+  getEmployeeHoursBreakdown(employeeId: string, periodId?: string) {
+    return request<HoursBreakdownItem>(
+      `/hours/admin/employees/${employeeId}/breakdown${periodId ? `?periodId=${periodId}` : ""}`
+    );
+  },
+
+  getEmployeeHoursReport(employeeId: string, periodId?: string) {
+    return request<HoursReportItem>(
+      `/hours/admin/employees/${employeeId}/report${periodId ? `?periodId=${periodId}` : ""}`
+    );
   },
 
   getProjectRequisitionForms() {

@@ -17,6 +17,7 @@ import {
   UserCircle,
   Gavel,
   Cog,
+  Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -30,6 +31,7 @@ const adminNav = [
   { to: "/admin/team", icon: Users, label: "Team" },
   { to: "/admin/projects", icon: FolderKanban, label: "Projects" },
   { to: "/admin/letter-numbering", icon: Mail, label: "Letter Numbering" },
+  { to: "/admin/employee-overtime", icon: Clock, label: "Employee Overtime" },
 ];
 
 const administrativeNav = [
@@ -67,6 +69,7 @@ const employeeNav = [
   { to: "/app/tasks", icon: ListTodo, label: "My Tasks" },
   { to: "/app/reports", icon: FileCheck, label: "My Reports" },
   { to: "/app/letter-numbering", icon: Mail, label: "Letter Numbering" },
+  { to: "/app/calculate-hours", icon: Clock, label: "Calculate Hours" },
   { to: "/app/expenses", icon: Receipt, label: "Expenses" },
   { to: "/app/profile", icon: UserCircle, label: "My Profile" },
 ];

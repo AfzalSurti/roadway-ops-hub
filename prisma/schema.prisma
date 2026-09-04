@@ -1,4 +1,3 @@
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -93,40 +92,44 @@ enum AuditAction {
 }
 
 model User {
-  id                 String         @id @default(cuid())
-  name               String
-  email              String         @unique
-  passwordHash       String
-  role               Role
-  contactNumber      String?
-  education          String?
-  yearOfPassing      String?
-  dateOfJoining      DateTime?
-  experienceInOrg    String?
-  currentCtc         String?
-  createdAt          DateTime       @default(now())
-  updatedAt          DateTime       @updatedAt
-  assignedTasks      Task[]         @relation("TaskAssignee")
-  createdTasks  Task[]         @relation("TaskCreator")
-  reports       Report[]
-  comments      Comment[]
-  attachments   Attachment[]
-  refreshTokens RefreshToken[]
-  audits        AuditLog[]
-  notifications Notification[]
-  expenseSheets   ExpenseSheet[]
-  expenseReviews  ExpenseApproval[] @relation("ExpenseReviewer")
-  referredLetters LetterEntry[]     @relation("LetterReferredTo")
+  id                String            @id @default(cuid())
+  name              String
+  email             String            @unique
+  passwordHash      String
+  role              Role
+  contactNumber     String?
+  education         String?
+  yearOfPassing     String?
+  dateOfJoining     DateTime?
+  experienceInOrg   String?
+  currentCtc        String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  assignedTasks     Task[]            @relation("TaskAssignee")
+  createdTasks      Task[]            @relation("TaskCreator")
+  reports           Report[]
+  comments          Comment[]
+  attachments       Attachment[]
+  refreshTokens     RefreshToken[]
+  audits            AuditLog[]
+  notifications     Notification[]
+  expenseSheets     ExpenseSheet[]
+  expenseReviews    ExpenseApproval[] @relation("ExpenseReviewer")
+  referredLetters   LetterEntry[]     @relation("LetterReferredTo")
+  leaveRequests     LeaveRequest[]    @relation("LeaveRequestEmployee")
+  leaveApprovals    LeaveRequest[]    @relation("LeaveRequestApprover")
+  overtimeRequests  OvertimeRequest[] @relation("OvertimeRequestEmployee")
+  overtimeApprovals OvertimeRequest[] @relation("OvertimeRequestApprover")
 }
 
 model RefreshToken {
-  id        String   @id @default(cuid())
-  tokenHash String   @unique
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
   userId    String
   expiresAt DateTime
   revokedAt DateTime?
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([expiresAt])
@@ -144,46 +147,46 @@ model ReportTemplate {
 }
 
 model Project {
-  id                    String   @id @default(cuid())
-  name                  String   @unique
-  description           String?
-  projectNumber         String?
-  projectCodePrefix     String?
-  companyCode           String?
-  technicalUnitCode     String?
-  subTechnicalUnitCode  String?
-  workCategoryCode      String?
-  financialYearShort    Int?
-  serialNumber          Int?
+  id                      String                  @id @default(cuid())
+  name                    String                  @unique
+  description             String?
+  projectNumber           String?
+  projectCodePrefix       String?
+  companyCode             String?
+  technicalUnitCode       String?
+  subTechnicalUnitCode    String?
+  workCategoryCode        String?
+  financialYearShort      Int?
+  serialNumber            Int?
   projectNumberAssignedAt DateTime?
-  woAmount              String   @default("")
-  woGstAmount           String   @default("")
-  woTotalAmount         String   @default("")
-  excessAmount          String   @default("")
-  excessGstAmount       String   @default("")
-  excessTotalAmount     String   @default("")
-  bgAmount              String   @default("")
-  bgIssueDate           DateTime?
-  bgExpiryDate          DateTime?
-  emdAmount             String   @default("")
-  emdIssueDate          DateTime?
-  emdExpiryDate         DateTime?
-  requisitionForm       ProjectRequisitionForm?
-  financialPlan         ProjectFinancialPlan?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  dprOverview           ProjectDprOverview?
-  expenseSheets         ExpenseSheet[]
-  assignments           ProjectAssignment[]
-  letterProjects        LetterProject[]
-  infraOtherCosts       InfraProjectOtherCost[]
+  woAmount                String                  @default("")
+  woGstAmount             String                  @default("")
+  woTotalAmount           String                  @default("")
+  excessAmount            String                  @default("")
+  excessGstAmount         String                  @default("")
+  excessTotalAmount       String                  @default("")
+  bgAmount                String                  @default("")
+  bgIssueDate             DateTime?
+  bgExpiryDate            DateTime?
+  emdAmount               String                  @default("")
+  emdIssueDate            DateTime?
+  emdExpiryDate           DateTime?
+  requisitionForm         ProjectRequisitionForm?
+  financialPlan           ProjectFinancialPlan?
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+  dprOverview             ProjectDprOverview?
+  expenseSheets           ExpenseSheet[]
+  assignments             ProjectAssignment[]
+  letterProjects          LetterProject[]
+  infraOtherCosts         InfraProjectOtherCost[]
 
   @@index([name])
   @@index([projectCodePrefix, financialYearShort])
 }
 
 model ProjectAssignment {
-  id           String    @id @default(cuid())
+  id            String          @id @default(cuid())
   projectId     String
   teamMemberId  String
   mobilizedAt   DateTime?
@@ -193,9 +196,9 @@ model ProjectAssignment {
   actualAmount  Float?
   /// Amount drawn / received from government (or client) against this employee
   drawnAmount   Float?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  project       Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
   teamMember    InfraTeamMember @relation(fields: [teamMemberId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
@@ -204,32 +207,32 @@ model ProjectAssignment {
 
 /// Non-staff project costs (vehicle, equipment, misc.) for Infra financial monitoring
 model InfraProjectOtherCost {
-  id          String   @id @default(cuid())
+  id           String   @id @default(cuid())
   projectId    String
-  description String
+  description  String
   actualAmount Float?
   drawnAmount  Float?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
 }
 
 model InfraTeamMember {
-  id              String              @id @default(cuid())
-  name            String
-  email           String?
-  phone           String?
-  manpowerGroup   String
-  manpowerRole    String
-  monthlyCost     Float?
-  currentProject  String?
-  mobilizedAt     DateTime?
-  demobilizedAt   DateTime?
-  notes           String?
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
+  id                 String              @id @default(cuid())
+  name               String
+  email              String?
+  phone              String?
+  manpowerGroup      String
+  manpowerRole       String
+  monthlyCost        Float?
+  currentProject     String?
+  mobilizedAt        DateTime?
+  demobilizedAt      DateTime?
+  notes              String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
   projectAssignments ProjectAssignment[]
 
   @@index([manpowerGroup])
@@ -237,37 +240,37 @@ model InfraTeamMember {
 }
 
 model Asset {
-  id                 String          @id @default(cuid())
-  assetId            String          @unique
-  itAssetId          String?
-  assetClass         String
-  assetType          String          @default("Other")
-  markModel          String?
-  dateOfPurchase     DateTime?
-  warrantyPeriod     String?
-  purchaseAmount     Float           @default(0)
-  gst                Float           @default(0)
-  totalAmountWithGst Float           @default(0)
-  usefulLifeYears    Int             @default(10)
-  scrapRate          Float           @default(0.1)
-  scrapValue         Float           @default(0)
-  depreciationPerYear Float          @default(0)
-  projectNumber      String?
-  projectName        String?
-  assignedUser       String?
-  assignedDate       DateTime?
-  status             AssetStatus     @default(IN_USE)
-  soldAmount         Float           @default(0)
-  soldRemark         String?
-  remarks            String?
-  forMonth           String?
-  billFileUrl        String?
-  billFileName       String?
-  billMimeType       String?
-  createdAt          DateTime        @default(now())
-  updatedAt          DateTime        @updatedAt
-  movements          AssetMovement[]
-  maintenances       AssetMaintenance[]
+  id                  String             @id @default(cuid())
+  assetId             String             @unique
+  itAssetId           String?
+  assetClass          String
+  assetType           String             @default("Other")
+  markModel           String?
+  dateOfPurchase      DateTime?
+  warrantyPeriod      String?
+  purchaseAmount      Float              @default(0)
+  gst                 Float              @default(0)
+  totalAmountWithGst  Float              @default(0)
+  usefulLifeYears     Int                @default(10)
+  scrapRate           Float              @default(0.1)
+  scrapValue          Float              @default(0)
+  depreciationPerYear Float              @default(0)
+  projectNumber       String?
+  projectName         String?
+  assignedUser        String?
+  assignedDate        DateTime?
+  status              AssetStatus        @default(IN_USE)
+  soldAmount          Float              @default(0)
+  soldRemark          String?
+  remarks             String?
+  forMonth            String?
+  billFileUrl         String?
+  billFileName        String?
+  billMimeType        String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  movements           AssetMovement[]
+  maintenances        AssetMaintenance[]
 
   @@index([projectNumber])
   @@index([assetClass])
@@ -276,20 +279,20 @@ model Asset {
 }
 
 model AssetMovement {
-  id                  String   @id @default(cuid())
-  assetId             String
+  id                    String    @id @default(cuid())
+  assetId               String
   previousProjectNumber String?
-  previousProjectName String?
-  previousAssignedDate DateTime?
-  previousUser        String?
-  movedToProjectNumber String?
-  movedToProjectName  String?
-  assignedDate        DateTime?
-  returnDate          DateTime?
-  dateOfMoving        DateTime
-  movedToUser         String?
-  createdAt           DateTime @default(now())
-  asset               Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  previousProjectName   String?
+  previousAssignedDate  DateTime?
+  previousUser          String?
+  movedToProjectNumber  String?
+  movedToProjectName    String?
+  assignedDate          DateTime?
+  returnDate            DateTime?
+  dateOfMoving          DateTime
+  movedToUser           String?
+  createdAt             DateTime  @default(now())
+  asset                 Asset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
 
   @@index([assetId])
 }
@@ -319,84 +322,84 @@ model AssetClassCatalog {
 }
 
 model ProjectRequisitionForm {
-  id                   String   @id @default(cuid())
-  projectId            String   @unique
-  costCentreDepartment String
-  hodDirectorName      String
-  applicationDate      DateTime
-  clientName           String
-  billingName          String
-  addressWithPincode   String
-  pincode              String
-  gstNumber            String
-  gstType              String
-  contactName          String
-  contactNumber        String
-  designation          String
-  department           String
-  panTanNumber         String
-  email                String
-  workOrderValue       String
-  workOrderDate        DateTime?
-  agreementNumber      String?
-  agreementDate        DateTime?
-  projectStartingDate  DateTime
-  projectDurationDays  Int
+  id                    String    @id @default(cuid())
+  projectId             String    @unique
+  costCentreDepartment  String
+  hodDirectorName       String
+  applicationDate       DateTime
+  clientName            String
+  billingName           String
+  addressWithPincode    String
+  pincode               String
+  gstNumber             String
+  gstType               String
+  contactName           String
+  contactNumber         String
+  designation           String
+  department            String
+  panTanNumber          String
+  email                 String
+  workOrderValue        String
+  workOrderDate         DateTime?
+  agreementNumber       String?
+  agreementDate         DateTime?
+  projectStartingDate   DateTime
+  projectDurationDays   Int
   projectCompletionDate DateTime
-  workOrderNumber      String
-  newProjectNumber     String
-  amountOfWorkOrder    String
-  gstAmount            String
-  totalAmount          String   @default("")
-  emdAmount            String
-  pgSdAmount           String
-  pgDate               DateTime?
-  pgExpiryDate         DateTime?
-  nameOfWork           String
-  locationDistrict     String
-  state                String
+  workOrderNumber       String
+  newProjectNumber      String
+  amountOfWorkOrder     String
+  gstAmount             String
+  totalAmount           String    @default("")
+  emdAmount             String
+  pgSdAmount            String
+  pgDate                DateTime?
+  pgExpiryDate          DateTime?
+  nameOfWork            String
+  locationDistrict      String
+  state                 String
   approvedProjectNumber String
-  approvedBy           String
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
-  project              Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  approvedBy            String
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  project               Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
   @@map("project_requisition_forms")
 }
 
 model Task {
-  id               String        @id @default(cuid())
-  title            String
-  description      String
-  projectCode      String?
-  projectNumber    String?
-  project          String
-  dueDate          DateTime
-  allocatedAt      DateTime      @default(now())
-  allottedDays     Int?
-  submittedForReviewAt DateTime?
+  id                    String         @id @default(cuid())
+  title                 String
+  description           String
+  projectCode           String?
+  projectNumber         String?
+  project               String
+  dueDate               DateTime
+  allocatedAt           DateTime       @default(now())
+  allottedDays          Int?
+  submittedForReviewAt  DateTime?
   managerReviewComments String?
-  reviewCompletedAt DateTime?
-  actualCompletedAt DateTime?
-  completionDays   Int?
-  completionDelayDays Int?
-  rating           Float?
-  ratingEnabled    Boolean       @default(true)
-  status           TaskStatus    @default(TODO)
-  priority         Priority
-  blockedReason    String?
-  assignedToId     String
-  createdById      String
-  reportTemplateId String
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
-  assignedTo       User          @relation("TaskAssignee", fields: [assignedToId], references: [id], onDelete: Restrict)
-  createdBy        User          @relation("TaskCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  reportTemplate   ReportTemplate @relation(fields: [reportTemplateId], references: [id], onDelete: Restrict)
-  reports          Report[]
-  comments         Comment[]
-  attachments      Attachment[]
+  reviewCompletedAt     DateTime?
+  actualCompletedAt     DateTime?
+  completionDays        Int?
+  completionDelayDays   Int?
+  rating                Float?
+  ratingEnabled         Boolean        @default(true)
+  status                TaskStatus     @default(TODO)
+  priority              Priority
+  blockedReason         String?
+  assignedToId          String
+  createdById           String
+  reportTemplateId      String
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+  assignedTo            User           @relation("TaskAssignee", fields: [assignedToId], references: [id], onDelete: Restrict)
+  createdBy             User           @relation("TaskCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  reportTemplate        ReportTemplate @relation(fields: [reportTemplateId], references: [id], onDelete: Restrict)
+  reports               Report[]
+  comments              Comment[]
+  attachments           Attachment[]
 
   @@index([assignedToId])
   @@index([status])
@@ -406,21 +409,21 @@ model Task {
 }
 
 model Report {
-  id               String       @id @default(cuid())
+  id               String         @id @default(cuid())
   taskId           String
   reportTemplateId String
   submittedById    String
   submission       Json
   templateSnapshot Json
-  status           ReportStatus @default(SUBMITTED)
+  status           ReportStatus   @default(SUBMITTED)
   adminFeedback    String?
-  submittedAt      DateTime     @default(now())
+  submittedAt      DateTime       @default(now())
   turnaroundDays   Int?
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
-  task             Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  task             Task           @relation(fields: [taskId], references: [id], onDelete: Cascade)
   reportTemplate   ReportTemplate @relation(fields: [reportTemplateId], references: [id], onDelete: Restrict)
-  submittedBy      User         @relation(fields: [submittedById], references: [id], onDelete: Restrict)
+  submittedBy      User           @relation(fields: [submittedById], references: [id], onDelete: Restrict)
   attachments      Attachment[]
 
   @@index([taskId])
@@ -481,14 +484,14 @@ model AuditLog {
 }
 
 model ProjectFinancialPlan {
-  id            String                    @id @default(cuid())
-  projectId     String                    @unique
+  id            String                   @id @default(cuid())
+  projectId     String                   @unique
   contractValue Float
   taxAmount     Float
   totalAmount   Float
-  createdAt     DateTime                  @default(now())
-  updatedAt     DateTime                  @updatedAt
-  project       Project                   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+  project       Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   items         ProjectFinancialItem[]
   bills         ProjectFinancialBill[]
   raBills       ProjectFinancialRaBill[]
@@ -497,50 +500,50 @@ model ProjectFinancialPlan {
 }
 
 model ProjectFinancialItem {
-  id          String                 @id @default(cuid())
-  planId      String
-  itemNumber  Int
-  planningType FinancialPlanningType @default(NORMAL)
-  particulars String
-  percentage  Float
-  amount      Float
-  createdAt   DateTime               @default(now())
-  updatedAt   DateTime               @updatedAt
-  plan        ProjectFinancialPlan   @relation(fields: [planId], references: [id], onDelete: Cascade)
-  bills       ProjectFinancialBill[]
+  id           String                 @id @default(cuid())
+  planId       String
+  itemNumber   Int
+  planningType FinancialPlanningType  @default(NORMAL)
+  particulars  String
+  percentage   Float
+  amount       Float
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+  plan         ProjectFinancialPlan   @relation(fields: [planId], references: [id], onDelete: Cascade)
+  bills        ProjectFinancialBill[]
 
   @@unique([planId, itemNumber, planningType])
   @@index([planId, planningType])
 }
 
 model ProjectFinancialRaBill {
-  id                      String                @id @default(cuid())
+  id                      String                         @id @default(cuid())
   planId                  String
-  planningType            FinancialPlanningType @default(NORMAL)
+  planningType            FinancialPlanningType          @default(NORMAL)
   billName                String
-  status                  FinancialBillStatus   @default(PLANNING)
-  totalBillAmount         Float                 @default(0)
-  totalTaxAmount          Float                 @default(0)
-  totalAmount             Float                 @default(0)
+  status                  FinancialBillStatus            @default(PLANNING)
+  totalBillAmount         Float                          @default(0)
+  totalTaxAmount          Float                          @default(0)
+  totalAmount             Float                          @default(0)
   receivedDate            DateTime?
-  chequeRtgsAmount        Float                 @default(0)
-  itDeductionPct          Float                 @default(0)
-  itDeductionAmount       Float                 @default(0)
-  lCessDeductionPct       Float                 @default(0)
-  lCessDeductionAmount    Float                 @default(0)
-  securityDepositPct      Float                 @default(0)
-  securityDepositAmount   Float                 @default(0)
-  recoverFromRaBillPct    Float                 @default(0)
-  recoverFromRaBillAmount Float                 @default(0)
-  gstWithheldPct          Float                 @default(0)
-  gstWithheldAmount       Float                 @default(0)
-  withheldPct             Float                 @default(0)
-  withheldAmount          Float                 @default(0)
-  totalReceivedAmount     Float                 @default(0)
+  chequeRtgsAmount        Float                          @default(0)
+  itDeductionPct          Float                          @default(0)
+  itDeductionAmount       Float                          @default(0)
+  lCessDeductionPct       Float                          @default(0)
+  lCessDeductionAmount    Float                          @default(0)
+  securityDepositPct      Float                          @default(0)
+  securityDepositAmount   Float                          @default(0)
+  recoverFromRaBillPct    Float                          @default(0)
+  recoverFromRaBillAmount Float                          @default(0)
+  gstWithheldPct          Float                          @default(0)
+  gstWithheldAmount       Float                          @default(0)
+  withheldPct             Float                          @default(0)
+  withheldAmount          Float                          @default(0)
+  totalReceivedAmount     Float                          @default(0)
   remark                  String?
-  createdAt               DateTime              @default(now())
-  updatedAt               DateTime              @updatedAt
-  plan                    ProjectFinancialPlan  @relation(fields: [planId], references: [id], onDelete: Cascade)
+  createdAt               DateTime                       @default(now())
+  updatedAt               DateTime                       @updatedAt
+  plan                    ProjectFinancialPlan           @relation(fields: [planId], references: [id], onDelete: Cascade)
   items                   ProjectFinancialBill[]
   outgoingCarryForwards   ProjectFinancialCarryForward[] @relation("ProjectFinancialCarryForwardSource")
   incomingCarryForwards   ProjectFinancialCarryForward[] @relation("ProjectFinancialCarryForwardTarget")
@@ -566,22 +569,22 @@ model ProjectFinancialCarryForward {
 }
 
 model ProjectFinancialBill {
-  id                 String              @id @default(cuid())
+  id                 String                  @id @default(cuid())
   planId             String
   raBillId           String?
   itemId             String
-  billPercentage     Float               @default(0)
-  billAmount         Float               @default(0)
-  taxAmount          Float               @default(0)
-  totalAmount        Float               @default(0)
-  carryForwardAmount Float               @default(0)
-  status             FinancialBillStatus @default(PLANNING)
-  receivedPercentage Float               @default(0)
-  receivedAmount     Float               @default(0)
+  billPercentage     Float                   @default(0)
+  billAmount         Float                   @default(0)
+  taxAmount          Float                   @default(0)
+  totalAmount        Float                   @default(0)
+  carryForwardAmount Float                   @default(0)
+  status             FinancialBillStatus     @default(PLANNING)
+  receivedPercentage Float                   @default(0)
+  receivedAmount     Float                   @default(0)
   receivedDate       DateTime?
   remark             String?
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
   plan               ProjectFinancialPlan    @relation(fields: [planId], references: [id], onDelete: Cascade)
   raBill             ProjectFinancialRaBill? @relation(fields: [raBillId], references: [id], onDelete: Cascade)
   item               ProjectFinancialItem    @relation(fields: [itemId], references: [id], onDelete: Cascade)
@@ -608,14 +611,14 @@ model Notification {
 }
 
 model ProjectDprOverview {
-  id         String          @id @default(cuid())
-  projectId  String          @unique
-  status     DprReportStatus @default(NOT_STARTED)
-  data       Json?
-  createdAt  DateTime        @default(now())
-  updatedAt  DateTime        @updatedAt
+  id        String          @id @default(cuid())
+  projectId String          @unique
+  status    DprReportStatus @default(NOT_STARTED)
+  data      Json?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
 
-  project    Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
 }
@@ -651,13 +654,13 @@ model ExpenseSheet {
   mobileNumber        String?
   bankAccount         String?
   sheetNumber         Int?
-  status        ExpenseSheetStatus @default(DRAFT)
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
-  employee      User               @relation(fields: [employeeId], references: [id], onDelete: Restrict)
-  project       Project?           @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  entries       ExpenseEntry[]
-  approvals     ExpenseApproval[]
+  status              ExpenseSheetStatus @default(DRAFT)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  employee            User               @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  project             Project?           @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  entries             ExpenseEntry[]
+  approvals           ExpenseApproval[]
 
   @@index([employeeId])
   @@index([projectId])
@@ -732,42 +735,42 @@ model LetterProject {
 }
 
 model LetterEntry {
-  id                String         @id @default(cuid())
-  letterProjectId   String
-  sortOrder         Float
-  serialLabel       String
-  letterDate        DateTime?
-  letterNumber      String         @default("")
-  category          LetterCategory
-  sentBy            String         @default("")
-  sentTo            String         @default("")
-  subject           String         @default("")
-  ccTo              String         @default("")
+  id               String              @id @default(cuid())
+  letterProjectId  String
+  sortOrder        Float
+  serialLabel      String
+  letterDate       DateTime?
+  letterNumber     String              @default("")
+  category         LetterCategory
+  sentBy           String              @default("")
+  sentTo           String              @default("")
+  subject          String              @default("")
+  ccTo             String              @default("")
   /// Who the letter was referred to (display name — kept in sync with referredToUser when set)
-  referredTo        String         @default("")
+  referredTo       String              @default("")
   /// Employee this letter is referred to — drives the employee's own Letter Numbering / Reply Pending view
-  referredToUserId  String?
-  subjectCategory   String         @default("")
-  letterLinkUrl     String?
-  outwardSequence   String?
+  referredToUserId String?
+  subjectCategory  String              @default("")
+  letterLinkUrl    String?
+  outwardSequence  String?
   /// For Inward/Other: whether a reply is required (null = not set / N/A for Outward)
-  needsReply        Boolean?
+  needsReply       Boolean?
   /// When the required reply was marked done
-  repliedAt         DateTime?
+  repliedAt        DateTime?
   /// Serial of the letter this row replies to (e.g. "2a") — auto-clears that letter from pending
-  replyOfSerial     String?
+  replyOfSerial    String?
   /// Optional free-text remark (admin's own note)
-  remark            String         @default("")
+  remark           String              @default("")
   /// Action assigned to the referred employee (null = "-", no action needed)
-  actionType        LetterActionType?
+  actionType       LetterActionType?
   /// Workflow status of the assigned action — null when actionType is null
-  actionStatus      LetterActionStatus?
+  actionStatus     LetterActionStatus?
   /// Remark the referred employee gave when submitting their action
-  employeeRemark    String         @default("")
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
-  letterProject     LetterProject  @relation(fields: [letterProjectId], references: [id], onDelete: Cascade)
-  referredToUser    User?          @relation("LetterReferredTo", fields: [referredToUserId], references: [id], onDelete: SetNull)
+  employeeRemark   String              @default("")
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  letterProject    LetterProject       @relation(fields: [letterProjectId], references: [id], onDelete: Cascade)
+  referredToUser   User?               @relation("LetterReferredTo", fields: [referredToUserId], references: [id], onDelete: SetNull)
 
   @@index([letterProjectId, sortOrder])
   @@index([letterProjectId, category])
@@ -791,38 +794,38 @@ enum SecurityDepositType {
 
 /// Tender module — tracks submitted bids
 model TenderBid {
-  id                String          @id @default(cuid())
-  srNo              Int
-  nameOfWork        String
-  nameOfBidder      String          @default("")
-  bidInvitingAuthority String       @default("")
-  tenderId          String          @default("")
-  projectLengthKm   Float           @default(0)
-  workCategory      String
-  client            String
-  state             String          @default("")
-  emd               Float           @default(0)
-  emdType           String          @default("")
-  emdBank           String          @default("")
-  emdIssuedDate     DateTime?
-  emdNumber         String          @default("")
-  emdValidUpto      DateTime?
-  emdLetterUrl      String?
-  tenderFees        Float           @default(0)
-  infraconFees      Float           @default(0)
+  id                          String               @id @default(cuid())
+  srNo                        Int
+  nameOfWork                  String
+  nameOfBidder                String               @default("")
+  bidInvitingAuthority        String               @default("")
+  tenderId                    String               @default("")
+  projectLengthKm             Float                @default(0)
+  workCategory                String
+  client                      String
+  state                       String               @default("")
+  emd                         Float                @default(0)
+  emdType                     String               @default("")
+  emdBank                     String               @default("")
+  emdIssuedDate               DateTime?
+  emdNumber                   String               @default("")
+  emdValidUpto                DateTime?
+  emdLetterUrl                String?
+  tenderFees                  Float                @default(0)
+  infraconFees                Float                @default(0)
   /// Estimated Contract Value
-  ecv               Float           @default(0)
-  bidAmount         Float           @default(0)
+  ecv                         Float                @default(0)
+  bidAmount                   Float                @default(0)
   /// ((bidAmount - ecv) / ecv) * 100
-  aboveBelowPercent Float           @default(0)
-  status            TenderBidStatus @default(NOT_ALLOTTED)
-  letterPreviewUrl  String?
-  bidInvitingAuthorityAddress String @default("")
-  remarks           String          @default("")
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
-  preContract       PreContractActivity?
-  contract          ContractActivity?
+  aboveBelowPercent           Float                @default(0)
+  status                      TenderBidStatus      @default(NOT_ALLOTTED)
+  letterPreviewUrl            String?
+  bidInvitingAuthorityAddress String               @default("")
+  remarks                     String               @default("")
+  createdAt                   DateTime             @default(now())
+  updatedAt                   DateTime             @updatedAt
+  preContract                 PreContractActivity?
+  contract                    ContractActivity?
 
   @@index([status])
   @@index([workCategory])
@@ -831,50 +834,50 @@ model TenderBid {
 
 /// Operations module — tracks pre-contract activities
 model PreContractActivity {
-  id                        String              @id @default(cuid())
+  id                        String               @id @default(cuid())
   srNo                      Int
-  tenderBidId               String?             @unique
+  tenderBidId               String?              @unique
   nameOfWork                String
   workCategory              String
   client                    String
-  state                     String              @default("")
+  state                     String               @default("")
   awardOfProjectDate        DateTime?
   awardOfProjectLetterUrl   String?
   securityDepositType       SecurityDepositType?
-  sdBank                    String              @default("")
+  sdBank                    String               @default("")
   sdIssuedDate              DateTime?
-  sdNumber                  String              @default("")
-  sdAmount                  Float               @default(0)
+  sdNumber                  String               @default("")
+  sdAmount                  Float                @default(0)
   sdExpiryDate              DateTime?
   sdLetterUrl               String?
   additionalSdType          SecurityDepositType?
-  additionalSdBank          String              @default("")
+  additionalSdBank          String               @default("")
   additionalSdIssuedDate    DateTime?
-  additionalSdNumber        String              @default("")
-  additionalSdAmount        Float               @default(0)
+  additionalSdNumber        String               @default("")
+  additionalSdAmount        Float                @default(0)
   additionalSdExpiryDate    DateTime?
   additionalSdLetterUrl     String?
   signingAgreementDate      DateTime?
   signingAgreementLetterUrl String?
   proceedingOrderDate       DateTime?
   proceedingOrderLetterUrl  String?
-  piPlPolicyNo              String              @default("")
+  piPlPolicyNo              String               @default("")
   piPlPolicyDate            DateTime?
-  piPlPolicyAmount          Float               @default(0)
+  piPlPolicyAmount          Float                @default(0)
   piPlPolicyIssueDate       DateTime?
   piPlPolicyExpiryDate      DateTime?
   piPlPolicyLetterUrl       String?
-  wcPolicyNo                String              @default("")
+  wcPolicyNo                String               @default("")
   wcPolicyDate              DateTime?
-  wcPolicyAmount            Float               @default(0)
+  wcPolicyAmount            Float                @default(0)
   wcPolicyIssueDate         DateTime?
   wcPolicyExpiryDate        DateTime?
   wcPolicyLetterUrl         String?
-  insurancePolicy           String              @default("")
-  remarks                   String              @default("")
-  createdAt                 DateTime            @default(now())
-  updatedAt                 DateTime            @updatedAt
-  tenderBid                 TenderBid?          @relation(fields: [tenderBidId], references: [id], onDelete: SetNull)
+  insurancePolicy           String               @default("")
+  remarks                   String               @default("")
+  createdAt                 DateTime             @default(now())
+  updatedAt                 DateTime             @updatedAt
+  tenderBid                 TenderBid?           @relation(fields: [tenderBidId], references: [id], onDelete: SetNull)
 
   @@index([tenderBidId])
   @@index([workCategory])
@@ -883,51 +886,131 @@ model PreContractActivity {
 
 /// Contract Activities — post award contract tracking (linked to allotted tenders)
 model ContractActivity {
-  id                        String              @id @default(cuid())
-  srNo                      Int
-  tenderBidId               String?             @unique
-  nameOfWork                String
-  nameOfBidder              String              @default("")
-  bidInvitingAuthority      String              @default("")
-  bidInvitingAuthorityAddress String            @default("")
-  workCategory              String
-  client                    String
-  state                     String              @default("")
-  securityDepositType       SecurityDepositType?
-  sdBank                    String              @default("")
-  sdIssuedDate              DateTime?
-  sdNumber                  String              @default("")
-  sdAmount                  Float               @default(0)
-  sdExpiryDate              DateTime?
-  sdLetterUrl               String?
-  additionalSdType          SecurityDepositType?
-  additionalSdBank          String              @default("")
-  additionalSdIssuedDate    DateTime?
-  additionalSdNumber        String              @default("")
-  additionalSdAmount        Float               @default(0)
-  additionalSdExpiryDate    DateTime?
-  additionalSdLetterUrl     String?
-  proceedingOrderDate       DateTime?
-  proceedingOrderLetterUrl  String?
-  woAmount                  Float               @default(0)
-  piPlPolicyNo              String              @default("")
-  piPlPolicyDate            DateTime?
-  piPlPolicyAmount          Float               @default(0)
-  piPlPolicyIssueDate       DateTime?
-  piPlPolicyExpiryDate      DateTime?
-  piPlPolicyLetterUrl       String?
-  wcPolicyNo                String              @default("")
-  wcPolicyDate              DateTime?
-  wcPolicyAmount            Float               @default(0)
-  wcPolicyIssueDate         DateTime?
-  wcPolicyExpiryDate        DateTime?
-  wcPolicyLetterUrl         String?
-  remarks                   String              @default("")
-  createdAt                 DateTime            @default(now())
-  updatedAt                 DateTime            @updatedAt
-  tenderBid                 TenderBid?          @relation(fields: [tenderBidId], references: [id], onDelete: SetNull)
+  id                          String               @id @default(cuid())
+  srNo                        Int
+  tenderBidId                 String?              @unique
+  nameOfWork                  String
+  nameOfBidder                String               @default("")
+  bidInvitingAuthority        String               @default("")
+  bidInvitingAuthorityAddress String               @default("")
+  workCategory                String
+  client                      String
+  state                       String               @default("")
+  securityDepositType         SecurityDepositType?
+  sdBank                      String               @default("")
+  sdIssuedDate                DateTime?
+  sdNumber                    String               @default("")
+  sdAmount                    Float                @default(0)
+  sdExpiryDate                DateTime?
+  sdLetterUrl                 String?
+  additionalSdType            SecurityDepositType?
+  additionalSdBank            String               @default("")
+  additionalSdIssuedDate      DateTime?
+  additionalSdNumber          String               @default("")
+  additionalSdAmount          Float                @default(0)
+  additionalSdExpiryDate      DateTime?
+  additionalSdLetterUrl       String?
+  proceedingOrderDate         DateTime?
+  proceedingOrderLetterUrl    String?
+  woAmount                    Float                @default(0)
+  piPlPolicyNo                String               @default("")
+  piPlPolicyDate              DateTime?
+  piPlPolicyAmount            Float                @default(0)
+  piPlPolicyIssueDate         DateTime?
+  piPlPolicyExpiryDate        DateTime?
+  piPlPolicyLetterUrl         String?
+  wcPolicyNo                  String               @default("")
+  wcPolicyDate                DateTime?
+  wcPolicyAmount              Float                @default(0)
+  wcPolicyIssueDate           DateTime?
+  wcPolicyExpiryDate          DateTime?
+  wcPolicyLetterUrl           String?
+  remarks                     String               @default("")
+  createdAt                   DateTime             @default(now())
+  updatedAt                   DateTime             @updatedAt
+  tenderBid                   TenderBid?           @relation(fields: [tenderBidId], references: [id], onDelete: SetNull)
 
   @@index([tenderBidId])
   @@index([workCategory])
   @@index([client])
+}
+
+/// Leave + Overtime ("Calculate Hours") module
+
+enum LeaveType {
+  FULL_DAY
+  HALF_DAY
+  SHORT_LEAVE
+}
+
+enum HoursRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum CalculationPeriodStatus {
+  ACTIVE
+  CLOSED
+}
+
+/// 26th-of-month → 25th-of-next-month cycle bucket for leave/overtime tracking
+model CalculationPeriod {
+  id               String                  @id @default(cuid())
+  startDate        DateTime
+  endDate          DateTime
+  status           CalculationPeriodStatus @default(ACTIVE)
+  createdAt        DateTime                @default(now())
+  closedAt         DateTime?
+  leaveRequests    LeaveRequest[]
+  overtimeRequests OvertimeRequest[]
+
+  @@unique([startDate, endDate])
+  @@index([status])
+}
+
+model LeaveRequest {
+  id                  String             @id @default(cuid())
+  employeeId          String
+  calculationPeriodId String
+  /// Calendar day the leave is taken (stored at UTC noon so IST never shifts the day)
+  date                DateTime
+  leaveType           LeaveType
+  /// FULL_DAY=480, HALF_DAY=240, SHORT_LEAVE=120 — always derived from leaveType
+  durationMinutes     Int
+  status              HoursRequestStatus @default(PENDING)
+  approvedById        String?
+  approvedAt          DateTime?
+  rejectionReason     String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  employee            User               @relation("LeaveRequestEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
+  approvedBy          User?              @relation("LeaveRequestApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  calculationPeriod   CalculationPeriod  @relation(fields: [calculationPeriodId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId, date])
+  @@index([calculationPeriodId, status])
+  @@index([employeeId, status])
+}
+
+model OvertimeRequest {
+  id                  String             @id @default(cuid())
+  employeeId          String
+  calculationPeriodId String
+  /// Calendar day the overtime was worked (stored at UTC noon so IST never shifts the day)
+  date                DateTime
+  durationMinutes     Int
+  status              HoursRequestStatus @default(PENDING)
+  approvedById        String?
+  approvedAt          DateTime?
+  rejectionReason     String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  employee            User               @relation("OvertimeRequestEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
+  approvedBy          User?              @relation("OvertimeRequestApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  calculationPeriod   CalculationPeriod  @relation(fields: [calculationPeriodId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId, date])
+  @@index([calculationPeriodId, status])
+  @@index([employeeId, status])
 }
