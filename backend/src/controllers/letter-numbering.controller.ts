@@ -16,14 +16,20 @@ export const letterNumberingController = {
   },
 
   async listMyPendingReplies(req: Request, res: Response) {
-    return sendSuccess(res, await letterNumberingService.listPendingReplies(req.user!.id));
+    return sendSuccess(res, await letterNumberingService.listMyActionableLetters(req.user!.id));
   },
 
-  async markMyReplyDone(req: Request, res: Response) {
-    const replied = req.body.replied !== false;
+  async submitMyLetterAction(req: Request, res: Response) {
     return sendSuccess(
       res,
-      await letterNumberingService.markOwnReply(req.user!.id, req.params.letterId, replied)
+      await letterNumberingService.submitEmployeeAction(req.user!.id, req.params.letterId, req.body.remark)
+    );
+  },
+
+  async reviewLetterAction(req: Request, res: Response) {
+    return sendSuccess(
+      res,
+      await letterNumberingService.reviewAction(req.params.letterId, req.body.approve)
     );
   },
 

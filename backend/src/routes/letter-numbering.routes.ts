@@ -8,9 +8,10 @@ import {
   createLetterEntrySchema,
   createLetterProjectSchema,
   bulkImportLettersSchema,
+  employeeActionSubmitSchema,
   importLetterProjectSchema,
   insertLetterEntrySchema,
-  myLetterReplySchema,
+  letterActionReviewSchema,
   updateLetterEntrySchema,
   updateLetterProjectSchema
 } from "../validators/letter-numbering.validator.js";
@@ -24,10 +25,10 @@ letterNumberingRouter.get(
   asyncHandler(letterNumberingController.listMyPendingReplies)
 );
 letterNumberingRouter.patch(
-  "/my/letters/:letterId/reply",
+  "/my/letters/:letterId/submit",
   requireAuth,
-  validate(myLetterReplySchema),
-  asyncHandler(letterNumberingController.markMyReplyDone)
+  validate(employeeActionSubmitSchema),
+  asyncHandler(letterNumberingController.submitMyLetterAction)
 );
 
 letterNumberingRouter.use(requireAuth, requireRole("ADMIN", "PMO"));
@@ -76,5 +77,10 @@ letterNumberingRouter.patch(
   "/letters/:letterId",
   validate(updateLetterEntrySchema),
   asyncHandler(letterNumberingController.updateLetter)
+);
+letterNumberingRouter.patch(
+  "/letters/:letterId/review",
+  validate(letterActionReviewSchema),
+  asyncHandler(letterNumberingController.reviewLetterAction)
 );
 letterNumberingRouter.delete("/letters/:letterId", asyncHandler(letterNumberingController.removeLetter));

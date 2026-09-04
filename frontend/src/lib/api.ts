@@ -30,6 +30,7 @@ import type {
   InfraOverviewItem,
   InfraProjectItem,
   InfraTeamMemberItem,
+  LetterActionType,
   LetterCategory,
   LetterEmployeeItem,
   LetterEntryItem,
@@ -640,6 +641,7 @@ export const api = {
       letterLinkUrl?: string | null;
       needsReply?: boolean | null;
       replied?: boolean;
+      actionType?: LetterActionType | null;
       replyOfSerial?: string | null;
       remark?: string;
       serialLabel?: string | null;
@@ -668,6 +670,7 @@ export const api = {
       letterLinkUrl?: string | null;
       needsReply?: boolean | null;
       replied?: boolean;
+      actionType?: LetterActionType | null;
       replyOfSerial?: string | null;
       remark?: string;
       serialLabel?: string | null;
@@ -708,6 +711,7 @@ export const api = {
       letterLinkUrl?: string | null;
       needsReply?: boolean | null;
       replied?: boolean;
+      actionType?: LetterActionType | null;
       replyOfSerial?: string | null;
       remark?: string;
     }
@@ -733,6 +737,7 @@ export const api = {
       letterLinkUrl: string | null;
       needsReply: boolean | null;
       replied: boolean;
+      actionType: LetterActionType | null;
       replyOfSerial: string | null;
       remark: string;
       letterNumber: string | null;
@@ -767,10 +772,17 @@ export const api = {
     return request<LetterPendingReplyItem[]>("/letter-numbering/my/pending-replies");
   },
 
-  markMyLetterReply(letterId: string, replied: boolean) {
-    return request<LetterEntryItem>(`/letter-numbering/my/letters/${letterId}/reply`, {
+  submitMyLetterAction(letterId: string, remark: string) {
+    return request<LetterEntryItem>(`/letter-numbering/my/letters/${letterId}/submit`, {
       method: "PATCH",
-      body: JSON.stringify({ replied })
+      body: JSON.stringify({ remark })
+    });
+  },
+
+  reviewLetterAction(letterId: string, approve: boolean) {
+    return request<LetterEntryItem>(`/letter-numbering/letters/${letterId}/review`, {
+      method: "PATCH",
+      body: JSON.stringify({ approve })
     });
   },
 

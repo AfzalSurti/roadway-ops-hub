@@ -89,6 +89,27 @@ export const letterNumberingRepository = {
     });
   },
 
+  /** Letters currently awaiting the referred employee's own action (not yet submitted). */
+  listMyActionableLetters(referredToUserId: string) {
+    return prisma.letterEntry.findMany({
+      where: {
+        referredToUserId,
+        actionStatus: "PENDING"
+      },
+      include: {
+        letterProject: {
+          select: {
+            id: true,
+            projectNumber: true,
+            projectCode: true,
+            shortName: true
+          }
+        }
+      },
+      orderBy: [{ letterDate: "asc" }, { sortOrder: "asc" }]
+    });
+  },
+
   listEmployees() {
     return prisma.user.findMany({
       where: { role: "EMPLOYEE" },

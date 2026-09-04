@@ -7,7 +7,7 @@ import {
   nextWholeSerial,
   planOutwardSequences
 } from "../utils/letter-numbering.js";
-import type { LetterCategory } from "@prisma/client";
+import type { LetterActionStatus, LetterActionType, LetterCategory } from "@prisma/client";
 
 function parseDate(value?: string | null) {
   if (value === undefined) return undefined;
@@ -105,25 +105,58 @@ async function resolveReferredToForCreate(payload: { referredTo?: string; referr
   if (payload.referredToUserId) {
     const employee = await letterNumberingRepository.findUserById(payload.referredToUserId);
     if (!employee) throw notFound("Employee not found");
-    return { referredTo: employee.name, referredToUser: { connect: { id: employee.id } } } as const;
+    return {
+      referredTo: employee.name,
+      referredToUser: { connect: { id: employee.id } },
+      referredToUserId: employee.id as string | null
+    } as const;
   }
-  return { referredTo: payload.referredTo?.trim() || "", referredToUser: undefined } as const;
+  return { referredTo: payload.referredTo?.trim() || "", referredToUser: undefined, referredToUserId: null as string | null } as const;
 }
 
-/** Resolve Referred To for an update: undefined leaves both fields untouched. */
-async function resolveReferredToForUpdate(payload: { referredTo?: string; referredToUserId?: string | null }) {
+/** Resolve Referred To for an update: undefined leaves both fields untouched (falls back to the letter's current assignee). */
+async function resolveReferredToForUpdate(
+  payload: { referredTo?: string; referredToUserId?: string | null },
+  currentReferredToUserId: string | null
+) {
   if (payload.referredToUserId !== undefined) {
     if (payload.referredToUserId === null) {
-      return { referredTo: "", referredToUser: { disconnect: true } } as const;
+      return { referredTo: "", referredToUser: { disconnect: true }, referredToUserId: null as string | null } as const;
     }
     const employee = await letterNumberingRepository.findUserById(payload.referredToUserId);
     if (!employee) throw notFound("Employee not found");
-    return { referredTo: employee.name, referredToUser: { connect: { id: employee.id } } } as const;
+    return {
+      referredTo: employee.name,
+      referredToUser: { connect: { id: employee.id } },
+      referredToUserId: employee.id as string | null
+    } as const;
   }
   if (payload.referredTo !== undefined) {
-    return { referredTo: payload.referredTo.trim(), referredToUser: undefined } as const;
+    return { referredTo: payload.referredTo.trim(), referredToUser: undefined, referredToUserId: currentReferredToUserId } as const;
   }
-  return { referredTo: undefined, referredToUser: undefined } as const;
+  return { referredTo: undefined, referredToUser: undefined, referredToUserId: currentReferredToUserId } as const;
+}
+
+type ActionFieldsPatch = { actionType: LetterActionType | null; actionStatus: LetterActionStatus | null };
+
+/** Resolve the assigned action for a new letter — any real type starts a fresh Pending cycle. */
+function resolveActionForCreate(category: LetterCategory, actionType?: LetterActionType | null): ActionFieldsPatch {
+  if (category === "OUTWARD" || !actionType) {
+    return { actionType: null, actionStatus: null };
+  }
+  return { actionType, actionStatus: "PENDING" };
+}
+
+/** Resolve the assigned action for an update. undefined = untouched. Any change restarts the cycle (fresh Pending, cleared remark). */
+function resolveActionForUpdate(
+  category: LetterCategory,
+  actionType: LetterActionType | null | undefined
+): (ActionFieldsPatch & { employeeRemark: string }) | undefined {
+  if (actionType === undefined) return undefined;
+  if (category === "OUTWARD" || actionType === null) {
+    return { actionType: null, actionStatus: null, employeeRemark: "" };
+  }
+  return { actionType, actionStatus: "PENDING", employeeRemark: "" };
 }
 
 function regenerateNumbers(
@@ -227,7 +260,10 @@ export const letterNumberingService = {
     if (toHeal.length > 0) {
       await Promise.all(
         toHeal.map((letter) =>
-          letterNumberingRepository.updateLetter(letter.id, { repliedAt: new Date() })
+          letterNumberingRepository.updateLetter(letter.id, {
+            repliedAt: new Date(),
+            ...(letter.actionType ? { actionStatus: "CLOSE" as const } : {})
+          })
         )
       );
     }
@@ -261,7 +297,10 @@ export const letterNumberingService = {
     if (heals.length > 0) {
       await Promise.all(
         heals.map((letter) =>
-          letterNumberingRepository.updateLetter(letter.id, { repliedAt: new Date() })
+          letterNumberingRepository.updateLetter(letter.id, {
+            repliedAt: new Date(),
+            ...(letter.actionType ? { actionStatus: "CLOSE" as const } : {})
+          })
         )
       );
       dirty = true;
@@ -465,6 +504,8 @@ export const letterNumberingService = {
       letterLinkUrl?: string | null;
       needsReply?: boolean | null;
       replied?: boolean;
+      /** Action assigned to the referred employee (null = "-") */
+      actionType?: LetterActionType | null;
       replyOfSerial?: string | null;
       remark?: string;
       /** Existing Sr No when pushing old letters (e.g. 01, 2a) */
@@ -543,6 +584,10 @@ export const letterNumberingService = {
       payload.replyOfSerial === undefined ? null : payload.replyOfSerial?.trim() || null;
 
     const referredToFields = await resolveReferredToForCreate(payload);
+    const actionFields = resolveActionForCreate(payload.category, payload.actionType);
+    if (actionFields.actionType && !referredToFields.referredToUserId) {
+      throw badRequest("Select an employee to refer this action to");
+    }
 
     const created = await letterNumberingRepository.createLetter({
       letterProject: { connect: { id: letterProjectId } },
@@ -560,8 +605,10 @@ export const letterNumberingService = {
       subjectCategory: payload.subjectCategory?.trim() || "",
       letterLinkUrl: payload.letterLinkUrl?.trim() || null,
       outwardSequence,
-      needsReply: replyFields.needsReply,
+      needsReply: actionFields.actionType ? true : replyFields.needsReply,
       repliedAt: replyFields.repliedAt,
+      actionType: actionFields.actionType,
+      actionStatus: actionFields.actionStatus,
       replyOfSerial,
       remark: payload.remark?.trim() || ""
     });
@@ -588,6 +635,7 @@ export const letterNumberingService = {
       letterLinkUrl?: string | null;
       needsReply?: boolean | null;
       replied?: boolean;
+      actionType?: LetterActionType | null;
       replyOfSerial?: string | null;
       remark?: string;
       serialLabel?: string | null;
@@ -643,6 +691,7 @@ export const letterNumberingService = {
       letterLinkUrl?: string | null;
       needsReply?: boolean | null;
       replied?: boolean;
+      actionType?: LetterActionType | null;
       replyOfSerial?: string | null;
       remark?: string;
     }
@@ -697,6 +746,10 @@ export const letterNumberingService = {
       payload.replyOfSerial === undefined ? null : payload.replyOfSerial?.trim() || null;
 
     const referredToFields = await resolveReferredToForCreate(payload);
+    const actionFields = resolveActionForCreate(payload.category, payload.actionType);
+    if (actionFields.actionType && !referredToFields.referredToUserId) {
+      throw badRequest("Select an employee to refer this action to");
+    }
 
     const created = await letterNumberingRepository.createLetter({
       letterProject: { connect: { id: letterProjectId } },
@@ -714,8 +767,10 @@ export const letterNumberingService = {
       subjectCategory: payload.subjectCategory?.trim() || "",
       letterLinkUrl: payload.letterLinkUrl?.trim() || null,
       outwardSequence,
-      needsReply: replyFields.needsReply,
+      needsReply: actionFields.actionType ? true : replyFields.needsReply,
       repliedAt: replyFields.repliedAt,
+      actionType: actionFields.actionType,
+      actionStatus: actionFields.actionStatus,
       replyOfSerial,
       remark: payload.remark?.trim() || ""
     });
@@ -752,7 +807,8 @@ export const letterNumberingService = {
     // Linking a reply means this letter is done — set needsReply + repliedAt
     return letterNumberingRepository.updateLetter(target.id, {
       needsReply: true,
-      repliedAt: new Date()
+      repliedAt: new Date(),
+      ...(target.actionType ? { actionStatus: "CLOSE" as const } : {})
     });
   },
 
@@ -780,7 +836,8 @@ export const letterNumberingService = {
 
     return letterNumberingRepository.updateLetter(target.id, {
       needsReply: true,
-      repliedAt: null
+      repliedAt: null,
+      ...(target.actionType ? { actionStatus: "PENDING" as const } : {})
     });
   },
 
@@ -799,6 +856,7 @@ export const letterNumberingService = {
       letterLinkUrl: string | null;
       needsReply: boolean | null;
       replied: boolean;
+      actionType: LetterActionType | null;
       replyOfSerial: string | null;
       remark: string;
       letterNumber: string | null;
@@ -863,7 +921,17 @@ export const letterNumberingService = {
         ? undefined
         : payload.replyOfSerial?.trim() || null;
 
-    const referredToFields = await resolveReferredToForUpdate(payload);
+    const referredToFields = await resolveReferredToForUpdate(payload, letter.referredToUserId);
+    // Only an actual change to the assigned action restarts the workflow (fresh Pending, cleared remark) —
+    // re-saving the dialog with the same action must not disturb an in-progress or closed cycle.
+    const actionFields =
+      payload.actionType !== undefined && payload.actionType !== letter.actionType
+        ? resolveActionForUpdate(category, payload.actionType)
+        : undefined;
+    const finalActionType = actionFields ? actionFields.actionType : letter.actionType;
+    if (finalActionType && !referredToFields.referredToUserId) {
+      throw badRequest("Select an employee to refer this action to");
+    }
 
     const updated = await letterNumberingRepository.updateLetter(letterId, {
       category: payload.category,
@@ -879,8 +947,11 @@ export const letterNumberingService = {
         payload.letterLinkUrl === undefined ? undefined : payload.letterLinkUrl?.trim() || null,
       outwardSequence,
       letterNumber,
-      needsReply: replyFields.needsReply,
-      repliedAt: replyFields.repliedAt,
+      needsReply: actionFields ? (actionFields.actionType ? true : null) : replyFields.needsReply,
+      repliedAt: actionFields ? null : replyFields.repliedAt,
+      actionType: actionFields?.actionType,
+      actionStatus: actionFields?.actionStatus,
+      employeeRemark: actionFields?.employeeRemark,
       replyOfSerial,
       remark: payload.remark?.trim()
     });
@@ -936,12 +1007,38 @@ export const letterNumberingService = {
     return { deleted: true };
   },
 
-  /** Employee marks/reopens a reply on a letter referred to them — scoped so they can't touch others' letters. */
-  async markOwnReply(userId: string, letterId: string, replied: boolean) {
+  listMyActionableLetters(userId: string) {
+    return letterNumberingRepository.listMyActionableLetters(userId);
+  },
+
+  /** Employee submits their action with a remark — scoped so they can only act on letters referred to them. */
+  async submitEmployeeAction(userId: string, letterId: string, remark: string) {
     const letter = await letterNumberingRepository.findLetterById(letterId);
     if (!letter) throw notFound("Letter not found");
     if (letter.referredToUserId !== userId) throw forbidden("This letter is not referred to you");
-    return this.updateLetter(letterId, { replied });
+    if (letter.actionStatus !== "PENDING") throw badRequest("This letter is not awaiting your action");
+    return letterNumberingRepository.updateLetter(letterId, {
+      actionStatus: "COMPLETED",
+      employeeRemark: remark.trim()
+    });
+  },
+
+  /** Admin reviews a completed action: approve closes it, reject sends it back to the employee. */
+  async reviewAction(letterId: string, approve: boolean) {
+    const letter = await letterNumberingRepository.findLetterById(letterId);
+    if (!letter) throw notFound("Letter not found");
+    if (letter.actionStatus !== "COMPLETED") throw badRequest("This letter is not awaiting review");
+    if (approve) {
+      return letterNumberingRepository.updateLetter(letterId, {
+        actionStatus: "CLOSE",
+        needsReply: true,
+        repliedAt: new Date()
+      });
+    }
+    return letterNumberingRepository.updateLetter(letterId, {
+      actionStatus: "PENDING",
+      repliedAt: null
+    });
   },
 
   suggestions(args: {

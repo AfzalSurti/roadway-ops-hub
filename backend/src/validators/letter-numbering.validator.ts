@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 const letterCategory = z.enum(["INWARD", "OUTWARD", "OTHER"]);
+const letterActionType = z.enum(["FOLLOW_UP", "REPLY"]);
 
 export const createLetterProjectSchema = z.object({
   projectNumber: z.string().trim().min(1, "Project number is required").max(40),
@@ -102,6 +103,8 @@ const createLetterEntryObjectSchema = z.object({
   needsReply: z.boolean().nullable().optional(),
   /** Mark reply completed (true) or reopen (false) */
   replied: z.boolean().optional(),
+  /** Action assigned to the referred employee (null = "-") */
+  actionType: letterActionType.nullable().optional(),
   /** Serial of the letter this row replies to (e.g. "2a") */
   replyOfSerial: z.string().trim().max(40).nullable().optional(),
   remark: z.string().trim().max(4000).optional(),
@@ -129,6 +132,7 @@ export const updateLetterEntrySchema = z
     letterLinkUrl: z.string().trim().max(2000).nullable().optional(),
     needsReply: z.boolean().nullable().optional(),
     replied: z.boolean().optional(),
+    actionType: letterActionType.nullable().optional(),
     replyOfSerial: z.string().trim().max(40).nullable().optional(),
     remark: z.string().trim().max(4000).optional(),
     letterNumber: z.string().trim().max(200).nullable().optional()
@@ -154,6 +158,10 @@ export const letterSuggestionsQuerySchema = z.object({
   letterProjectId: z.string().optional()
 });
 
-export const myLetterReplySchema = z.object({
-  replied: z.boolean().optional()
+export const employeeActionSubmitSchema = z.object({
+  remark: z.string().trim().min(1, "Add a remark before submitting").max(4000)
+});
+
+export const letterActionReviewSchema = z.object({
+  approve: z.boolean()
 });

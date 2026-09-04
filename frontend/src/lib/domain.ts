@@ -146,6 +146,8 @@ export type InfraOverviewItem = {
 };
 
 export type LetterCategory = "INWARD" | "OUTWARD" | "OTHER";
+export type LetterActionType = "FOLLOW_UP" | "REPLY";
+export type LetterActionStatus = "PENDING" | "COMPLETED" | "CLOSE";
 
 export type LetterProjectItem = {
   id: string;
@@ -187,8 +189,14 @@ export type LetterEntryItem = {
   repliedAt?: string | null;
   /** Serial this letter replies to (e.g. "2a") */
   replyOfSerial?: string | null;
-  /** Optional remark */
+  /** Optional remark (admin's own note) */
   remark?: string;
+  /** Action assigned to the referred employee (null/undefined = "-") */
+  actionType?: LetterActionType | null;
+  /** Workflow status of the assigned action */
+  actionStatus?: LetterActionStatus | null;
+  /** Remark the referred employee gave when submitting their action */
+  employeeRemark?: string;
   createdAt: string;
   updatedAt: string;
 };

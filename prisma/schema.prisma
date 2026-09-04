@@ -53,6 +53,17 @@ enum LetterCategory {
   OTHER
 }
 
+enum LetterActionType {
+  FOLLOW_UP
+  REPLY
+}
+
+enum LetterActionStatus {
+  PENDING
+  COMPLETED
+  CLOSE
+}
+
 enum ReportStatus {
   SUBMITTED
   APPROVED
@@ -745,8 +756,14 @@ model LetterEntry {
   repliedAt         DateTime?
   /// Serial of the letter this row replies to (e.g. "2a") — auto-clears that letter from pending
   replyOfSerial     String?
-  /// Optional free-text remark
+  /// Optional free-text remark (admin's own note)
   remark            String         @default("")
+  /// Action assigned to the referred employee (null = "-", no action needed)
+  actionType        LetterActionType?
+  /// Workflow status of the assigned action — null when actionType is null
+  actionStatus      LetterActionStatus?
+  /// Remark the referred employee gave when submitting their action
+  employeeRemark    String         @default("")
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
   letterProject     LetterProject  @relation(fields: [letterProjectId], references: [id], onDelete: Cascade)
@@ -756,6 +773,7 @@ model LetterEntry {
   @@index([letterProjectId, category])
   @@index([letterProjectId, needsReply, repliedAt])
   @@index([letterProjectId, replyOfSerial])
+  @@index([referredToUserId, actionStatus])
   @@index([referredToUserId, needsReply, repliedAt])
 }
 

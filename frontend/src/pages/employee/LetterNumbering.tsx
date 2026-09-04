@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { PageWrapper } from "@/components/PageWrapper";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
+import type { LetterActionType } from "@/lib/domain";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, Loader2, MailWarning } from "lucide-react";
 import { toast } from "sonner";
@@ -19,21 +21,34 @@ function toDateInput(value?: string | null) {
   return `${String(parts.d).padStart(2, "0")}/${String(parts.m).padStart(2, "0")}/${parts.y}`;
 }
 
+function actionTypeLabel(actionType?: LetterActionType | null) {
+  if (actionType === "FOLLOW_UP") return "Follow Up";
+  if (actionType === "REPLY") return "Reply";
+  return "-";
+}
+
 export default function EmployeeLetterNumbering() {
   const queryClient = useQueryClient();
+  const [remarks, setRemarks] = useState<Record<string, string>>({});
 
   const { data: pendingReplies = [], isLoading } = useQuery({
     queryKey: ["letter-my-pending-replies"],
     queryFn: () => api.getMyLetterPendingReplies()
   });
 
-  const markRepliedMutation = useMutation({
-    mutationFn: (letterId: string) => api.markMyLetterReply(letterId, true),
-    onSuccess: async () => {
-      toast.success("Marked replied");
+  const submitMutation = useMutation({
+    mutationFn: ({ letterId, remark }: { letterId: string; remark: string }) =>
+      api.submitMyLetterAction(letterId, remark),
+    onSuccess: async (_data, variables) => {
+      toast.success("Submitted — sent to admin for review");
+      setRemarks((prev) => {
+        const next = { ...prev };
+        delete next[variables.letterId];
+        return next;
+      });
       await queryClient.invalidateQueries({ queryKey: ["letter-my-pending-replies"] });
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to update")
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to submit")
   });
 
   return (
@@ -41,12 +56,12 @@ export default function EmployeeLetterNumbering() {
       <div className="page-header flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="page-title">Letter Numbering</h1>
-          <p className="page-subtitle">Letters referred to you — mark replied once you've responded.</p>
+          <p className="page-subtitle">Letters referred to you — complete the action and submit a remark.</p>
         </div>
         {pendingReplies.length > 0 ? (
           <Badge variant="secondary" className="rounded-full gap-1 self-start">
             <MailWarning className="h-3.5 w-3.5" />
-            {pendingReplies.length} pending reply
+            {pendingReplies.length} pending
           </Badge>
         ) : null}
       </div>
@@ -58,7 +73,7 @@ export default function EmployeeLetterNumbering() {
             Reply Pending
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Letters referred to you that are marked Need reply = Yes.
+            Letters referred to you. Add a remark and submit — it goes to admin for review.
           </p>
         </div>
 
@@ -67,19 +82,19 @@ export default function EmployeeLetterNumbering() {
             <Loader2 className="h-4 w-4 animate-spin" /> Loading pending letters...
           </p>
         ) : pendingReplies.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-8 text-center">No letters pending reply.</p>
+          <p className="text-sm text-muted-foreground py-8 text-center">No letters pending.</p>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {pendingReplies.map((letter) => (
-              <div
-                key={letter.id}
-                className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-              >
+              <div key={letter.id} className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 space-y-3">
                 <div className="min-w-0">
                   <p className="text-sm font-medium">
                     {letter.letterProject.projectNumber} · {letter.letterProject.shortName}
                     <Badge variant="outline" className="ml-2 text-[10px]">
                       #{letter.serialLabel} {letter.category}
+                    </Badge>
+                    <Badge variant="secondary" className="ml-2 text-[10px]">
+                      {actionTypeLabel(letter.actionType)}
                     </Badge>
                   </p>
                   <p className="text-xs text-muted-foreground mt-1 whitespace-normal break-words">
@@ -90,15 +105,31 @@ export default function EmployeeLetterNumbering() {
                     {letter.subject || "No subject"}
                   </p>
                 </div>
-                <Button
-                  size="sm"
-                  className="gap-1 shrink-0"
-                  disabled={markRepliedMutation.isPending}
-                  onClick={() => markRepliedMutation.mutate(letter.id)}
-                >
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  Mark replied
-                </Button>
+                <textarea
+                  value={remarks[letter.id] ?? letter.employeeRemark ?? ""}
+                  onChange={(e) => setRemarks((prev) => ({ ...prev, [letter.id]: e.target.value }))}
+                  placeholder="Add a remark before submitting…"
+                  rows={2}
+                  className="w-full rounded-md border border-input bg-transparent px-2 py-1.5 text-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                />
+                <div className="flex justify-end">
+                  <Button
+                    size="sm"
+                    className="gap-1"
+                    disabled={
+                      submitMutation.isPending || !(remarks[letter.id] ?? letter.employeeRemark ?? "").trim()
+                    }
+                    onClick={() =>
+                      submitMutation.mutate({
+                        letterId: letter.id,
+                        remark: (remarks[letter.id] ?? letter.employeeRemark ?? "").trim()
+                      })
+                    }
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    Submit
+                  </Button>
+                </div>
               </div>
             ))}
           </div>
