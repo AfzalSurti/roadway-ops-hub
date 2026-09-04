@@ -105,6 +105,11 @@ export const hoursController = {
     return sendSuccess(res, result);
   },
 
+  async getAllEmployeesReport(req: Request, res: Response) {
+    const result = await hoursService.getAllEmployeesReport(strParam(req.query.periodId));
+    return sendSuccess(res, result);
+  },
+
   // ─── Summary / breakdown / report ────────────────────────────────────────
 
   async getMySummary(req: Request, res: Response) {

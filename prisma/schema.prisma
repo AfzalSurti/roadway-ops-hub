@@ -973,10 +973,14 @@ model LeaveRequest {
   id                  String             @id @default(cuid())
   employeeId          String
   calculationPeriodId String
-  /// Calendar day the leave is taken (stored at UTC noon so IST never shifts the day)
-  date                DateTime
+  /// First day of the leave (stored at UTC noon so IST never shifts the day)
+  startDate           DateTime
+  /// Last day of the leave, inclusive (equals startDate for a single-day request)
+  endDate             DateTime
+  /// Inclusive day count between startDate and endDate
+  numberOfDays        Int
   leaveType           LeaveType
-  /// FULL_DAY=480, HALF_DAY=240, SHORT_LEAVE=120 — always derived from leaveType
+  /// numberOfDays × (FULL_DAY=480 | HALF_DAY=240 | SHORT_LEAVE=120)
   durationMinutes     Int
   status              HoursRequestStatus @default(PENDING)
   approvedById        String?
@@ -988,7 +992,7 @@ model LeaveRequest {
   approvedBy          User?              @relation("LeaveRequestApprover", fields: [approvedById], references: [id], onDelete: SetNull)
   calculationPeriod   CalculationPeriod  @relation(fields: [calculationPeriodId], references: [id], onDelete: Cascade)
 
-  @@index([employeeId, date])
+  @@index([employeeId, startDate, endDate])
   @@index([calculationPeriodId, status])
   @@index([employeeId, status])
 }
@@ -999,6 +1003,14 @@ model OvertimeRequest {
   calculationPeriodId String
   /// Calendar day the overtime was worked (stored at UTC noon so IST never shifts the day)
   date                DateTime
+  /// Free-text project label (drawn from the employee's own tasks in the UI)
+  project             String
+  /// Real timestamp — date + start time, in IST
+  startTime           DateTime
+  /// Real timestamp — date + end time, in IST
+  endTime             DateTime
+  reason              String
+  /// (endTime - startTime) in minutes — always server-computed, never trusted from the client
   durationMinutes     Int
   status              HoursRequestStatus @default(PENDING)
   approvedById        String?

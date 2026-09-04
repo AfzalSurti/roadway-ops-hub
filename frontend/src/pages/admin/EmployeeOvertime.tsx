@@ -15,8 +15,17 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { api } from "@/lib/api";
 import type { HoursAdminRequestItem, HoursRequestStatus, LeaveRequestItem, LeaveType, OvertimeRequestItem } from "@/lib/domain";
-import { exportHoursReportPdf } from "@/lib/hours-report-pdf";
-import { formatDisplayDate, leaveTypeLabel, statusBadgeVariant, statusLabel } from "@/lib/hours-format";
+import { exportAllEmployeesHoursReportPdf } from "@/lib/hours-report-pdf";
+import {
+  buildBreakdownRows,
+  formatDateRange,
+  formatDisplayDate,
+  formatIsoTimeLabel,
+  leaveTypeLabel,
+  pluralizeDays,
+  statusBadgeVariant,
+  statusLabel
+} from "@/lib/hours-format";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, Download, Loader2, XCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -132,63 +141,16 @@ export default function EmployeeOvertime() {
 
   const selectedEmployee = employees.find((employee) => employee.id === selectedEmployeeId);
 
-  const breakdownRows = useMemo(() => {
-    if (!report) return [];
-    const leaveHasAllocation = new Set(report.allocations.map((allocation) => allocation.leaveId));
-    const leaveById = new Map(report.leaveBreakdown.map((row) => [row.id, row]));
+  const breakdownRows = useMemo(() => (report ? buildBreakdownRows(report) : []), [report]);
 
-    type Row = {
-      key: string;
-      leaveDate?: string;
-      leaveLabel?: string;
-      leaveHours?: string;
-      overtimeDate?: string;
-      overtimeHours?: string;
-      coverage: string;
-    };
-    const rows: Row[] = [];
-
-    report.allocations.forEach((allocation, index) => {
-      const leave = leaveById.get(allocation.leaveId);
-      rows.push({
-        key: `alloc-${index}`,
-        leaveDate: allocation.leaveDate,
-        leaveLabel: leaveTypeLabel(allocation.leaveType),
-        leaveHours: leave?.durationLabel,
-        overtimeDate: allocation.overtimeDate,
-        overtimeHours: allocation.minutesAppliedLabel,
-        coverage: leave?.coverageStatus === "COVERED" ? "Covered" : "Partially Covered"
-      });
-    });
-
-    report.leaveBreakdown
-      .filter((leave) => !leaveHasAllocation.has(leave.id))
-      .forEach((leave) => {
-        rows.push({
-          key: `leave-${leave.id}`,
-          leaveDate: leave.date,
-          leaveLabel: leaveTypeLabel(leave.leaveType),
-          leaveHours: leave.durationLabel,
-          coverage: "Not Covered"
-        });
-      });
-
-    report.overtimeBreakdown
-      .filter((overtime) => overtime.extraMinutes > 0)
-      .forEach((overtime) => {
-        rows.push({
-          key: `extra-${overtime.id}`,
-          overtimeDate: overtime.date,
-          overtimeHours: overtime.extraLabel,
-          coverage: "Extra"
-        });
-      });
-
-    return rows.sort(
-      (a, b) =>
-        new Date(a.leaveDate ?? a.overtimeDate ?? 0).getTime() - new Date(b.leaveDate ?? b.overtimeDate ?? 0).getTime()
-    );
-  }, [report]);
+  const downloadAllMutation = useMutation({
+    mutationFn: () => api.getAllEmployeesHoursReport(selectedPeriodId || undefined),
+    onSuccess: (allReport) => {
+      exportAllEmployeesHoursReportPdf(allReport);
+      toast.success("Report downloaded");
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to generate report")
+  });
 
   const clearFilters = () =>
     setFilters({ employeeId: "", periodId: "", leaveType: "", requestType: "", status: "PENDING", dateFrom: "", dateTo: "" });
@@ -202,7 +164,7 @@ export default function EmployeeOvertime() {
         <p className="page-subtitle">Leave and overtime requests, approvals, and per-employee hour calculations.</p>
       </div>
 
-      <div className="glass-panel p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="glass-panel p-4 grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3 items-end">
         <div>
           <Label className="text-xs text-muted-foreground mb-1.5 block">Employee</Label>
           <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
@@ -234,6 +196,10 @@ export default function EmployeeOvertime() {
             </SelectContent>
           </Select>
         </div>
+        <Button className="gap-1" disabled={downloadAllMutation.isPending} onClick={() => downloadAllMutation.mutate()}>
+          <Download className="h-4 w-4" />
+          {downloadAllMutation.isPending ? "Preparing..." : "Download All Employee Report"}
+        </Button>
       </div>
 
       {loadingReport || fetchingReport ? (
@@ -260,19 +226,9 @@ export default function EmployeeOvertime() {
           </div>
 
           <div className="glass-panel p-5 space-y-4">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <h2 className="text-lg font-semibold">
-                {selectedEmployee?.name} — Leave Summary
-              </h2>
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1"
-                onClick={() => exportHoursReportPdf(report, selectedEmployee?.name ?? "Employee")}
-              >
-                <Download className="h-3.5 w-3.5" /> Export PDF
-              </Button>
-            </div>
+            <h2 className="text-lg font-semibold">
+              {selectedEmployee?.name} — Leave Summary
+            </h2>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -438,6 +394,7 @@ export default function EmployeeOvertime() {
                 <th className="py-2 pr-3 text-left font-medium">Employee</th>
                 <th className="py-2 px-3 text-left font-medium">Date</th>
                 <th className="py-2 px-3 text-left font-medium">Type</th>
+                <th className="py-2 px-3 text-left font-medium">Details</th>
                 <th className="py-2 px-3 text-right font-medium">Hours</th>
                 <th className="py-2 px-3 text-left font-medium">Status</th>
                 <th className="py-2 pl-3 text-right font-medium">Action</th>
@@ -446,7 +403,7 @@ export default function EmployeeOvertime() {
             <tbody>
               {loadingRequests ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-muted-foreground">
+                  <td colSpan={7} className="py-8 text-center text-muted-foreground">
                     <span className="inline-flex items-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" /> Loading requests...
                     </span>
@@ -454,17 +411,33 @@ export default function EmployeeOvertime() {
                 </tr>
               ) : requests.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-muted-foreground">
+                  <td colSpan={7} className="py-8 text-center text-muted-foreground">
                     No requests match the filters.
                   </td>
                 </tr>
               ) : (
                 requests.map((request) => (
-                  <tr key={`${request.requestType}-${request.id}`} className="border-b border-border/20">
+                  <tr key={`${request.requestType}-${request.id}`} className="border-b border-border/20 align-top">
                     <td className="py-2 pr-3">{request.employee.name}</td>
-                    <td className="py-2 px-3 whitespace-nowrap">{formatDisplayDate(request.date)}</td>
+                    <td className="py-2 px-3 whitespace-nowrap">
+                      {request.requestType === "LEAVE"
+                        ? formatDateRange(request.startDate, request.endDate)
+                        : formatDisplayDate(request.date)}
+                    </td>
                     <td className="py-2 px-3">
                       {request.requestType === "LEAVE" ? leaveTypeLabel(request.leaveType) : "Overtime"}
+                    </td>
+                    <td className="py-2 px-3 max-w-[240px]">
+                      {request.requestType === "LEAVE" ? (
+                        <span className="text-xs text-muted-foreground">{pluralizeDays(request.numberOfDays)}</span>
+                      ) : (
+                        <div className="text-xs text-muted-foreground">
+                          <p>
+                            {request.project} · {formatIsoTimeLabel(request.startTime)}–{formatIsoTimeLabel(request.endTime)}
+                          </p>
+                          <p className="line-clamp-2">{request.reason}</p>
+                        </div>
+                      )}
                     </td>
                     <td className="py-2 px-3 text-right">{request.durationLabel}</td>
                     <td className="py-2 px-3">

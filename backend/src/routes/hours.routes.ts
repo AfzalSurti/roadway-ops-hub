@@ -38,6 +38,7 @@ hoursRouter.use("/admin", requireRole("ADMIN"));
 
 hoursRouter.get("/admin/requests", asyncHandler(hoursController.listAdminRequests));
 hoursRouter.get("/admin/periods", asyncHandler(hoursController.listPeriods));
+hoursRouter.get("/admin/report", asyncHandler(hoursController.getAllEmployeesReport));
 
 hoursRouter.get("/admin/leave-requests", asyncHandler(hoursController.listAdminLeaveRequests));
 hoursRouter.patch("/admin/leave-requests/:id/approve", asyncHandler(hoursController.approveLeaveRequest));

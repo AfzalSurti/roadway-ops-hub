@@ -32,6 +32,7 @@ import type {
   InfraTeamMemberItem,
   CalculationPeriodItem,
   HoursAdminRequestItem,
+  HoursAllEmployeesReportItem,
   HoursBreakdownItem,
   HoursRequestStatus,
   HoursReportItem,
@@ -797,7 +798,7 @@ export const api = {
 
   // ─── Calculate Hours (Leave + Overtime) ─────────────────────────────────
 
-  createLeaveRequest(payload: { date: string; leaveType: LeaveType }) {
+  createLeaveRequest(payload: { startDate: string; endDate: string; leaveType: LeaveType }) {
     return request<LeaveRequestItem>("/hours/leave-requests", {
       method: "POST",
       body: JSON.stringify(payload)
@@ -808,7 +809,7 @@ export const api = {
     return request<LeaveRequestItem[]>("/hours/leave-requests/me");
   },
 
-  createOvertimeRequest(payload: { date: string; hours: number; minutes: number }) {
+  createOvertimeRequest(payload: { date: string; project: string; startTime: string; endTime: string; reason: string }) {
     return request<OvertimeRequestItem>("/hours/overtime-requests", {
       method: "POST",
       body: JSON.stringify(payload)
@@ -882,6 +883,10 @@ export const api = {
     return request<HoursReportItem>(
       `/hours/admin/employees/${employeeId}/report${periodId ? `?periodId=${periodId}` : ""}`
     );
+  },
+
+  getAllEmployeesHoursReport(periodId?: string) {
+    return request<HoursAllEmployeesReportItem>(`/hours/admin/report${periodId ? `?periodId=${periodId}` : ""}`);
   },
 
   getProjectRequisitionForms() {

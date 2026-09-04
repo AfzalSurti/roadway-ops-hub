@@ -57,6 +57,26 @@ export function now(): Date {
   return new Date();
 }
 
+/** Inclusive day count between two UTC-noon-anchored calendar days (same day = 1). */
+export function daysBetweenInclusive(startDate: Date, endDate: Date): number {
+  return Math.round((endDate.getTime() - startDate.getTime()) / 86_400_000) + 1;
+}
+
+/** Combine a "YYYY-MM-DD" date and a 24h "HH:mm" time into the real UTC instant, interpreted in IST. */
+export function combineDateAndTime(dateValue: string, timeValue: string): Date {
+  const dateMatch = dateValue.trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const timeMatch = timeValue.trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!dateMatch || !timeMatch) {
+    throw new Error("Invalid date or time");
+  }
+  const [, year, month, day] = dateMatch;
+  const [, hours, minutes] = timeMatch;
+  const virtual = new Date(
+    Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hours), Number(minutes), 0, 0)
+  );
+  return fromIstVirtual(virtual);
+}
+
 /** "150" -> "2h 30m". Minutes-only internal storage avoids floating point drift; this is display-only. */
 export function minutesToLabel(totalMinutes: number): string {
   const sign = totalMinutes < 0 ? "-" : "";

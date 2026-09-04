@@ -39,9 +39,15 @@ export const hoursRepository = {
 
   // ─── Leave requests ─────────────────────────────────────────────────────
 
-  findActiveLeaveOnDate(employeeId: string, date: Date) {
+  /** Any active (pending/approved) leave whose [startDate,endDate] overlaps the given range. */
+  findOverlappingLeave(employeeId: string, startDate: Date, endDate: Date) {
     return prisma.leaveRequest.findFirst({
-      where: { employeeId, date, status: { in: ["PENDING", "APPROVED"] } }
+      where: {
+        employeeId,
+        status: { in: ["PENDING", "APPROVED"] },
+        startDate: { lte: endDate },
+        endDate: { gte: startDate }
+      }
     });
   },
 
@@ -74,7 +80,7 @@ export const hoursRepository = {
     return prisma.leaveRequest.findMany({
       where,
       include: { employee: { select: employeeSelect } },
-      orderBy: { date: "asc" }
+      orderBy: { startDate: "asc" }
     });
   },
 
@@ -116,6 +122,14 @@ export const hoursRepository = {
       where,
       include: { employee: { select: employeeSelect } },
       orderBy: { date: "asc" }
+    });
+  },
+
+  listEmployees() {
+    return prisma.user.findMany({
+      where: { role: "EMPLOYEE" },
+      select: employeeSelect,
+      orderBy: { name: "asc" }
     });
   }
 };

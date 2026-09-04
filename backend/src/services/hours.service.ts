@@ -1,14 +1,22 @@
 import type { HoursRequestStatus, LeaveType } from "@prisma/client";
 import { hoursRepository } from "../repositories/hours.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
-import { LEAVE_DURATION_MINUTES, minutesToLabel, now, parseHoursDate, periodBoundsForDate } from "../utils/hours.js";
+import {
+  LEAVE_DURATION_MINUTES,
+  combineDateAndTime,
+  daysBetweenInclusive,
+  minutesToLabel,
+  now,
+  parseHoursDate,
+  periodBoundsForDate
+} from "../utils/hours.js";
 
-type LeaveRow = { id: string; date: Date; leaveType: LeaveType; durationMinutes: number };
+type LeaveRow = { id: string; startDate: Date; leaveType: LeaveType; durationMinutes: number };
 type OvertimeRow = { id: string; date: Date; durationMinutes: number };
 
 /** FIFO allocation: oldest approved leave is covered first, drawing from approved overtime in date order. */
 function allocateOvertimeToLeave(leaves: LeaveRow[], overtimes: OvertimeRow[]) {
-  const sortedLeaves = [...leaves].sort((a, b) => a.date.getTime() - b.date.getTime());
+  const sortedLeaves = [...leaves].sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
   const sortedOvertimes = [...overtimes].sort((a, b) => a.date.getTime() - b.date.getTime());
 
   const overtimeRemaining = new Map(sortedOvertimes.map((o) => [o.id, o.durationMinutes]));
@@ -41,7 +49,9 @@ function serializeLeave(leave: {
   id: string;
   employeeId: string;
   calculationPeriodId: string;
-  date: Date;
+  startDate: Date;
+  endDate: Date;
+  numberOfDays: number;
   leaveType: LeaveType;
   durationMinutes: number;
   status: HoursRequestStatus;
@@ -58,7 +68,11 @@ function serializeLeave(leave: {
     employeeId: leave.employeeId,
     employee: leave.employee,
     calculationPeriodId: leave.calculationPeriodId,
-    date: leave.date.toISOString(),
+    // "date" mirrors startDate — a single sortable/displayable date for the combined admin feed.
+    date: leave.startDate.toISOString(),
+    startDate: leave.startDate.toISOString(),
+    endDate: leave.endDate.toISOString(),
+    numberOfDays: leave.numberOfDays,
     leaveType: leave.leaveType,
     durationMinutes: leave.durationMinutes,
     durationLabel: minutesToLabel(leave.durationMinutes),
@@ -76,6 +90,10 @@ function serializeOvertime(overtime: {
   employeeId: string;
   calculationPeriodId: string;
   date: Date;
+  project: string;
+  startTime: Date;
+  endTime: Date;
+  reason: string;
   durationMinutes: number;
   status: HoursRequestStatus;
   approvedById: string | null;
@@ -92,6 +110,10 @@ function serializeOvertime(overtime: {
     employee: overtime.employee,
     calculationPeriodId: overtime.calculationPeriodId,
     date: overtime.date.toISOString(),
+    project: overtime.project,
+    startTime: overtime.startTime.toISOString(),
+    endTime: overtime.endTime.toISOString(),
+    reason: overtime.reason,
     durationMinutes: overtime.durationMinutes,
     durationLabel: minutesToLabel(overtime.durationMinutes),
     status: overtime.status,
@@ -130,24 +152,31 @@ export const hoursService = {
 
   // ─── Leave requests ──────────────────────────────────────────────────────
 
-  async createLeaveRequest(employeeId: string, payload: { date: string; leaveType: LeaveType }) {
-    const date = parseHoursDate(payload.date);
+  async createLeaveRequest(employeeId: string, payload: { startDate: string; endDate: string; leaveType: LeaveType }) {
+    const startDate = parseHoursDate(payload.startDate);
+    const endDate = parseHoursDate(payload.endDate);
+    if (endDate.getTime() < startDate.getTime()) {
+      throw badRequest("End date cannot be before start date");
+    }
+
     const period = await this.getActivePeriod();
-
-    if (date.getTime() < period.startDate.getTime() || date.getTime() > period.endDate.getTime()) {
-      throw badRequest("Selected date is outside the active calculation period");
+    if (startDate.getTime() < period.startDate.getTime() || endDate.getTime() > period.endDate.getTime()) {
+      throw badRequest("Selected dates are outside the active calculation period");
     }
 
-    const duplicate = await hoursRepository.findActiveLeaveOnDate(employeeId, date);
-    if (duplicate) {
-      throw conflict("A leave request already exists for this date");
+    const overlap = await hoursRepository.findOverlappingLeave(employeeId, startDate, endDate);
+    if (overlap) {
+      throw conflict("An overlapping leave request already exists for these dates");
     }
 
-    const durationMinutes = LEAVE_DURATION_MINUTES[payload.leaveType];
+    const numberOfDays = daysBetweenInclusive(startDate, endDate);
+    const durationMinutes = numberOfDays * LEAVE_DURATION_MINUTES[payload.leaveType];
     const created = await hoursRepository.createLeaveRequest({
       employeeId,
       calculationPeriodId: period.id,
-      date,
+      startDate,
+      endDate,
+      numberOfDays,
       leaveType: payload.leaveType,
       durationMinutes,
       status: "PENDING"
@@ -174,14 +203,9 @@ export const hoursService = {
       ...(filters.periodId ? { calculationPeriodId: filters.periodId } : {}),
       ...(filters.leaveType ? { leaveType: filters.leaveType } : {}),
       ...(filters.status ? { status: filters.status } : {}),
-      ...(filters.dateFrom || filters.dateTo
-        ? {
-            date: {
-              ...(filters.dateFrom ? { gte: parseHoursDate(filters.dateFrom) } : {}),
-              ...(filters.dateTo ? { lte: parseHoursDate(filters.dateTo) } : {})
-            }
-          }
-        : {})
+      // A leave "matches" a date filter when its [startDate,endDate] range overlaps it.
+      ...(filters.dateTo ? { startDate: { lte: parseHoursDate(filters.dateTo) } } : {}),
+      ...(filters.dateFrom ? { endDate: { gte: parseHoursDate(filters.dateFrom) } } : {})
     });
     return rows.map(serializeLeave);
   },
@@ -202,13 +226,17 @@ export const hoursService = {
 
   // ─── Overtime requests ────────────────────────────────────────────────────
 
-  async createOvertimeRequest(employeeId: string, payload: { date: string; hours: number; minutes: number }) {
-    const durationMinutes = payload.hours * 60 + payload.minutes;
-    if (durationMinutes <= 0) throw badRequest("Overtime duration must be greater than 0");
-
+  async createOvertimeRequest(
+    employeeId: string,
+    payload: { date: string; project: string; startTime: string; endTime: string; reason: string }
+  ) {
     const date = parseHoursDate(payload.date);
-    const period = await this.getActivePeriod();
+    const startTime = combineDateAndTime(payload.date, payload.startTime);
+    const endTime = combineDateAndTime(payload.date, payload.endTime);
+    const durationMinutes = Math.round((endTime.getTime() - startTime.getTime()) / 60_000);
+    if (durationMinutes <= 0) throw badRequest("End time must be after start time");
 
+    const period = await this.getActivePeriod();
     if (date.getTime() < period.startDate.getTime() || date.getTime() > period.endDate.getTime()) {
       throw badRequest("Selected date is outside the active calculation period");
     }
@@ -222,6 +250,10 @@ export const hoursService = {
       employeeId,
       calculationPeriodId: period.id,
       date,
+      project: payload.project.trim(),
+      startTime,
+      endTime,
+      reason: payload.reason.trim(),
       durationMinutes,
       status: "PENDING"
     });
@@ -354,13 +386,15 @@ export const hoursService = {
     const { allocations, leaveCovered, overtimeRemaining } = allocateOvertimeToLeave(leaves, overtimes);
 
     const leaveBreakdown = [...leaves]
-      .sort((a, b) => a.date.getTime() - b.date.getTime())
+      .sort((a, b) => a.startDate.getTime() - b.startDate.getTime())
       .map((leave) => {
         const covered = leaveCovered.get(leave.id) ?? 0;
         const remaining = leave.durationMinutes - covered;
         return {
           id: leave.id,
-          date: leave.date.toISOString(),
+          startDate: leave.startDate.toISOString(),
+          endDate: leave.endDate.toISOString(),
+          numberOfDays: leave.numberOfDays,
           leaveType: leave.leaveType,
           durationMinutes: leave.durationMinutes,
           durationLabel: minutesToLabel(leave.durationMinutes),
@@ -380,6 +414,10 @@ export const hoursService = {
         return {
           id: overtime.id,
           date: overtime.date.toISOString(),
+          project: overtime.project,
+          startTime: overtime.startTime.toISOString(),
+          endTime: overtime.endTime.toISOString(),
+          reason: overtime.reason,
           durationMinutes: overtime.durationMinutes,
           durationLabel: minutesToLabel(overtime.durationMinutes),
           appliedMinutes: applied,
@@ -396,7 +434,7 @@ export const hoursService = {
       const overtime = overtimeById.get(a.overtimeId)!;
       return {
         leaveId: a.leaveId,
-        leaveDate: leave.date.toISOString(),
+        leaveDate: leave.startDate.toISOString(),
         leaveType: leave.leaveType,
         overtimeId: a.overtimeId,
         overtimeDate: overtime.date.toISOString(),
@@ -428,5 +466,31 @@ export const hoursService = {
   async getMyHoursSummary(employeeId: string) {
     const period = await this.getActivePeriod();
     return this.getEmployeeReport(employeeId, period.id);
+  },
+
+  /** Combined summary + breakdown for every employee in one period — powers the "Download All Employee Report" PDF. */
+  async getAllEmployeesReport(periodId?: string) {
+    const period = periodId ? await this.getPeriodById(periodId) : await this.getActivePeriod();
+    const employees = await hoursRepository.listEmployees();
+
+    const employeeReports = await Promise.all(
+      employees.map(async (employee) => {
+        const [summary, breakdown] = await Promise.all([
+          this.getEmployeeSummary(employee.id, period),
+          this.getEmployeeBreakdown(employee.id, { id: period.id })
+        ]);
+        return { employee, ...summary, ...breakdown };
+      })
+    );
+
+    return {
+      period: {
+        id: period.id,
+        startDate: period.startDate.toISOString(),
+        endDate: period.endDate.toISOString(),
+        status: period.status
+      },
+      employees: employeeReports
+    };
   }
 };

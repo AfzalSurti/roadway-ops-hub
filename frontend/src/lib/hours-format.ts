@@ -1,4 +1,4 @@
-import type { HoursRequestStatus, LeaveType } from "./domain";
+import type { HoursBreakdownItem, HoursRequestStatus, LeaveType } from "./domain";
 
 /** Mirrors backend/src/utils/hours.ts — internal storage is always minutes. */
 export const LEAVE_DURATION_MINUTES: Record<LeaveType, number> = {
@@ -55,4 +55,99 @@ export function formatDisplayDate(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
   return date.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+export function formatDateRange(startDate: string, endDate: string): string {
+  if (dateKey(startDate) === dateKey(endDate)) return formatDisplayDate(startDate);
+  return `${formatDisplayDate(startDate)} - ${formatDisplayDate(endDate)}`;
+}
+
+export function pluralizeDays(numberOfDays: number): string {
+  return `${numberOfDays} Day${numberOfDays === 1 ? "" : "s"}`;
+}
+
+/** Inclusive day count between two local dates (same day = 1). */
+export function daysBetweenInclusive(start: Date, end: Date): number {
+  const startMidnight = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const endMidnight = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+  return Math.round((endMidnight.getTime() - startMidnight.getTime()) / 86_400_000) + 1;
+}
+
+/** "HH:mm" (24h) -> "6:00 PM". */
+export function formatTimeLabel(time: string): string {
+  const match = time.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return time;
+  const hours24 = Number(match[1]);
+  const minutes = match[2];
+  const period = hours24 >= 12 ? "PM" : "AM";
+  const hours12 = hours24 % 12 === 0 ? 12 : hours24 % 12;
+  return `${hours12}:${minutes} ${period}`;
+}
+
+/** Format a full ISO timestamp (as returned by the API) as a 12h time, e.g. "6:00 PM". */
+export function formatIsoTimeLabel(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true });
+}
+
+export type HoursBreakdownDisplayRow = {
+  key: string;
+  leaveDate?: string;
+  leaveLabel?: string;
+  leaveHours?: string;
+  overtimeDate?: string;
+  overtimeHours?: string;
+  coverage: "Covered" | "Partially Covered" | "Not Covered" | "Extra";
+};
+
+/**
+ * Deterministic date-wise leave/overtime coverage rows, built from the server's FIFO allocations —
+ * shared by the on-screen admin breakdown table and the PDF export so they can never drift apart.
+ */
+export function buildBreakdownRows(report: HoursBreakdownItem): HoursBreakdownDisplayRow[] {
+  const leaveHasAllocation = new Set(report.allocations.map((allocation) => allocation.leaveId));
+  const leaveById = new Map(report.leaveBreakdown.map((row) => [row.id, row]));
+  const rows: HoursBreakdownDisplayRow[] = [];
+
+  report.allocations.forEach((allocation, index) => {
+    const leave = leaveById.get(allocation.leaveId);
+    rows.push({
+      key: `alloc-${index}`,
+      leaveDate: allocation.leaveDate,
+      leaveLabel: leaveTypeLabel(allocation.leaveType),
+      leaveHours: leave?.durationLabel,
+      overtimeDate: allocation.overtimeDate,
+      overtimeHours: allocation.minutesAppliedLabel,
+      coverage: leave?.coverageStatus === "COVERED" ? "Covered" : "Partially Covered"
+    });
+  });
+
+  report.leaveBreakdown
+    .filter((leave) => !leaveHasAllocation.has(leave.id))
+    .forEach((leave) => {
+      rows.push({
+        key: `leave-${leave.id}`,
+        leaveDate: leave.startDate,
+        leaveLabel: leaveTypeLabel(leave.leaveType),
+        leaveHours: leave.durationLabel,
+        coverage: "Not Covered"
+      });
+    });
+
+  report.overtimeBreakdown
+    .filter((overtime) => overtime.extraMinutes > 0)
+    .forEach((overtime) => {
+      rows.push({
+        key: `extra-${overtime.id}`,
+        overtimeDate: overtime.date,
+        overtimeHours: overtime.extraLabel,
+        coverage: "Extra"
+      });
+    });
+
+  return rows.sort(
+    (a, b) =>
+      new Date(a.leaveDate ?? a.overtimeDate ?? 0).getTime() - new Date(b.leaveDate ?? b.overtimeDate ?? 0).getTime()
+  );
 }

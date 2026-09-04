@@ -15,12 +15,17 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/lib/api";
-import type { LeaveRequestItem, LeaveType, OvertimeRequestItem } from "@/lib/domain";
+import type { LeaveType, TaskItem } from "@/lib/domain";
 import {
+  LEAVE_DURATION_MINUTES,
   LEAVE_TYPE_OPTIONS,
   dateKey,
-  formatDisplayDate,
+  daysBetweenInclusive,
+  formatDateRange,
+  formatIsoTimeLabel,
   leaveTypeLabel,
+  minutesToLabel,
+  pluralizeDays,
   statusBadgeVariant,
   statusLabel,
   toRequestDateInput
@@ -30,25 +35,25 @@ import { CalendarClock, CheckCircle2, Clock3, Loader2, MailWarning } from "lucid
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-/** Per date, pick the request that matters most: the active (pending/approved) one, else the latest rejected one. */
-function pickLatestByDate<T extends { date: string; status: string; createdAt: string }>(items: T[]): Map<string, T> {
-  const map = new Map<string, T>();
-  for (const item of items) {
-    const key = dateKey(item.date);
-    const existing = map.get(key);
-    if (!existing) {
-      map.set(key, item);
-      continue;
-    }
-    const existingActive = existing.status !== "REJECTED";
-    const itemActive = item.status !== "REJECTED";
-    if (itemActive && !existingActive) {
-      map.set(key, item);
-    } else if (itemActive === existingActive && new Date(item.createdAt) > new Date(existing.createdAt)) {
-      map.set(key, item);
-    }
+function getProjectLabel(task: TaskItem): string {
+  return task.projectNumber?.trim() || task.projectCode?.trim() || task.project?.trim() || "";
+}
+
+function localDateFromInput(value: string): Date {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+/** Days covered by a leave request, as local-calendar-day keys. */
+function daysInRange(startDate: string, endDate: string): string[] {
+  const keys: string[] = [];
+  const cursor = new Date(dateKey(startDate));
+  const end = new Date(dateKey(endDate));
+  while (cursor.getTime() <= end.getTime()) {
+    keys.push(dateKey(cursor));
+    cursor.setDate(cursor.getDate() + 1);
   }
-  return map;
+  return keys;
 }
 
 function dotClass(status: string, kind: "leave" | "overtime") {
@@ -60,9 +65,13 @@ function dotClass(status: string, kind: "leave" | "overtime") {
 export default function CalculateHours() {
   const queryClient = useQueryClient();
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [leaveFrom, setLeaveFrom] = useState("");
+  const [leaveTo, setLeaveTo] = useState("");
   const [leaveType, setLeaveType] = useState<LeaveType | "">("");
-  const [otHours, setOtHours] = useState("");
-  const [otMinutes, setOtMinutes] = useState("");
+  const [otProject, setOtProject] = useState("");
+  const [otFrom, setOtFrom] = useState("");
+  const [otTo, setOtTo] = useState("");
+  const [otReason, setOtReason] = useState("");
 
   const { data: summary, isLoading: loadingSummary } = useQuery({
     queryKey: ["hours-my-summary"],
@@ -79,8 +88,50 @@ export default function CalculateHours() {
     queryFn: () => api.getMyOvertimeRequests()
   });
 
-  const leaveByDate = useMemo(() => pickLatestByDate(leaveRequests), [leaveRequests]);
-  const overtimeByDate = useMemo(() => pickLatestByDate(overtimeRequests), [overtimeRequests]);
+  const { data: myTasksPage } = useQuery({
+    queryKey: ["tasks", "hours-projects"],
+    queryFn: () => api.getTasks({ limit: 200 })
+  });
+
+  const projectOptions = useMemo(() => {
+    const labels = new Set<string>();
+    (myTasksPage?.items ?? []).forEach((task: TaskItem) => {
+      const label = getProjectLabel(task);
+      if (label) labels.add(label);
+    });
+    return Array.from(labels).sort((a, b) => a.localeCompare(b));
+  }, [myTasksPage]);
+
+  // Per calendar day: the leave (if any day within an active range covers it) and overtime (if any) that day.
+  const leaveByDate = useMemo(() => {
+    const map = new Map<string, (typeof leaveRequests)[number]>();
+    for (const item of leaveRequests) {
+      if (item.status === "REJECTED") continue;
+      for (const key of daysInRange(item.startDate, item.endDate)) {
+        map.set(key, item);
+      }
+    }
+    // Rejected requests fill in only where nothing active already covers that day.
+    for (const item of leaveRequests) {
+      if (item.status !== "REJECTED") continue;
+      for (const key of daysInRange(item.startDate, item.endDate)) {
+        if (!map.has(key)) map.set(key, item);
+      }
+    }
+    return map;
+  }, [leaveRequests]);
+
+  const overtimeByDate = useMemo(() => {
+    const map = new Map<string, (typeof overtimeRequests)[number]>();
+    const sorted = [...overtimeRequests].sort((a, b) =>
+      a.status === "REJECTED" ? 1 : b.status === "REJECTED" ? -1 : 0
+    );
+    for (const item of sorted) {
+      const key = dateKey(item.date);
+      if (!map.has(key) || item.status !== "REJECTED") map.set(key, item);
+    }
+    return map;
+  }, [overtimeRequests]);
 
   const refresh = async () => {
     await Promise.all([
@@ -90,11 +141,23 @@ export default function CalculateHours() {
     ]);
   };
 
+  const resetLeaveForm = () => {
+    setLeaveFrom("");
+    setLeaveTo("");
+    setLeaveType("");
+  };
+  const resetOvertimeForm = () => {
+    setOtProject("");
+    setOtFrom("");
+    setOtTo("");
+    setOtReason("");
+  };
+
   const createLeaveMutation = useMutation({
-    mutationFn: () => api.createLeaveRequest({ date: toRequestDateInput(selectedDate!), leaveType: leaveType as LeaveType }),
+    mutationFn: () => api.createLeaveRequest({ startDate: leaveFrom, endDate: leaveTo, leaveType: leaveType as LeaveType }),
     onSuccess: async () => {
       toast.success("Leave request submitted");
-      setLeaveType("");
+      resetLeaveForm();
       setSelectedDate(null);
       await refresh();
     },
@@ -105,13 +168,14 @@ export default function CalculateHours() {
     mutationFn: () =>
       api.createOvertimeRequest({
         date: toRequestDateInput(selectedDate!),
-        hours: Number(otHours) || 0,
-        minutes: Number(otMinutes) || 0
+        project: otProject,
+        startTime: otFrom,
+        endTime: otTo,
+        reason: otReason.trim()
       }),
     onSuccess: async () => {
       toast.success("Overtime request submitted");
-      setOtHours("");
-      setOtMinutes("");
+      resetOvertimeForm();
       setSelectedDate(null);
       await refresh();
     },
@@ -128,19 +192,30 @@ export default function CalculateHours() {
   const canRequestLeave = !selectedLeave || selectedLeave.status === "REJECTED";
   const canRequestOvertime = !selectedOvertime || selectedOvertime.status === "REJECTED";
 
+  const leaveNumberOfDays = leaveFrom && leaveTo ? daysBetweenInclusive(localDateFromInput(leaveFrom), localDateFromInput(leaveTo)) : 0;
+  const leaveTotalMinutes = leaveType && leaveNumberOfDays > 0 ? leaveNumberOfDays * LEAVE_DURATION_MINUTES[leaveType] : 0;
+  const leaveRangeInvalid = Boolean(leaveFrom && leaveTo && leaveTo < leaveFrom);
+
+  const otDurationMinutes = useMemo(() => {
+    if (!otFrom || !otTo) return 0;
+    const [fh, fm] = otFrom.split(":").map(Number);
+    const [th, tm] = otTo.split(":").map(Number);
+    return th * 60 + tm - (fh * 60 + fm);
+  }, [otFrom, otTo]);
+
   const timelineItems = useMemo(() => {
     const items: Array<{ id: string; date: string; label: string; status: string; rejectionReason?: string | null }> = [
       ...leaveRequests.map((item) => ({
         id: `leave-${item.id}`,
-        date: item.date,
-        label: `${leaveTypeLabel(item.leaveType)} Leave — ${item.durationLabel}`,
+        date: item.startDate,
+        label: `${leaveTypeLabel(item.leaveType)} Leave — ${formatDateRange(item.startDate, item.endDate)} (${pluralizeDays(item.numberOfDays)}) — ${item.durationLabel}`,
         status: item.status,
         rejectionReason: item.rejectionReason
       })),
       ...overtimeRequests.map((item) => ({
         id: `overtime-${item.id}`,
         date: item.date,
-        label: `Overtime — ${item.durationLabel}`,
+        label: `Overtime — ${item.project} — ${formatIsoTimeLabel(item.startTime)} to ${formatIsoTimeLabel(item.endTime)} — ${item.durationLabel}`,
         status: item.status,
         rejectionReason: item.rejectionReason
       }))
@@ -150,6 +225,17 @@ export default function CalculateHours() {
 
   const isLoading = loadingSummary || loadingLeave || loadingOvertime;
 
+  const openDialog = (date: Date) => {
+    setSelectedDate(date);
+    const key = toRequestDateInput(date);
+    setLeaveFrom(key);
+    setLeaveTo(key);
+    setOtFrom("");
+    setOtTo("");
+    setOtProject("");
+    setOtReason("");
+  };
+
   return (
     <PageWrapper>
       <div className="page-header flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -157,7 +243,7 @@ export default function CalculateHours() {
           <h1 className="page-title">Calculate Hours</h1>
           <p className="page-subtitle">
             {period
-              ? `Cycle: ${formatDisplayDate(period.startDate)} – ${formatDisplayDate(period.endDate)}`
+              ? `Cycle: ${formatDateRange(period.startDate, period.endDate)}`
               : "Leave and overtime for the current calculation cycle."}
           </p>
         </div>
@@ -194,7 +280,7 @@ export default function CalculateHours() {
                 defaultMonth={periodStart}
                 fromDate={periodStart}
                 toDate={periodEnd}
-                onDayClick={(date) => setSelectedDate(date)}
+                onDayClick={(date) => openDialog(date)}
                 components={{
                   DayContent: ({ date }) => {
                     const key = dateKey(date);
@@ -253,9 +339,7 @@ export default function CalculateHours() {
                   className="rounded-lg border border-border/40 bg-card/60 p-3 flex items-center justify-between gap-3"
                 >
                   <div className="min-w-0">
-                    <p className="text-sm font-medium">
-                      {formatDisplayDate(item.date)} · {item.label}
-                    </p>
+                    <p className="text-sm font-medium">{item.label}</p>
                     {item.status === "REJECTED" && item.rejectionReason ? (
                       <p className="text-xs text-muted-foreground mt-0.5">Reason: {item.rejectionReason}</p>
                     ) : null}
@@ -271,9 +355,9 @@ export default function CalculateHours() {
       </div>
 
       <Dialog open={Boolean(selectedDate)} onOpenChange={(open) => !open && setSelectedDate(null)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{selectedDate ? formatDisplayDate(selectedDate.toISOString()) : ""}</DialogTitle>
+            <DialogTitle>{selectedDate ? formatDateRange(selectedDate.toISOString(), selectedDate.toISOString()) : ""}</DialogTitle>
             <DialogDescription>Request leave or overtime for this date.</DialogDescription>
           </DialogHeader>
 
@@ -287,7 +371,8 @@ export default function CalculateHours() {
               {selectedLeave ? (
                 <div className="rounded-lg border border-border/40 bg-secondary/20 p-3 space-y-1">
                   <p className="text-sm font-medium">
-                    {leaveTypeLabel(selectedLeave.leaveType)} — {selectedLeave.durationLabel}
+                    {leaveTypeLabel(selectedLeave.leaveType)} — {formatDateRange(selectedLeave.startDate, selectedLeave.endDate)} (
+                    {pluralizeDays(selectedLeave.numberOfDays)}) — {selectedLeave.durationLabel}
                   </p>
                   <Badge variant={statusBadgeVariant(selectedLeave.status)}>{statusLabel(selectedLeave.status)}</Badge>
                   {selectedLeave.status === "REJECTED" && selectedLeave.rejectionReason ? (
@@ -298,6 +383,34 @@ export default function CalculateHours() {
 
               {canRequestLeave ? (
                 <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-xs text-muted-foreground mb-1 block">From Date</Label>
+                      <Input
+                        type="date"
+                        value={leaveFrom}
+                        min={periodStart ? toRequestDateInput(periodStart) : undefined}
+                        max={periodEnd ? toRequestDateInput(periodEnd) : undefined}
+                        onChange={(e) => setLeaveFrom(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground mb-1 block">To Date</Label>
+                      <Input
+                        type="date"
+                        value={leaveTo}
+                        min={leaveFrom || (periodStart ? toRequestDateInput(periodStart) : undefined)}
+                        max={periodEnd ? toRequestDateInput(periodEnd) : undefined}
+                        onChange={(e) => setLeaveTo(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  {leaveRangeInvalid ? (
+                    <p className="text-xs text-destructive">To Date cannot be before From Date.</p>
+                  ) : leaveNumberOfDays > 0 ? (
+                    <p className="text-xs text-muted-foreground">Number of Days: {pluralizeDays(leaveNumberOfDays)}</p>
+                  ) : null}
+
                   <Label>Leave Type</Label>
                   <Select value={leaveType} onValueChange={(value) => setLeaveType(value as LeaveType)}>
                     <SelectTrigger>
@@ -306,14 +419,20 @@ export default function CalculateHours() {
                     <SelectContent>
                       {LEAVE_TYPE_OPTIONS.map((option) => (
                         <SelectItem key={option.value} value={option.value}>
-                          {option.label} — {option.minutes / 60}h
+                          {option.label} — {option.minutes / 60}h / day
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  {leaveTotalMinutes > 0 ? (
+                    <p className="text-sm font-medium">Total Leave Hours: {minutesToLabel(leaveTotalMinutes)}</p>
+                  ) : null}
+
                   <Button
                     className="w-full gap-1"
-                    disabled={!leaveType || createLeaveMutation.isPending}
+                    disabled={
+                      !leaveType || !leaveFrom || !leaveTo || leaveRangeInvalid || createLeaveMutation.isPending
+                    }
                     onClick={() => createLeaveMutation.mutate()}
                   >
                     <CheckCircle2 className="h-3.5 w-3.5" />
@@ -330,7 +449,11 @@ export default function CalculateHours() {
             <TabsContent value="overtime" className="space-y-3 pt-3">
               {selectedOvertime ? (
                 <div className="rounded-lg border border-border/40 bg-secondary/20 p-3 space-y-1">
-                  <p className="text-sm font-medium">Overtime — {selectedOvertime.durationLabel}</p>
+                  <p className="text-sm font-medium">
+                    Overtime — {selectedOvertime.project} — {formatIsoTimeLabel(selectedOvertime.startTime)} to{" "}
+                    {formatIsoTimeLabel(selectedOvertime.endTime)} — {selectedOvertime.durationLabel}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{selectedOvertime.reason}</p>
                   <Badge variant={statusBadgeVariant(selectedOvertime.status)}>
                     {statusLabel(selectedOvertime.status)}
                   </Badge>
@@ -342,34 +465,64 @@ export default function CalculateHours() {
 
               {canRequestOvertime ? (
                 <div className="space-y-2">
-                  <Label>Duration</Label>
-                  <div className="flex items-center gap-2">
+                  <Label>Project</Label>
+                  {projectOptions.length > 0 ? (
+                    <Select value={otProject} onValueChange={setOtProject}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select project" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {projectOptions.map((project) => (
+                          <SelectItem key={project} value={project}>
+                            {project}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
                     <Input
-                      type="number"
-                      min={0}
-                      max={23}
-                      placeholder="Hours"
-                      value={otHours}
-                      onChange={(e) => setOtHours(e.target.value)}
-                      className="w-24"
+                      placeholder="Enter project name"
+                      value={otProject}
+                      onChange={(e) => setOtProject(e.target.value)}
                     />
-                    <span className="text-sm text-muted-foreground">h</span>
-                    <Input
-                      type="number"
-                      min={0}
-                      max={59}
-                      placeholder="Minutes"
-                      value={otMinutes}
-                      onChange={(e) => setOtMinutes(e.target.value)}
-                      className="w-24"
-                    />
-                    <span className="text-sm text-muted-foreground">m</span>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-xs text-muted-foreground mb-1 block">From</Label>
+                      <Input type="time" value={otFrom} onChange={(e) => setOtFrom(e.target.value)} />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground mb-1 block">To</Label>
+                      <Input type="time" value={otTo} onChange={(e) => setOtTo(e.target.value)} />
+                    </div>
                   </div>
+                  {otFrom && otTo ? (
+                    otDurationMinutes > 0 ? (
+                      <p className="text-sm font-medium">Duration: {minutesToLabel(otDurationMinutes)}</p>
+                    ) : (
+                      <p className="text-xs text-destructive">To time must be after From time.</p>
+                    )
+                  ) : null}
+
+                  <Label>Reason</Label>
+                  <textarea
+                    value={otReason}
+                    onChange={(e) => setOtReason(e.target.value)}
+                    placeholder="Why was this overtime needed?"
+                    rows={2}
+                    className="w-full rounded-md border border-input bg-transparent px-2 py-1.5 text-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  />
+
                   <Button
                     className="w-full gap-1"
                     disabled={
                       createOvertimeMutation.isPending ||
-                      ((Number(otHours) || 0) === 0 && (Number(otMinutes) || 0) === 0)
+                      !otProject.trim() ||
+                      !otFrom ||
+                      !otTo ||
+                      otDurationMinutes <= 0 ||
+                      !otReason.trim()
                     }
                     onClick={() => createOvertimeMutation.mutate()}
                   >

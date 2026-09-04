@@ -940,6 +940,7 @@ type HoursRequestBase = {
   employeeId: string;
   employee: HoursEmployeeRef;
   calculationPeriodId: string;
+  /** A single sortable/displayable date — startDate for leave, the work date for overtime. */
   date: string;
   durationMinutes: number;
   durationLabel: string;
@@ -953,11 +954,18 @@ type HoursRequestBase = {
 
 export type LeaveRequestItem = HoursRequestBase & {
   requestType: "LEAVE";
+  startDate: string;
+  endDate: string;
+  numberOfDays: number;
   leaveType: LeaveType;
 };
 
 export type OvertimeRequestItem = HoursRequestBase & {
   requestType: "OVERTIME";
+  project: string;
+  startTime: string;
+  endTime: string;
+  reason: string;
 };
 
 export type HoursAdminRequestItem = LeaveRequestItem | OvertimeRequestItem;
@@ -983,7 +991,9 @@ export type HoursSummaryItem = {
 
 export type HoursLeaveBreakdownRow = {
   id: string;
-  date: string;
+  startDate: string;
+  endDate: string;
+  numberOfDays: number;
   leaveType: LeaveType;
   durationMinutes: number;
   durationLabel: string;
@@ -996,6 +1006,10 @@ export type HoursLeaveBreakdownRow = {
 export type HoursOvertimeBreakdownRow = {
   id: string;
   date: string;
+  project: string;
+  startTime: string;
+  endTime: string;
+  reason: string;
   durationMinutes: number;
   durationLabel: string;
   appliedMinutes: number;
@@ -1021,3 +1035,10 @@ export type HoursBreakdownItem = {
 };
 
 export type HoursReportItem = HoursSummaryItem & HoursBreakdownItem;
+
+export type HoursEmployeeReportItem = HoursReportItem & { employee: HoursEmployeeRef };
+
+export type HoursAllEmployeesReportItem = {
+  period: { id: string; startDate: string; endDate: string; status: CalculationPeriodStatus };
+  employees: HoursEmployeeReportItem[];
+};
