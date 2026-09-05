@@ -14,7 +14,6 @@ const RIGHT_X = MARGIN + LEFT_W + HALF_GAP;
 
 const BRAND: [number, number, number] = [11, 31, 58];
 const DARK: [number, number, number] = [17, 24, 39];
-const MID: [number, number, number] = [107, 114, 128];
 const LIGHT: [number, number, number] = [243, 244, 246];
 const WHITE: [number, number, number] = [255, 255, 255];
 
@@ -44,10 +43,6 @@ function setFillColor(doc: jsPDF, color: [number, number, number]) {
 }
 function setTextColor(doc: jsPDF, color: [number, number, number]) {
   doc.setTextColor(color[0], color[1], color[2]);
-}
-
-function getLastTableY(doc: jsPDF): number {
-  return (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
 }
 
 function drawSectionTitle(doc: jsPDF, text: string, x: number, width: number, y: number): number {
@@ -160,7 +155,6 @@ export function exportAllEmployeesHoursReportPdf(report: HoursAllEmployeesReport
       6: { cellWidth: 9, halign: "center" }
     }
   });
-  const leftFinalY = getLastTableY(doc);
 
   autoTable(doc, {
     startY: y,
@@ -181,15 +175,6 @@ export function exportAllEmployeesHoursReportPdf(report: HoursAllEmployeesReport
       5: { cellWidth: 15, halign: "right" }
     }
   });
-  const rightFinalY = getLastTableY(doc);
-
-  const footerY = Math.max(leftFinalY, rightFinalY) + 8;
-  doc.setFont("helvetica", "italic");
-  doc.setFontSize(7);
-  setTextColor(doc, MID);
-  doc.text('2 SL per month auto-modified as "P" — beyond that, adjustment is considered from OT.', MARGIN, footerY);
-  doc.setFont("helvetica", "bold");
-  doc.text("Duration considered after 19:00 PM, minimum 1 hour after.", MARGIN, footerY + 4);
 
   doc.save(`Employee-Hours-Report-${formatDisplayDate(report.period.startDate)}.pdf`);
 }

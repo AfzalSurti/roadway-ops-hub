@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { PageWrapper } from "@/components/PageWrapper";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -402,6 +402,10 @@ export default function LetterNumbering() {
     projectCoordinator: "",
     projectEngineer: ""
   });
+  const letterTopBarRef = useRef<HTMLDivElement | null>(null);
+  const letterHeaderRowRef = useRef<HTMLTableRowElement | null>(null);
+  const [letterTopBarHeight, setLetterTopBarHeight] = useState(0);
+  const [letterHeaderRowHeight, setLetterHeaderRowHeight] = useState(0);
   const [letterImportOpen, setLetterImportOpen] = useState(false);
   const [oldLetterOpen, setOldLetterOpen] = useState(false);
   const [letterDialogId, setLetterDialogId] = useState<string | null>(null);
@@ -998,6 +1002,22 @@ export default function LetterNumbering() {
     }
   }, [view, selectedProjectId, letterProjects]);
 
+  // Measure the sticky top bar / table header row heights so the two sticky layers stack without overlap.
+  useEffect(() => {
+    const topBarEl = letterTopBarRef.current;
+    const headerRowEl = letterHeaderRowRef.current;
+    if (!topBarEl || !headerRowEl) return;
+    const measure = () => {
+      setLetterTopBarHeight(topBarEl.getBoundingClientRect().height);
+      setLetterHeaderRowHeight(headerRowEl.getBoundingClientRect().height);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(topBarEl);
+    observer.observe(headerRowEl);
+    return () => observer.disconnect();
+  }, [selectedProjectId, pendingReplyLetters.length, hasLetterFilters]);
+
   const selectLetterProject = (projectId: string) => {
     setSelectedProjectId(projectId);
     setLetterFilters(emptyLetterFilters);
@@ -1530,88 +1550,90 @@ export default function LetterNumbering() {
 
               {selectedProjectId && selectedProject ? (
                 <>
-                  <div className="rounded-lg bg-primary/10 border border-primary/20 px-4 py-2.5 text-sm font-medium flex flex-wrap items-center gap-2">
-                    <span>
-                      {selectedProject.projectNumber}, {selectedProject.shortName}
-                    </span>
-                    {!selectedProject.linkedProjectId ? (
+                  <div ref={letterTopBarRef} className="sticky top-0 z-30 bg-background pt-1 pb-3 space-y-3">
+                    <div className="rounded-lg bg-primary/10 border border-primary/20 px-4 py-2.5 text-sm font-medium flex flex-wrap items-center gap-2">
+                      <span>
+                        {selectedProject.projectNumber}, {selectedProject.shortName}
+                      </span>
+                      {!selectedProject.linkedProjectId ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7"
+                          disabled={syncMutation.isPending}
+                          onClick={() => syncMutation.mutate(selectedProject.id)}
+                        >
+                          Add to Project section
+                        </Button>
+                      ) : (
+                        <Badge variant="secondary">Synced</Badge>
+                      )}
+                      <Button size="sm" variant="ghost" className="h-7 ml-auto" onClick={changeLetterProject}>
+                        Change project
+                      </Button>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        className="gap-1"
+                        disabled={addLetterMutation.isPending}
+                        onClick={() => addLetterMutation.mutate("OUTWARD")}
+                      >
+                        <Plus className="h-3.5 w-3.5" /> Add Outward
+                      </Button>
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-7"
-                        disabled={syncMutation.isPending}
-                        onClick={() => syncMutation.mutate(selectedProject.id)}
+                        disabled={addLetterMutation.isPending}
+                        onClick={() => addLetterMutation.mutate("INWARD")}
                       >
-                        Add to Project section
+                        Add Inward
                       </Button>
-                    ) : (
-                      <Badge variant="secondary">Synced</Badge>
-                    )}
-                    <Button size="sm" variant="ghost" className="h-7 ml-auto" onClick={changeLetterProject}>
-                      Change project
-                    </Button>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      size="sm"
-                      className="gap-1"
-                      disabled={addLetterMutation.isPending}
-                      onClick={() => addLetterMutation.mutate("OUTWARD")}
-                    >
-                      <Plus className="h-3.5 w-3.5" /> Add Outward
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={addLetterMutation.isPending}
-                      onClick={() => addLetterMutation.mutate("INWARD")}
-                    >
-                      Add Inward
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={addLetterMutation.isPending}
-                      onClick={() => addLetterMutation.mutate("OTHER")}
-                    >
-                      Add Other
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      className="gap-1"
-                      onClick={() => setOldLetterOpen(true)}
-                    >
-                      <Plus className="h-3.5 w-3.5" /> Add Old Letter
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-1"
-                      onClick={() => downloadLetterImportTemplate()}
-                    >
-                      <Download className="h-3.5 w-3.5" /> Sample Excel
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      className="gap-1"
-                      onClick={() => setLetterImportOpen(true)}
-                    >
-                      <FileUp className="h-3.5 w-3.5" /> Import Excel
-                    </Button>
-                    {pendingReplyLetters.length > 0 ? (
-                      <Badge variant="secondary" className="rounded-full self-center gap-1">
-                        <MailWarning className="h-3.5 w-3.5" />
-                        {pendingReplyLetters.length} to reply
-                      </Badge>
-                    ) : null}
-                    {hasLetterFilters ? (
-                      <Badge variant="outline" className="rounded-full self-center text-[11px]">
-                        Showing {filteredLetters.length} of {letters.length}
-                      </Badge>
-                    ) : null}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={addLetterMutation.isPending}
+                        onClick={() => addLetterMutation.mutate("OTHER")}
+                      >
+                        Add Other
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="gap-1"
+                        onClick={() => setOldLetterOpen(true)}
+                      >
+                        <Plus className="h-3.5 w-3.5" /> Add Old Letter
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1"
+                        onClick={() => downloadLetterImportTemplate()}
+                      >
+                        <Download className="h-3.5 w-3.5" /> Sample Excel
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="gap-1"
+                        onClick={() => setLetterImportOpen(true)}
+                      >
+                        <FileUp className="h-3.5 w-3.5" /> Import Excel
+                      </Button>
+                      {pendingReplyLetters.length > 0 ? (
+                        <Badge variant="secondary" className="rounded-full self-center gap-1">
+                          <MailWarning className="h-3.5 w-3.5" />
+                          {pendingReplyLetters.length} to reply
+                        </Badge>
+                      ) : null}
+                      {hasLetterFilters ? (
+                        <Badge variant="outline" className="rounded-full self-center text-[11px]">
+                          Showing {filteredLetters.length} of {letters.length}
+                        </Badge>
+                      ) : null}
+                    </div>
                   </div>
 
                   {!loadingSelected && pendingReplyLetters.length > 0 ? (
@@ -1719,10 +1741,14 @@ export default function LetterNumbering() {
                       <Loader2 className="h-4 w-4 animate-spin" /> Loading letters...
                     </p>
                   ) : (
-                    <div className="overflow-x-auto rounded-xl border border-border/40">
+                    <div className="overflow-x-auto overflow-y-visible rounded-xl border border-border/40">
                       <table className="w-full text-xs min-w-[1500px] table-auto">
                         <thead>
-                          <tr className="bg-secondary/40 text-muted-foreground">
+                          <tr
+                            ref={letterHeaderRowRef}
+                            className="bg-secondary/40 text-muted-foreground [&>th]:sticky [&>th]:z-20 [&>th]:top-[var(--st-top)] [&>th]:bg-secondary [&>th]:bg-clip-padding"
+                            style={{ "--st-top": `${letterTopBarHeight}px` } as CSSProperties}
+                          >
                             <th className="p-2 text-left font-medium w-14">Sr.</th>
                             <th className="p-2 text-left font-medium min-w-[160px] w-[160px]">Date</th>
                             <th className="p-2 text-left font-medium w-48">Letter Number</th>
@@ -1738,7 +1764,12 @@ export default function LetterNumbering() {
                             <th className="p-2 text-left font-medium min-w-[180px]">Remark by Employee</th>
                             <th className="p-2 text-right font-medium w-36">Actions</th>
                           </tr>
-                          <tr className="bg-secondary/25 border-t border-border/20">
+                          <tr
+                            className="bg-secondary/25 border-t border-border/20 [&>th]:sticky [&>th]:z-20 [&>th]:top-[var(--st-top2)] [&>th]:bg-secondary/95 [&>th]:bg-clip-padding"
+                            style={
+                              { "--st-top2": `${letterTopBarHeight + letterHeaderRowHeight}px` } as CSSProperties
+                            }
+                          >
                             <th className="p-1.5">
                               <Input
                                 className="h-7 text-[11px]"
