@@ -65,15 +65,27 @@ export default function EmployeeOvertime() {
   });
 
   useEffect(() => {
-    if (!selectedEmployeeId && employees.length > 0) setSelectedEmployeeId(employees[0].id);
-  }, [employees, selectedEmployeeId]);
-
-  useEffect(() => {
     if (!selectedPeriodId && periods.length > 0) {
       const active = periods.find((period) => period.status === "ACTIVE");
       setSelectedPeriodId(active?.id ?? periods[0].id);
     }
   }, [periods, selectedPeriodId]);
+
+  const { data: overview, isLoading: loadingOverview } = useQuery({
+    queryKey: ["hours-all-employees-overview", selectedPeriodId],
+    queryFn: () => api.getAllEmployeesHoursReport(selectedPeriodId || undefined),
+    enabled: Boolean(selectedPeriodId)
+  });
+  const overviewEmployees = overview?.employees ?? [];
+
+  useEffect(() => {
+    if (overviewEmployees.length === 0) return;
+    if (!selectedEmployeeId || !overviewEmployees.some((row) => row.employee.id === selectedEmployeeId)) {
+      setSelectedEmployeeId(overviewEmployees[0].employee.id);
+    }
+    // Only re-run when the overview's employee set actually changes (e.g. period switch).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [overviewEmployees.map((row) => row.employee.id).join(",")]);
 
   const {
     data: report,
@@ -177,22 +189,7 @@ export default function EmployeeOvertime() {
         <p className="page-subtitle">Leave and overtime requests, approvals, and per-employee hour calculations.</p>
       </div>
 
-      <div className="glass-panel p-4 grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3 items-end">
-        <div>
-          <Label className="text-xs text-muted-foreground mb-1.5 block">Employee</Label>
-          <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select employee" />
-            </SelectTrigger>
-            <SelectContent>
-              {employees.map((employee) => (
-                <SelectItem key={employee.id} value={employee.id}>
-                  {employee.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      <div className="glass-panel p-4 grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 items-end">
         <div>
           <Label className="text-xs text-muted-foreground mb-1.5 block">Calculation Period</Label>
           <Select value={selectedPeriodId} onValueChange={setSelectedPeriodId}>
@@ -213,6 +210,62 @@ export default function EmployeeOvertime() {
           <Download className="h-4 w-4" />
           {downloadAllMutation.isPending ? "Preparing..." : "Download All Employee Report"}
         </Button>
+      </div>
+
+      <div className="glass-panel p-5 space-y-3">
+        <h2 className="text-lg font-semibold">All Employees — click a row for full detail</h2>
+        {loadingOverview ? (
+          <p className="text-sm text-muted-foreground inline-flex items-center gap-2 py-4">
+            <Loader2 className="h-4 w-4 animate-spin" /> Loading employees...
+          </p>
+        ) : overviewEmployees.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-4">No employees found.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border/40 text-muted-foreground">
+                  <th className="py-2 pr-3 text-left font-medium">Employee</th>
+                  <th className="py-2 px-3 text-right font-medium">Full Day</th>
+                  <th className="py-2 px-3 text-right font-medium">Half Day</th>
+                  <th className="py-2 px-3 text-right font-medium">Short Leave</th>
+                  <th className="py-2 px-3 text-right font-medium">Total Leave</th>
+                  <th className="py-2 px-3 text-right font-medium">Approved OT</th>
+                  <th className="py-2 px-3 text-right font-medium">Converted</th>
+                  <th className="py-2 px-3 text-right font-medium">Remaining</th>
+                  <th className="py-2 pl-3 text-right font-medium">Pending</th>
+                </tr>
+              </thead>
+              <tbody>
+                {overviewEmployees.map((row) => (
+                  <tr
+                    key={row.employee.id}
+                    onClick={() => setSelectedEmployeeId(row.employee.id)}
+                    className={`cursor-pointer border-b border-border/20 hover:bg-secondary/30 ${
+                      row.employee.id === selectedEmployeeId ? "bg-primary/10" : ""
+                    }`}
+                  >
+                    <td className="py-2 pr-3 font-medium">{row.employee.name}</td>
+                    <td className="py-2 px-3 text-right">{row.leave.fullDay.count}</td>
+                    <td className="py-2 px-3 text-right">{row.leave.halfDay.count}</td>
+                    <td className="py-2 px-3 text-right">{row.leave.shortLeave.count}</td>
+                    <td className="py-2 px-3 text-right">{row.leave.totalLabel}</td>
+                    <td className="py-2 px-3 text-right">{row.approvedOvertimeLabel}</td>
+                    <td className="py-2 px-3 text-right">{row.convertedLabel}</td>
+                    <td className="py-2 px-3 text-right">{row.remainingLabel}</td>
+                    <td className="py-2 pl-3 text-right">
+                      {row.pendingCount > 0 ? (
+                        <Badge variant="secondary">{row.pendingCount}</Badge>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {loadingReport || fetchingReport ? (
