@@ -121,20 +121,24 @@ export function format24HourTime(value: string): string {
 
 export type HoursBreakdownDisplayRow = {
   key: string;
+  /** Set on leave rows — lets the UI offer a per-row admin action for uncovered leave. */
+  leaveId?: string;
   leaveDate?: string;
   leaveLabel?: string;
   leaveHours?: string;
   overtimeDate?: string;
   overtimeHours?: string;
-  coverage: "Covered" | "Partially Covered" | "Not Covered" | "Extra";
+  coverage: "Covered" | "Covered (OL)" | "Partially Covered" | "Not Covered" | "Extra";
 };
 
 /**
  * Deterministic date-wise leave/overtime coverage rows, built from the server's FIFO allocations —
  * shared by the on-screen admin breakdown table and the PDF export so they can never drift apart.
+ * Leaves settled via an admin conversion ("OL") don't have a real overtime allocation, so their
+ * coverage is read from leaveBreakdown directly rather than from the OT-only allocations array.
  */
 export function buildBreakdownRows(report: HoursBreakdownItem): HoursBreakdownDisplayRow[] {
-  const leaveHasAllocation = new Set(report.allocations.map((allocation) => allocation.leaveId));
+  const leaveHasOtAllocation = new Set(report.allocations.map((allocation) => allocation.leaveId));
   const leaveById = new Map(report.leaveBreakdown.map((row) => [row.id, row]));
   const rows: HoursBreakdownDisplayRow[] = [];
 
@@ -142,6 +146,7 @@ export function buildBreakdownRows(report: HoursBreakdownItem): HoursBreakdownDi
     const leave = leaveById.get(allocation.leaveId);
     rows.push({
       key: `alloc-${index}`,
+      leaveId: allocation.leaveId,
       leaveDate: allocation.leaveDate,
       leaveLabel: leaveTypeLabel(allocation.leaveType),
       leaveHours: leave?.durationLabel,
@@ -152,14 +157,15 @@ export function buildBreakdownRows(report: HoursBreakdownItem): HoursBreakdownDi
   });
 
   report.leaveBreakdown
-    .filter((leave) => !leaveHasAllocation.has(leave.id))
+    .filter((leave) => !leaveHasOtAllocation.has(leave.id))
     .forEach((leave) => {
       rows.push({
         key: `leave-${leave.id}`,
+        leaveId: leave.id,
         leaveDate: leave.startDate,
         leaveLabel: leaveTypeLabel(leave.leaveType),
         leaveHours: leave.durationLabel,
-        coverage: "Not Covered"
+        coverage: leave.adjustmentAgainst === "OL" ? "Covered (OL)" : "Not Covered"
       });
     });
 

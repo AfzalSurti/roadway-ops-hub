@@ -32,6 +32,7 @@ import { toast } from "sonner";
 
 const COVERAGE_STYLES: Record<string, string> = {
   Covered: "text-emerald-600",
+  "Covered (OL)": "text-sky-600",
   "Partially Covered": "text-amber-600",
   "Not Covered": "text-red-500",
   Extra: "text-sky-600"
@@ -371,6 +372,7 @@ export default function EmployeeOvertime() {
                       <th className="p-2 text-left font-medium">Overtime Hours</th>
                       <th className="p-2 text-left font-medium">Status</th>
                       <th className="p-2 text-left font-medium">Coverage</th>
+                      <th className="p-2 text-right font-medium">Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -383,6 +385,20 @@ export default function EmployeeOvertime() {
                         <td className="p-2">{row.overtimeHours ?? "—"}</td>
                         <td className="p-2">Approved</td>
                         <td className={`p-2 font-medium ${COVERAGE_STYLES[row.coverage] ?? ""}`}>{row.coverage}</td>
+                        <td className="p-2 text-right">
+                          {row.coverage === "Not Covered" && report.canConvert ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-6 gap-1 px-2 text-[10px]"
+                              onClick={() => setConvertDialogOpen(true)}
+                            >
+                              Adjust to Leave
+                            </Button>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -590,9 +606,10 @@ export default function EmployeeOvertime() {
           <DialogHeader>
             <DialogTitle>Convert to Leave</DialogTitle>
             <DialogDescription>
-              This converts {selectedEmployee?.name}'s uncovered balance of{" "}
-              <span className="font-semibold text-foreground">{report?.remainingLabel}</span> into a permanent
-              recorded leave deduction. The original leave and overtime records are kept for audit.
+              This settles {selectedEmployee?.name}'s entire outstanding uncovered balance of{" "}
+              <span className="font-semibold text-foreground">{report?.remainingLabel}</span> — covering every
+              "Not Covered" leave for this period, not just one row — into a permanent recorded leave deduction
+              (OL). The original leave and overtime records are kept for audit.
             </DialogDescription>
           </DialogHeader>
           <Label>Reason</Label>
