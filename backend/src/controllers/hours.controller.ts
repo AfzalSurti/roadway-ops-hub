@@ -47,6 +47,11 @@ export const hoursController = {
     return sendSuccess(res, result);
   },
 
+  async markLeaveObedient(req: Request, res: Response) {
+    const result = await hoursService.markLeaveObedient(req.params.id, req.user!.id, req.body.reason);
+    return sendSuccess(res, result);
+  },
+
   // ─── Overtime ─────────────────────────────────────────────────────────
 
   async createOvertimeRequest(req: Request, res: Response) {

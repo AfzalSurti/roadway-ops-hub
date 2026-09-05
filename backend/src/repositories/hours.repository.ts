@@ -84,6 +84,17 @@ export const hoursRepository = {
     });
   },
 
+  markLeaveObedient(
+    id: string,
+    data: { obedientReason: string; obedientById: string; obedientAt: Date }
+  ) {
+    return prisma.leaveRequest.update({
+      where: { id },
+      data,
+      include: { employee: { select: employeeSelect } }
+    });
+  },
+
   // ─── Overtime requests ──────────────────────────────────────────────────
 
   findActiveOvertimeOnDate(employeeId: string, date: Date) {

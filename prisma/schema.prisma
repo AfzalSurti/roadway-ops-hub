@@ -92,36 +92,37 @@ enum AuditAction {
 }
 
 model User {
-  id                String            @id @default(cuid())
-  name              String
-  email             String            @unique
-  passwordHash      String
-  role              Role
-  contactNumber     String?
-  education         String?
-  yearOfPassing     String?
-  dateOfJoining     DateTime?
-  experienceInOrg   String?
-  currentCtc        String?
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
-  assignedTasks     Task[]            @relation("TaskAssignee")
-  createdTasks      Task[]            @relation("TaskCreator")
-  reports           Report[]
-  comments          Comment[]
-  attachments       Attachment[]
-  refreshTokens     RefreshToken[]
-  audits            AuditLog[]
-  notifications     Notification[]
-  expenseSheets     ExpenseSheet[]
-  expenseReviews    ExpenseApproval[] @relation("ExpenseReviewer")
-  referredLetters   LetterEntry[]     @relation("LetterReferredTo")
-  leaveRequests     LeaveRequest[]    @relation("LeaveRequestEmployee")
-  leaveApprovals    LeaveRequest[]    @relation("LeaveRequestApprover")
-  overtimeRequests  OvertimeRequest[] @relation("OvertimeRequestEmployee")
-  overtimeApprovals OvertimeRequest[] @relation("OvertimeRequestApprover")
-  convertedLeaves   ConvertedLeave[]  @relation("ConvertedLeaveEmployee")
-  leaveConversions  ConvertedLeave[]  @relation("ConvertedLeaveConverter")
+  id                 String            @id @default(cuid())
+  name               String
+  email              String            @unique
+  passwordHash       String
+  role               Role
+  contactNumber      String?
+  education          String?
+  yearOfPassing      String?
+  dateOfJoining      DateTime?
+  experienceInOrg    String?
+  currentCtc         String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  assignedTasks      Task[]            @relation("TaskAssignee")
+  createdTasks       Task[]            @relation("TaskCreator")
+  reports            Report[]
+  comments           Comment[]
+  attachments        Attachment[]
+  refreshTokens      RefreshToken[]
+  audits             AuditLog[]
+  notifications      Notification[]
+  expenseSheets      ExpenseSheet[]
+  expenseReviews     ExpenseApproval[] @relation("ExpenseReviewer")
+  referredLetters    LetterEntry[]     @relation("LetterReferredTo")
+  leaveRequests      LeaveRequest[]    @relation("LeaveRequestEmployee")
+  leaveApprovals     LeaveRequest[]    @relation("LeaveRequestApprover")
+  leaveObedientMarks LeaveRequest[]    @relation("LeaveRequestObedientBy")
+  overtimeRequests   OvertimeRequest[] @relation("OvertimeRequestEmployee")
+  overtimeApprovals  OvertimeRequest[] @relation("OvertimeRequestApprover")
+  convertedLeaves    ConvertedLeave[]  @relation("ConvertedLeaveEmployee")
+  leaveConversions   ConvertedLeave[]  @relation("ConvertedLeaveConverter")
 }
 
 model RefreshToken {
@@ -990,10 +991,15 @@ model LeaveRequest {
   approvedById        String?
   approvedAt          DateTime?
   rejectionReason     String?
+  /// Admin's reason for excusing this specific leave from needing overtime coverage ("Obedient Leave")
+  obedientReason      String?
+  obedientById        String?
+  obedientAt          DateTime?
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
   employee            User               @relation("LeaveRequestEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
   approvedBy          User?              @relation("LeaveRequestApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  obedientBy          User?              @relation("LeaveRequestObedientBy", fields: [obedientById], references: [id], onDelete: SetNull)
   calculationPeriod   CalculationPeriod  @relation(fields: [calculationPeriodId], references: [id], onDelete: Cascade)
 
   @@index([employeeId, startDate, endDate])

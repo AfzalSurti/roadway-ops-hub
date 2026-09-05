@@ -26,3 +26,7 @@ export const convertLeaveSchema = z.object({
   periodId: z.string().min(1, "Calculation period is required"),
   reason: z.string().trim().min(1, "Reason is required").max(1000)
 });
+
+export const markLeaveObedientSchema = z.object({
+  reason: z.string().trim().min(1, "Reason is required").max(1000)
+});

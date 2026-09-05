@@ -46,6 +46,8 @@ export default function EmployeeOvertime() {
   const [rejectReason, setRejectReason] = useState("");
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
   const [convertReason, setConvertReason] = useState("");
+  const [obedientTarget, setObedientTarget] = useState<{ leaveId: string; leaveLabel: string } | null>(null);
+  const [obedientReason, setObedientReason] = useState("");
 
   const [filters, setFilters] = useState({
     employeeId: "",
@@ -176,6 +178,20 @@ export default function EmployeeOvertime() {
       await queryClient.invalidateQueries({ queryKey: ["hours-employee-report"] });
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to convert leave")
+  });
+
+  const obedientMutation = useMutation({
+    mutationFn: () => {
+      if (!obedientTarget) throw new Error("No leave selected");
+      return api.markLeaveObedient(obedientTarget.leaveId, obedientReason.trim());
+    },
+    onSuccess: async () => {
+      toast.success("Marked as Obedient Leave");
+      setObedientTarget(null);
+      setObedientReason("");
+      await queryClient.invalidateQueries({ queryKey: ["hours-employee-report"] });
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to mark as Obedient Leave")
   });
 
   const clearFilters = () =>
@@ -386,14 +402,19 @@ export default function EmployeeOvertime() {
                         <td className="p-2">Approved</td>
                         <td className={`p-2 font-medium ${COVERAGE_STYLES[row.coverage] ?? ""}`}>{row.coverage}</td>
                         <td className="p-2 text-right">
-                          {row.coverage === "Not Covered" && report.canConvert ? (
+                          {(row.coverage === "Not Covered" || row.coverage === "Partially Covered") && row.leaveId ? (
                             <Button
                               size="sm"
                               variant="outline"
                               className="h-6 gap-1 px-2 text-[10px]"
-                              onClick={() => setConvertDialogOpen(true)}
+                              onClick={() =>
+                                setObedientTarget({
+                                  leaveId: row.leaveId!,
+                                  leaveLabel: `${row.leaveLabel ?? "Leave"} · ${row.leaveDate ? formatDisplayDate(row.leaveDate) : ""}`
+                                })
+                              }
                             >
-                              Adjust to Leave
+                              Obedient Leave
                             </Button>
                           ) : (
                             <span className="text-muted-foreground">—</span>
@@ -629,6 +650,38 @@ export default function EmployeeOvertime() {
               onClick={() => convertMutation.mutate()}
             >
               {convertMutation.isPending ? "Converting..." : "Confirm Conversion"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(obedientTarget)} onOpenChange={(open) => !open && setObedientTarget(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Mark as Obedient Leave</DialogTitle>
+            <DialogDescription>
+              Excuses <span className="font-semibold text-foreground">{obedientTarget?.leaveLabel}</span> from
+              needing overtime coverage — for example, leave taken for a genuine personal emergency. This applies
+              immediately, regardless of whether the period has closed. The original leave record is kept for audit.
+            </DialogDescription>
+          </DialogHeader>
+          <Label>Reason</Label>
+          <textarea
+            value={obedientReason}
+            onChange={(e) => setObedientReason(e.target.value)}
+            placeholder="Why is this leave being excused?"
+            rows={3}
+            className="w-full rounded-md border border-input bg-transparent px-2 py-1.5 text-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          />
+          <DialogFooter className="gap-2">
+            <Button variant="ghost" onClick={() => setObedientTarget(null)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={!obedientReason.trim() || obedientMutation.isPending}
+              onClick={() => obedientMutation.mutate()}
+            >
+              {obedientMutation.isPending ? "Saving..." : "Confirm"}
             </Button>
           </DialogFooter>
         </DialogContent>

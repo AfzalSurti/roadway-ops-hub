@@ -13,7 +13,14 @@ import {
   periodBoundsForDate
 } from "../utils/hours.js";
 
-type LeaveRow = { id: string; startDate: Date; createdAt: Date; leaveType: LeaveType; durationMinutes: number };
+type LeaveRow = {
+  id: string;
+  startDate: Date;
+  createdAt: Date;
+  leaveType: LeaveType;
+  durationMinutes: number;
+  obedientAt?: Date | null;
+};
 type OvertimeRow = { id: string; date: Date; durationMinutes: number };
 
 /** Client rule: the first 2 approved Short Leaves in a period are auto-exempt — no overtime needed. */
@@ -27,6 +34,8 @@ const LEAVE_COVERAGE_PRIORITY: Record<LeaveType, number> = { HALF_DAY: 0, FULL_D
  *  - The first 2 Short Leaves SUBMITTED in a period are exempt (auto-approved at creation, "P", no
  *    adjustment needed) — same submission-order used at creation time in createLeaveRequest, so the
  *    two mechanisms never disagree about which Short Leaves are "the free 2".
+ *  - Leaves an admin has directly marked "Obedient Leave" (a valid-reason excuse for one specific
+ *    leave, entered any time — not gated by period closure) are also skipped entirely.
  *  - Remaining leave is sorted by client priority (HL -> L -> SL) then oldest-first, and covered first
  *    by real approved overtime, then by whatever an admin has manually converted ("OL").
  */
@@ -39,8 +48,10 @@ function allocateLeaveCoverage(leaves: LeaveRow[], overtimes: OvertimeRow[], con
       .map((l) => l.id)
   );
 
+  const obedientIds = new Set(leaves.filter((l) => l.obedientAt).map((l) => l.id));
+
   const needingCoverage = leaves
-    .filter((l) => !freeSlIds.has(l.id))
+    .filter((l) => !freeSlIds.has(l.id) && !obedientIds.has(l.id))
     .sort((a, b) => {
       const priorityDiff = LEAVE_COVERAGE_PRIORITY[a.leaveType] - LEAVE_COVERAGE_PRIORITY[b.leaveType];
       return priorityDiff !== 0 ? priorityDiff : a.startDate.getTime() - b.startDate.getTime();
@@ -83,7 +94,7 @@ function allocateLeaveCoverage(leaves: LeaveRow[], overtimes: OvertimeRow[], con
     olPool -= applied;
   }
 
-  return { freeSlIds, coveredByOt, coveredByOl, overtimeRemaining, allocations };
+  return { freeSlIds, obedientIds, coveredByOt, coveredByOl, overtimeRemaining, allocations };
 }
 
 function serializeLeave(leave: {
@@ -321,6 +332,24 @@ export const hoursService = {
     return serializeLeave(updated);
   },
 
+  /** Admin excuses one specific approved leave from needing overtime coverage — "Obedient Leave" (OL). */
+  async markLeaveObedient(id: string, adminId: string, reason: string) {
+    const leave = await hoursRepository.findLeaveById(id);
+    if (!leave) throw notFound("Leave request not found");
+    if (leave.status !== "APPROVED") throw badRequest("Only approved leave requests can be marked as Obedient Leave");
+    if (leave.obedientAt) throw badRequest("This leave has already been marked as Obedient Leave");
+
+    const trimmedReason = reason.trim();
+    if (!trimmedReason) throw badRequest("Reason is required");
+
+    const updated = await hoursRepository.markLeaveObedient(id, {
+      obedientReason: trimmedReason,
+      obedientById: adminId,
+      obedientAt: new Date()
+    });
+    return serializeLeave(updated);
+  },
+
   // ─── Overtime requests ────────────────────────────────────────────────────
 
   async createOvertimeRequest(
@@ -456,7 +485,11 @@ export const hoursService = {
       .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
       .slice(0, FREE_SHORT_LEAVES_PER_PERIOD)
       .reduce((sum, l) => sum + l.durationMinutes, 0);
-    const coverageRequiredMinutes = totalLeaveMinutes - freeShortLeaveMinutes;
+    // Leaves an admin has directly excused ("Obedient Leave") also need no coverage.
+    const obedientMinutes = approvedLeaves
+      .filter((l) => l.obedientAt)
+      .reduce((sum, l) => sum + l.durationMinutes, 0);
+    const coverageRequiredMinutes = totalLeaveMinutes - freeShortLeaveMinutes - obedientMinutes;
     const remainingMinutes = coverageRequiredMinutes - approvedOvertimeMinutes - convertedMinutes;
 
     const pendingCount =
@@ -498,7 +531,7 @@ export const hoursService = {
     ]);
     const convertedMinutes = convertedLeaves.reduce((sum, c) => sum + c.durationMinutes, 0);
 
-    const { freeSlIds, coveredByOt, coveredByOl, overtimeRemaining, allocations } = allocateLeaveCoverage(
+    const { freeSlIds, obedientIds, coveredByOt, coveredByOl, overtimeRemaining, allocations } = allocateLeaveCoverage(
       leaves,
       overtimes,
       convertedMinutes
@@ -508,12 +541,14 @@ export const hoursService = {
       .sort((a, b) => a.startDate.getTime() - b.startDate.getTime())
       .map((leave) => {
         const isFreeSl = freeSlIds.has(leave.id);
+        const isObedient = obedientIds.has(leave.id);
         const otCovered = coveredByOt.get(leave.id) ?? 0;
         const olCovered = coveredByOl.get(leave.id) ?? 0;
-        const covered = isFreeSl ? leave.durationMinutes : otCovered + olCovered;
+        const covered = isFreeSl || isObedient ? leave.durationMinutes : otCovered + olCovered;
         const remaining = leave.durationMinutes - covered;
         const modification: "P" | "L" = remaining <= 0 ? "P" : "L";
-        const adjustmentAgainst: "OT" | "OL" | "-" = isFreeSl ? "-" : olCovered > 0 ? "OL" : otCovered > 0 ? "OT" : "-";
+        const adjustmentAgainst: "OT" | "OL" | "-" =
+          isObedient ? "OL" : isFreeSl ? "-" : olCovered > 0 ? "OL" : otCovered > 0 ? "OT" : "-";
         return {
           id: leave.id,
           startDate: leave.startDate.toISOString(),
@@ -529,7 +564,8 @@ export const hoursService = {
           coverageStatus:
             remaining <= 0 ? ("COVERED" as const) : covered > 0 ? ("PARTIALLY_COVERED" as const) : ("NOT_COVERED" as const),
           modification,
-          adjustmentAgainst
+          adjustmentAgainst,
+          obedientReason: isObedient ? leave.obedientReason ?? null : null
         };
       });
 

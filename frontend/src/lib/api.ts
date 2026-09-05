@@ -861,6 +861,13 @@ export const api = {
     });
   },
 
+  markLeaveObedient(id: string, reason: string) {
+    return request<LeaveRequestItem>(`/hours/admin/leave-requests/${id}/mark-obedient`, {
+      method: "PATCH",
+      body: JSON.stringify({ reason })
+    });
+  },
+
   approveOvertimeRequest(id: string) {
     return request<OvertimeRequestItem>(`/hours/admin/overtime-requests/${id}/approve`, { method: "PATCH" });
   },

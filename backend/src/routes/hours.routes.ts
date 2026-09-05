@@ -8,6 +8,7 @@ import {
   convertLeaveSchema,
   createLeaveRequestSchema,
   createOvertimeRequestSchema,
+  markLeaveObedientSchema,
   reviewRequestSchema
 } from "../validators/hours.validator.js";
 
@@ -48,6 +49,11 @@ hoursRouter.patch(
   "/admin/leave-requests/:id/reject",
   validate(reviewRequestSchema),
   asyncHandler(hoursController.rejectLeaveRequest)
+);
+hoursRouter.patch(
+  "/admin/leave-requests/:id/mark-obedient",
+  validate(markLeaveObedientSchema),
+  asyncHandler(hoursController.markLeaveObedient)
 );
 
 hoursRouter.get("/admin/overtime-requests", asyncHandler(hoursController.listAdminOvertimeRequests));

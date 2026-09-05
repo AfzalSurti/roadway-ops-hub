@@ -1012,6 +1012,8 @@ export type HoursLeaveBreakdownRow = {
   modification: "P" | "L";
   /** What resolved this leave, if anything: approved overtime, an admin conversion, or none. */
   adjustmentAgainst: "OT" | "OL" | "-";
+  /** Set when an admin directly excused this leave from needing coverage ("Obedient Leave"). */
+  obedientReason: string | null;
 };
 
 export type HoursOvertimeBreakdownRow = {
