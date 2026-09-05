@@ -17,6 +17,13 @@ export function leaveTypeLabel(type: LeaveType): string {
   return LEAVE_TYPE_OPTIONS.find((item) => item.value === type)?.label ?? type;
 }
 
+/** Client's report abbreviation: Full Day -> L, Half Day -> HL, Short Leave -> SL. */
+export function leaveTypeShortLabel(type: LeaveType): string {
+  if (type === "FULL_DAY") return "L";
+  if (type === "HALF_DAY") return "HL";
+  return "SL";
+}
+
 /** 150 -> "2h 30m" — display-only; never do arithmetic on the label. */
 export function minutesToLabel(totalMinutes: number): string {
   const sign = totalMinutes < 0 ? "-" : "";

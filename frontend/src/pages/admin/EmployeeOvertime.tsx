@@ -43,6 +43,8 @@ export default function EmployeeOvertime() {
   const [selectedPeriodId, setSelectedPeriodId] = useState("");
   const [rejectTarget, setRejectTarget] = useState<{ id: string; type: "LEAVE" | "OVERTIME" } | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [convertDialogOpen, setConvertDialogOpen] = useState(false);
+  const [convertReason, setConvertReason] = useState("");
 
   const [filters, setFilters] = useState({
     employeeId: "",
@@ -152,6 +154,17 @@ export default function EmployeeOvertime() {
     onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to generate report")
   });
 
+  const convertMutation = useMutation({
+    mutationFn: () => api.convertEmployeeLeave(selectedEmployeeId, report!.period.id, convertReason.trim()),
+    onSuccess: async () => {
+      toast.success("Uncovered leave converted");
+      setConvertDialogOpen(false);
+      setConvertReason("");
+      await queryClient.invalidateQueries({ queryKey: ["hours-employee-report"] });
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to convert leave")
+  });
+
   const clearFilters = () =>
     setFilters({ employeeId: "", periodId: "", leaveType: "", requestType: "", status: "PENDING", dateFrom: "", dateTo: "" });
   const hasFilters =
@@ -208,13 +221,14 @@ export default function EmployeeOvertime() {
         </p>
       ) : report ? (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
             {[
               { label: "Full Day Leave", value: String(report.leave.fullDay.count) },
               { label: "Half Day Leave", value: String(report.leave.halfDay.count) },
               { label: "Short Leave", value: String(report.leave.shortLeave.count) },
               { label: "Total Leave Hours", value: report.leave.totalLabel },
               { label: "Approved Overtime", value: report.approvedOvertimeLabel },
+              { label: "Converted", value: report.convertedLabel },
               { label: "Remaining", value: report.remainingLabel },
               { label: "Pending Requests", value: String(report.pendingCount) }
             ].map((card) => (
@@ -224,6 +238,18 @@ export default function EmployeeOvertime() {
               </div>
             ))}
           </div>
+
+          {report.canConvert ? (
+            <div className="glass-panel p-4 flex flex-wrap items-center justify-between gap-3 border border-amber-500/30 bg-amber-500/5">
+              <p className="text-sm">
+                <span className="font-medium">{report.remainingLabel}</span> of {selectedEmployee?.name}'s leave is
+                uncovered for this closed period.
+              </p>
+              <Button variant="outline" className="gap-1" onClick={() => setConvertDialogOpen(true)}>
+                Convert to Leave
+              </Button>
+            </div>
+          ) : null}
 
           <div className="glass-panel p-5 space-y-4">
             <h2 className="text-lg font-semibold">
@@ -429,7 +455,10 @@ export default function EmployeeOvertime() {
                     </td>
                     <td className="py-2 px-3 max-w-[240px]">
                       {request.requestType === "LEAVE" ? (
-                        <span className="text-xs text-muted-foreground">{pluralizeDays(request.numberOfDays)}</span>
+                        <div className="text-xs text-muted-foreground">
+                          <p>{pluralizeDays(request.numberOfDays)}</p>
+                          <p className="line-clamp-2">{request.reason}</p>
+                        </div>
                       ) : (
                         <div className="text-xs text-muted-foreground">
                           <p>
@@ -498,6 +527,38 @@ export default function EmployeeOvertime() {
             </Button>
             <Button variant="destructive" disabled={rejectMutation.isPending} onClick={() => rejectMutation.mutate()}>
               {rejectMutation.isPending ? "Rejecting..." : "Reject"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={convertDialogOpen} onOpenChange={(open) => !open && setConvertDialogOpen(false)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Convert to Leave</DialogTitle>
+            <DialogDescription>
+              This converts {selectedEmployee?.name}'s uncovered balance of{" "}
+              <span className="font-semibold text-foreground">{report?.remainingLabel}</span> into a permanent
+              recorded leave deduction. The original leave and overtime records are kept for audit.
+            </DialogDescription>
+          </DialogHeader>
+          <Label>Reason</Label>
+          <textarea
+            value={convertReason}
+            onChange={(e) => setConvertReason(e.target.value)}
+            placeholder="Why is this balance being converted?"
+            rows={3}
+            className="w-full rounded-md border border-input bg-transparent px-2 py-1.5 text-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          />
+          <DialogFooter className="gap-2">
+            <Button variant="ghost" onClick={() => setConvertDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={!convertReason.trim() || convertMutation.isPending}
+              onClick={() => convertMutation.mutate()}
+            >
+              {convertMutation.isPending ? "Converting..." : "Confirm Conversion"}
             </Button>
           </DialogFooter>
         </DialogContent>

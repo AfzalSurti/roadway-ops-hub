@@ -958,6 +958,7 @@ export type LeaveRequestItem = HoursRequestBase & {
   endDate: string;
   numberOfDays: number;
   leaveType: LeaveType;
+  reason: string;
 };
 
 export type OvertimeRequestItem = HoursRequestBase & {
@@ -984,8 +985,13 @@ export type HoursSummaryItem = {
   };
   approvedOvertimeMinutes: number;
   approvedOvertimeLabel: string;
+  /** Total settled via admin's "Convert to Leave" action for this period. */
+  convertedMinutes: number;
+  convertedLabel: string;
   remainingMinutes: number;
   remainingLabel: string;
+  /** True once the period has ended and there's an uncovered balance left to settle. */
+  canConvert: boolean;
   pendingCount: number;
 };
 
@@ -995,12 +1001,17 @@ export type HoursLeaveBreakdownRow = {
   endDate: string;
   numberOfDays: number;
   leaveType: LeaveType;
+  reason: string;
   durationMinutes: number;
   durationLabel: string;
   coveredMinutes: number;
   coveredLabel: string;
   remainingMinutes: number;
   coverageStatus: "COVERED" | "PARTIALLY_COVERED" | "NOT_COVERED";
+  /** P = treated as present (covered or auto-exempt), L = leave still stands uncovered. */
+  modification: "P" | "L";
+  /** What resolved this leave, if anything: approved overtime, an admin conversion, or none. */
+  adjustmentAgainst: "OT" | "OL" | "-";
 };
 
 export type HoursOvertimeBreakdownRow = {
@@ -1036,7 +1047,25 @@ export type HoursBreakdownItem = {
 
 export type HoursReportItem = HoursSummaryItem & HoursBreakdownItem;
 
-export type HoursEmployeeReportItem = HoursReportItem & { employee: HoursEmployeeRef };
+export type ConvertedLeaveItem = {
+  id: string;
+  employeeId: string;
+  employee: HoursEmployeeRef;
+  calculationPeriodId: string;
+  calculationPeriod?: { id: string; startDate: string; endDate: string };
+  durationMinutes: number;
+  durationLabel: string;
+  reason: string;
+  convertedById: string;
+  convertedBy: HoursEmployeeRef;
+  convertedAt: string;
+  createdAt: string;
+};
+
+export type HoursEmployeeReportItem = HoursReportItem & {
+  employee: HoursEmployeeRef;
+  convertedLeaves: ConvertedLeaveItem[];
+};
 
 export type HoursAllEmployeesReportItem = {
   period: { id: string; startDate: string; endDate: string; status: CalculationPeriodStatus };

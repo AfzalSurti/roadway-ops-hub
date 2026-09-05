@@ -136,5 +136,22 @@ export const hoursController = {
   async getEmployeeReport(req: Request, res: Response) {
     const result = await hoursService.getEmployeeReport(req.params.id, strParam(req.query.periodId));
     return sendSuccess(res, result);
+  },
+
+  // ─── Converted leave (admin settlement) ─────────────────────────────────
+
+  async convertLeave(req: Request, res: Response) {
+    const result = await hoursService.convertUncoveredLeave(
+      req.params.id,
+      req.body.periodId,
+      req.user!.id,
+      req.body.reason
+    );
+    return sendSuccess(res, result, 201);
+  },
+
+  async listMyConvertedLeaves(req: Request, res: Response) {
+    const result = await hoursService.listMyConvertedLeaves(req.user!.id);
+    return sendSuccess(res, result);
   }
 };

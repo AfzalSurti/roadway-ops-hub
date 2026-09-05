@@ -77,6 +77,43 @@ export function combineDateAndTime(dateValue: string, timeValue: string): Date {
   return fromIstVirtual(virtual);
 }
 
+/** Client rule: overtime is only counted for time worked after 19:00 IST, and only when ≥1h qualifies. */
+export const OVERTIME_THRESHOLD_HOUR = 19;
+export const OVERTIME_MINIMUM_MINUTES = 60;
+
+/**
+ * Overtime duration = time worked after the 19:00 IST threshold, discarded entirely if under the
+ * 1-hour minimum. Example: 18:00-22:00 raw is 4h, but only 19:00-22:00 = 3h counts.
+ */
+export function computeOvertimeMinutes(startTime: Date, endTime: Date): number {
+  const virtualStart = toIstVirtual(startTime);
+  const thresholdVirtual = new Date(
+    Date.UTC(
+      virtualStart.getUTCFullYear(),
+      virtualStart.getUTCMonth(),
+      virtualStart.getUTCDate(),
+      OVERTIME_THRESHOLD_HOUR,
+      0,
+      0,
+      0
+    )
+  );
+  const threshold = fromIstVirtual(thresholdVirtual);
+  const effectiveStart = startTime.getTime() > threshold.getTime() ? startTime : threshold;
+  const rawMinutes = Math.round((endTime.getTime() - effectiveStart.getTime()) / 60_000);
+  if (rawMinutes < OVERTIME_MINIMUM_MINUTES) return 0;
+  return rawMinutes;
+}
+
+/** True once "today" (IST) reaches the period's end calendar day or later — i.e. on/after the 25th. */
+export function isPeriodSettleable(periodEndDate: Date, reference: Date = now()): boolean {
+  const virtualNow = toIstVirtual(reference);
+  const virtualEnd = toIstVirtual(periodEndDate);
+  const todayKey = Date.UTC(virtualNow.getUTCFullYear(), virtualNow.getUTCMonth(), virtualNow.getUTCDate());
+  const endKey = Date.UTC(virtualEnd.getUTCFullYear(), virtualEnd.getUTCMonth(), virtualEnd.getUTCDate());
+  return todayKey >= endKey;
+}
+
 /** "150" -> "2h 30m". Minutes-only internal storage avoids floating point drift; this is display-only. */
 export function minutesToLabel(totalMinutes: number): string {
   const sign = totalMinutes < 0 ? "-" : "";

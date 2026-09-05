@@ -131,6 +131,27 @@ export const hoursRepository = {
       select: employeeSelect,
       orderBy: { name: "asc" }
     });
+  },
+
+  // ─── Converted leave (admin settlement) ─────────────────────────────────
+
+  listConvertedLeaves(where: Prisma.ConvertedLeaveWhereInput) {
+    return prisma.convertedLeave.findMany({
+      where,
+      include: {
+        employee: { select: employeeSelect },
+        convertedBy: { select: employeeSelect },
+        calculationPeriod: { select: { id: true, startDate: true, endDate: true } }
+      },
+      orderBy: { convertedAt: "desc" }
+    });
+  },
+
+  createConvertedLeave(data: Prisma.ConvertedLeaveUncheckedCreateInput) {
+    return prisma.convertedLeave.create({
+      data,
+      include: { employee: { select: employeeSelect }, convertedBy: { select: employeeSelect } }
+    });
   }
 };
 

@@ -5,6 +5,7 @@ import { requireRole } from "../middleware/rbac.js";
 import { validate } from "../middleware/validate.js";
 import { asyncHandler } from "../utils/async-handler.js";
 import {
+  convertLeaveSchema,
   createLeaveRequestSchema,
   createOvertimeRequestSchema,
   reviewRequestSchema
@@ -32,6 +33,7 @@ hoursRouter.post(
 hoursRouter.get("/overtime-requests/me", asyncHandler(hoursController.listMyOvertimeRequests));
 
 hoursRouter.get("/me/summary", asyncHandler(hoursController.getMySummary));
+hoursRouter.get("/converted-leaves/me", asyncHandler(hoursController.listMyConvertedLeaves));
 
 // Admin-facing
 hoursRouter.use("/admin", requireRole("ADMIN"));
@@ -59,3 +61,8 @@ hoursRouter.patch(
 hoursRouter.get("/admin/employees/:id/summary", asyncHandler(hoursController.getEmployeeSummary));
 hoursRouter.get("/admin/employees/:id/breakdown", asyncHandler(hoursController.getEmployeeBreakdown));
 hoursRouter.get("/admin/employees/:id/report", asyncHandler(hoursController.getEmployeeReport));
+hoursRouter.post(
+  "/admin/employees/:id/convert-leave",
+  validate(convertLeaveSchema),
+  asyncHandler(hoursController.convertLeave)
+);

@@ -68,6 +68,7 @@ export default function CalculateHours() {
   const [leaveFrom, setLeaveFrom] = useState("");
   const [leaveTo, setLeaveTo] = useState("");
   const [leaveType, setLeaveType] = useState<LeaveType | "">("");
+  const [leaveReason, setLeaveReason] = useState("");
   const [otProject, setOtProject] = useState("");
   const [otFrom, setOtFrom] = useState("");
   const [otTo, setOtTo] = useState("");
@@ -86,6 +87,11 @@ export default function CalculateHours() {
   const { data: overtimeRequests = [], isLoading: loadingOvertime } = useQuery({
     queryKey: ["hours-my-overtime"],
     queryFn: () => api.getMyOvertimeRequests()
+  });
+
+  const { data: convertedLeaves = [] } = useQuery({
+    queryKey: ["hours-my-converted-leaves"],
+    queryFn: () => api.getMyConvertedLeaves()
   });
 
   const { data: myTasksPage } = useQuery({
@@ -145,6 +151,7 @@ export default function CalculateHours() {
     setLeaveFrom("");
     setLeaveTo("");
     setLeaveType("");
+    setLeaveReason("");
   };
   const resetOvertimeForm = () => {
     setOtProject("");
@@ -154,7 +161,13 @@ export default function CalculateHours() {
   };
 
   const createLeaveMutation = useMutation({
-    mutationFn: () => api.createLeaveRequest({ startDate: leaveFrom, endDate: leaveTo, leaveType: leaveType as LeaveType }),
+    mutationFn: () =>
+      api.createLeaveRequest({
+        startDate: leaveFrom,
+        endDate: leaveTo,
+        leaveType: leaveType as LeaveType,
+        reason: leaveReason.trim()
+      }),
     onSuccess: async () => {
       toast.success("Leave request submitted");
       resetLeaveForm();
@@ -218,10 +231,17 @@ export default function CalculateHours() {
         label: `Overtime — ${item.project} — ${formatIsoTimeLabel(item.startTime)} to ${formatIsoTimeLabel(item.endTime)} — ${item.durationLabel}`,
         status: item.status,
         rejectionReason: item.rejectionReason
+      })),
+      ...convertedLeaves.map((item) => ({
+        id: `converted-${item.id}`,
+        date: item.calculationPeriod?.endDate ?? item.convertedAt,
+        label: `Converted Leave — ${item.durationLabel}`,
+        status: "APPROVED",
+        rejectionReason: item.reason || null
       }))
     ];
     return items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [leaveRequests, overtimeRequests]);
+  }, [leaveRequests, overtimeRequests, convertedLeaves]);
 
   const isLoading = loadingSummary || loadingLeave || loadingOvertime;
 
@@ -230,6 +250,7 @@ export default function CalculateHours() {
     const key = toRequestDateInput(date);
     setLeaveFrom(key);
     setLeaveTo(key);
+    setLeaveReason("");
     setOtFrom("");
     setOtTo("");
     setOtProject("");
@@ -340,7 +361,7 @@ export default function CalculateHours() {
                 >
                   <div className="min-w-0">
                     <p className="text-sm font-medium">{item.label}</p>
-                    {item.status === "REJECTED" && item.rejectionReason ? (
+                    {item.rejectionReason ? (
                       <p className="text-xs text-muted-foreground mt-0.5">Reason: {item.rejectionReason}</p>
                     ) : null}
                   </div>
@@ -375,8 +396,11 @@ export default function CalculateHours() {
                     {pluralizeDays(selectedLeave.numberOfDays)}) — {selectedLeave.durationLabel}
                   </p>
                   <Badge variant={statusBadgeVariant(selectedLeave.status)}>{statusLabel(selectedLeave.status)}</Badge>
+                  {selectedLeave.reason ? (
+                    <p className="text-xs text-muted-foreground">Reason: {selectedLeave.reason}</p>
+                  ) : null}
                   {selectedLeave.status === "REJECTED" && selectedLeave.rejectionReason ? (
-                    <p className="text-xs text-muted-foreground">Reason: {selectedLeave.rejectionReason}</p>
+                    <p className="text-xs text-muted-foreground">Admin note: {selectedLeave.rejectionReason}</p>
                   ) : null}
                 </div>
               ) : null}
@@ -428,10 +452,24 @@ export default function CalculateHours() {
                     <p className="text-sm font-medium">Total Leave Hours: {minutesToLabel(leaveTotalMinutes)}</p>
                   ) : null}
 
+                  <Label>Reason</Label>
+                  <textarea
+                    value={leaveReason}
+                    onChange={(e) => setLeaveReason(e.target.value)}
+                    placeholder="Why do you need this leave?"
+                    rows={2}
+                    className="w-full rounded-md border border-input bg-transparent px-2 py-1.5 text-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  />
+
                   <Button
                     className="w-full gap-1"
                     disabled={
-                      !leaveType || !leaveFrom || !leaveTo || leaveRangeInvalid || createLeaveMutation.isPending
+                      !leaveType ||
+                      !leaveFrom ||
+                      !leaveTo ||
+                      leaveRangeInvalid ||
+                      !leaveReason.trim() ||
+                      createLeaveMutation.isPending
                     }
                     onClick={() => createLeaveMutation.mutate()}
                   >

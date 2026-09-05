@@ -31,6 +31,7 @@ import type {
   InfraProjectItem,
   InfraTeamMemberItem,
   CalculationPeriodItem,
+  ConvertedLeaveItem,
   HoursAdminRequestItem,
   HoursAllEmployeesReportItem,
   HoursBreakdownItem,
@@ -798,7 +799,7 @@ export const api = {
 
   // ─── Calculate Hours (Leave + Overtime) ─────────────────────────────────
 
-  createLeaveRequest(payload: { startDate: string; endDate: string; leaveType: LeaveType }) {
+  createLeaveRequest(payload: { startDate: string; endDate: string; leaveType: LeaveType; reason: string }) {
     return request<LeaveRequestItem>("/hours/leave-requests", {
       method: "POST",
       body: JSON.stringify(payload)
@@ -822,6 +823,10 @@ export const api = {
 
   getMyHoursSummary() {
     return request<HoursReportItem>("/hours/me/summary");
+  },
+
+  getMyConvertedLeaves() {
+    return request<ConvertedLeaveItem[]>("/hours/converted-leaves/me");
   },
 
   getHoursPeriods() {
@@ -887,6 +892,16 @@ export const api = {
 
   getAllEmployeesHoursReport(periodId?: string) {
     return request<HoursAllEmployeesReportItem>(`/hours/admin/report${periodId ? `?periodId=${periodId}` : ""}`);
+  },
+
+  convertEmployeeLeave(employeeId: string, periodId: string, reason: string) {
+    return request<HoursSummaryItem & { convertedLeave: ConvertedLeaveItem }>(
+      `/hours/admin/employees/${employeeId}/convert-leave`,
+      {
+        method: "POST",
+        body: JSON.stringify({ periodId, reason })
+      }
+    );
   },
 
   getProjectRequisitionForms() {

@@ -4,45 +4,86 @@ import { badRequest, conflict, notFound } from "../utils/errors.js";
 import {
   LEAVE_DURATION_MINUTES,
   combineDateAndTime,
+  computeOvertimeMinutes,
   daysBetweenInclusive,
+  isPeriodSettleable,
   minutesToLabel,
   now,
   parseHoursDate,
   periodBoundsForDate
 } from "../utils/hours.js";
 
-type LeaveRow = { id: string; startDate: Date; leaveType: LeaveType; durationMinutes: number };
+type LeaveRow = { id: string; startDate: Date; createdAt: Date; leaveType: LeaveType; durationMinutes: number };
 type OvertimeRow = { id: string; date: Date; durationMinutes: number };
 
-/** FIFO allocation: oldest approved leave is covered first, drawing from approved overtime in date order. */
-function allocateOvertimeToLeave(leaves: LeaveRow[], overtimes: OvertimeRow[]) {
-  const sortedLeaves = [...leaves].sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
-  const sortedOvertimes = [...overtimes].sort((a, b) => a.date.getTime() - b.date.getTime());
+/** Client rule: the first 2 approved Short Leaves in a period are auto-exempt — no overtime needed. */
+const FREE_SHORT_LEAVES_PER_PERIOD = 2;
 
+/** Client rule: leave coverage priority is Half Day -> Full Day -> Short Leave (excess beyond the free 2). */
+const LEAVE_COVERAGE_PRIORITY: Record<LeaveType, number> = { HALF_DAY: 0, FULL_DAY: 1, SHORT_LEAVE: 2 };
+
+/**
+ * Two-pass FIFO leave coverage:
+ *  - The first 2 Short Leaves SUBMITTED in a period are exempt (auto-approved at creation, "P", no
+ *    adjustment needed) — same submission-order used at creation time in createLeaveRequest, so the
+ *    two mechanisms never disagree about which Short Leaves are "the free 2".
+ *  - Remaining leave is sorted by client priority (HL -> L -> SL) then oldest-first, and covered first
+ *    by real approved overtime, then by whatever an admin has manually converted ("OL").
+ */
+function allocateLeaveCoverage(leaves: LeaveRow[], overtimes: OvertimeRow[], convertedMinutes: number) {
+  const freeSlIds = new Set(
+    leaves
+      .filter((l) => l.leaveType === "SHORT_LEAVE")
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+      .slice(0, FREE_SHORT_LEAVES_PER_PERIOD)
+      .map((l) => l.id)
+  );
+
+  const needingCoverage = leaves
+    .filter((l) => !freeSlIds.has(l.id))
+    .sort((a, b) => {
+      const priorityDiff = LEAVE_COVERAGE_PRIORITY[a.leaveType] - LEAVE_COVERAGE_PRIORITY[b.leaveType];
+      return priorityDiff !== 0 ? priorityDiff : a.startDate.getTime() - b.startDate.getTime();
+    });
+
+  const sortedOvertimes = [...overtimes].sort((a, b) => a.date.getTime() - b.date.getTime());
   const overtimeRemaining = new Map(sortedOvertimes.map((o) => [o.id, o.durationMinutes]));
-  const leaveCovered = new Map<string, number>(sortedLeaves.map((l) => [l.id, 0]));
+  const coveredByOt = new Map<string, number>(leaves.map((l) => [l.id, 0]));
   const allocations: Array<{ leaveId: string; overtimeId: string; minutesApplied: number }> = [];
 
+  // Pass 1 — real approved overtime, in priority order.
   let otIndex = 0;
-  for (const leave of sortedLeaves) {
-    let remainingToCover = leave.durationMinutes;
-    while (remainingToCover > 0 && otIndex < sortedOvertimes.length) {
+  for (const leave of needingCoverage) {
+    let remaining = leave.durationMinutes;
+    while (remaining > 0 && otIndex < sortedOvertimes.length) {
       const ot = sortedOvertimes[otIndex];
       const otRemaining = overtimeRemaining.get(ot.id) ?? 0;
       if (otRemaining <= 0) {
         otIndex += 1;
         continue;
       }
-      const applied = Math.min(otRemaining, remainingToCover);
+      const applied = Math.min(otRemaining, remaining);
       allocations.push({ leaveId: leave.id, overtimeId: ot.id, minutesApplied: applied });
       overtimeRemaining.set(ot.id, otRemaining - applied);
-      leaveCovered.set(leave.id, (leaveCovered.get(leave.id) ?? 0) + applied);
-      remainingToCover -= applied;
+      coveredByOt.set(leave.id, (coveredByOt.get(leave.id) ?? 0) + applied);
+      remaining -= applied;
       if ((overtimeRemaining.get(ot.id) ?? 0) <= 0) otIndex += 1;
     }
   }
 
-  return { allocations, leaveCovered, overtimeRemaining };
+  // Pass 2 — admin-converted balance settles whatever's still outstanding, same priority order.
+  const coveredByOl = new Map<string, number>(leaves.map((l) => [l.id, 0]));
+  let olPool = convertedMinutes;
+  for (const leave of needingCoverage) {
+    if (olPool <= 0) break;
+    const stillNeeded = leave.durationMinutes - (coveredByOt.get(leave.id) ?? 0);
+    if (stillNeeded <= 0) continue;
+    const applied = Math.min(olPool, stillNeeded);
+    coveredByOl.set(leave.id, applied);
+    olPool -= applied;
+  }
+
+  return { freeSlIds, coveredByOt, coveredByOl, overtimeRemaining, allocations };
 }
 
 function serializeLeave(leave: {
@@ -54,6 +95,7 @@ function serializeLeave(leave: {
   numberOfDays: number;
   leaveType: LeaveType;
   durationMinutes: number;
+  reason: string;
   status: HoursRequestStatus;
   approvedById: string | null;
   approvedAt: Date | null;
@@ -75,6 +117,7 @@ function serializeLeave(leave: {
     numberOfDays: leave.numberOfDays,
     leaveType: leave.leaveType,
     durationMinutes: leave.durationMinutes,
+    reason: leave.reason,
     durationLabel: minutesToLabel(leave.durationMinutes),
     status: leave.status,
     approvedById: leave.approvedById,
@@ -125,6 +168,41 @@ function serializeOvertime(overtime: {
   };
 }
 
+function serializeConvertedLeave(row: {
+  id: string;
+  employeeId: string;
+  calculationPeriodId: string;
+  durationMinutes: number;
+  reason: string;
+  convertedById: string;
+  convertedAt: Date;
+  createdAt: Date;
+  employee: { id: string; name: string; email: string };
+  convertedBy: { id: string; name: string; email: string };
+  calculationPeriod?: { id: string; startDate: Date; endDate: Date };
+}) {
+  return {
+    id: row.id,
+    employeeId: row.employeeId,
+    employee: row.employee,
+    calculationPeriodId: row.calculationPeriodId,
+    calculationPeriod: row.calculationPeriod
+      ? {
+          id: row.calculationPeriod.id,
+          startDate: row.calculationPeriod.startDate.toISOString(),
+          endDate: row.calculationPeriod.endDate.toISOString()
+        }
+      : undefined,
+    durationMinutes: row.durationMinutes,
+    durationLabel: minutesToLabel(row.durationMinutes),
+    reason: row.reason,
+    convertedById: row.convertedById,
+    convertedBy: row.convertedBy,
+    convertedAt: row.convertedAt.toISOString(),
+    createdAt: row.createdAt.toISOString()
+  };
+}
+
 export const hoursService = {
   // ─── Calculation period resolution ──────────────────────────────────────
 
@@ -152,7 +230,10 @@ export const hoursService = {
 
   // ─── Leave requests ──────────────────────────────────────────────────────
 
-  async createLeaveRequest(employeeId: string, payload: { startDate: string; endDate: string; leaveType: LeaveType }) {
+  async createLeaveRequest(
+    employeeId: string,
+    payload: { startDate: string; endDate: string; leaveType: LeaveType; reason: string }
+  ) {
     const startDate = parseHoursDate(payload.startDate);
     const endDate = parseHoursDate(payload.endDate);
     if (endDate.getTime() < startDate.getTime()) {
@@ -171,6 +252,20 @@ export const hoursService = {
 
     const numberOfDays = daysBetweenInclusive(startDate, endDate);
     const durationMinutes = numberOfDays * LEAVE_DURATION_MINUTES[payload.leaveType];
+
+    // Client rule: the first 2 Short Leaves submitted in a period need no admin approval at all —
+    // they're auto-fulfilled immediately, no overtime required either (see allocateLeaveCoverage).
+    let autoApproved = false;
+    if (payload.leaveType === "SHORT_LEAVE") {
+      const existingShortLeaves = await hoursRepository.listLeaveRequests({
+        employeeId,
+        calculationPeriodId: period.id,
+        leaveType: "SHORT_LEAVE",
+        status: { in: ["PENDING", "APPROVED"] }
+      });
+      autoApproved = existingShortLeaves.length < FREE_SHORT_LEAVES_PER_PERIOD;
+    }
+
     const created = await hoursRepository.createLeaveRequest({
       employeeId,
       calculationPeriodId: period.id,
@@ -179,7 +274,9 @@ export const hoursService = {
       numberOfDays,
       leaveType: payload.leaveType,
       durationMinutes,
-      status: "PENDING"
+      reason: payload.reason.trim(),
+      status: autoApproved ? "APPROVED" : "PENDING",
+      approvedAt: autoApproved ? new Date() : null
     });
     return serializeLeave(created);
   },
@@ -233,8 +330,10 @@ export const hoursService = {
     const date = parseHoursDate(payload.date);
     const startTime = combineDateAndTime(payload.date, payload.startTime);
     const endTime = combineDateAndTime(payload.date, payload.endTime);
-    const durationMinutes = Math.round((endTime.getTime() - startTime.getTime()) / 60_000);
-    if (durationMinutes <= 0) throw badRequest("End time must be after start time");
+    if (endTime.getTime() <= startTime.getTime()) throw badRequest("End time must be after start time");
+    // Client rule: only time worked after 19:00 counts, and only when at least 1h of it qualifies —
+    // the request is still recorded even when that comes out to 0 (shown as "-" in reports).
+    const durationMinutes = computeOvertimeMinutes(startTime, endTime);
 
     const period = await this.getActivePeriod();
     if (date.getTime() < period.startDate.getTime() || date.getTime() > period.endDate.getTime()) {
@@ -327,9 +426,10 @@ export const hoursService = {
 
   /** Approved-only totals for an employee within a period — the numbers that matter for compensation. */
   async getEmployeeSummary(employeeId: string, period: { id: string; startDate: Date; endDate: Date; status: string }) {
-    const [allLeaves, allOvertimes] = await Promise.all([
+    const [allLeaves, allOvertimes, convertedLeaves] = await Promise.all([
       hoursRepository.listLeaveRequests({ employeeId, calculationPeriodId: period.id }),
-      hoursRepository.listOvertimeRequests({ employeeId, calculationPeriodId: period.id })
+      hoursRepository.listOvertimeRequests({ employeeId, calculationPeriodId: period.id }),
+      hoursRepository.listConvertedLeaves({ employeeId, calculationPeriodId: period.id })
     ]);
 
     const approvedLeaves = allLeaves.filter((l) => l.status === "APPROVED");
@@ -347,7 +447,17 @@ export const hoursService = {
     const totalLeaveMinutes = fullDay.minutes + halfDay.minutes + shortLeave.minutes;
     const totalLeaveCount = fullDay.count + halfDay.count + shortLeave.count;
     const approvedOvertimeMinutes = approvedOvertimes.reduce((sum, o) => sum + o.durationMinutes, 0);
-    const remainingMinutes = totalLeaveMinutes - approvedOvertimeMinutes;
+    const convertedMinutes = convertedLeaves.reduce((sum, c) => sum + c.durationMinutes, 0);
+
+    // Client rule: the first 2 Short Leaves submitted in a period need no coverage at all
+    // (they're also auto-approved at creation — see createLeaveRequest).
+    const freeShortLeaveMinutes = approvedLeaves
+      .filter((l) => l.leaveType === "SHORT_LEAVE")
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+      .slice(0, FREE_SHORT_LEAVES_PER_PERIOD)
+      .reduce((sum, l) => sum + l.durationMinutes, 0);
+    const coverageRequiredMinutes = totalLeaveMinutes - freeShortLeaveMinutes;
+    const remainingMinutes = coverageRequiredMinutes - approvedOvertimeMinutes - convertedMinutes;
 
     const pendingCount =
       allLeaves.filter((l) => l.status === "PENDING").length +
@@ -370,39 +480,56 @@ export const hoursService = {
       },
       approvedOvertimeMinutes,
       approvedOvertimeLabel: minutesToLabel(approvedOvertimeMinutes),
+      convertedMinutes,
+      convertedLabel: minutesToLabel(convertedMinutes),
       remainingMinutes,
       remainingLabel: minutesToLabel(remainingMinutes),
+      canConvert: remainingMinutes > 0 && isPeriodSettleable(period.endDate),
       pendingCount
     };
   },
 
-  /** Date-wise FIFO allocation of approved overtime against approved leave for a period. */
+  /** Date-wise FIFO allocation of approved overtime (then admin-converted balance) against approved leave. */
   async getEmployeeBreakdown(employeeId: string, period: { id: string }) {
-    const [leaves, overtimes] = await Promise.all([
+    const [leaves, overtimes, convertedLeaves] = await Promise.all([
       hoursRepository.listLeaveRequests({ employeeId, calculationPeriodId: period.id, status: "APPROVED" }),
-      hoursRepository.listOvertimeRequests({ employeeId, calculationPeriodId: period.id, status: "APPROVED" })
+      hoursRepository.listOvertimeRequests({ employeeId, calculationPeriodId: period.id, status: "APPROVED" }),
+      hoursRepository.listConvertedLeaves({ employeeId, calculationPeriodId: period.id })
     ]);
+    const convertedMinutes = convertedLeaves.reduce((sum, c) => sum + c.durationMinutes, 0);
 
-    const { allocations, leaveCovered, overtimeRemaining } = allocateOvertimeToLeave(leaves, overtimes);
+    const { freeSlIds, coveredByOt, coveredByOl, overtimeRemaining, allocations } = allocateLeaveCoverage(
+      leaves,
+      overtimes,
+      convertedMinutes
+    );
 
     const leaveBreakdown = [...leaves]
       .sort((a, b) => a.startDate.getTime() - b.startDate.getTime())
       .map((leave) => {
-        const covered = leaveCovered.get(leave.id) ?? 0;
+        const isFreeSl = freeSlIds.has(leave.id);
+        const otCovered = coveredByOt.get(leave.id) ?? 0;
+        const olCovered = coveredByOl.get(leave.id) ?? 0;
+        const covered = isFreeSl ? leave.durationMinutes : otCovered + olCovered;
         const remaining = leave.durationMinutes - covered;
+        const modification: "P" | "L" = remaining <= 0 ? "P" : "L";
+        const adjustmentAgainst: "OT" | "OL" | "-" = isFreeSl ? "-" : olCovered > 0 ? "OL" : otCovered > 0 ? "OT" : "-";
         return {
           id: leave.id,
           startDate: leave.startDate.toISOString(),
           endDate: leave.endDate.toISOString(),
           numberOfDays: leave.numberOfDays,
           leaveType: leave.leaveType,
+          reason: leave.reason,
           durationMinutes: leave.durationMinutes,
           durationLabel: minutesToLabel(leave.durationMinutes),
           coveredMinutes: covered,
           coveredLabel: minutesToLabel(covered),
           remainingMinutes: Math.max(remaining, 0),
           coverageStatus:
-            remaining <= 0 ? ("COVERED" as const) : covered > 0 ? ("PARTIALLY_COVERED" as const) : ("NOT_COVERED" as const)
+            remaining <= 0 ? ("COVERED" as const) : covered > 0 ? ("PARTIALLY_COVERED" as const) : ("NOT_COVERED" as const),
+          modification,
+          adjustmentAgainst
         };
       });
 
@@ -475,11 +602,17 @@ export const hoursService = {
 
     const employeeReports = await Promise.all(
       employees.map(async (employee) => {
-        const [summary, breakdown] = await Promise.all([
+        const [summary, breakdown, convertedLeaves] = await Promise.all([
           this.getEmployeeSummary(employee.id, period),
-          this.getEmployeeBreakdown(employee.id, { id: period.id })
+          this.getEmployeeBreakdown(employee.id, { id: period.id }),
+          hoursRepository.listConvertedLeaves({ employeeId: employee.id, calculationPeriodId: period.id })
         ]);
-        return { employee, ...summary, ...breakdown };
+        return {
+          employee,
+          ...summary,
+          ...breakdown,
+          convertedLeaves: convertedLeaves.map(serializeConvertedLeave)
+        };
       })
     );
 
@@ -492,5 +625,37 @@ export const hoursService = {
       },
       employees: employeeReports
     };
+  },
+
+  // ─── Converted leave (admin settlement) ─────────────────────────────────
+
+  /** Admin explicitly settles an employee's uncovered leave balance once the period has ended. */
+  async convertUncoveredLeave(employeeId: string, periodId: string, adminId: string, reason: string) {
+    const period = await this.getPeriodById(periodId);
+    if (!isPeriodSettleable(period.endDate)) {
+      throw badRequest("This calculation period has not closed yet");
+    }
+
+    const summary = await this.getEmployeeSummary(employeeId, period);
+    const unconvertedMinutes = Math.max(summary.remainingMinutes, 0);
+    if (unconvertedMinutes <= 0) {
+      throw badRequest("No uncovered leave balance to convert");
+    }
+
+    const created = await hoursRepository.createConvertedLeave({
+      employeeId,
+      calculationPeriodId: period.id,
+      durationMinutes: unconvertedMinutes,
+      reason: reason.trim(),
+      convertedById: adminId
+    });
+
+    const updatedSummary = await this.getEmployeeSummary(employeeId, period);
+    return { ...updatedSummary, convertedLeave: serializeConvertedLeave(created) };
+  },
+
+  async listMyConvertedLeaves(employeeId: string) {
+    const rows = await hoursRepository.listConvertedLeaves({ employeeId });
+    return rows.map(serializeConvertedLeave);
   }
 };

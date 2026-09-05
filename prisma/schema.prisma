@@ -120,6 +120,8 @@ model User {
   leaveApprovals    LeaveRequest[]    @relation("LeaveRequestApprover")
   overtimeRequests  OvertimeRequest[] @relation("OvertimeRequestEmployee")
   overtimeApprovals OvertimeRequest[] @relation("OvertimeRequestApprover")
+  convertedLeaves   ConvertedLeave[]  @relation("ConvertedLeaveEmployee")
+  leaveConversions  ConvertedLeave[]  @relation("ConvertedLeaveConverter")
 }
 
 model RefreshToken {
@@ -964,6 +966,7 @@ model CalculationPeriod {
   closedAt         DateTime?
   leaveRequests    LeaveRequest[]
   overtimeRequests OvertimeRequest[]
+  convertedLeaves  ConvertedLeave[]
 
   @@unique([startDate, endDate])
   @@index([status])
@@ -982,6 +985,7 @@ model LeaveRequest {
   leaveType           LeaveType
   /// numberOfDays × (FULL_DAY=480 | HALF_DAY=240 | SHORT_LEAVE=120)
   durationMinutes     Int
+  reason              String
   status              HoursRequestStatus @default(PENDING)
   approvedById        String?
   approvedAt          DateTime?
@@ -1025,4 +1029,24 @@ model OvertimeRequest {
   @@index([employeeId, date])
   @@index([calculationPeriodId, status])
   @@index([employeeId, status])
+}
+
+/// Admin-initiated settlement: converts an employee's leave-not-covered-by-overtime balance into a
+/// recorded deduction once a calculation period has ended. Never auto-created; original LeaveRequest /
+/// OvertimeRequest rows are untouched for audit history.
+model ConvertedLeave {
+  id                  String            @id @default(cuid())
+  employeeId          String
+  calculationPeriodId String
+  durationMinutes     Int
+  reason              String
+  convertedById       String
+  convertedAt         DateTime          @default(now())
+  createdAt           DateTime          @default(now())
+  employee            User              @relation("ConvertedLeaveEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
+  convertedBy         User              @relation("ConvertedLeaveConverter", fields: [convertedById], references: [id], onDelete: Restrict)
+  calculationPeriod   CalculationPeriod @relation(fields: [calculationPeriodId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId, calculationPeriodId])
+  @@index([calculationPeriodId])
 }
