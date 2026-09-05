@@ -1,16 +1,11 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import type { HoursAllEmployeesReportItem, HoursEmployeeReportItem } from "./domain";
+import type { HoursAllEmployeesReportItem } from "./domain";
 import { formatDateRange, formatDisplayDate, formatIsoTimeLabel, leaveTypeShortLabel } from "./hours-format";
 
 const PAGE_W = 210;
 const MARGIN = 14;
 const CONTENT_W = PAGE_W - MARGIN * 2;
-const PAGE_BOTTOM = 280;
-const HALF_GAP = 4;
-const LEFT_W = (CONTENT_W - HALF_GAP) / 2;
-const RIGHT_W = (CONTENT_W - HALF_GAP) / 2;
-const RIGHT_X = MARGIN + LEFT_W + HALF_GAP;
 
 const BRAND: [number, number, number] = [11, 31, 58];
 const DARK: [number, number, number] = [17, 24, 39];
@@ -21,19 +16,19 @@ const TABLE_HEAD_STYLES = {
   fillColor: BRAND,
   textColor: WHITE,
   fontStyle: "bold" as const,
-  fontSize: 6.5,
-  minCellHeight: 6,
-  cellPadding: { top: 1.2, right: 1.5, bottom: 1.2, left: 1.5 }
+  fontSize: 7.5,
+  minCellHeight: 6.5,
+  cellPadding: { top: 1.5, right: 2, bottom: 1.5, left: 2 }
 };
 
 const TABLE_BODY_STYLES = {
   font: "helvetica",
-  fontSize: 6.5,
+  fontSize: 7.5,
   textColor: DARK,
-  cellPadding: { top: 1.2, right: 1.5, bottom: 1.2, left: 1.5 },
+  cellPadding: { top: 1.5, right: 2, bottom: 1.5, left: 2 },
   lineColor: [229, 231, 235] as [number, number, number],
   lineWidth: 0.2,
-  minCellHeight: 5,
+  minCellHeight: 6,
   overflow: "linebreak" as const,
   valign: "middle" as const
 };
@@ -45,112 +40,19 @@ function setTextColor(doc: jsPDF, color: [number, number, number]) {
   doc.setTextColor(color[0], color[1], color[2]);
 }
 
-function getLastTableY(doc: jsPDF): number {
-  return (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
-}
+type Row = {
+  employee: string;
+  type: string;
+  date: string;
+  details: string;
+  fromTo: string;
+  duration: string;
+  modification: string;
+  adjustment: string;
+  sortKey: number;
+};
 
-function ensureSpace(doc: jsPDF, y: number, needed: number): number {
-  if (y + needed <= PAGE_BOTTOM) return y;
-  doc.addPage();
-  return 20;
-}
-
-/** Draws one employee's Leave Summary (left) and Overtime Summary (right) side by side. */
-function drawEmployeeSection(doc: jsPDF, report: HoursEmployeeReportItem, startY: number): number {
-  const rowsNeeded = Math.max(report.leaveBreakdown.length, report.overtimeBreakdown.length, 1);
-  let y = ensureSpace(doc, startY, 14 + rowsNeeded * 5);
-
-  setFillColor(doc, LIGHT);
-  doc.rect(MARGIN, y, CONTENT_W, 7, "F");
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(10.5);
-  setTextColor(doc, DARK);
-  doc.text(report.employee.name, MARGIN + 2, y + 5);
-  y += 10;
-
-  const tableTop = y;
-
-  // ─── Left: Leave Summary ─────────────────────────────────────────────
-  autoTable(doc, {
-    startY: tableTop,
-    head: [["Sr", "Date", "Type", "Reason", "Mod.", "Adj."]],
-    body:
-      report.leaveBreakdown.length > 0
-        ? report.leaveBreakdown.map((leave, index) => [
-            String(index + 1),
-            formatDateRange(leave.startDate, leave.endDate),
-            leaveTypeShortLabel(leave.leaveType),
-            leave.reason || "-",
-            leave.modification,
-            leave.adjustmentAgainst
-          ])
-        : [[{ content: "No approved leave in this period.", colSpan: 6, styles: { halign: "center" as const } }]],
-    theme: "grid",
-    margin: { left: MARGIN, right: PAGE_W - MARGIN - LEFT_W },
-    tableWidth: LEFT_W,
-    styles: TABLE_BODY_STYLES,
-    headStyles: TABLE_HEAD_STYLES,
-    alternateRowStyles: { fillColor: LIGHT },
-    columnStyles: {
-      0: { cellWidth: 6, halign: "center" },
-      2: { cellWidth: 9, halign: "center" },
-      4: { cellWidth: 9, halign: "center" },
-      5: { cellWidth: 9, halign: "center" }
-    }
-  });
-  const leftFinalY = getLastTableY(doc);
-
-  // ─── Right: Overtime Summary ────────────────────────────────────────
-  autoTable(doc, {
-    startY: tableTop,
-    head: [["Sr", "Date", "Project", "From", "To", "Duration", "Reason"]],
-    body:
-      report.overtimeBreakdown.length > 0
-        ? report.overtimeBreakdown.map((overtime, index) => [
-            String(index + 1),
-            formatDisplayDate(overtime.date),
-            overtime.project,
-            formatIsoTimeLabel(overtime.startTime),
-            formatIsoTimeLabel(overtime.endTime),
-            overtime.durationMinutes > 0 ? overtime.durationLabel : "-",
-            overtime.reason || "-"
-          ])
-        : [[{ content: "No approved overtime in this period.", colSpan: 7, styles: { halign: "center" as const } }]],
-    theme: "grid",
-    margin: { left: RIGHT_X, right: MARGIN },
-    tableWidth: RIGHT_W,
-    styles: TABLE_BODY_STYLES,
-    headStyles: TABLE_HEAD_STYLES,
-    alternateRowStyles: { fillColor: LIGHT },
-    columnStyles: {
-      0: { cellWidth: 6, halign: "center" },
-      3: { cellWidth: 13, halign: "center" },
-      4: { cellWidth: 13, halign: "center" },
-      5: { cellWidth: 15, halign: "right" }
-    }
-  });
-  const rightFinalY = getLastTableY(doc);
-
-  y = Math.max(leftFinalY, rightFinalY) + 3;
-
-  if (report.convertedLeaves.length > 0) {
-    y = ensureSpace(doc, y, 6 * report.convertedLeaves.length + 4);
-    doc.setFont("helvetica", "italic");
-    doc.setFontSize(7);
-    report.convertedLeaves.forEach((converted) => {
-      doc.text(
-        `Converted Leave: ${converted.durationLabel} — ${converted.reason} (by ${converted.convertedBy.name}, ${formatDisplayDate(converted.convertedAt)})`,
-        MARGIN + 2,
-        y
-      );
-      y += 4.5;
-    });
-  }
-
-  return y + 6;
-}
-
-/** One combined PDF covering every employee for the selected calculation period. */
+/** One combined PDF, one flat table covering every employee's leave, overtime, and converted-leave rows. */
 export function exportAllEmployeesHoursReportPdf(report: HoursAllEmployeesReportItem) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
 
@@ -169,9 +71,87 @@ export function exportAllEmployeesHoursReportPdf(report: HoursAllEmployeesReport
   );
   setTextColor(doc, DARK);
 
-  let y = 28;
+  const rows: Row[] = [];
+
   report.employees.forEach((employeeReport) => {
-    y = drawEmployeeSection(doc, employeeReport, y);
+    employeeReport.leaveBreakdown.forEach((leave) => {
+      rows.push({
+        employee: employeeReport.employee.name,
+        type: leaveTypeShortLabel(leave.leaveType),
+        date: formatDateRange(leave.startDate, leave.endDate),
+        details: leave.reason || "-",
+        fromTo: "-",
+        duration: leave.durationLabel,
+        modification: leave.modification,
+        adjustment: leave.adjustmentAgainst,
+        sortKey: new Date(leave.startDate).getTime()
+      });
+    });
+
+    employeeReport.overtimeBreakdown.forEach((overtime) => {
+      rows.push({
+        employee: employeeReport.employee.name,
+        type: "Overtime",
+        date: formatDisplayDate(overtime.date),
+        details: `${overtime.project} — ${overtime.reason || "-"}`,
+        fromTo: `${formatIsoTimeLabel(overtime.startTime)}-${formatIsoTimeLabel(overtime.endTime)}`,
+        duration: overtime.durationMinutes > 0 ? overtime.durationLabel : "-",
+        modification: "-",
+        adjustment: "-",
+        sortKey: new Date(overtime.date).getTime()
+      });
+    });
+
+    employeeReport.convertedLeaves.forEach((converted) => {
+      rows.push({
+        employee: employeeReport.employee.name,
+        type: "Converted Leave",
+        date: formatDisplayDate(converted.convertedAt),
+        details: `${converted.reason} (by ${converted.convertedBy.name})`,
+        fromTo: "-",
+        duration: converted.durationLabel,
+        modification: "OL",
+        adjustment: "OL",
+        sortKey: new Date(converted.convertedAt).getTime()
+      });
+    });
+  });
+
+  rows.sort((a, b) => a.employee.localeCompare(b.employee) || a.sortKey - b.sortKey);
+
+  autoTable(doc, {
+    startY: 28,
+    head: [["Sr", "Employee", "Type", "Date", "Details", "From-To", "Duration", "Mod.", "Adj."]],
+    body:
+      rows.length > 0
+        ? rows.map((row, index) => [
+            String(index + 1),
+            row.employee,
+            row.type,
+            row.date,
+            row.details,
+            row.fromTo,
+            row.duration,
+            row.modification,
+            row.adjustment
+          ])
+        : [[{ content: "No approved leave or overtime in this period.", colSpan: 9, styles: { halign: "center" as const } }]],
+    theme: "grid",
+    margin: { left: MARGIN, right: MARGIN },
+    tableWidth: CONTENT_W,
+    styles: TABLE_BODY_STYLES,
+    headStyles: TABLE_HEAD_STYLES,
+    alternateRowStyles: { fillColor: LIGHT },
+    columnStyles: {
+      0: { cellWidth: 8, halign: "center" },
+      1: { cellWidth: 26 },
+      2: { cellWidth: 16 },
+      3: { cellWidth: 24 },
+      5: { cellWidth: 20, halign: "center" },
+      6: { cellWidth: 16, halign: "right" },
+      7: { cellWidth: 10, halign: "center" },
+      8: { cellWidth: 10, halign: "center" }
+    }
   });
 
   doc.save(`Employee-Hours-Report-${formatDisplayDate(report.period.startDate)}.pdf`);
