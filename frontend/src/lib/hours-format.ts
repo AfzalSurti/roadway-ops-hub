@@ -98,6 +98,27 @@ export function formatIsoTimeLabel(value: string): string {
   return date.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true });
 }
 
+/** "DD-MM-YYYY" — the client's report date format. */
+export function formatDateDMY(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  return `${day}-${month}-${date.getFullYear()}`;
+}
+
+export function formatDateRangeDMY(startDate: string, endDate: string): string {
+  if (dateKey(startDate) === dateKey(endDate)) return formatDateDMY(startDate);
+  return `${formatDateDMY(startDate)} - ${formatDateDMY(endDate)}`;
+}
+
+/** Format a full ISO timestamp as 24h "HH:mm", e.g. "18:00" — the client's report time format. */
+export function format24HourTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
 export type HoursBreakdownDisplayRow = {
   key: string;
   leaveDate?: string;
