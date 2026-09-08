@@ -187,6 +187,7 @@ export function ProfessionalStaffSection({
   );
 
   return (
+    <>
     <div className="glass-panel p-5">
       <div className="mb-4">
         <h2 className="text-base font-semibold inline-flex items-center gap-2">
@@ -265,8 +266,9 @@ export function ProfessionalStaffSection({
           ) : null}
         </div>
       )}
+    </div>
 
-      {showAddProfession ? (
+    {showAddProfession ? (
         <FinancialModal title="Add Profession" onClose={onCloseAddProfession}>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4 text-sm">
             <DetailTile label="People in this batch" value={String(validProfessionRows.length)} />
@@ -464,6 +466,6 @@ export function ProfessionalStaffSection({
           </div>
         </FinancialModal>
       ) : null}
-    </div>
+    </>
   );
 }
