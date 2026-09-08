@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { FinancialPlan, FinancialProfession, FinancialProfessionCategory } from "@/lib/domain";
 import { DetailTile, FinancialModal } from "@/pages/admin/Financial";
-import { Plus, Users } from "lucide-react";
+import { Save, Users } from "lucide-react";
 import { toast } from "sonner";
 
 function money(value: number) {
@@ -46,10 +46,22 @@ type ProfessionMetrics = {
   balanceAmount: number;
 };
 
-export function ProfessionalStaffSection({ projectId, plan }: { projectId: string; plan: FinancialPlan }) {
+export function ProfessionalStaffSection({
+  projectId,
+  plan,
+  showAddProfession,
+  onCloseAddProfession,
+  showCreateBill,
+  onCloseCreateBill
+}: {
+  projectId: string;
+  plan: FinancialPlan;
+  showAddProfession: boolean;
+  onCloseAddProfession: () => void;
+  showCreateBill: boolean;
+  onCloseCreateBill: () => void;
+}) {
   const queryClient = useQueryClient();
-  const [showAddProfession, setShowAddProfession] = useState(false);
-  const [showCreateBill, setShowCreateBill] = useState(false);
   const [professionForm, setProfessionForm] = useState<NewProfessionForm>(emptyProfessionForm);
   const [billingMonth, setBillingMonth] = useState("");
   const [billRemark, setBillRemark] = useState("");
@@ -115,7 +127,7 @@ export function ProfessionalStaffSection({ projectId, plan }: { projectId: strin
       }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["financial-project", projectId] });
-      setShowAddProfession(false);
+      onCloseAddProfession();
       setProfessionForm(emptyProfessionForm);
       toast.success("Profession added");
     },
@@ -133,7 +145,7 @@ export function ProfessionalStaffSection({ projectId, plan }: { projectId: strin
       }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["financial-project", projectId] });
-      setShowCreateBill(false);
+      onCloseCreateBill();
       setBillMmInputs({});
       setBillingMonth("");
       setBillRemark("");
@@ -152,31 +164,14 @@ export function ProfessionalStaffSection({ projectId, plan }: { projectId: strin
 
   return (
     <div className="glass-panel p-5">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-base font-semibold inline-flex items-center gap-2">
-            <Users className="h-4 w-4" /> Professional Staff
-          </h2>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Person-month staff billing (Key/Sub-professional staff, rate × MM) — for consultancy-style invoices,
-            alongside the item-based RA bills above.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setShowAddProfession(true)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary/10 text-primary border border-primary/20 text-sm font-medium hover:bg-primary/20"
-          >
-            <Plus className="h-4 w-4" /> Add Profession
-          </button>
-          <button
-            onClick={() => setShowCreateBill(true)}
-            disabled={professions.length === 0}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary/10 text-primary border border-primary/20 text-sm font-medium hover:bg-primary/20 disabled:opacity-50"
-          >
-            <Plus className="h-4 w-4" /> Create Professional Bill
-          </button>
-        </div>
+      <div className="mb-4">
+        <h2 className="text-base font-semibold inline-flex items-center gap-2">
+          <Users className="h-4 w-4" /> Professional Staff
+        </h2>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          Person-month staff billing (Key/Sub-professional staff, rate × MM) — for consultancy-style invoices,
+          alongside the item-based RA bills above.
+        </p>
       </div>
 
       {professions.length === 0 ? (
@@ -248,7 +243,7 @@ export function ProfessionalStaffSection({ projectId, plan }: { projectId: strin
       )}
 
       {showAddProfession ? (
-        <FinancialModal title="Add Profession" onClose={() => setShowAddProfession(false)}>
+        <FinancialModal title="Add Profession" onClose={onCloseAddProfession}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">Category</label>
@@ -317,6 +312,7 @@ export function ProfessionalStaffSection({ projectId, plan }: { projectId: strin
               disabled={!professionForm.position.trim() || !professionForm.rate || addProfessionMutation.isPending}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary/10 text-primary border border-primary/20 text-sm font-medium hover:bg-primary/20 disabled:opacity-50"
             >
+              <Save className="h-4 w-4" />
               {addProfessionMutation.isPending ? "Saving..." : "Save Profession"}
             </button>
           </div>
@@ -324,7 +320,7 @@ export function ProfessionalStaffSection({ projectId, plan }: { projectId: strin
       ) : null}
 
       {showCreateBill ? (
-        <FinancialModal title="Create Professional Bill" onClose={() => setShowCreateBill(false)}>
+        <FinancialModal title="Create Professional Bill" onClose={onCloseCreateBill}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm mb-4">
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">Billing Month</label>
@@ -391,6 +387,7 @@ export function ProfessionalStaffSection({ projectId, plan }: { projectId: strin
               disabled={createBillMutation.isPending || Object.values(billMmInputs).every((v) => !Number(v))}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary/10 text-primary border border-primary/20 text-sm font-medium hover:bg-primary/20 disabled:opacity-50"
             >
+              <Save className="h-4 w-4" />
               {createBillMutation.isPending ? "Saving..." : "Save Professional Bill"}
             </button>
           </div>

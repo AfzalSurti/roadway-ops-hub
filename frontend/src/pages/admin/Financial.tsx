@@ -95,6 +95,8 @@ export default function AdminFinancial() {
   const [showPlanning, setShowPlanning] = useState(false);
   const [showCreateBill, setShowCreateBill] = useState(false);
   const [showCarryRecord, setShowCarryRecord] = useState(false);
+  const [showAddProfession, setShowAddProfession] = useState(false);
+  const [showCreateProfessionalBill, setShowCreateProfessionalBill] = useState(false);
   const [planningType, setPlanningType] = useState<PlanningType>("NORMAL");
   const [billPlanningType, setBillPlanningType] = useState<PlanningType>("NORMAL");
   const [planningRows, setPlanningRows] = useState<PlanningRow[]>([]);
@@ -131,6 +133,7 @@ export default function AdminFinancial() {
   });
 
   const raBills = detail?.plan?.raBills ?? [];
+  const professions = detail?.plan?.professions ?? [];
 
   const itemsByType = useMemo(() => {
     const items = detail?.plan?.items ?? [];
@@ -790,6 +793,23 @@ export default function AdminFinancial() {
                     Create Excess Bill
                   </button>
                 </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setShowAddProfession(true)}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary/10 text-primary border border-primary/20 text-sm font-medium hover:bg-primary/20"
+                  >
+                    <Save className="h-4 w-4" />
+                    Add Profession
+                  </button>
+                  <button
+                    onClick={() => setShowCreateProfessionalBill(true)}
+                    disabled={!detail.plan || professions.length === 0}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary/10 text-primary border border-primary/20 text-sm font-medium hover:bg-primary/20 disabled:opacity-50"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Create Professional Bill
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -830,7 +850,16 @@ export default function AdminFinancial() {
           </div>
 
           {/* Professional Staff (person-month) billing — parallel to the item-based RA bills above */}
-          {detail.plan ? <ProfessionalStaffSection projectId={activeProjectId} plan={detail.plan} /> : null}
+          {detail.plan ? (
+            <ProfessionalStaffSection
+              projectId={activeProjectId}
+              plan={detail.plan}
+              showAddProfession={showAddProfession}
+              onCloseAddProfession={() => setShowAddProfession(false)}
+              showCreateBill={showCreateProfessionalBill}
+              onCloseCreateBill={() => setShowCreateProfessionalBill(false)}
+            />
+          ) : null}
 
           {/* Tender Item Modal */}
           {showPlanning && (
