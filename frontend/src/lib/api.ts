@@ -1404,15 +1404,17 @@ export const api = {
     });
   },
 
-  addFinancialProfession(
+  addFinancialProfessions(
     projectId: string,
     payload: {
-      category?: "KEY" | "SUB";
-      position: string;
-      personName?: string;
-      rate: number;
-      mmConstruction: number;
-      mmMaintenance: number;
+      items: Array<{
+        category?: "KEY" | "SUB";
+        position: string;
+        personName?: string;
+        rate: number;
+        mmConstruction: number;
+        mmMaintenance: number;
+      }>;
     }
   ) {
     return request<FinancialPlan>(`/financials/${projectId}/professions`, {

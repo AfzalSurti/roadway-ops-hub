@@ -340,18 +340,25 @@ export const financialRepository = {
     return db.projectFinancialProfessionalBill.count({ where: { planId } }).then((count: number) => count + 1);
   },
 
-  async addProfession(args: {
+  async addProfessions(args: {
     planId: string;
-    category: string;
-    position: string;
-    personName: string;
-    rate: number;
-    mmConstruction: number;
-    mmMaintenance: number;
-    sortOrder: number;
+    items: Array<{
+      category: string;
+      position: string;
+      personName: string;
+      rate: number;
+      mmConstruction: number;
+      mmMaintenance: number;
+      sortOrder: number;
+    }>;
   }) {
-    await db.projectFinancialProfession.create({ data: args });
-    return db.projectFinancialPlan.findUniqueOrThrow({ where: { id: args.planId }, include: PLAN_INCLUDE });
+    return db.$transaction(async (txClient: any) => {
+      const tx = txClient as any;
+      for (const item of args.items) {
+        await tx.projectFinancialProfession.create({ data: { planId: args.planId, ...item } });
+      }
+      return tx.projectFinancialPlan.findUniqueOrThrow({ where: { id: args.planId }, include: PLAN_INCLUDE });
+    });
   },
 
   async createProfessionalBill(args: {

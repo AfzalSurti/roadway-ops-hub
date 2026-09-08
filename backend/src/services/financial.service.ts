@@ -453,28 +453,32 @@ export const financialService = {
 
   // ─── Professional staff billing (person-month based, parallel to RA bills) ───────────
 
-  async addProfession(projectId: string, payload: {
-    category?: "KEY" | "SUB";
-    position: string;
-    personName?: string;
-    rate: number;
-    mmConstruction: number;
-    mmMaintenance: number;
+  async addProfessions(projectId: string, payload: {
+    items: Array<{
+      category?: "KEY" | "SUB";
+      position: string;
+      personName?: string;
+      rate: number;
+      mmConstruction: number;
+      mmMaintenance: number;
+    }>;
   }) {
     const plan = await financialRepository.findPlanByProjectId(projectId);
     if (!plan) {
       throw badRequest("Create financial item planning first");
     }
-    const sortOrder = await financialRepository.nextProfessionSortOrder(plan.id);
-    return financialRepository.addProfession({
+    const startingSortOrder = await financialRepository.nextProfessionSortOrder(plan.id);
+    return financialRepository.addProfessions({
       planId: plan.id,
-      category: payload.category ?? "KEY",
-      position: payload.position.trim(),
-      personName: (payload.personName ?? "").trim(),
-      rate: round2(payload.rate),
-      mmConstruction: round2(payload.mmConstruction),
-      mmMaintenance: round2(payload.mmMaintenance),
-      sortOrder
+      items: payload.items.map((item, index) => ({
+        category: item.category ?? "KEY",
+        position: item.position.trim(),
+        personName: (item.personName ?? "").trim(),
+        rate: round2(item.rate),
+        mmConstruction: round2(item.mmConstruction),
+        mmMaintenance: round2(item.mmMaintenance),
+        sortOrder: startingSortOrder + index
+      }))
     });
   },
 

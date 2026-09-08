@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { FinancialPlan, FinancialProfession, FinancialProfessionCategory } from "@/lib/domain";
@@ -62,7 +62,7 @@ export function ProfessionalStaffSection({
   onCloseCreateBill: () => void;
 }) {
   const queryClient = useQueryClient();
-  const [professionForm, setProfessionForm] = useState<NewProfessionForm>(emptyProfessionForm);
+  const [professionRows, setProfessionRows] = useState<NewProfessionForm[]>([emptyProfessionForm]);
   const [billingMonth, setBillingMonth] = useState("");
   const [billRemark, setBillRemark] = useState("");
   const [billMmInputs, setBillMmInputs] = useState<Record<string, string>>({});
@@ -115,24 +115,48 @@ export function ProfessionalStaffSection({
     { label: "Sub-Professional Staff", rows: metrics.filter((m) => m.profession.category === "SUB") }
   ];
 
+  useEffect(() => {
+    if (showAddProfession) setProfessionRows([emptyProfessionForm]);
+  }, [showAddProfession]);
+
+  const validProfessionRows = professionRows.filter((row) => row.position.trim() && Number(row.rate) > 0);
+
   const addProfessionMutation = useMutation({
     mutationFn: () =>
-      api.addFinancialProfession(projectId, {
-        category: professionForm.category,
-        position: professionForm.position.trim(),
-        personName: professionForm.personName.trim() || undefined,
-        rate: Number(professionForm.rate || 0),
-        mmConstruction: Number(professionForm.mmConstruction || 0),
-        mmMaintenance: Number(professionForm.mmMaintenance || 0)
+      api.addFinancialProfessions(projectId, {
+        items: validProfessionRows.map((row) => ({
+          category: row.category,
+          position: row.position.trim(),
+          personName: row.personName.trim() || undefined,
+          rate: Number(row.rate || 0),
+          mmConstruction: Number(row.mmConstruction || 0),
+          mmMaintenance: Number(row.mmMaintenance || 0)
+        }))
       }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["financial-project", projectId] });
       onCloseAddProfession();
-      setProfessionForm(emptyProfessionForm);
-      toast.success("Profession added");
+      setProfessionRows([emptyProfessionForm]);
+      toast.success(validProfessionRows.length > 1 ? "Professions added" : "Profession added");
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to add profession")
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to add profession(s)")
   });
+
+  function addProfessionRow() {
+    setProfessionRows((prev) => [...prev, emptyProfessionForm]);
+  }
+
+  function removeProfessionRow(index: number) {
+    setProfessionRows((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function updateProfessionRow(index: number, patch: Partial<NewProfessionForm>) {
+    setProfessionRows((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
+  }
+
+  const professionRowsTotalAmount = round2(
+    professionRows.reduce((sum, row) => sum + Number(row.rate || 0) * (Number(row.mmConstruction || 0) + Number(row.mmMaintenance || 0)), 0)
+  );
 
   const createBillMutation = useMutation({
     mutationFn: () =>
@@ -244,76 +268,112 @@ export function ProfessionalStaffSection({
 
       {showAddProfession ? (
         <FinancialModal title="Add Profession" onClose={onCloseAddProfession}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-            <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Category</label>
-              <select
-                value={professionForm.category}
-                onChange={(e) => setProfessionForm((prev) => ({ ...prev, category: e.target.value as FinancialProfessionCategory }))}
-                className="w-full px-3 py-2 rounded-xl bg-secondary/50 border border-border/50"
-              >
-                <option value="KEY">Key Professional Staff</option>
-                <option value="SUB">Sub-Professional Staff</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Position *</label>
-              <input
-                value={professionForm.position}
-                onChange={(e) => setProfessionForm((prev) => ({ ...prev, position: e.target.value }))}
-                className="w-full px-3 py-2 rounded-xl bg-secondary/50 border border-border/50"
-                placeholder="e.g. Team Leader cum Senior Highway Engineer"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Name</label>
-              <input
-                value={professionForm.personName}
-                onChange={(e) => setProfessionForm((prev) => ({ ...prev, personName: e.target.value }))}
-                className="w-full px-3 py-2 rounded-xl bg-secondary/50 border border-border/50"
-                placeholder="e.g. Mr. Manish Kumar Jivani"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Rate (₹ / month) *</label>
-              <input
-                type="number" min="0" step="0.01"
-                value={professionForm.rate}
-                onChange={(e) => setProfessionForm((prev) => ({ ...prev, rate: e.target.value }))}
-                className="w-full px-3 py-2 rounded-xl bg-secondary/50 border border-border/50"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground mb-1 block">MM in Construction Period</label>
-              <input
-                type="number" min="0" step="0.01"
-                value={professionForm.mmConstruction}
-                onChange={(e) => setProfessionForm((prev) => ({ ...prev, mmConstruction: e.target.value }))}
-                className="w-full px-3 py-2 rounded-xl bg-secondary/50 border border-border/50"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground mb-1 block">MM in Maintenance Period</label>
-              <input
-                type="number" min="0" step="0.01"
-                value={professionForm.mmMaintenance}
-                onChange={(e) => setProfessionForm((prev) => ({ ...prev, mmMaintenance: e.target.value }))}
-                className="w-full px-3 py-2 rounded-xl bg-secondary/50 border border-border/50"
-              />
-            </div>
-            <DetailTile
-              label="Contract Amount"
-              value={money(Number(professionForm.rate || 0) * (Number(professionForm.mmConstruction || 0) + Number(professionForm.mmMaintenance || 0)))}
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4 text-sm">
+            <DetailTile label="People in this batch" value={String(validProfessionRows.length)} />
+            <DetailTile label="Total Contract MM" value={professionRows.reduce((s, r) => s + Number(r.mmConstruction || 0) + Number(r.mmMaintenance || 0), 0).toFixed(2)} />
+            <DetailTile label="Total Contract Amount" value={money(professionRowsTotalAmount)} />
           </div>
-          <div className="flex justify-end mt-4">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[1080px]">
+              <thead>
+                <tr className="border-b border-border/40 text-muted-foreground">
+                  <th className="text-left p-3 font-medium">Sr. No.</th>
+                  <th className="text-left p-3 font-medium">Category</th>
+                  <th className="text-left p-3 font-medium">Position</th>
+                  <th className="text-left p-3 font-medium">Name</th>
+                  <th className="text-left p-3 font-medium">Rate (₹/mo)</th>
+                  <th className="text-left p-3 font-medium">MM Constr.</th>
+                  <th className="text-left p-3 font-medium">MM Maint.</th>
+                  <th className="text-left p-3 font-medium">Contract Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {professionRows.map((row, index) => {
+                  const amount = Number(row.rate || 0) * (Number(row.mmConstruction || 0) + Number(row.mmMaintenance || 0));
+                  return (
+                    <tr key={index} className="border-b border-border/20 align-top">
+                      <td className="p-3 font-medium w-16">{index + 1}</td>
+                      <td className="p-3 w-40">
+                        <select
+                          value={row.category}
+                          onChange={(e) => updateProfessionRow(index, { category: e.target.value as FinancialProfessionCategory })}
+                          className="w-full px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 text-xs"
+                        >
+                          <option value="KEY">Key Staff</option>
+                          <option value="SUB">Sub-Staff</option>
+                        </select>
+                      </td>
+                      <td className="p-3 min-w-[220px]">
+                        <textarea
+                          value={row.position}
+                          onChange={(e) => updateProfessionRow(index, { position: e.target.value })}
+                          rows={2}
+                          className="w-full px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 resize-y"
+                          placeholder="e.g. Team Leader cum Senior Highway Engineer"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeProfessionRow(index)}
+                          disabled={professionRows.length <= 1}
+                          className="mt-2 text-xs text-destructive disabled:text-muted-foreground"
+                        >
+                          Remove
+                        </button>
+                      </td>
+                      <td className="p-3 min-w-[160px]">
+                        <input
+                          value={row.personName}
+                          onChange={(e) => updateProfessionRow(index, { personName: e.target.value })}
+                          className="w-full px-3 py-2 rounded-xl bg-secondary/50 border border-border/50"
+                          placeholder="e.g. Mr. Manish Kumar Jivani"
+                        />
+                      </td>
+                      <td className="p-3 w-28">
+                        <input
+                          type="number" min="0" step="0.01"
+                          value={row.rate}
+                          onChange={(e) => updateProfessionRow(index, { rate: e.target.value })}
+                          className="w-24 px-3 py-2 rounded-xl bg-secondary/50 border border-border/50"
+                        />
+                      </td>
+                      <td className="p-3 w-24">
+                        <input
+                          type="number" min="0" step="0.01"
+                          value={row.mmConstruction}
+                          onChange={(e) => updateProfessionRow(index, { mmConstruction: e.target.value })}
+                          className="w-20 px-3 py-2 rounded-xl bg-secondary/50 border border-border/50"
+                        />
+                      </td>
+                      <td className="p-3 w-24">
+                        <input
+                          type="number" min="0" step="0.01"
+                          value={row.mmMaintenance}
+                          onChange={(e) => updateProfessionRow(index, { mmMaintenance: e.target.value })}
+                          className="w-20 px-3 py-2 rounded-xl bg-secondary/50 border border-border/50"
+                        />
+                      </td>
+                      <td className="p-3 font-medium">{money(amount)}</td>
+                    </tr>
+                  );
+                })}
+                <tr className="bg-secondary/20 font-medium">
+                  <td className="p-3" colSpan={7}>Total</td>
+                  <td className="p-3">{money(professionRowsTotalAmount)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div className="flex items-center justify-between mt-4">
+            <button type="button" onClick={addProfessionRow} className="px-4 py-2 rounded-xl border border-border/50 text-sm hover:bg-secondary/40">
+              Add Item
+            </button>
             <button
               onClick={() => addProfessionMutation.mutate()}
-              disabled={!professionForm.position.trim() || !professionForm.rate || addProfessionMutation.isPending}
+              disabled={validProfessionRows.length === 0 || addProfessionMutation.isPending}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary/10 text-primary border border-primary/20 text-sm font-medium hover:bg-primary/20 disabled:opacity-50"
             >
               <Save className="h-4 w-4" />
-              {addProfessionMutation.isPending ? "Saving..." : "Save Profession"}
+              {addProfessionMutation.isPending ? "Saving..." : "Save Profession(s)"}
             </button>
           </div>
         </FinancialModal>
@@ -343,6 +403,17 @@ export function ProfessionalStaffSection({
           <p className="text-xs text-muted-foreground mb-3">
             Enter the person-months claimed this invoice for each profession. Leave at 0 for anyone not billed this round.
           </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4 text-sm">
+            <DetailTile
+              label="People Billed This Invoice"
+              value={String(Object.values(billMmInputs).filter((v) => Number(v) > 0).length)}
+            />
+            <DetailTile
+              label="Total MM This Invoice"
+              value={Object.values(billMmInputs).reduce((sum, v) => sum + Number(v || 0), 0).toFixed(2)}
+            />
+            <DetailTile label="Total Amount This Invoice" value={money(billTotalAmount)} />
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[720px]">
               <thead>

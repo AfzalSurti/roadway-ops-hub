@@ -5,7 +5,7 @@ import { requireRole } from "../middleware/rbac.js";
 import { asyncHandler } from "../utils/async-handler.js";
 import { validate } from "../middleware/validate.js";
 import {
-  addProfessionSchema,
+  addProfessionsSchema,
   createProfessionalBillSchema,
   createRaBillSchema,
   updateRaBillSchema,
@@ -28,8 +28,8 @@ financialRouter.post("/:projectId/ra-bills", validate(createRaBillSchema), async
 financialRouter.patch("/ra-bills/:raBillId", validate(updateRaBillSchema), asyncHandler(financialController.updateRaBill));
 financialRouter.post(
   "/:projectId/professions",
-  validate(addProfessionSchema),
-  asyncHandler(financialController.addProfession)
+  validate(addProfessionsSchema),
+  asyncHandler(financialController.addProfessions)
 );
 financialRouter.post(
   "/:projectId/professional-bills",

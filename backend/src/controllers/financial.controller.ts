@@ -33,8 +33,8 @@ export const financialController = {
     return sendSuccess(res, raBill);
   },
 
-  async addProfession(req: Request, res: Response) {
-    const plan = await financialService.addProfession(req.params.projectId, req.body);
+  async addProfessions(req: Request, res: Response) {
+    const plan = await financialService.addProfessions(req.params.projectId, req.body);
     return sendSuccess(res, plan, 201);
   },
 
