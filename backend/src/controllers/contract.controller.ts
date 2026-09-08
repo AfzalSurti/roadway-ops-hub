@@ -40,5 +40,10 @@ export const contractController = {
   async remove(req: Request, res: Response) {
     await contractService.remove(req.params.id);
     return sendSuccess(res, { deleted: true });
+  },
+
+  async createProject(req: Request, res: Response) {
+    const result = await contractService.createProjectFromContract(req.params.id);
+    return sendSuccess(res, result, 201);
   }
 };

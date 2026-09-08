@@ -11,10 +11,10 @@ export const financialRouter = Router();
 financialRouter.use(requireAuth);
 financialRouter.get(
   "/bill-status/projects",
-  requireRole("ADMIN", "HOD", "INFRA"),
+  requireRole("ADMIN", "HOD", "INFRA", "ACCOUNTS"),
   asyncHandler(financialController.getAllProjectsBillStatus)
 );
-financialRouter.use(requireRole("ADMIN"));
+financialRouter.use(requireRole("ADMIN", "ACCOUNTS"));
 financialRouter.get("/projects", asyncHandler(financialController.listEligibleProjects));
 financialRouter.get("/:projectId", asyncHandler(financialController.getProjectFinancial));
 financialRouter.post("/:projectId/plan", validate(upsertFinancialPlanSchema), asyncHandler(financialController.upsertPlan));

@@ -1860,5 +1860,9 @@ export const api = {
 
   deleteContractActivity(id: string) {
     return request<{ deleted: boolean }>(`/contract/${id}`, { method: "DELETE" });
+  },
+
+  createProjectFromContract(id: string) {
+    return request<ContractActivityItem>(`/contract/${id}/create-project`, { method: "POST" });
   }
 };

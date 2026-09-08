@@ -16,3 +16,8 @@ contractRouter.get("/:id", requireRole("OPERATIONS", "TENDER", "ADMIN", "HOD"), 
 contractRouter.post("/", requireRole("OPERATIONS", "TENDER", "ADMIN"), validate(createContractSchema), asyncHandler(contractController.create));
 contractRouter.patch("/:id", requireRole("OPERATIONS", "TENDER", "ADMIN"), validate(updateContractSchema), asyncHandler(contractController.update));
 contractRouter.delete("/:id", requireRole("OPERATIONS", "ADMIN"), asyncHandler(contractController.remove));
+contractRouter.post(
+  "/:id/create-project",
+  requireRole("OPERATIONS", "TENDER", "ADMIN"),
+  asyncHandler(contractController.createProject)
+);

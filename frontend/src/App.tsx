@@ -46,10 +46,13 @@ import EmployeeExpenseDetail from "./pages/employee/ExpenseDetail";
 import TenderDashboard from "./pages/tender/Dashboard";
 import TenderLetterPreview from "./pages/tender/LetterPreview";
 import OperationsDashboard from "./pages/operations/Dashboard";
+import OperationsContract from "./pages/operations/Contract";
 import HodTender from "./pages/hod/Tender";
 import HodAdmin from "./pages/hod/Admin";
 import HodAccount from "./pages/hod/Account";
 import InfraBilling from "./pages/infra/Billing";
+import AccountsDashboard from "./pages/accounts/Dashboard";
+import AccountsFinancial from "./pages/accounts/Financial";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -77,6 +80,7 @@ function getLandingPath(role?: string | null) {
   if (role === "INFRA") return "/infra/dashboard";
   if (role === "TENDER") return "/tender/dashboard";
   if (role === "OPERATIONS") return "/operations/dashboard";
+  if (role === "ACCOUNTS") return "/accounts/dashboard";
   return "/app/dashboard";
 }
 
@@ -119,6 +123,13 @@ function OperationsRoute({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
   if (user.role !== "OPERATIONS") return <Navigate to={getLandingPath(user.role)} replace />;
+  return <>{children}</>;
+}
+
+function AccountsRoute({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role !== "ACCOUNTS") return <Navigate to={getLandingPath(user.role)} replace />;
   return <>{children}</>;
 }
 
@@ -185,6 +196,12 @@ function AppRoutes() {
 
       <Route path="/operations" element={<OperationsRoute><AppLayout /></OperationsRoute>}>
         <Route path="dashboard" element={<OperationsDashboard />} />
+        <Route path="contract" element={<OperationsContract />} />
+      </Route>
+
+      <Route path="/accounts" element={<AccountsRoute><AppLayout /></AccountsRoute>}>
+        <Route path="dashboard" element={<AccountsDashboard />} />
+        <Route path="financial" element={<AccountsFinancial />} />
       </Route>
 
       <Route path="/infra" element={<InfraRoute><AppLayout /></InfraRoute>}>

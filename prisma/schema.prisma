@@ -15,6 +15,7 @@ enum Role {
   TENDER
   OPERATIONS
   EMPLOYEE
+  ACCOUNTS
 }
 
 enum DprReportStatus {
@@ -183,6 +184,8 @@ model Project {
   assignments             ProjectAssignment[]
   letterProjects          LetterProject[]
   infraOtherCosts         InfraProjectOtherCost[]
+  /// Contract(s) this project was created from via "Create Project" (Contract -> Project autofill)
+  contractActivities      ContractActivity[]
 
   @@index([name])
   @@index([projectCodePrefix, financialYearShort])
@@ -929,13 +932,17 @@ model ContractActivity {
   wcPolicyExpiryDate          DateTime?
   wcPolicyLetterUrl           String?
   remarks                     String               @default("")
+  /// Set once "Create Project" has generated an Admin project from this contract (prevents duplicates)
+  linkedProjectId             String?
   createdAt                   DateTime             @default(now())
   updatedAt                   DateTime             @updatedAt
   tenderBid                   TenderBid?           @relation(fields: [tenderBidId], references: [id], onDelete: SetNull)
+  linkedProject               Project?             @relation(fields: [linkedProjectId], references: [id], onDelete: SetNull)
 
   @@index([tenderBidId])
   @@index([workCategory])
   @@index([client])
+  @@index([linkedProjectId])
 }
 
 /// Leave + Overtime ("Calculate Hours") module

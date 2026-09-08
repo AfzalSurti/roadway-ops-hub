@@ -1,4 +1,4 @@
-export type Role = "ADMIN" | "PMO" | "HOD" | "INFRA" | "TENDER" | "OPERATIONS" | "EMPLOYEE";
+export type Role = "ADMIN" | "PMO" | "HOD" | "INFRA" | "TENDER" | "OPERATIONS" | "EMPLOYEE" | "ACCOUNTS";
 export type Priority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 export type TaskStatus = "TODO" | "IN_PROGRESS" | "BLOCKED" | "DONE";
 export type ReportStatus = "SUBMITTED" | "APPROVED" | "CHANGES_REQUESTED" | "REJECTED";
@@ -870,6 +870,8 @@ export type ContractActivityItem = {
   wcPolicyExpiryDate?: string | null;
   wcPolicyLetterUrl?: string | null;
   remarks: string;
+  /** Set once "Create Project" has generated an Admin project from this contract. */
+  linkedProjectId?: string | null;
   createdAt: string;
   updatedAt: string;
 };

@@ -18,6 +18,7 @@ import {
   Gavel,
   Cog,
   Clock,
+  Briefcase,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -54,6 +55,12 @@ const tenderNav = [
 
 const operationsNav = [
   { to: "/operations/dashboard", icon: Cog, label: "Pre-Contract" },
+  { to: "/operations/contract", icon: Briefcase, label: "Contract" },
+];
+
+const accountsNav = [
+  { to: "/accounts/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+  { to: "/accounts/financial", icon: Landmark, label: "Financial" },
 ];
 
 const infraNav = [
@@ -75,9 +82,23 @@ const employeeNav = [
 ];
 
 export function AppSidebar() {
-  const { user, isAdmin, isPmo, isHod, isTender, isOperations, logout } = useAuth();
+  const { user, isAdmin, isPmo, isHod, isTender, isOperations, isAccounts, logout } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
-  const navItems = isAdmin ? adminNav : isPmo ? administrativeNav : isHod ? hodNav : isTender ? tenderNav : isOperations ? operationsNav : user?.role === "INFRA" ? infraNav : employeeNav;
+  const navItems = isAdmin
+    ? adminNav
+    : isPmo
+      ? administrativeNav
+      : isHod
+        ? hodNav
+        : isTender
+          ? tenderNav
+          : isOperations
+            ? operationsNav
+            : user?.role === "INFRA"
+              ? infraNav
+              : isAccounts
+                ? accountsNav
+                : employeeNav;
 
   const handleLogout = async () => {
     const confirmed = window.confirm("Are you sure you want to logout?");

@@ -1,5 +1,6 @@
 import { contractRepository } from "../repositories/contract.repository.js";
-import { notFound } from "../utils/errors.js";
+import { projectService } from "./project.service.js";
+import { badRequest, notFound } from "../utils/errors.js";
 import { getPagination } from "../utils/pagination.js";
 
 const DATE_FIELDS = [
@@ -108,5 +109,33 @@ export const contractService = {
     await contractRepository.delete(id);
     await contractRepository.resequenceSrNos();
     return { deleted: true };
+  },
+
+  /** "Create Project" — carries the contract's known details over into a new Admin project. */
+  async createProjectFromContract(id: string) {
+    const contract = await this.getById(id);
+    if (contract.linkedProjectId) {
+      throw badRequest("A project has already been created from this contract");
+    }
+
+    const description = [contract.client, contract.workCategory, contract.nameOfBidder]
+      .filter((part) => part && part.trim().length > 0)
+      .join(" — ");
+
+    const project = await projectService.create({
+      name: contract.nameOfWork,
+      description: description || undefined
+    });
+
+    const isBankGuarantee = contract.securityDepositType === "BANK_GUARANTEE";
+    await projectService.update(project.id, {
+      woAmount: contract.woAmount ? String(contract.woAmount) : undefined,
+      bgAmount: isBankGuarantee && contract.sdAmount ? String(contract.sdAmount) : undefined,
+      bgIssueDate: isBankGuarantee ? contract.sdIssuedDate : undefined,
+      bgExpiryDate: isBankGuarantee ? contract.sdExpiryDate : undefined
+    });
+
+    await contractRepository.update(id, { linkedProject: { connect: { id: project.id } } });
+    return this.getById(id);
   }
 };

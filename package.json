@@ -18,6 +18,7 @@
     "bootstrap:administrative": "tsx backend/src/scripts/bootstrap-administrative.ts",
     "bootstrap:tender": "tsx backend/src/scripts/bootstrap-tender.ts",
     "bootstrap:operations": "tsx backend/src/scripts/bootstrap-operations.ts",
+    "bootstrap:accounts": "tsx backend/src/scripts/bootstrap-accounts.ts",
     "seed:demo-expense": "tsx backend/src/scripts/seed-demo-expense.ts",
     "db:wipe:keep-admin": "tsx backend/src/scripts/wipe-db-keep-admin.ts",
     "lint": "eslint .",
