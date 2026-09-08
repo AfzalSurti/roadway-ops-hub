@@ -451,6 +451,93 @@ export const financialService = {
     });
   },
 
+  // ─── Professional staff billing (person-month based, parallel to RA bills) ───────────
+
+  async addProfession(projectId: string, payload: {
+    category?: "KEY" | "SUB";
+    position: string;
+    personName?: string;
+    rate: number;
+    mmConstruction: number;
+    mmMaintenance: number;
+  }) {
+    const plan = await financialRepository.findPlanByProjectId(projectId);
+    if (!plan) {
+      throw badRequest("Create financial item planning first");
+    }
+    const sortOrder = await financialRepository.nextProfessionSortOrder(plan.id);
+    return financialRepository.addProfession({
+      planId: plan.id,
+      category: payload.category ?? "KEY",
+      position: payload.position.trim(),
+      personName: (payload.personName ?? "").trim(),
+      rate: round2(payload.rate),
+      mmConstruction: round2(payload.mmConstruction),
+      mmMaintenance: round2(payload.mmMaintenance),
+      sortOrder
+    });
+  },
+
+  async createProfessionalBill(projectId: string, payload: {
+    billingMonth?: string;
+    remark?: string;
+    items: Array<{ professionId: string; currentMm: number }>;
+  }) {
+    const plan = await financialRepository.findPlanByProjectId(projectId);
+    if (!plan) {
+      throw badRequest("Create financial item planning first");
+    }
+
+    type Profession = { id: string; position: string; rate: number; mmConstruction: number; mmMaintenance: number };
+    type ProfessionalBill = { items: Array<{ professionId: string; currentMm: number }> };
+    const professionsById = new Map<string, Profession>(plan.professions.map((p: Profession) => [p.id, p]));
+
+    const previousMmByProfession = new Map<string, number>();
+    for (const bill of plan.professionalBills as ProfessionalBill[]) {
+      for (const item of bill.items) {
+        previousMmByProfession.set(
+          item.professionId,
+          round2((previousMmByProfession.get(item.professionId) ?? 0) + Number(item.currentMm))
+        );
+      }
+    }
+
+    const filteredItems = payload.items.filter((item) => item.professionId && Number(item.currentMm) > 0);
+    if (filteredItems.length === 0) {
+      throw badRequest("Enter at least one person-month value for this bill");
+    }
+
+    const items = filteredItems.map((entry) => {
+      const profession = professionsById.get(entry.professionId);
+      if (!profession) {
+        throw badRequest("Invalid profession selected for this bill");
+      }
+      const currentMm = round2(Number(entry.currentMm));
+      const previousMm = previousMmByProfession.get(entry.professionId) ?? 0;
+      const totalContractMm = round2(profession.mmConstruction + profession.mmMaintenance);
+      const remainingMm = round2(Math.max(totalContractMm - previousMm, 0));
+      if (currentMm > remainingMm + 0.0001) {
+        throw badRequest(
+          `${profession.position} has only ${remainingMm.toFixed(2)} person-month(s) remaining (contracted ${totalContractMm.toFixed(2)}).`
+        );
+      }
+      return {
+        professionId: entry.professionId,
+        currentMm,
+        currentAmount: round2(profession.rate * currentMm)
+      };
+    });
+
+    const nextNumber = await financialRepository.nextProfessionalBillNumber(plan.id);
+    return financialRepository.createProfessionalBill({
+      planId: plan.id,
+      billName: `PB-${nextNumber}`,
+      billingMonth: (payload.billingMonth ?? "").trim(),
+      remark: payload.remark?.trim() || null,
+      items
+    });
+  },
+
   // Legacy kept for backward compat
   async createBills(projectId: string, payload: { bills: Array<{ itemId: string; includePreviousRemaining?: boolean; status: FinancialBillStatus; remark?: string | null }> }) {
     const plan = await financialRepository.findPlanByProjectId(projectId);

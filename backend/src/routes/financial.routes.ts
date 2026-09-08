@@ -4,7 +4,13 @@ import { requireAuth } from "../middleware/auth.js";
 import { requireRole } from "../middleware/rbac.js";
 import { asyncHandler } from "../utils/async-handler.js";
 import { validate } from "../middleware/validate.js";
-import { createRaBillSchema, updateRaBillSchema, upsertFinancialPlanSchema } from "../validators/project.validator.js";
+import {
+  addProfessionSchema,
+  createProfessionalBillSchema,
+  createRaBillSchema,
+  updateRaBillSchema,
+  upsertFinancialPlanSchema
+} from "../validators/project.validator.js";
 
 export const financialRouter = Router();
 
@@ -20,3 +26,13 @@ financialRouter.get("/:projectId", asyncHandler(financialController.getProjectFi
 financialRouter.post("/:projectId/plan", validate(upsertFinancialPlanSchema), asyncHandler(financialController.upsertPlan));
 financialRouter.post("/:projectId/ra-bills", validate(createRaBillSchema), asyncHandler(financialController.createRaBill));
 financialRouter.patch("/ra-bills/:raBillId", validate(updateRaBillSchema), asyncHandler(financialController.updateRaBill));
+financialRouter.post(
+  "/:projectId/professions",
+  validate(addProfessionSchema),
+  asyncHandler(financialController.addProfession)
+);
+financialRouter.post(
+  "/:projectId/professional-bills",
+  validate(createProfessionalBillSchema),
+  asyncHandler(financialController.createProfessionalBill)
+);

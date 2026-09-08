@@ -43,6 +43,11 @@ const PLAN_INCLUDE = {
   raBills: {
     include: RA_BILL_INCLUDE,
     orderBy: { billName: "asc" }
+  },
+  professions: { orderBy: { sortOrder: "asc" } },
+  professionalBills: {
+    include: { items: true },
+    orderBy: { createdAt: "asc" }
   }
 } as const;
 
@@ -320,6 +325,68 @@ export const financialRepository = {
         ...RA_BILL_INCLUDE,
         plan: { include: { project: { include: { requisitionForm: true } } } }
       }
+    });
+  },
+
+  // ─── Professional staff billing (person-month based, parallel to RA bills) ───────────
+
+  nextProfessionSortOrder(planId: string) {
+    return db.projectFinancialProfession
+      .aggregate({ where: { planId }, _max: { sortOrder: true } })
+      .then((r: { _max: { sortOrder: number | null } }) => (r._max.sortOrder ?? 0) + 1);
+  },
+
+  nextProfessionalBillNumber(planId: string) {
+    return db.projectFinancialProfessionalBill.count({ where: { planId } }).then((count: number) => count + 1);
+  },
+
+  async addProfession(args: {
+    planId: string;
+    category: string;
+    position: string;
+    personName: string;
+    rate: number;
+    mmConstruction: number;
+    mmMaintenance: number;
+    sortOrder: number;
+  }) {
+    await db.projectFinancialProfession.create({ data: args });
+    return db.projectFinancialPlan.findUniqueOrThrow({ where: { id: args.planId }, include: PLAN_INCLUDE });
+  },
+
+  async createProfessionalBill(args: {
+    planId: string;
+    billName: string;
+    billingMonth: string;
+    remark: string | null;
+    items: Array<{ professionId: string; currentMm: number; currentAmount: number }>;
+  }) {
+    return db.$transaction(async (txClient: any) => {
+      const tx = txClient as any;
+      const bill = await tx.projectFinancialProfessionalBill.create({
+        data: {
+          planId: args.planId,
+          billName: args.billName,
+          billingMonth: args.billingMonth,
+          remark: args.remark
+        }
+      });
+
+      for (const item of args.items) {
+        await tx.projectFinancialProfessionalBillItem.create({
+          data: {
+            billId: bill.id,
+            professionId: item.professionId,
+            currentMm: item.currentMm,
+            currentAmount: item.currentAmount
+          }
+        });
+      }
+
+      return tx.projectFinancialPlan.findUniqueOrThrow({
+        where: { id: args.planId },
+        include: PLAN_INCLUDE
+      });
     });
   },
 

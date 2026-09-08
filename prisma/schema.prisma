@@ -490,19 +490,75 @@ model AuditLog {
 }
 
 model ProjectFinancialPlan {
-  id            String                   @id @default(cuid())
-  projectId     String                   @unique
-  contractValue Float
-  taxAmount     Float
-  totalAmount   Float
-  createdAt     DateTime                 @default(now())
-  updatedAt     DateTime                 @updatedAt
-  project       Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  items         ProjectFinancialItem[]
-  bills         ProjectFinancialBill[]
-  raBills       ProjectFinancialRaBill[]
+  id                String                             @id @default(cuid())
+  projectId         String                             @unique
+  contractValue     Float
+  taxAmount         Float
+  totalAmount       Float
+  createdAt         DateTime                           @default(now())
+  updatedAt         DateTime                           @updatedAt
+  project           Project                            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  items             ProjectFinancialItem[]
+  bills             ProjectFinancialBill[]
+  raBills           ProjectFinancialRaBill[]
+  professions       ProjectFinancialProfession[]
+  professionalBills ProjectFinancialProfessionalBill[]
 
   @@index([projectId])
+}
+
+/// A staff position billed by person-months against a professional/consultancy contract
+/// (e.g. AE staffing bills like RA-02) — a parallel billing style to the percentage-of-item RA bills above.
+model ProjectFinancialProfession {
+  id             String                                 @id @default(cuid())
+  planId         String
+  /// "KEY" (Key Professional Staff) or "SUB" (Sub-Professional Staff) — mirrors the client's Excel grouping
+  category       String                                 @default("KEY")
+  position       String
+  personName     String                                 @default("")
+  /// Contracted rate per person-month
+  rate           Float                                  @default(0)
+  mmConstruction Float                                  @default(0)
+  mmMaintenance  Float                                  @default(0)
+  sortOrder      Int                                    @default(0)
+  createdAt      DateTime                               @default(now())
+  updatedAt      DateTime                               @updatedAt
+  plan           ProjectFinancialPlan                   @relation(fields: [planId], references: [id], onDelete: Cascade)
+  billItems      ProjectFinancialProfessionalBillItem[]
+
+  @@index([planId])
+}
+
+/// One monthly professional invoice (like RA-02's "Invoice No: 02") — a snapshot of person-months
+/// claimed this round for every profession on the plan; cumulative/balance figures are derived by
+/// summing all bills up to and including this one, in creation order.
+model ProjectFinancialProfessionalBill {
+  id           String                                 @id @default(cuid())
+  planId       String
+  billName     String
+  billingMonth String                                 @default("")
+  remark       String?
+  createdAt    DateTime                               @default(now())
+  updatedAt    DateTime                               @updatedAt
+  plan         ProjectFinancialPlan                   @relation(fields: [planId], references: [id], onDelete: Cascade)
+  items        ProjectFinancialProfessionalBillItem[]
+
+  @@index([planId])
+}
+
+model ProjectFinancialProfessionalBillItem {
+  id            String                           @id @default(cuid())
+  billId        String
+  professionId  String
+  currentMm     Float                            @default(0)
+  currentAmount Float                            @default(0)
+  createdAt     DateTime                         @default(now())
+  bill          ProjectFinancialProfessionalBill @relation(fields: [billId], references: [id], onDelete: Cascade)
+  profession    ProjectFinancialProfession       @relation(fields: [professionId], references: [id], onDelete: Cascade)
+
+  @@unique([billId, professionId])
+  @@index([billId])
+  @@index([professionId])
 }
 
 model ProjectFinancialItem {

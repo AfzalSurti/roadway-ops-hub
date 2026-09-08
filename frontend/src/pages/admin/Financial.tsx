@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { financialBillStatusConfig, type FinancialBillStatus, type FinancialRaBill } from "@/lib/domain";
 import { downloadProperBillPdf, downloadRaBillPdf } from "@/lib/ra-bill-pdf";
+import { ProfessionalStaffSection } from "@/components/admin/ProfessionalStaffSection";
 import { toast } from "sonner";
 import { Download, FileText, Plus, Save, X } from "lucide-react";
 import * as XLSX from "xlsx";
@@ -828,6 +829,9 @@ export default function AdminFinancial() {
             )}
           </div>
 
+          {/* Professional Staff (person-month) billing — parallel to the item-based RA bills above */}
+          {detail.plan ? <ProfessionalStaffSection projectId={activeProjectId} plan={detail.plan} /> : null}
+
           {/* Tender Item Modal */}
           {showPlanning && (
             <FinancialModal title={planningType === "EXCESS" ? "Excess Planning" : "Tender Item"} onClose={() => setShowPlanning(false)}>
@@ -1644,7 +1648,7 @@ function DeductionField({ label, value, onChange, computedAmount, helperText, is
   );
 }
 
-function DetailTile({ label, value }: { label: string; value: string }) {
+export function DetailTile({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-border/40 bg-secondary/20 p-3">
       <p className="text-xs text-muted-foreground mb-1">{label}</p>
@@ -1653,7 +1657,7 @@ function DetailTile({ label, value }: { label: string; value: string }) {
   );
 }
 
-function FinancialModal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+export function FinancialModal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm" onClick={onClose}>
       <div onClick={(e) => e.stopPropagation()} className="glass-panel-strong p-6 w-full max-w-5xl mx-4 max-h-[90vh] overflow-y-auto">

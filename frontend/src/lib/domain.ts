@@ -559,6 +559,42 @@ export type FinancialItemTemplate = {
   particulars: string;
 };
 
+export type FinancialProfessionCategory = "KEY" | "SUB";
+
+export type FinancialProfession = {
+  id: string;
+  planId: string;
+  category: FinancialProfessionCategory;
+  position: string;
+  personName: string;
+  rate: number;
+  mmConstruction: number;
+  mmMaintenance: number;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type FinancialProfessionalBillItem = {
+  id: string;
+  billId: string;
+  professionId: string;
+  currentMm: number;
+  currentAmount: number;
+  createdAt: string;
+};
+
+export type FinancialProfessionalBill = {
+  id: string;
+  planId: string;
+  billName: string;
+  billingMonth: string;
+  remark?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  items: FinancialProfessionalBillItem[];
+};
+
 export type FinancialPlan = {
   id: string;
   projectId: string;
@@ -570,6 +606,8 @@ export type FinancialPlan = {
   project?: ProjectItem;
   items: FinancialPlanItem[];
   raBills: FinancialRaBill[];
+  professions: FinancialProfession[];
+  professionalBills: FinancialProfessionalBill[];
 };
 
 export type FinancialProjectDetail = {

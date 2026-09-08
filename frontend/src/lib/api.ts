@@ -1404,6 +1404,37 @@ export const api = {
     });
   },
 
+  addFinancialProfession(
+    projectId: string,
+    payload: {
+      category?: "KEY" | "SUB";
+      position: string;
+      personName?: string;
+      rate: number;
+      mmConstruction: number;
+      mmMaintenance: number;
+    }
+  ) {
+    return request<FinancialPlan>(`/financials/${projectId}/professions`, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+  },
+
+  createProfessionalBill(
+    projectId: string,
+    payload: {
+      billingMonth?: string;
+      remark?: string;
+      items: Array<{ professionId: string; currentMm: number }>;
+    }
+  ) {
+    return request<FinancialPlan>(`/financials/${projectId}/professional-bills`, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+  },
+
   createFinancialBills(
     projectId: string,
     payload: { bills: Array<{ itemId: string; includePreviousRemaining?: boolean; status: FinancialBillStatus; remark?: string | null }> }
