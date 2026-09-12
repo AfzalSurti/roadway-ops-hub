@@ -148,14 +148,25 @@ export const updateRaBillSchema = z.object({
 export const addProfessionsSchema = z.object({
   items: z.array(
     z.object({
-      category: z.enum(["KEY", "SUB"]).optional(),
+      category: z.string().trim().min(1).max(200).optional(),
       position: z.string().trim().min(1, "Position is required").max(300),
       personName: z.string().trim().max(200).optional(),
       rate: z.coerce.number().min(0),
       mmConstruction: z.coerce.number().min(0),
-      mmMaintenance: z.coerce.number().min(0)
+      mmMaintenance: z.coerce.number().min(0),
+      deductionPct: z.coerce.number().min(0).max(100).optional()
     })
   ).min(1, "Add at least one profession")
+});
+
+export const updateProfessionSchema = z.object({
+  category: z.string().trim().min(1).max(200).optional(),
+  position: z.string().trim().min(1).max(300).optional(),
+  personName: z.string().trim().max(200).optional(),
+  rate: z.coerce.number().min(0).optional(),
+  mmConstruction: z.coerce.number().min(0).optional(),
+  mmMaintenance: z.coerce.number().min(0).optional(),
+  deductionPct: z.coerce.number().min(0).max(100).optional()
 });
 
 export const createProfessionalBillSchema = z.object({

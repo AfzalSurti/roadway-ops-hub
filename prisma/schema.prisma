@@ -520,6 +520,8 @@ model ProjectFinancialProfession {
   rate           Float                                  @default(0)
   mmConstruction Float                                  @default(0)
   mmMaintenance  Float                                  @default(0)
+  /// % reduced from this person's contract amount (rate x MM) — e.g. 5 means net = 95% of gross
+  deductionPct   Float                                  @default(0)
   sortOrder      Int                                    @default(0)
   createdAt      DateTime                               @default(now())
   updatedAt      DateTime                               @updatedAt

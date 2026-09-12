@@ -340,6 +340,36 @@ export const financialRepository = {
     return db.projectFinancialProfessionalBill.count({ where: { planId } }).then((count: number) => count + 1);
   },
 
+  findProfessionById(professionId: string) {
+    return db.projectFinancialProfession.findUnique({
+      where: { id: professionId },
+      include: { plan: true }
+    });
+  },
+
+  async updateProfession(
+    professionId: string,
+    data: {
+      category?: string;
+      position?: string;
+      personName?: string;
+      rate?: number;
+      mmConstruction?: number;
+      mmMaintenance?: number;
+      deductionPct?: number;
+    }
+  ) {
+    const updated = await db.projectFinancialProfession.update({ where: { id: professionId }, data });
+    return db.projectFinancialPlan.findUniqueOrThrow({ where: { id: updated.planId }, include: PLAN_INCLUDE });
+  },
+
+  distinctProfessionCategoriesAndPositions() {
+    return db.projectFinancialProfession.findMany({
+      select: { category: true, position: true },
+      distinct: ["category", "position"]
+    });
+  },
+
   async addProfessions(args: {
     planId: string;
     items: Array<{
@@ -349,6 +379,7 @@ export const financialRepository = {
       rate: number;
       mmConstruction: number;
       mmMaintenance: number;
+      deductionPct: number;
       sortOrder: number;
     }>;
   }) {

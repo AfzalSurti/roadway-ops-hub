@@ -559,7 +559,8 @@ export type FinancialItemTemplate = {
   particulars: string;
 };
 
-export type FinancialProfessionCategory = "KEY" | "SUB";
+/** Free-form now (client uses ~11 real cost-head categories, plus custom "Other" entries). */
+export type FinancialProfessionCategory = string;
 
 export type FinancialProfession = {
   id: string;
@@ -570,9 +571,16 @@ export type FinancialProfession = {
   rate: number;
   mmConstruction: number;
   mmMaintenance: number;
+  /** % reduced from this person's contract amount (rate x MM). */
+  deductionPct: number;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
+};
+
+export type FinancialProfessionOptions = {
+  categories: string[];
+  positionsByCategory: Record<string, string[]>;
 };
 
 export type FinancialProfessionalBillItem = {

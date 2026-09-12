@@ -22,6 +22,7 @@ import type {
   FinancialBillItem,
   FinancialBillStatus,
   FinancialPlan,
+  FinancialProfessionOptions,
   FinancialProjectDetail,
   FinancialProjectSummary,
   FinancialRaBill,
@@ -1408,12 +1409,13 @@ export const api = {
     projectId: string,
     payload: {
       items: Array<{
-        category?: "KEY" | "SUB";
+        category?: string;
         position: string;
         personName?: string;
         rate: number;
         mmConstruction: number;
         mmMaintenance: number;
+        deductionPct?: number;
       }>;
     }
   ) {
@@ -1421,6 +1423,28 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload)
     });
+  },
+
+  updateFinancialProfession(
+    professionId: string,
+    payload: Partial<{
+      category: string;
+      position: string;
+      personName: string;
+      rate: number;
+      mmConstruction: number;
+      mmMaintenance: number;
+      deductionPct: number;
+    }>
+  ) {
+    return request<FinancialPlan>(`/financials/professions/${professionId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    });
+  },
+
+  getFinancialProfessionOptions() {
+    return request<FinancialProfessionOptions>("/financials/profession-options");
   },
 
   createProfessionalBill(

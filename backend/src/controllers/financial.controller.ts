@@ -38,6 +38,16 @@ export const financialController = {
     return sendSuccess(res, plan, 201);
   },
 
+  async updateProfession(req: Request, res: Response) {
+    const plan = await financialService.updateProfession(req.params.professionId, req.body);
+    return sendSuccess(res, plan);
+  },
+
+  async getProfessionOptions(_req: Request, res: Response) {
+    const options = await financialService.getProfessionOptions();
+    return sendSuccess(res, options);
+  },
+
   async createProfessionalBill(req: Request, res: Response) {
     const plan = await financialService.createProfessionalBill(req.params.projectId, req.body);
     return sendSuccess(res, plan, 201);

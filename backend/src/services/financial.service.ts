@@ -1,5 +1,6 @@
 import { financialRepository } from "../repositories/financial.repository.js";
 import { badRequest, notFound } from "../utils/errors.js";
+import { PROFESSION_CATALOG_SEED } from "../utils/profession-catalog.js";
 
 type FinancialBillStatus = "PLANNING" | "PUT_UP" | "RECEIVED";
 
@@ -455,12 +456,13 @@ export const financialService = {
 
   async addProfessions(projectId: string, payload: {
     items: Array<{
-      category?: "KEY" | "SUB";
+      category?: string;
       position: string;
       personName?: string;
       rate: number;
       mmConstruction: number;
       mmMaintenance: number;
+      deductionPct?: number;
     }>;
   }) {
     const plan = await financialRepository.findPlanByProjectId(projectId);
@@ -471,15 +473,62 @@ export const financialService = {
     return financialRepository.addProfessions({
       planId: plan.id,
       items: payload.items.map((item, index) => ({
-        category: item.category ?? "KEY",
+        category: (item.category ?? "Key Professional Staff").trim(),
         position: item.position.trim(),
         personName: (item.personName ?? "").trim(),
         rate: round2(item.rate),
         mmConstruction: round2(item.mmConstruction),
         mmMaintenance: round2(item.mmMaintenance),
+        deductionPct: round2(item.deductionPct ?? 0),
         sortOrder: startingSortOrder + index
       }))
     });
+  },
+
+  async updateProfession(professionId: string, payload: {
+    category?: string;
+    position?: string;
+    personName?: string;
+    rate?: number;
+    mmConstruction?: number;
+    mmMaintenance?: number;
+    deductionPct?: number;
+  }) {
+    const existing = await financialRepository.findProfessionById(professionId);
+    if (!existing) {
+      throw notFound("Profession not found");
+    }
+    return financialRepository.updateProfession(professionId, {
+      category: payload.category?.trim(),
+      position: payload.position?.trim(),
+      personName: payload.personName !== undefined ? payload.personName.trim() : undefined,
+      rate: payload.rate !== undefined ? round2(payload.rate) : undefined,
+      mmConstruction: payload.mmConstruction !== undefined ? round2(payload.mmConstruction) : undefined,
+      mmMaintenance: payload.mmMaintenance !== undefined ? round2(payload.mmMaintenance) : undefined,
+      deductionPct: payload.deductionPct !== undefined ? round2(payload.deductionPct) : undefined
+    });
+  },
+
+  async getProfessionOptions() {
+    const rows: Array<{ category: string; position: string }> =
+      await financialRepository.distinctProfessionCategoriesAndPositions();
+
+    const positionsByCategory: Record<string, Set<string>> = {};
+    for (const [category, positions] of Object.entries(PROFESSION_CATALOG_SEED)) {
+      positionsByCategory[category] = new Set(positions);
+    }
+    for (const row of rows) {
+      if (!row.category || !row.position) continue;
+      if (!positionsByCategory[row.category]) positionsByCategory[row.category] = new Set();
+      positionsByCategory[row.category].add(row.position);
+    }
+
+    return {
+      categories: Object.keys(positionsByCategory),
+      positionsByCategory: Object.fromEntries(
+        Object.entries(positionsByCategory).map(([category, positions]) => [category, Array.from(positions)])
+      )
+    };
   },
 
   async createProfessionalBill(projectId: string, payload: {

@@ -8,6 +8,7 @@ import {
   addProfessionsSchema,
   createProfessionalBillSchema,
   createRaBillSchema,
+  updateProfessionSchema,
   updateRaBillSchema,
   upsertFinancialPlanSchema
 } from "../validators/project.validator.js";
@@ -22,6 +23,12 @@ financialRouter.get(
 );
 financialRouter.use(requireRole("ADMIN", "ACCOUNTS"));
 financialRouter.get("/projects", asyncHandler(financialController.listEligibleProjects));
+financialRouter.get("/profession-options", asyncHandler(financialController.getProfessionOptions));
+financialRouter.patch(
+  "/professions/:professionId",
+  validate(updateProfessionSchema),
+  asyncHandler(financialController.updateProfession)
+);
 financialRouter.get("/:projectId", asyncHandler(financialController.getProjectFinancial));
 financialRouter.post("/:projectId/plan", validate(upsertFinancialPlanSchema), asyncHandler(financialController.upsertPlan));
 financialRouter.post("/:projectId/ra-bills", validate(createRaBillSchema), asyncHandler(financialController.createRaBill));
