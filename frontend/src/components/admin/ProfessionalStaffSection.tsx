@@ -654,6 +654,108 @@ export function ProfessionalStaffSection({
         </FinancialModal>
       ) : null}
 
+      {showCreateBill ? (
+        <FinancialModal title="Create Professional Bill" onClose={onCloseCreateBill}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm mb-4">
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Billing Month</label>
+              <input
+                value={billingMonth}
+                onChange={(e) => setBillingMonth(e.target.value)}
+                placeholder="e.g. August 2021"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Remark</label>
+              <input value={billRemark} onChange={(e) => setBillRemark(e.target.value)} className={inputClass} />
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">
+            Enter the person-months claimed this invoice for each profession. Leave at 0 for anyone not billed this round.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4 text-sm">
+            <DetailTile
+              label="People Billed This Invoice"
+              value={String(Object.values(billMmInputs).filter((v) => Number(v) > 0).length)}
+            />
+            <DetailTile
+              label="Total MM This Invoice"
+              value={Object.values(billMmInputs).reduce((sum, v) => sum + Number(v || 0), 0).toFixed(2)}
+            />
+            <DetailTile label="Total Amount This Invoice" value={money(billTotalAmount)} />
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[720px]">
+              <thead>
+                <tr className="border-b border-border/40 text-muted-foreground">
+                  <th className="text-left p-3 font-medium">Position</th>
+                  <th className="text-left p-3 font-medium">Name</th>
+                  <th className="text-right p-3 font-medium">Balance MM</th>
+                  <th className="text-right p-3 font-medium">Current MM</th>
+                  <th className="text-right p-3 font-medium">Current Amount</th>
+                  <th className="p-3"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {metrics.map((row) => (
+                  <tr key={row.profession.id} className="border-b border-border/20">
+                    <td className="p-3 max-w-[220px]">
+                      <span className="line-clamp-2">{row.profession.position}</span>
+                    </td>
+                    <td className="p-3">{row.profession.personName || "—"}</td>
+                    <td className="p-3 text-right tabular-nums">{row.balanceMm.toFixed(2)}</td>
+                    <td className="p-3 w-32">
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        max={row.balanceMm}
+                        value={billMmInputs[row.profession.id] ?? ""}
+                        onChange={(e) => setBillMmInputs((prev) => ({ ...prev, [row.profession.id]: e.target.value }))}
+                        className="w-24 px-3 py-2 rounded-xl bg-secondary/50 border border-border/50"
+                        placeholder="0"
+                      />
+                    </td>
+                    <td className="p-3 text-right tabular-nums">
+                      {money(row.profession.rate * Number(billMmInputs[row.profession.id] || 0))}
+                    </td>
+                    <td className="p-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => openEditProfession(row.profession)}
+                        className="p-1.5 rounded-lg hover:bg-secondary/50 text-muted-foreground hover:text-foreground"
+                        title="Edit"
+                        aria-label="Edit profession"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                <tr className="bg-secondary/20 font-medium">
+                  <td className="p-3" colSpan={4}>
+                    Total
+                  </td>
+                  <td className="p-3 text-right tabular-nums">{money(billTotalAmount)}</td>
+                  <td></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div className="flex justify-end mt-4">
+            <button
+              onClick={() => createBillMutation.mutate()}
+              disabled={createBillMutation.isPending || Object.values(billMmInputs).every((v) => !Number(v))}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary/10 text-primary border border-primary/20 text-sm font-medium hover:bg-primary/20 disabled:opacity-50"
+            >
+              <Save className="h-4 w-4" />
+              {createBillMutation.isPending ? "Saving..." : "Save Professional Bill"}
+            </button>
+          </div>
+        </FinancialModal>
+      ) : null}
+
       {editingProfession ? (
         <FinancialModal title="Edit Profession" onClose={() => setEditingProfession(null)}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
@@ -750,95 +852,6 @@ export function ProfessionalStaffSection({
             >
               <Save className="h-4 w-4" />
               {updateProfessionMutation.isPending ? "Saving..." : "Save Changes"}
-            </button>
-          </div>
-        </FinancialModal>
-      ) : null}
-
-      {showCreateBill ? (
-        <FinancialModal title="Create Professional Bill" onClose={onCloseCreateBill}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm mb-4">
-            <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Billing Month</label>
-              <input
-                value={billingMonth}
-                onChange={(e) => setBillingMonth(e.target.value)}
-                placeholder="e.g. August 2021"
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Remark</label>
-              <input value={billRemark} onChange={(e) => setBillRemark(e.target.value)} className={inputClass} />
-            </div>
-          </div>
-          <p className="text-xs text-muted-foreground mb-3">
-            Enter the person-months claimed this invoice for each profession. Leave at 0 for anyone not billed this round.
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4 text-sm">
-            <DetailTile
-              label="People Billed This Invoice"
-              value={String(Object.values(billMmInputs).filter((v) => Number(v) > 0).length)}
-            />
-            <DetailTile
-              label="Total MM This Invoice"
-              value={Object.values(billMmInputs).reduce((sum, v) => sum + Number(v || 0), 0).toFixed(2)}
-            />
-            <DetailTile label="Total Amount This Invoice" value={money(billTotalAmount)} />
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[720px]">
-              <thead>
-                <tr className="border-b border-border/40 text-muted-foreground">
-                  <th className="text-left p-3 font-medium">Position</th>
-                  <th className="text-left p-3 font-medium">Name</th>
-                  <th className="text-right p-3 font-medium">Balance MM</th>
-                  <th className="text-right p-3 font-medium">Current MM</th>
-                  <th className="text-right p-3 font-medium">Current Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {metrics.map((row) => (
-                  <tr key={row.profession.id} className="border-b border-border/20">
-                    <td className="p-3 max-w-[220px]">
-                      <span className="line-clamp-2">{row.profession.position}</span>
-                    </td>
-                    <td className="p-3">{row.profession.personName || "—"}</td>
-                    <td className="p-3 text-right tabular-nums">{row.balanceMm.toFixed(2)}</td>
-                    <td className="p-3 w-32">
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        max={row.balanceMm}
-                        value={billMmInputs[row.profession.id] ?? ""}
-                        onChange={(e) => setBillMmInputs((prev) => ({ ...prev, [row.profession.id]: e.target.value }))}
-                        className="w-24 px-3 py-2 rounded-xl bg-secondary/50 border border-border/50"
-                        placeholder="0"
-                      />
-                    </td>
-                    <td className="p-3 text-right tabular-nums">
-                      {money(row.profession.rate * Number(billMmInputs[row.profession.id] || 0))}
-                    </td>
-                  </tr>
-                ))}
-                <tr className="bg-secondary/20 font-medium">
-                  <td className="p-3" colSpan={4}>
-                    Total
-                  </td>
-                  <td className="p-3 text-right tabular-nums">{money(billTotalAmount)}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div className="flex justify-end mt-4">
-            <button
-              onClick={() => createBillMutation.mutate()}
-              disabled={createBillMutation.isPending || Object.values(billMmInputs).every((v) => !Number(v))}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary/10 text-primary border border-primary/20 text-sm font-medium hover:bg-primary/20 disabled:opacity-50"
-            >
-              <Save className="h-4 w-4" />
-              {createBillMutation.isPending ? "Saving..." : "Save Professional Bill"}
             </button>
           </div>
         </FinancialModal>
