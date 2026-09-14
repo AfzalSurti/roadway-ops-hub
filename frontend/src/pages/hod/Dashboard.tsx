@@ -188,7 +188,10 @@ export default function HodDashboard() {
           woAmountExclGst: financial?.workOrderAmountExclGst ?? null,
           receivedAmountExclGst: financial?.receivedAmountExclGst ?? null,
           financialProgressPct: financial?.financialProgressPct ?? null,
-          billingAmount: financial?.raBillRaisedClaim ?? null
+          billingAmount: financial?.raBillRaisedClaim ?? null,
+          billsRaised: financial?.billsRaisedCount ?? 0,
+          billsPassed: financial?.billsPassedCount ?? 0,
+          billsRemaining: financial?.billsRemainingCount ?? 0
         };
       })
       .sort((a, b) => compareHodProjectsByNumber(a.project, b.project));
@@ -200,6 +203,8 @@ export default function HodDashboard() {
     let woAmountExclGst = 0;
     let receivedAmountExclGst = 0;
     let billingAmount = 0;
+    let billsPassed = 0;
+    let billsRemaining = 0;
 
     for (const row of projectRows) {
       if (row.lifecycle === "COMPLETED") {
@@ -210,6 +215,8 @@ export default function HodDashboard() {
       woAmountExclGst += Number(row.woAmountExclGst) || 0;
       receivedAmountExclGst += Number(row.receivedAmountExclGst) || 0;
       billingAmount += Number(row.billingAmount) || 0;
+      billsPassed += row.billsPassed;
+      billsRemaining += row.billsRemaining;
     }
 
     return {
@@ -218,7 +225,9 @@ export default function HodDashboard() {
       ongoing,
       woAmountExclGst,
       receivedAmountExclGst,
-      billingAmount
+      billingAmount,
+      billsPassed,
+      billsRemaining
     };
   }, [projectRows]);
 
@@ -327,7 +336,7 @@ export default function HodDashboard() {
   };
 
   const isLoading = loadingProjects || loadingTasks || loadingFinancial;
-  const projectTableColSpan = 11;
+  const projectTableColSpan = 13;
 
   return (
     <PageWrapper>
@@ -735,6 +744,8 @@ export default function HodDashboard() {
                   { header: "Received Amount", value: (r) => r.receivedAmountExclGst },
                   { header: "Financial Progress %", value: (r) => r.financialProgressPct },
                   { header: "Billing Amount", value: (r) => r.billingAmount },
+                  { header: "Bills Passed", value: (r) => r.billsPassed },
+                  { header: "Bills Remaining", value: (r) => r.billsRemaining },
                   { header: "Tasks", value: (r) => r.summary.total },
                   { header: "Under Preparation", value: (r) => r.summary.pending },
                   { header: "Draft Submitted", value: (r) => r.summary.completed },
@@ -757,6 +768,8 @@ export default function HodDashboard() {
                   { header: "Received", value: (r) => r.receivedAmountExclGst },
                   { header: "Progress %", value: (r) => r.financialProgressPct },
                   { header: "Billing", value: (r) => r.billingAmount },
+                  { header: "Bills Passed", value: (r) => r.billsPassed },
+                  { header: "Bills Remaining", value: (r) => r.billsRemaining },
                   { header: "Tasks", value: (r) => r.summary.total },
                   { header: "Approved", value: (r) => r.summary.approved },
                   { header: "Lifecycle", value: (r) => r.lifecycle },
@@ -774,6 +787,13 @@ export default function HodDashboard() {
           </div>
         </div>
 
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+          <MiniStat label="Total Work Order Amount" value={totals.woAmountExclGst} isCurrency />
+          <MiniStat label="Total Received" value={totals.receivedAmountExclGst} isCurrency />
+          <MiniStat label="Bills Passed" value={totals.billsPassed} />
+          <MiniStat label="Bills Remaining" value={totals.billsRemaining} />
+        </div>
+
         <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[1280px]">
             <thead>
@@ -784,6 +804,8 @@ export default function HodDashboard() {
                 <th className="py-3 px-4 text-right font-medium">Received Amount</th>
                 <th className="py-3 px-4 text-right font-medium">Financial Progress (%)</th>
                 <th className="py-3 px-4 text-right font-medium">Billing Amount</th>
+                <th className="py-3 px-4 text-right font-medium">Bills Passed</th>
+                <th className="py-3 px-4 text-right font-medium">Bills Remaining</th>
                 <th className="py-3 px-4 text-right font-medium">Tasks</th>
                 <th className="py-3 px-4 text-right font-medium">Under Preparation</th>
                 <th className="py-3 px-4 text-right font-medium">Draft Submitted</th>
@@ -828,6 +850,12 @@ export default function HodDashboard() {
                       <td className="py-3 px-4 text-right tabular-nums text-muted-foreground">
                         {formatHodCurrency(row.billingAmount)}
                       </td>
+                      <td className="py-3 px-4 text-right tabular-nums text-emerald-600">
+                        {row.billsRaised > 0 ? row.billsPassed : "—"}
+                      </td>
+                      <td className="py-3 px-4 text-right tabular-nums text-amber-700">
+                        {row.billsRaised > 0 ? row.billsRemaining : "—"}
+                      </td>
                       <td className="py-3 px-4 text-right tabular-nums">{row.summary.total}</td>
                       <td className="py-3 px-4 text-right tabular-nums text-amber-700">{row.summary.pending}</td>
                       <td className="py-3 px-4 text-right tabular-nums text-sky-600">{row.summary.completed}</td>
@@ -864,6 +892,8 @@ export default function HodDashboard() {
                   <td className="py-3 px-4 text-right tabular-nums">{formatHodCurrency(totals.receivedAmountExclGst)}</td>
                   <td className="py-3 px-4"></td>
                   <td className="py-3 px-4 text-right tabular-nums">{formatHodCurrency(totals.billingAmount)}</td>
+                  <td className="py-3 px-4 text-right tabular-nums">{totals.billsPassed}</td>
+                  <td className="py-3 px-4 text-right tabular-nums">{totals.billsRemaining}</td>
                   <td className="py-3 px-4" colSpan={5}></td>
                 </tr>
               </tfoot>

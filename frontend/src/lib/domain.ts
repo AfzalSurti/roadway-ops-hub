@@ -637,6 +637,12 @@ export type FinancialProjectBillStatusRow = {
   totalExcessExclGst: number;
   excessReceived: number;
   excessBillRaisedClaim: number;
+  /** RA bills raised so far (Normal + Excess). */
+  billsRaisedCount: number;
+  /** Bills with status RECEIVED — payment settled. */
+  billsPassedCount: number;
+  /** Bills still in Planning / Put-up-for-payment. */
+  billsRemainingCount: number;
   remark: string;
 };
 

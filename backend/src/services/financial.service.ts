@@ -121,6 +121,11 @@ export const financialService = {
         .reverse()
         .find((bill) => (bill.remark ?? "").trim().length > 0)?.remark ?? "";
 
+      // "Passed" = bill received / payment settled; "remaining" = still in planning or put-up-for-payment.
+      const billsRaisedCount = allBills.length;
+      const billsPassedCount = allBills.filter((bill) => bill.status === "RECEIVED").length;
+      const billsRemainingCount = billsRaisedCount - billsPassedCount;
+
       return {
         projectId: project.id,
         folderNo: "",
@@ -134,6 +139,9 @@ export const financialService = {
         totalExcessExclGst,
         excessReceived,
         excessBillRaisedClaim,
+        billsRaisedCount,
+        billsPassedCount,
+        billsRemainingCount,
         remark: latestRemark
       };
     });
