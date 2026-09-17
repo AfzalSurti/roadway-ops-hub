@@ -1,6 +1,18 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <script>
+      // Apply the saved theme before paint so there's no flash of the wrong theme
+      // (next-themes' own default storage key/values — kept in sync with App.tsx's ThemeProvider).
+      (function () {
+        try {
+          var theme = localStorage.getItem("theme") || "dark";
+          document.documentElement.classList.add(theme);
+        } catch (e) {
+          document.documentElement.classList.add("dark");
+        }
+      })();
+    </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/roadway-logo.svg" />

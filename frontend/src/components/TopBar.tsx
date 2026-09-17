@@ -1,14 +1,18 @@
-import { Bell, Search, X } from "lucide-react";
+import { Bell, Moon, Search, Sun, X } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { useTheme } from "next-themes";
 import type { AppNotification, TaskItem } from "@/lib/domain";
 import { toast } from "sonner";
 import { BackButton } from "@/components/BackButton";
 
 export function TopBar() {
   const { user } = useAuth();
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const [open, setOpen] = useState(false);
   const [selectedNotification, setSelectedNotification] = useState<AppNotification | null>(null);
   const [comment, setComment] = useState("");
@@ -116,6 +120,14 @@ export function TopBar() {
 
       {/* Right side */}
       <div className="flex items-center gap-4">
+        <button
+          aria-label="Toggle theme"
+          title={mounted && theme === "light" ? "Switch to dark theme" : "Switch to light theme"}
+          onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+          className="p-2 rounded-xl hover:bg-secondary/50 transition-colors text-muted-foreground hover:text-foreground"
+        >
+          {mounted && theme === "light" ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+        </button>
         <button
           aria-label="Notifications"
           title="Notifications"
