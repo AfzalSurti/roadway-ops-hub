@@ -15,6 +15,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CalendarIcon,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Download,
   FileUp,
   Link2,
@@ -404,6 +406,9 @@ export default function LetterNumbering() {
   });
   const letterTopBarRef = useRef<HTMLDivElement | null>(null);
   const letterHeaderRowRef = useRef<HTMLTableRowElement | null>(null);
+  const letterTableScrollRef = useRef<HTMLDivElement | null>(null);
+  const scrollLetterTable = (direction: -1 | 1) =>
+    letterTableScrollRef.current?.scrollBy({ left: direction * 480, behavior: "smooth" });
   const [letterTopBarHeight, setLetterTopBarHeight] = useState(0);
   const [letterHeaderRowHeight, setLetterHeaderRowHeight] = useState(0);
   const [letterImportOpen, setLetterImportOpen] = useState(false);
@@ -1606,6 +1611,28 @@ export default function LetterNumbering() {
                           Showing {filteredLetters.length} of {letters.length}
                         </Badge>
                       ) : null}
+                      <div className="ml-auto flex items-center gap-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 w-8 p-0"
+                          title="Scroll table left"
+                          aria-label="Scroll table left"
+                          onClick={() => scrollLetterTable(-1)}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 w-8 p-0"
+                          title="Scroll table right"
+                          aria-label="Scroll table right"
+                          onClick={() => scrollLetterTable(1)}
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
 
@@ -1678,8 +1705,9 @@ export default function LetterNumbering() {
                     </p>
                   ) : (
                     <div
+                      ref={letterTableScrollRef}
                       className="overflow-auto rounded-xl border border-border/40"
-                      style={{ maxHeight: `calc(100vh - 4rem - ${letterTopBarHeight}px - 1.5rem)` }}
+                      style={{ maxHeight: `calc(100vh - 4rem - ${letterTopBarHeight}px - 2.5rem)` }}
                     >
                       <table className="w-full text-xs min-w-[1500px] table-auto">
                         <thead>
