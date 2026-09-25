@@ -1,6 +1,52 @@
 import * as XLSX from "xlsx";
-import type { LetterCategory } from "./domain";
+import type { LetterCategory, LetterEntryItem } from "./domain";
 import { parseExcelDate } from "./asset-import";
+
+function formatExportDate(value?: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const dd = String(date.getUTCDate()).padStart(2, "0");
+  const mm = String(date.getUTCMonth() + 1).padStart(2, "0");
+  return `${dd}/${mm}/${date.getUTCFullYear()}`;
+}
+
+function exportActionLabel(letter: LetterEntryItem) {
+  if (!letter.actionType) return "-";
+  const type = letter.actionType === "FOLLOW_UP" ? "Follow up" : "Reply";
+  return letter.actionStatus === "CLOSE" ? `${type} · Closed` : `${type} · Pending`;
+}
+
+/** Downloads the letters register of one project as an Excel file (same order as the on-screen table). */
+export function exportLettersToExcel(
+  project: { projectNumber: string; shortName: string; fullName?: string },
+  letters: LetterEntryItem[]
+) {
+  const rows = letters.map((letter) => ({
+    "Project Number": project.projectNumber,
+    "Project Name": project.fullName || project.shortName,
+    "Sr No": letter.serialLabel,
+    "Letter Date": formatExportDate(letter.letterDate),
+    "Letter Number": letter.letterNumber || "",
+    Category: letter.category,
+    Action: exportActionLabel(letter),
+    "Sent By": letter.sentBy || "",
+    "Sent To": letter.sentTo || "",
+    Subject: letter.subject || "",
+    "CC To": letter.ccTo || "",
+    "Referred To": letter.referredTo || "",
+    "Subject Category": letter.subjectCategory || "",
+    "Reply Letter Of": letter.replyOfSerial || "",
+    "Remark by Employee": letter.employeeRemark || "",
+    Remark: letter.remark || ""
+  }));
+  const sheet = XLSX.utils.json_to_sheet(rows);
+  sheet["!cols"] = [16, 30, 8, 12, 28, 10, 16, 22, 22, 40, 18, 18, 22, 14, 30, 24].map((wch) => ({ wch }));
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, sheet, "Letters");
+  const safeName = project.projectNumber.replace(/[^\w-]+/g, "_");
+  XLSX.writeFile(workbook, `letters-${safeName}-${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
 
 export const LETTER_IMPORT_HEADERS = [
   "Category*",

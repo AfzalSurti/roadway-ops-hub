@@ -40,7 +40,7 @@ export default function EmployeeLetterNumbering() {
     mutationFn: ({ letterId, remark }: { letterId: string; remark: string }) =>
       api.submitMyLetterAction(letterId, remark),
     onSuccess: async (_data, variables) => {
-      toast.success("Submitted — sent to admin for review");
+      toast.success("Submitted — action closed");
       setRemarks((prev) => {
         const next = { ...prev };
         delete next[variables.letterId];
@@ -73,7 +73,7 @@ export default function EmployeeLetterNumbering() {
             Reply Pending
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Letters referred to you. Add a remark and submit — it goes to admin for review.
+            Letters referred to you. Add a remark and submit — it closes the action, no admin approval needed.
           </p>
         </div>
 

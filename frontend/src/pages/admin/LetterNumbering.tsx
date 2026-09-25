@@ -27,7 +27,7 @@ import {
   XCircle
 } from "lucide-react";
 import { toast } from "sonner";
-import { downloadLetterImportTemplate } from "@/lib/letter-import";
+import { downloadLetterImportTemplate, exportLettersToExcel } from "@/lib/letter-import";
 import {
   isLetterSubjectCategoryOtherOption,
   mergeLetterSubjectCategories,
@@ -365,7 +365,7 @@ function SubjectCategoryField({
         <Input
           ref={otherInputRef}
           className="h-8 text-xs"
-          placeholder={`Type custom ${otherParent}…`}
+          placeholder={`Type custom ${otherParent}â€¦`}
           value={otherText}
           onChange={(e) => setOtherText(e.target.value)}
           onBlur={commitOther}
@@ -715,7 +715,7 @@ export default function LetterNumbering() {
         letterDate: todayLetterDateIso()
       }),
     onSuccess: async (created) => {
-      toast.success("Letter added — fill details and Save");
+      toast.success("Letter added â€” fill details and Save");
       await refresh();
       openLetterDialog(created);
     },
@@ -792,7 +792,7 @@ export default function LetterNumbering() {
         letterDate: todayLetterDateIso()
       }),
     onSuccess: async (created) => {
-      toast.success("Back-dated letter inserted — fill details and Save");
+      toast.success("Back-dated letter inserted â€” fill details and Save");
       await refresh();
       openLetterDialog(created);
     },
@@ -845,7 +845,7 @@ export default function LetterNumbering() {
       if (variables.payload.replied === true) toast.success("Marked as replied");
       else if ("replyOfSerial" in variables.payload) {
         if (cleared) {
-          toast.success(`Reply linked — #${cleared} marked Reply Done (removed from pending)`);
+          toast.success(`Reply linked â€” #${cleared} marked Reply Done (removed from pending)`);
         } else if (reopened) {
           toast.success(`#${reopened} back to Reply Pending`);
         } else if (variables.payload.replyOfSerial) {
@@ -898,16 +898,6 @@ export default function LetterNumbering() {
       await refresh();
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Delete failed")
-  });
-
-  const reviewActionMutation = useMutation({
-    mutationFn: ({ letterId, approve }: { letterId: string; approve: boolean }) =>
-      api.reviewLetterAction(letterId, approve),
-    onSuccess: async (_data, variables) => {
-      toast.success(variables.approve ? "Closed" : "Sent back to employee");
-      await refresh();
-    },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to update")
   });
 
   const dialogActionType = letterDialogForm.category === "OUTWARD" ? "" : letterDialogForm.actionType;
@@ -979,7 +969,7 @@ export default function LetterNumbering() {
       return letterProjects.filter((project) => project.id === selectedProjectId);
     }
 
-    // No search typed yet → hide full list (like Structure inventory)
+    // No search typed yet â†’ hide full list (like Structure inventory)
     if (!num && !name) return [];
 
     return letterProjects.filter((project) => {
@@ -992,7 +982,7 @@ export default function LetterNumbering() {
     });
   }, [letterProjects, filterNumber, filterShortName, selectedProjectId, hasProjectSearch]);
 
-  // Do not auto-select first project — user must search & pick
+  // Do not auto-select first project â€” user must search & pick
   useEffect(() => {
     if (view !== "database") return;
     if (!selectedProjectId) return;
@@ -1065,7 +1055,7 @@ export default function LetterNumbering() {
         <div>
           <h1 className="page-title">Letter Numbering</h1>
           <p className="page-subtitle">
-            DPR Admin letter database — synced with Projects. Geo Designs &amp; Research Pvt. Ltd.
+            DPR Admin letter database â€” synced with Projects. Geo Designs &amp; Research Pvt. Ltd.
           </p>
         </div>
         <div className="flex flex-wrap gap-2 self-start">
@@ -1233,7 +1223,7 @@ export default function LetterNumbering() {
                       }
                       rows={3}
                       className="w-full px-3 py-2 rounded-xl bg-secondary/50 border border-border/50 text-sm outline-none focus:border-primary/50"
-                      placeholder="Fetched from Sankalp — edit if needed"
+                      placeholder="Fetched from Sankalp â€” edit if needed"
                     />
                   </div>
                 </div>
@@ -1389,32 +1379,23 @@ export default function LetterNumbering() {
                     >
                       <div className="min-w-0">
                         <p className="text-sm font-medium">
-                          {letter.letterProject.projectNumber} · {letter.letterProject.shortName}
+                          {letter.letterProject.projectNumber} Â· {letter.letterProject.shortName}
                           <Badge variant="outline" className="ml-2 text-[10px]">
                             #{letter.serialLabel} {letter.category}
                           </Badge>
                         </p>
                         <p className="text-xs text-muted-foreground mt-1 whitespace-normal break-words">
                           {letter.letterDate ? toDateInput(letter.letterDate) : "No date"}
-                          {" · From: "}
+                          {" Â· From: "}
                           {letter.sentBy || "-"}
-                          {" · "}
+                          {" Â· "}
                           {letter.subject || "No subject"}
                         </p>
                         {letter.actionType ? (
-                          letter.actionStatus === "COMPLETED" ? (
-                            <p className="text-xs mt-2 rounded-md border border-sky-500/30 bg-sky-500/5 px-2 py-1.5">
-                              <span className="font-medium text-sky-700 dark:text-sky-400">
-                                {letter.referredTo || "Employee"} submitted:
-                              </span>{" "}
-                              {letter.employeeRemark || "—"}
-                            </p>
-                          ) : (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {actionTypeLabel(letter.actionType)} — waiting on{" "}
-                              {letter.referredTo || "referred employee"}
-                            </p>
-                          )
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {actionTypeLabel(letter.actionType)} â€” waiting on{" "}
+                            {letter.referredTo || "referred employee"}
+                          </p>
                         ) : null}
                       </div>
                       <div className="flex flex-wrap gap-2 shrink-0">
@@ -1428,31 +1409,7 @@ export default function LetterNumbering() {
                         >
                           Open project
                         </Button>
-                        {letter.actionType ? (
-                          letter.actionStatus === "COMPLETED" ? (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="gap-1"
-                                disabled={reviewActionMutation.isPending}
-                                onClick={() => reviewActionMutation.mutate({ letterId: letter.id, approve: false })}
-                              >
-                                <XCircle className="h-3.5 w-3.5" />
-                                Reject
-                              </Button>
-                              <Button
-                                size="sm"
-                                className="gap-1"
-                                disabled={reviewActionMutation.isPending}
-                                onClick={() => reviewActionMutation.mutate({ letterId: letter.id, approve: true })}
-                              >
-                                <CheckCircle2 className="h-3.5 w-3.5" />
-                                Approve &amp; Close
-                              </Button>
-                            </>
-                          ) : null
-                        ) : (
+                        {letter.actionType ? null : (
                           <Button
                             size="sm"
                             className="gap-1"
@@ -1622,6 +1579,22 @@ export default function LetterNumbering() {
                       >
                         <FileUp className="h-3.5 w-3.5" /> Import Excel
                       </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1"
+                        disabled={filteredLetters.length === 0}
+                        onClick={() => {
+                          try {
+                            exportLettersToExcel(selectedProject, filteredLetters);
+                            toast.success(`Exported ${filteredLetters.length} letter(s)`);
+                          } catch (error) {
+                            toast.error(error instanceof Error ? error.message : "Export failed");
+                          }
+                        }}
+                      >
+                        <Download className="h-3.5 w-3.5" /> Export Excel
+                      </Button>
                       {pendingReplyLetters.length > 0 ? (
                         <Badge variant="secondary" className="rounded-full self-center gap-1">
                           <MailWarning className="h-3.5 w-3.5" />
@@ -1644,8 +1617,8 @@ export default function LetterNumbering() {
                           Letters you should reply to
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Inward / Other letters with an Action assigned, or marked “Need reply = Yes”.
-                          Completed actions need your Approve to close.
+                          Inward / Other letters with an Action assigned, or marked â€œNeed reply = Yesâ€.
+                          They close automatically once the referred employee submits.
                         </p>
                       </div>
                       <div className="space-y-2">
@@ -1656,64 +1629,27 @@ export default function LetterNumbering() {
                           >
                             <div className="min-w-0">
                               <p className="text-sm font-medium">
-                                #{letter.serialLabel} · {letter.letterNumber || letter.category}
+                                #{letter.serialLabel} Â· {letter.letterNumber || letter.category}
                                 <Badge variant="outline" className="ml-2 text-[10px]">
                                   {letter.category}
                                 </Badge>
                               </p>
                               <p className="text-xs text-muted-foreground mt-1 whitespace-normal break-words">
                                 {letter.letterDate ? toDateInput(letter.letterDate) : "No date"}
-                                {" · From: "}
+                                {" Â· From: "}
                                 {letter.sentBy || "-"}
-                                {" · "}
+                                {" Â· "}
                                 {letter.subject || "No subject"}
                               </p>
                               {letter.actionType ? (
-                                letter.actionStatus === "COMPLETED" ? (
-                                  <p className="text-xs mt-2 rounded-md border border-sky-500/30 bg-sky-500/5 px-2 py-1.5">
-                                    <span className="font-medium text-sky-700 dark:text-sky-400">
-                                      {letter.referredTo || "Employee"} submitted:
-                                    </span>{" "}
-                                    {letter.employeeRemark || "—"}
-                                  </p>
-                                ) : (
-                                  <p className="text-xs text-muted-foreground mt-1">
-                                    {actionTypeLabel(letter.actionType)} — waiting on{" "}
-                                    {letter.referredTo || "referred employee"}
-                                  </p>
-                                )
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {actionTypeLabel(letter.actionType)} â€” waiting on{" "}
+                                  {letter.referredTo || "referred employee"}
+                                </p>
                               ) : null}
                             </div>
                             <div className="flex flex-wrap gap-2 shrink-0">
-                              {letter.actionType ? (
-                                letter.actionStatus === "COMPLETED" ? (
-                                  <>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="gap-1"
-                                      disabled={reviewActionMutation.isPending}
-                                      onClick={() =>
-                                        reviewActionMutation.mutate({ letterId: letter.id, approve: false })
-                                      }
-                                    >
-                                      <XCircle className="h-3.5 w-3.5" />
-                                      Reject
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      className="gap-1"
-                                      disabled={reviewActionMutation.isPending}
-                                      onClick={() =>
-                                        reviewActionMutation.mutate({ letterId: letter.id, approve: true })
-                                      }
-                                    >
-                                      <CheckCircle2 className="h-3.5 w-3.5" />
-                                      Approve &amp; Close
-                                    </Button>
-                                  </>
-                                ) : null
-                              ) : (
+                              {letter.actionType ? null : (
                                 <Button
                                   size="sm"
                                   className="gap-1"
@@ -1749,7 +1685,9 @@ export default function LetterNumbering() {
                             className="bg-secondary/40 text-muted-foreground [&>th]:sticky [&>th]:z-20 [&>th]:top-[var(--st-top)] [&>th]:bg-secondary [&>th]:bg-clip-padding"
                             style={{ "--st-top": `${letterTopBarHeight}px` } as CSSProperties}
                           >
-                            <th className="p-2 text-left font-medium w-14">Sr.</th>
+                            <th className="p-2 text-left font-medium w-[110px] min-w-[110px] !left-0 !z-30">Project No.</th>
+                            <th className="p-2 text-left font-medium w-[150px] min-w-[150px] !left-[110px] !z-30">Project Name</th>
+                            <th className="p-2 text-left font-medium w-14 min-w-[56px] !left-[260px] !z-30 border-r border-border/40">Sr.</th>
                             <th className="p-2 text-left font-medium min-w-[160px] w-[160px]">Date</th>
                             <th className="p-2 text-left font-medium w-48">Letter Number</th>
                             <th className="p-2 text-left font-medium w-32">Category</th>
@@ -1770,7 +1708,9 @@ export default function LetterNumbering() {
                               { "--st-top2": `${letterTopBarHeight + letterHeaderRowHeight}px` } as CSSProperties
                             }
                           >
-                            <th className="p-1.5">
+                            <th className="p-1.5 !left-0 !z-30" />
+                            <th className="p-1.5 !left-[110px] !z-30" />
+                            <th className="p-1.5 !left-[260px] !z-30 border-r border-border/40">
                               <Input
                                 className="h-7 text-[11px]"
                                 placeholder="Filter"
@@ -1934,14 +1874,14 @@ export default function LetterNumbering() {
                         <tbody>
                           {letters.length === 0 ? (
                             <tr>
-                              <td colSpan={14} className="p-8 text-center text-muted-foreground">
+                              <td colSpan={16} className="p-8 text-center text-muted-foreground">
                                 No letters yet. Add Inward / Outward / Other, or Add Old Letter / Import Excel for existing numbers.
                               </td>
                             </tr>
                           ) : null}
                           {letters.length > 0 && filteredLetters.length === 0 ? (
                             <tr>
-                              <td colSpan={14} className="p-8 text-center text-muted-foreground">
+                              <td colSpan={16} className="p-8 text-center text-muted-foreground">
                                 No letters match the filters.{" "}
                                 <button
                                   type="button"
@@ -1957,20 +1897,20 @@ export default function LetterNumbering() {
                             const isInsert = /[a-z]/i.test(letter.serialLabel);
                             const legacyReplyStatus =
                               letter.category === "OUTWARD"
-                                ? "—"
+                                ? "â€”"
                                 : letter.needsReply === true && isLetterReplyDone(letter)
                                   ? "Reply Done"
                                   : letter.needsReply === true
-                                    ? "Yes — Pending"
+                                    ? "Yes â€” Pending"
                                     : letter.needsReply === false
                                       ? "No"
-                                      : "—";
+                                      : "â€”";
                             const actionCell = letter.actionType
                               ? letter.actionStatus === "CLOSE"
                                 ? { text: "Close", className: "text-muted-foreground" }
                                 : letter.actionStatus === "COMPLETED"
                                   ? { text: "Completed", className: "text-sky-600" }
-                                  : { text: `${actionTypeLabel(letter.actionType)} · Pending`, className: "text-amber-600" }
+                                  : { text: `${actionTypeLabel(letter.actionType)} Â· Pending`, className: "text-amber-600" }
                               : {
                                   text: legacyReplyStatus,
                                   className: legacyReplyStatus.includes("Pending")
@@ -1987,12 +1927,18 @@ export default function LetterNumbering() {
                                 }`}
                                 onClick={() => openLetterDialog(letter)}
                               >
-                                <td className="p-2 font-medium">{letter.serialLabel}</td>
+                                <td className="p-2 sticky left-0 z-10 bg-card w-[110px] min-w-[110px] max-w-[110px] truncate font-medium">
+                                  {selectedProject.projectNumber}
+                                </td>
+                                <td className="p-2 sticky left-[110px] z-10 bg-card w-[150px] min-w-[150px] max-w-[150px] truncate" title={selectedProject.fullName || selectedProject.shortName}>
+                                  {selectedProject.shortName}
+                                </td>
+                                <td className="p-2 sticky left-[260px] z-10 bg-card font-medium border-r border-border/40">{letter.serialLabel}</td>
                                 <td className="p-2 whitespace-nowrap">
-                                  {letter.letterDate ? toDateInput(letter.letterDate) : "—"}
+                                  {letter.letterDate ? toDateInput(letter.letterDate) : "â€”"}
                                 </td>
                                 <td className="p-2 font-mono text-[11px] whitespace-normal break-all">
-                                  {letter.letterNumber || "—"}
+                                  {letter.letterNumber || "â€”"}
                                 </td>
                                 <td className="p-2">{letter.category}</td>
                                 <td className="p-2">
@@ -2000,34 +1946,34 @@ export default function LetterNumbering() {
                                 </td>
                                 <td className="p-2 max-w-[180px]">
                                   <p className="line-clamp-2 whitespace-pre-wrap break-words">
-                                    {letter.sentBy || "—"}
+                                    {letter.sentBy || "â€”"}
                                   </p>
                                 </td>
                                 <td className="p-2 max-w-[180px]">
                                   <p className="line-clamp-2 whitespace-pre-wrap break-words">
-                                    {letter.sentTo || "—"}
+                                    {letter.sentTo || "â€”"}
                                   </p>
                                 </td>
                                 <td className="p-2 max-w-[200px]">
                                   <p className="line-clamp-2 whitespace-pre-wrap break-words">
-                                    {letter.subject || "—"}
+                                    {letter.subject || "â€”"}
                                   </p>
                                 </td>
                                 <td className="p-2 max-w-[160px]">
                                   <p className="line-clamp-2 whitespace-pre-wrap break-words">
-                                    {letter.ccTo || "—"}
+                                    {letter.ccTo || "â€”"}
                                   </p>
                                 </td>
                                 <td className="p-2 max-w-[160px]">
                                   <p className="line-clamp-2 whitespace-pre-wrap break-words">
-                                    {letter.referredTo || "—"}
+                                    {letter.referredTo || "â€”"}
                                   </p>
                                 </td>
-                                <td className="p-2">{letter.subjectCategory || "—"}</td>
-                                <td className="p-2">{letter.replyOfSerial || "—"}</td>
+                                <td className="p-2">{letter.subjectCategory || "â€”"}</td>
+                                <td className="p-2">{letter.replyOfSerial || "â€”"}</td>
                                 <td className="p-2 max-w-[180px]">
                                   <p className="line-clamp-2 whitespace-pre-wrap break-words">
-                                    {letter.employeeRemark || "—"}
+                                    {letter.employeeRemark || "â€”"}
                                   </p>
                                 </td>
                                 <td className="p-2 text-right">
@@ -2081,7 +2027,7 @@ export default function LetterNumbering() {
                     <span className="font-mono">
                       {selectedProject.projectNumber}/{selectedProject.projectCode}/Sr/OutwardSeq
                     </span>
-                    ). Use + to insert a back-dated letter (3a, 5a…).
+                    ). Use + to insert a back-dated letter (3a, 5aâ€¦).
                   </p>
                 </>
               ) : (
@@ -2109,7 +2055,7 @@ export default function LetterNumbering() {
           letterProjectId={selectedProjectId}
           projectLabel={
             selectedProject
-              ? `${selectedProject.projectNumber} · ${selectedProject.shortName}`
+              ? `${selectedProject.projectNumber} Â· ${selectedProject.shortName}`
               : undefined
           }
         />
@@ -2125,7 +2071,7 @@ export default function LetterNumbering() {
           <DialogHeader>
             <DialogTitle>
               Letter details
-              {dialogLetter ? ` — Sr. ${dialogLetter.serialLabel}` : ""}
+              {dialogLetter ? ` â€” Sr. ${dialogLetter.serialLabel}` : ""}
             </DialogTitle>
             <DialogDescription>
               View and edit this letter record. Click Save to keep changes.
@@ -2292,7 +2238,7 @@ export default function LetterNumbering() {
                   <SelectValue placeholder="Select employee" />
                 </SelectTrigger>
                 <SelectContent className="z-[80]">
-                  <SelectItem value="__none__">—</SelectItem>
+                  <SelectItem value="__none__">â€”</SelectItem>
                   {letterEmployees.map((employee) => (
                     <SelectItem key={employee.id} value={employee.id}>
                       {employee.name}
@@ -2345,7 +2291,7 @@ export default function LetterNumbering() {
               >
                 {updateLetterMutation.isPending ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin mr-1" /> Saving…
+                    <Loader2 className="h-4 w-4 animate-spin mr-1" /> Savingâ€¦
                   </>
                 ) : (
                   "Save"
@@ -2362,7 +2308,7 @@ export default function LetterNumbering() {
             <DialogTitle>Add Old Letter</DialogTitle>
             <DialogDescription>
               Push a historical letter that already has a number. Enter the existing Sr No (required).
-              Letter Number is optional — leave blank to build from project format. Dates use dd/mm/yyyy.
+              Letter Number is optional â€” leave blank to build from project format. Dates use dd/mm/yyyy.
             </DialogDescription>
           </DialogHeader>
 
@@ -2501,7 +2447,7 @@ export default function LetterNumbering() {
                     <SelectValue placeholder="Select employee" />
                   </SelectTrigger>
                   <SelectContent className="z-[80]">
-                    <SelectItem value="__none__">—</SelectItem>
+                    <SelectItem value="__none__">â€”</SelectItem>
                     {letterEmployees.map((employee) => (
                       <SelectItem key={employee.id} value={employee.id}>
                         {employee.name}
@@ -2543,7 +2489,7 @@ export default function LetterNumbering() {
                     <SelectValue placeholder="Optional" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__none__">—</SelectItem>
+                    <SelectItem value="__none__">â€”</SelectItem>
                     <SelectItem value="yes">Yes</SelectItem>
                     <SelectItem value="no">No</SelectItem>
                   </SelectContent>
@@ -2574,7 +2520,7 @@ export default function LetterNumbering() {
             >
               {addOldLetterMutation.isPending ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-1" /> Saving…
+                  <Loader2 className="h-4 w-4 animate-spin mr-1" /> Savingâ€¦
                 </>
               ) : (
                 "Save Old Letter"

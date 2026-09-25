@@ -4,8 +4,7 @@ import {
   buildLetterNumber,
   nextInsertSerial,
   nextOutwardSequence,
-  nextWholeSerial,
-  planOutwardSequences
+  nextWholeSerial
 } from "../utils/letter-numbering.js";
 import type { LetterActionStatus, LetterActionType, LetterCategory } from "@prisma/client";
 
@@ -139,7 +138,7 @@ async function resolveReferredToForUpdate(
 
 type ActionFieldsPatch = { actionType: LetterActionType | null; actionStatus: LetterActionStatus | null };
 
-/** Resolve the assigned action for a new letter — any real type starts a fresh Pending cycle. */
+/** Resolve the assigned action for a new letter â€” any real type starts a fresh Pending cycle. */
 function resolveActionForCreate(category: LetterCategory, actionType?: LetterActionType | null): ActionFieldsPatch {
   if (category === "OUTWARD" || !actionType) {
     return { actionType: null, actionStatus: null };
@@ -180,52 +179,6 @@ function regenerateNumbers(
       })
     }
   }));
-}
-
-async function resequenceOutwardLetters(
-  letterProjectId: string,
-  project: { projectNumber: string; projectCode: string }
-) {
-  const letters = await letterNumberingRepository.listLetters(letterProjectId);
-  const planned = planOutwardSequences(letters);
-  const updates: Array<{ id: string; data: { outwardSequence: string | null; letterNumber: string } }> =
-    [];
-
-  for (const letter of letters) {
-    if (letter.category !== "OUTWARD") {
-      if (letter.outwardSequence) {
-        updates.push({
-          id: letter.id,
-          data: {
-            outwardSequence: null,
-            // Keep manual Inward/Other letter numbers — do not overwrite with Sr.
-            letterNumber: letter.letterNumber
-          }
-        });
-      }
-      continue;
-    }
-
-    const nextSeq = planned.get(letter.id);
-    if (!nextSeq) continue;
-    const nextNumber = buildLetterNumber({
-      projectNumber: project.projectNumber,
-      projectCode: project.projectCode,
-      serialLabel: letter.serialLabel,
-      category: "OUTWARD",
-      outwardSequence: nextSeq
-    });
-    if (letter.outwardSequence === nextSeq && letter.letterNumber === nextNumber) continue;
-    updates.push({
-      id: letter.id,
-      data: { outwardSequence: nextSeq, letterNumber: nextNumber }
-    });
-  }
-
-  if (updates.length > 0) {
-    await letterNumberingRepository.updateManyLetters(letterProjectId, updates);
-  }
-  return updates.length;
 }
 
 export const letterNumberingService = {
@@ -306,11 +259,20 @@ export const letterNumberingService = {
       dirty = true;
     }
 
-    const outwardFixed = await resequenceOutwardLetters(id, {
-      projectNumber: project.projectNumber,
-      projectCode: project.projectCode
-    });
-    if (outwardFixed > 0) dirty = true;
+    // Actions submitted before admin sign-off was removed are closed automatically.
+    const legacyCompleted = project.letters.filter((letter) => letter.actionStatus === "COMPLETED");
+    if (legacyCompleted.length > 0) {
+      await Promise.all(
+        legacyCompleted.map((letter) =>
+          letterNumberingRepository.updateLetter(letter.id, {
+            actionStatus: "CLOSE",
+            needsReply: true,
+            repliedAt: letter.repliedAt ?? new Date()
+          })
+        )
+      );
+      dirty = true;
+    }
 
     if (dirty) {
       const refreshed = await letterNumberingRepository.findProjectById(id);
@@ -779,15 +741,6 @@ export const letterNumberingService = {
       await this.markSerialReplied(letterProjectId, replyOfSerial, created.id);
     }
 
-    if (payload.category === "OUTWARD") {
-      await resequenceOutwardLetters(letterProjectId, {
-        projectNumber: project.projectNumber,
-        projectCode: project.projectCode
-      });
-      const refreshed = await letterNumberingRepository.findLetterById(created.id);
-      return refreshed ?? created;
-    }
-
     return created;
   },
 
@@ -804,7 +757,7 @@ export const letterNumberingService = {
     });
     if (!target) return null;
 
-    // Linking a reply means this letter is done — set needsReply + repliedAt
+    // Linking a reply means this letter is done â€” set needsReply + repliedAt
     return letterNumberingRepository.updateLetter(target.id, {
       needsReply: true,
       repliedAt: new Date(),
@@ -904,7 +857,7 @@ export const letterNumberingService = {
     } else if (payload.letterNumber !== undefined) {
       letterNumber = payload.letterNumber?.trim() || "";
     } else if (payload.category && payload.category !== letter.category) {
-      // Switched to Inward/Other — clear auto Outward number for manual entry
+      // Switched to Inward/Other â€” clear auto Outward number for manual entry
       letterNumber = "";
     }
 
@@ -922,7 +875,7 @@ export const letterNumberingService = {
         : payload.replyOfSerial?.trim() || null;
 
     const referredToFields = await resolveReferredToForUpdate(payload, letter.referredToUserId);
-    // Only an actual change to the assigned action restarts the workflow (fresh Pending, cleared remark) —
+    // Only an actual change to the assigned action restarts the workflow (fresh Pending, cleared remark) â€”
     // re-saving the dialog with the same action must not disturb an in-progress or closed cycle.
     const actionFields =
       payload.actionType !== undefined && payload.actionType !== letter.actionType
@@ -955,14 +908,6 @@ export const letterNumberingService = {
       replyOfSerial,
       remark: payload.remark?.trim()
     });
-
-    // Keep Outward seq / letter numbers correct in table order (fixes 3b=/04 vs 4=/03)
-    if (payload.category && payload.category !== letter.category) {
-      await resequenceOutwardLetters(letter.letterProjectId, {
-        projectNumber: letter.letterProject.projectNumber,
-        projectCode: letter.letterProject.projectCode
-      });
-    }
 
     let clearedPendingSerial: string | null = null;
     let reopenedPendingSerial: string | null = null;
@@ -997,13 +942,8 @@ export const letterNumberingService = {
   async removeLetter(letterId: string) {
     const letter = await letterNumberingRepository.findLetterById(letterId);
     if (!letter) throw notFound("Letter not found");
-    const projectMeta = {
-      projectNumber: letter.letterProject.projectNumber,
-      projectCode: letter.letterProject.projectCode
-    };
-    const letterProjectId = letter.letterProjectId;
+    // Numbers are permanent once generated â€” deleting a letter leaves a gap, it never renumbers the rest.
     await letterNumberingRepository.deleteLetter(letterId);
-    await resequenceOutwardLetters(letterProjectId, projectMeta);
     return { deleted: true };
   },
 
@@ -1011,15 +951,18 @@ export const letterNumberingService = {
     return letterNumberingRepository.listMyActionableLetters(userId);
   },
 
-  /** Employee submits their action with a remark — scoped so they can only act on letters referred to them. */
+  /** Employee submits their action with a remark â€” scoped so they can only act on letters referred to them. */
   async submitEmployeeAction(userId: string, letterId: string, remark: string) {
     const letter = await letterNumberingRepository.findLetterById(letterId);
     if (!letter) throw notFound("Letter not found");
     if (letter.referredToUserId !== userId) throw forbidden("This letter is not referred to you");
     if (letter.actionStatus !== "PENDING") throw badRequest("This letter is not awaiting your action");
+    // No admin sign-off step: the employee's submission closes the action immediately.
     return letterNumberingRepository.updateLetter(letterId, {
-      actionStatus: "COMPLETED",
-      employeeRemark: remark.trim()
+      actionStatus: "CLOSE",
+      employeeRemark: remark.trim(),
+      needsReply: true,
+      repliedAt: new Date()
     });
   },
 
