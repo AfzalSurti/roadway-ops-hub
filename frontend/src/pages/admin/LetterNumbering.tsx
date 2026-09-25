@@ -404,12 +404,10 @@ export default function LetterNumbering() {
     projectCoordinator: "",
     projectEngineer: ""
   });
-  const letterTopBarRef = useRef<HTMLDivElement | null>(null);
   const letterHeaderRowRef = useRef<HTMLTableRowElement | null>(null);
   const letterTableScrollRef = useRef<HTMLDivElement | null>(null);
   const scrollLetterTable = (direction: -1 | 1) =>
     letterTableScrollRef.current?.scrollBy({ left: direction * 480, behavior: "smooth" });
-  const [letterTopBarHeight, setLetterTopBarHeight] = useState(0);
   const [letterHeaderRowHeight, setLetterHeaderRowHeight] = useState(0);
   const [letterImportOpen, setLetterImportOpen] = useState(false);
   const [oldLetterOpen, setOldLetterOpen] = useState(false);
@@ -997,21 +995,16 @@ export default function LetterNumbering() {
     }
   }, [view, selectedProjectId, letterProjects]);
 
-  // Measure the sticky top bar / table header row heights so the two sticky layers stack without overlap.
+  // Measure the first header row so the filter row can stick right below it inside the table box.
   useEffect(() => {
-    const topBarEl = letterTopBarRef.current;
     const headerRowEl = letterHeaderRowRef.current;
-    if (!topBarEl || !headerRowEl) return;
-    const measure = () => {
-      setLetterTopBarHeight(topBarEl.getBoundingClientRect().height);
-      setLetterHeaderRowHeight(headerRowEl.getBoundingClientRect().height);
-    };
+    if (!headerRowEl) return;
+    const measure = () => setLetterHeaderRowHeight(headerRowEl.getBoundingClientRect().height);
     measure();
     const observer = new ResizeObserver(measure);
-    observer.observe(topBarEl);
     observer.observe(headerRowEl);
     return () => observer.disconnect();
-  }, [selectedProjectId, pendingReplyLetters.length, hasLetterFilters]);
+  }, [selectedProjectId, loadingSelected, pendingReplyLetters.length, hasLetterFilters]);
 
   const selectLetterProject = (projectId: string) => {
     setSelectedProjectId(projectId);
@@ -1512,7 +1505,74 @@ export default function LetterNumbering() {
 
               {selectedProjectId && selectedProject ? (
                 <>
-                  <div ref={letterTopBarRef} className="sticky top-16 z-30 bg-background pt-1 pb-3 space-y-3">
+                  {!loadingSelected && pendingReplyLetters.length > 0 ? (
+                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-3">
+                      <div>
+                        <p className="text-sm font-semibold text-amber-700 dark:text-amber-400 inline-flex items-center gap-2">
+                          <MailWarning className="h-4 w-4" />
+                          Letters you should reply to
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Inward / Other letters with an Action assigned, or marked “Need reply = Yes”.
+                          They close automatically once the referred employee submits.
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        {pendingReplyLetters.map((letter) => (
+                          <div
+                            key={letter.id}
+                            className="rounded-lg border border-border/40 bg-card/60 p-3 flex flex-col sm:flex-row sm:items-start justify-between gap-3"
+                          >
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium">
+                                #{letter.serialLabel} · {letter.letterNumber || letter.category}
+                                <Badge variant="outline" className="ml-2 text-[10px]">
+                                  {letter.category}
+                                </Badge>
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-1 whitespace-normal break-words">
+                                {letter.letterDate ? toDateInput(letter.letterDate) : "No date"}
+                                {" · From: "}
+                                {letter.sentBy || "-"}
+                                {" · "}
+                                {letter.subject || "No subject"}
+                              </p>
+                              {letter.actionType ? (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {actionTypeLabel(letter.actionType)} — waiting on{" "}
+                                  {letter.referredTo || "referred employee"}
+                                </p>
+                              ) : null}
+                            </div>
+                            <div className="flex flex-wrap gap-2 shrink-0">
+                              {letter.actionType ? null : (
+                                <Button
+                                  size="sm"
+                                  className="gap-1"
+                                  disabled={updateLetterMutation.isPending}
+                                  onClick={() =>
+                                    updateLetterMutation.mutate({
+                                      letterId: letter.id,
+                                      payload: { replied: true }
+                                    })
+                                  }
+                                >
+                                  <CheckCircle2 className="h-3.5 w-3.5" />
+                                  Mark replied
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div
+                    className="flex flex-col overflow-hidden rounded-xl border border-border/40 bg-card/40"
+                    style={{ height: "calc(100vh - 8rem)", minHeight: 480 }}
+                  >
+                    <div className="shrink-0 space-y-3 border-b border-border/40 bg-background p-3">
                     <div className="rounded-lg bg-primary/10 border border-primary/20 px-4 py-2.5 text-sm font-medium flex flex-wrap items-center gap-2">
                       <span>
                         {selectedProject.projectNumber}, {selectedProject.shortName}
@@ -1635,80 +1695,12 @@ export default function LetterNumbering() {
                       </div>
                     </div>
                   </div>
-
-                  {!loadingSelected && pendingReplyLetters.length > 0 ? (
-                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-3">
-                      <div>
-                        <p className="text-sm font-semibold text-amber-700 dark:text-amber-400 inline-flex items-center gap-2">
-                          <MailWarning className="h-4 w-4" />
-                          Letters you should reply to
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Inward / Other letters with an Action assigned, or marked “Need reply = Yes”.
-                          They close automatically once the referred employee submits.
-                        </p>
-                      </div>
-                      <div className="space-y-2">
-                        {pendingReplyLetters.map((letter) => (
-                          <div
-                            key={letter.id}
-                            className="rounded-lg border border-border/40 bg-card/60 p-3 flex flex-col sm:flex-row sm:items-start justify-between gap-3"
-                          >
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium">
-                                #{letter.serialLabel} · {letter.letterNumber || letter.category}
-                                <Badge variant="outline" className="ml-2 text-[10px]">
-                                  {letter.category}
-                                </Badge>
-                              </p>
-                              <p className="text-xs text-muted-foreground mt-1 whitespace-normal break-words">
-                                {letter.letterDate ? toDateInput(letter.letterDate) : "No date"}
-                                {" · From: "}
-                                {letter.sentBy || "-"}
-                                {" · "}
-                                {letter.subject || "No subject"}
-                              </p>
-                              {letter.actionType ? (
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  {actionTypeLabel(letter.actionType)} — waiting on{" "}
-                                  {letter.referredTo || "referred employee"}
-                                </p>
-                              ) : null}
-                            </div>
-                            <div className="flex flex-wrap gap-2 shrink-0">
-                              {letter.actionType ? null : (
-                                <Button
-                                  size="sm"
-                                  className="gap-1"
-                                  disabled={updateLetterMutation.isPending}
-                                  onClick={() =>
-                                    updateLetterMutation.mutate({
-                                      letterId: letter.id,
-                                      payload: { replied: true }
-                                    })
-                                  }
-                                >
-                                  <CheckCircle2 className="h-3.5 w-3.5" />
-                                  Mark replied
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
-
                   {loadingSelected ? (
-                    <p className="text-sm text-muted-foreground inline-flex items-center gap-2">
+                    <p className="p-4 text-sm text-muted-foreground inline-flex items-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" /> Loading letters...
                     </p>
                   ) : (
-                    <div
-                      ref={letterTableScrollRef}
-                      className="overflow-auto rounded-xl border border-border/40"
-                      style={{ maxHeight: `calc(100vh - 4rem - ${letterTopBarHeight}px - 2.5rem)` }}
-                    >
+                    <div ref={letterTableScrollRef} className="min-h-0 flex-1 overflow-auto">
                       <table className="w-full text-xs min-w-[1500px] table-auto">
                         <thead>
                           <tr
@@ -2052,6 +2044,7 @@ export default function LetterNumbering() {
                       </table>
                     </div>
                   )}
+                  </div>
                   <p className="text-xs text-muted-foreground">
                     Records show in the table. Click a row or Edit to open details, then Save.
                     Inward/Other letter numbers are manual; Outward is auto (
