@@ -138,7 +138,7 @@ async function resolveReferredToForUpdate(
 
 type ActionFieldsPatch = { actionType: LetterActionType | null; actionStatus: LetterActionStatus | null };
 
-/** Resolve the assigned action for a new letter â€” any real type starts a fresh Pending cycle. */
+/** Resolve the assigned action for a new letter — any real type starts a fresh Pending cycle. */
 function resolveActionForCreate(category: LetterCategory, actionType?: LetterActionType | null): ActionFieldsPatch {
   if (category === "OUTWARD" || !actionType) {
     return { actionType: null, actionStatus: null };
@@ -757,7 +757,7 @@ export const letterNumberingService = {
     });
     if (!target) return null;
 
-    // Linking a reply means this letter is done â€” set needsReply + repliedAt
+    // Linking a reply means this letter is done — set needsReply + repliedAt
     return letterNumberingRepository.updateLetter(target.id, {
       needsReply: true,
       repliedAt: new Date(),
@@ -857,7 +857,7 @@ export const letterNumberingService = {
     } else if (payload.letterNumber !== undefined) {
       letterNumber = payload.letterNumber?.trim() || "";
     } else if (payload.category && payload.category !== letter.category) {
-      // Switched to Inward/Other â€” clear auto Outward number for manual entry
+      // Switched to Inward/Other — clear auto Outward number for manual entry
       letterNumber = "";
     }
 
@@ -875,7 +875,7 @@ export const letterNumberingService = {
         : payload.replyOfSerial?.trim() || null;
 
     const referredToFields = await resolveReferredToForUpdate(payload, letter.referredToUserId);
-    // Only an actual change to the assigned action restarts the workflow (fresh Pending, cleared remark) â€”
+    // Only an actual change to the assigned action restarts the workflow (fresh Pending, cleared remark) —
     // re-saving the dialog with the same action must not disturb an in-progress or closed cycle.
     const actionFields =
       payload.actionType !== undefined && payload.actionType !== letter.actionType
@@ -942,7 +942,7 @@ export const letterNumberingService = {
   async removeLetter(letterId: string) {
     const letter = await letterNumberingRepository.findLetterById(letterId);
     if (!letter) throw notFound("Letter not found");
-    // Numbers are permanent once generated â€” deleting a letter leaves a gap, it never renumbers the rest.
+    // Numbers are permanent once generated — deleting a letter leaves a gap, it never renumbers the rest.
     await letterNumberingRepository.deleteLetter(letterId);
     return { deleted: true };
   },
@@ -951,7 +951,7 @@ export const letterNumberingService = {
     return letterNumberingRepository.listMyActionableLetters(userId);
   },
 
-  /** Employee submits their action with a remark â€” scoped so they can only act on letters referred to them. */
+  /** Employee submits their action with a remark — scoped so they can only act on letters referred to them. */
   async submitEmployeeAction(userId: string, letterId: string, remark: string) {
     const letter = await letterNumberingRepository.findLetterById(letterId);
     if (!letter) throw notFound("Letter not found");

@@ -54,7 +54,7 @@ export function AppLayout() {
       <div className="flex-1 flex flex-col min-w-0">
         <TopBar />
         {showProfileIncompletePrompt ? <ProfileIncompletePrompt /> : null}
-        <main className="flex-1 p-6 overflow-auto">
+        <main className="flex-1 p-6 overflow-x-clip">
           <Outlet />
         </main>
       </div>
