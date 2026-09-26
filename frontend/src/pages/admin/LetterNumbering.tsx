@@ -927,7 +927,7 @@ export default function LetterNumbering() {
           letterDate: letterDialogForm.letterDate,
           letterNumber:
             letterDialogForm.category === "OUTWARD"
-              ? null
+              ? letterDialogForm.letterNumber.trim() || null
               : letterDialogForm.letterNumber.trim(),
           sentBy: letterDialogForm.sentBy,
           sentTo: letterDialogForm.sentTo,
@@ -2139,29 +2139,25 @@ export default function LetterNumbering() {
             <div className="space-y-1.5 sm:col-span-2">
               <Label>
                 {letterDialogForm.category === "OUTWARD"
-                  ? "Letter Number (auto)"
+                  ? "Letter Number"
                   : "Letter Number *"}
               </Label>
+              <Input
+                className="font-mono"
+                placeholder={
+                  letterDialogForm.category === "OUTWARD" ? "Auto on Save" : "Enter letter number"
+                }
+                value={letterDialogForm.letterNumber}
+                onChange={(e) =>
+                  setLetterDialogForm((prev) => ({ ...prev, letterNumber: e.target.value }))
+                }
+              />
               {letterDialogForm.category === "OUTWARD" ? (
-                <Input
-                  readOnly
-                  className="bg-secondary/40 font-mono"
-                  value={
-                    dialogLetter?.category === "OUTWARD"
-                      ? dialogLetter.letterNumber || "Auto on Save"
-                      : "Auto on Save"
-                  }
-                />
-              ) : (
-                <Input
-                  className="font-mono"
-                  placeholder="Enter letter number"
-                  value={letterDialogForm.letterNumber}
-                  onChange={(e) =>
-                    setLetterDialogForm((prev) => ({ ...prev, letterNumber: e.target.value }))
-                  }
-                />
-              )}
+                <p className="text-[11px] text-muted-foreground">
+                  Generated automatically and permanent. You can edit it (format PN/CODE/Sr/Seq); the running
+                  sequence follows what you enter.
+                </p>
+              ) : null}
             </div>
 
             {letterDialogForm.category !== "OUTWARD" ? (

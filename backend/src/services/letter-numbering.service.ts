@@ -847,13 +847,29 @@ export const letterNumberingService = {
 
     let letterNumber = letter.letterNumber;
     if (category === "OUTWARD") {
-      letterNumber = buildLetterNumber({
-        projectNumber: letter.letterProject.projectNumber,
-        projectCode: letter.letterProject.projectCode,
-        serialLabel: letter.serialLabel,
-        category,
-        outwardSequence
-      });
+      const requested = payload.letterNumber?.trim();
+      if (requested && requested !== letter.letterNumber) {
+        // Manual edit of an Outward number: must be unique, and the running sequence follows it
+        // (last "/" segment) so the next auto-numbered letter continues from the right place.
+        const siblings = await letterNumberingRepository.listLetters(letter.letterProjectId);
+        const clash = siblings.find(
+          (item) => item.id !== letter.id && (item.letterNumber ?? "").trim().toLowerCase() === requested.toLowerCase()
+        );
+        if (clash) throw conflict(`Letter number "${requested}" is already used by Sr. ${clash.serialLabel}`);
+        letterNumber = requested;
+        const parts = requested.split("/");
+        if (parts.length >= 4 && parts[parts.length - 1].trim()) {
+          outwardSequence = parts[parts.length - 1].trim();
+        }
+      } else if (!letter.letterNumber || letter.category !== "OUTWARD") {
+        letterNumber = buildLetterNumber({
+          projectNumber: letter.letterProject.projectNumber,
+          projectCode: letter.letterProject.projectCode,
+          serialLabel: letter.serialLabel,
+          category,
+          outwardSequence
+        });
+      }
     } else if (payload.letterNumber !== undefined) {
       letterNumber = payload.letterNumber?.trim() || "";
     } else if (payload.category && payload.category !== letter.category) {
@@ -908,6 +924,17 @@ export const letterNumberingService = {
       replyOfSerial,
       remark: payload.remark?.trim()
     });
+
+    // Keep reply links in sync: other letters that pointed at the old number now point at the new one.
+    if (category === "OUTWARD" && letter.letterNumber && letterNumber !== letter.letterNumber) {
+      const oldKey = normalizeSerialLabel(letter.letterNumber);
+      const siblings = await letterNumberingRepository.listLetters(letter.letterProjectId);
+      await Promise.all(
+        siblings
+          .filter((item) => item.id !== letterId && normalizeSerialLabel(item.replyOfSerial ?? "") === oldKey)
+          .map((item) => letterNumberingRepository.updateLetter(item.id, { replyOfSerial: letterNumber }))
+      );
+    }
 
     let clearedPendingSerial: string | null = null;
     let reopenedPendingSerial: string | null = null;
