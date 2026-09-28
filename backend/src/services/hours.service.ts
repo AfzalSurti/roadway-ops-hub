@@ -179,6 +179,35 @@ function serializeOvertime(overtime: {
   };
 }
 
+function serializePastAccess(row: {
+  id: string;
+  employeeId: string;
+  startDate: Date;
+  endDate: Date;
+  numberOfDays: number;
+  reason: string;
+  status: HoursRequestStatus;
+  reviewedById: string | null;
+  reviewedAt: Date | null;
+  rejectionReason: string | null;
+  createdAt: Date;
+  employee: { id: string; name: string; email: string };
+}) {
+  return {
+    id: row.id,
+    employeeId: row.employeeId,
+    employee: row.employee,
+    startDate: row.startDate.toISOString(),
+    endDate: row.endDate.toISOString(),
+    numberOfDays: row.numberOfDays,
+    reason: row.reason,
+    status: row.status,
+    reviewedAt: row.reviewedAt ? row.reviewedAt.toISOString() : null,
+    rejectionReason: row.rejectionReason,
+    createdAt: row.createdAt.toISOString()
+  };
+}
+
 function serializeConvertedLeave(row: {
   id: string;
   employeeId: string;
@@ -364,9 +393,22 @@ export const hoursService = {
     // the request is still recorded even when that comes out to 0 (shown as "-" in reports).
     const durationMinutes = computeOvertimeMinutes(startTime, endTime);
 
-    const period = await this.getActivePeriod();
-    if (date.getTime() < period.startDate.getTime() || date.getTime() > period.endDate.getTime()) {
-      throw badRequest("Selected date is outside the active calculation period");
+    const activePeriod = await this.getActivePeriod();
+    let period = activePeriod;
+    const inActivePeriod =
+      date.getTime() >= activePeriod.startDate.getTime() && date.getTime() <= activePeriod.endDate.getTime();
+    if (!inActivePeriod) {
+      if (date.getTime() > activePeriod.endDate.getTime()) {
+        throw badRequest("Selected date is outside the active calculation period");
+      }
+      // A date from an already-closed period: only allowed once the admin has approved past-date access.
+      const access = await hoursRepository.findApprovedPastAccessCovering(employeeId, date);
+      if (!access) {
+        throw badRequest(
+          "This date belongs to a closed period. Send a past-date request to the admin first and wait for approval."
+        );
+      }
+      period = await this.resolvePeriodForDate(date);
     }
 
     const duplicate = await hoursRepository.findActiveOvertimeOnDate(employeeId, date);
@@ -388,10 +430,81 @@ export const hoursService = {
     return serializeOvertime(created);
   },
 
+  /** The period a (past) calendar day belongs to — created as CLOSED if it was never touched before. */
+  async resolvePeriodForDate(date: Date) {
+    const bounds = periodBoundsForDate(date);
+    const existing = await hoursRepository.findPeriodByBounds(bounds.startDate, bounds.endDate);
+    if (existing) return existing;
+    return hoursRepository.createPeriod({ ...bounds, status: "CLOSED" });
+  },
+
   async listMyOvertimeRequests(employeeId: string) {
     const period = await this.getActivePeriod();
-    const rows = await hoursRepository.listOvertimeRequests({ employeeId, calculationPeriodId: period.id });
+    // Active-period requests, plus any overtime the employee logged inside an admin-approved past-date window.
+    const approvedAccess = await hoursRepository.listPastAccess({ employeeId, status: "APPROVED" });
+    const rows = await hoursRepository.listOvertimeRequests({
+      employeeId,
+      OR: [
+        { calculationPeriodId: period.id },
+        ...approvedAccess.map((access) => ({ date: { gte: access.startDate, lte: access.endDate } }))
+      ]
+    });
     return rows.map(serializeOvertime);
+  },
+
+  // ─── Past-date overtime access (employee asks admin to reopen already-closed dates) ───
+
+  async createPastAccessRequest(employeeId: string, payload: { startDate: string; endDate: string; reason: string }) {
+    const startDate = parseHoursDate(payload.startDate);
+    const endDate = parseHoursDate(payload.endDate);
+    if (endDate.getTime() < startDate.getTime()) {
+      throw badRequest("End date cannot be before start date");
+    }
+
+    const activePeriod = await this.getActivePeriod();
+    if (endDate.getTime() >= activePeriod.startDate.getTime()) {
+      throw badRequest("These dates are in the current cycle already — add overtime directly from the calendar");
+    }
+
+    const overlap = await hoursRepository.findOverlappingPastAccess(employeeId, startDate, endDate);
+    if (overlap) {
+      throw conflict("You already have a pending or approved request covering some of these dates");
+    }
+
+    const created = await hoursRepository.createPastAccess({
+      employeeId,
+      startDate,
+      endDate,
+      numberOfDays: daysBetweenInclusive(startDate, endDate),
+      reason: payload.reason.trim()
+    });
+    return serializePastAccess(created);
+  },
+
+  async listMyPastAccessRequests(employeeId: string) {
+    const rows = await hoursRepository.listPastAccess({ employeeId });
+    return rows.map(serializePastAccess);
+  },
+
+  async listAdminPastAccessRequests(filters: { status?: HoursRequestStatus; employeeId?: string }) {
+    const rows = await hoursRepository.listPastAccess({
+      ...(filters.status ? { status: filters.status } : {}),
+      ...(filters.employeeId ? { employeeId: filters.employeeId } : {})
+    });
+    return rows.map(serializePastAccess);
+  },
+
+  async reviewPastAccessRequest(id: string, adminId: string, approve: boolean, rejectionReason?: string) {
+    const request = await hoursRepository.findPastAccessById(id);
+    if (!request) throw notFound("Past-date request not found");
+    if (request.status !== "PENDING") throw badRequest("This request has already been reviewed");
+    const updated = await hoursRepository.updatePastAccessStatus(id, {
+      status: approve ? "APPROVED" : "REJECTED",
+      reviewedById: adminId,
+      reviewedAt: new Date(),
+      rejectionReason: approve ? null : rejectionReason?.trim() || null
+    });
+    return serializePastAccess(updated);
   },
 
   async listAdminOvertimeRequests(filters: {

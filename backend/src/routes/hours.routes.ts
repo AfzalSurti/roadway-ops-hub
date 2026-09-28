@@ -8,6 +8,7 @@ import {
   convertLeaveSchema,
   createLeaveRequestSchema,
   createOvertimeRequestSchema,
+  createPastAccessSchema,
   markLeaveObedientSchema,
   reviewRequestSchema
 } from "../validators/hours.validator.js";
@@ -33,6 +34,14 @@ hoursRouter.post(
 );
 hoursRouter.get("/overtime-requests/me", asyncHandler(hoursController.listMyOvertimeRequests));
 
+hoursRouter.post(
+  "/past-overtime-access",
+  requireRole("EMPLOYEE"),
+  validate(createPastAccessSchema),
+  asyncHandler(hoursController.createPastAccessRequest)
+);
+hoursRouter.get("/past-overtime-access/me", asyncHandler(hoursController.listMyPastAccessRequests));
+
 hoursRouter.get("/me/summary", asyncHandler(hoursController.getMySummary));
 hoursRouter.get("/converted-leaves/me", asyncHandler(hoursController.listMyConvertedLeaves));
 
@@ -54,6 +63,14 @@ hoursRouter.patch(
   "/admin/leave-requests/:id/mark-obedient",
   validate(markLeaveObedientSchema),
   asyncHandler(hoursController.markLeaveObedient)
+);
+
+hoursRouter.get("/admin/past-overtime-access", asyncHandler(hoursController.listAdminPastAccessRequests));
+hoursRouter.patch("/admin/past-overtime-access/:id/approve", asyncHandler(hoursController.approvePastAccessRequest));
+hoursRouter.patch(
+  "/admin/past-overtime-access/:id/reject",
+  validate(reviewRequestSchema),
+  asyncHandler(hoursController.rejectPastAccessRequest)
 );
 
 hoursRouter.get("/admin/overtime-requests", asyncHandler(hoursController.listAdminOvertimeRequests));

@@ -90,6 +90,41 @@ export const hoursController = {
     return sendSuccess(res, result);
   },
 
+  // ─── Past-date overtime access ────────────────────────────────────────
+
+  async createPastAccessRequest(req: Request, res: Response) {
+    const result = await hoursService.createPastAccessRequest(req.user!.id, req.body);
+    return sendSuccess(res, result, 201);
+  },
+
+  async listMyPastAccessRequests(req: Request, res: Response) {
+    const result = await hoursService.listMyPastAccessRequests(req.user!.id);
+    return sendSuccess(res, result);
+  },
+
+  async listAdminPastAccessRequests(req: Request, res: Response) {
+    const result = await hoursService.listAdminPastAccessRequests({
+      status: strParam(req.query.status) as HoursRequestStatus | undefined,
+      employeeId: strParam(req.query.employeeId)
+    });
+    return sendSuccess(res, result);
+  },
+
+  async approvePastAccessRequest(req: Request, res: Response) {
+    const result = await hoursService.reviewPastAccessRequest(req.params.id, req.user!.id, true);
+    return sendSuccess(res, result);
+  },
+
+  async rejectPastAccessRequest(req: Request, res: Response) {
+    const result = await hoursService.reviewPastAccessRequest(
+      req.params.id,
+      req.user!.id,
+      false,
+      req.body.rejectionReason
+    );
+    return sendSuccess(res, result);
+  },
+
   // ─── Combined admin feed + periods ──────────────────────────────────────
 
   async listAdminRequests(req: Request, res: Response) {

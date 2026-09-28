@@ -1103,6 +1103,21 @@ export type HoursBreakdownItem = {
 
 export type HoursReportItem = HoursSummaryItem & HoursBreakdownItem;
 
+/** Employee request to reopen dates of an already-closed cycle for overtime entry. */
+export type PastOvertimeAccessItem = {
+  id: string;
+  employeeId: string;
+  employee: HoursEmployeeRef;
+  startDate: string;
+  endDate: string;
+  numberOfDays: number;
+  reason: string;
+  status: HoursRequestStatus;
+  reviewedAt?: string | null;
+  rejectionReason?: string | null;
+  createdAt: string;
+};
+
 export type ConvertedLeaveItem = {
   id: string;
   employeeId: string;

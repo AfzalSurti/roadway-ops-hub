@@ -48,6 +48,7 @@ import type {
   LetterPendingReplyItem,
   LetterProjectItem,
   OvertimeRequestItem,
+  PastOvertimeAccessItem,
   ContractActivityItem,
   PreContractActivityItem,
   ProjectItem,
@@ -857,6 +858,34 @@ export const api = {
 
   rejectLeaveRequest(id: string, rejectionReason?: string) {
     return request<LeaveRequestItem>(`/hours/admin/leave-requests/${id}/reject`, {
+      method: "PATCH",
+      body: JSON.stringify({ rejectionReason })
+    });
+  },
+
+  createPastOvertimeAccess(payload: { startDate: string; endDate: string; reason: string }) {
+    return request<PastOvertimeAccessItem>("/hours/past-overtime-access", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+  },
+
+  getMyPastOvertimeAccess() {
+    return request<PastOvertimeAccessItem[]>("/hours/past-overtime-access/me");
+  },
+
+  getAdminPastOvertimeAccess(status?: HoursRequestStatus) {
+    return request<PastOvertimeAccessItem[]>(
+      `/hours/admin/past-overtime-access${status ? `?status=${status}` : ""}`
+    );
+  },
+
+  approvePastOvertimeAccess(id: string) {
+    return request<PastOvertimeAccessItem>(`/hours/admin/past-overtime-access/${id}/approve`, { method: "PATCH" });
+  },
+
+  rejectPastOvertimeAccess(id: string, rejectionReason?: string) {
+    return request<PastOvertimeAccessItem>(`/hours/admin/past-overtime-access/${id}/reject`, {
       method: "PATCH",
       body: JSON.stringify({ rejectionReason })
     });

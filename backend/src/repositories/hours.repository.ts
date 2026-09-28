@@ -136,6 +136,53 @@ export const hoursRepository = {
     });
   },
 
+  // ─── Past-date overtime access ──────────────────────────────────────────
+
+  createPastAccess(data: Prisma.PastOvertimeAccessUncheckedCreateInput) {
+    return prisma.pastOvertimeAccess.create({ data, include: { employee: { select: employeeSelect } } });
+  },
+
+  findPastAccessById(id: string) {
+    return prisma.pastOvertimeAccess.findUnique({ where: { id }, include: { employee: { select: employeeSelect } } });
+  },
+
+  listPastAccess(where: Prisma.PastOvertimeAccessWhereInput) {
+    return prisma.pastOvertimeAccess.findMany({
+      where,
+      include: { employee: { select: employeeSelect } },
+      orderBy: { createdAt: "desc" }
+    });
+  },
+
+  updatePastAccessStatus(
+    id: string,
+    data: { status: HoursRequestStatus; reviewedById: string; reviewedAt: Date; rejectionReason: string | null }
+  ) {
+    return prisma.pastOvertimeAccess.update({
+      where: { id },
+      data,
+      include: { employee: { select: employeeSelect } }
+    });
+  },
+
+  /** Any pending/approved access request whose range overlaps the given one (used to block duplicates). */
+  findOverlappingPastAccess(employeeId: string, startDate: Date, endDate: Date) {
+    return prisma.pastOvertimeAccess.findFirst({
+      where: {
+        employeeId,
+        status: { in: ["PENDING", "APPROVED"] },
+        startDate: { lte: endDate },
+        endDate: { gte: startDate }
+      }
+    });
+  },
+
+  findApprovedPastAccessCovering(employeeId: string, date: Date) {
+    return prisma.pastOvertimeAccess.findFirst({
+      where: { employeeId, status: "APPROVED", startDate: { lte: date }, endDate: { gte: date } }
+    });
+  },
+
   listEmployees() {
     return prisma.user.findMany({
       where: { role: "EMPLOYEE" },

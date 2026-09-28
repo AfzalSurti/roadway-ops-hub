@@ -93,37 +93,39 @@ enum AuditAction {
 }
 
 model User {
-  id                 String            @id @default(cuid())
-  name               String
-  email              String            @unique
-  passwordHash       String
-  role               Role
-  contactNumber      String?
-  education          String?
-  yearOfPassing      String?
-  dateOfJoining      DateTime?
-  experienceInOrg    String?
-  currentCtc         String?
-  createdAt          DateTime          @default(now())
-  updatedAt          DateTime          @updatedAt
-  assignedTasks      Task[]            @relation("TaskAssignee")
-  createdTasks       Task[]            @relation("TaskCreator")
-  reports            Report[]
-  comments           Comment[]
-  attachments        Attachment[]
-  refreshTokens      RefreshToken[]
-  audits             AuditLog[]
-  notifications      Notification[]
-  expenseSheets      ExpenseSheet[]
-  expenseReviews     ExpenseApproval[] @relation("ExpenseReviewer")
-  referredLetters    LetterEntry[]     @relation("LetterReferredTo")
-  leaveRequests      LeaveRequest[]    @relation("LeaveRequestEmployee")
-  leaveApprovals     LeaveRequest[]    @relation("LeaveRequestApprover")
-  leaveObedientMarks LeaveRequest[]    @relation("LeaveRequestObedientBy")
-  overtimeRequests   OvertimeRequest[] @relation("OvertimeRequestEmployee")
-  overtimeApprovals  OvertimeRequest[] @relation("OvertimeRequestApprover")
-  convertedLeaves    ConvertedLeave[]  @relation("ConvertedLeaveEmployee")
-  leaveConversions   ConvertedLeave[]  @relation("ConvertedLeaveConverter")
+  id                         String               @id @default(cuid())
+  name                       String
+  email                      String               @unique
+  passwordHash               String
+  role                       Role
+  contactNumber              String?
+  education                  String?
+  yearOfPassing              String?
+  dateOfJoining              DateTime?
+  experienceInOrg            String?
+  currentCtc                 String?
+  createdAt                  DateTime             @default(now())
+  updatedAt                  DateTime             @updatedAt
+  assignedTasks              Task[]               @relation("TaskAssignee")
+  createdTasks               Task[]               @relation("TaskCreator")
+  reports                    Report[]
+  comments                   Comment[]
+  attachments                Attachment[]
+  refreshTokens              RefreshToken[]
+  audits                     AuditLog[]
+  notifications              Notification[]
+  expenseSheets              ExpenseSheet[]
+  expenseReviews             ExpenseApproval[]    @relation("ExpenseReviewer")
+  referredLetters            LetterEntry[]        @relation("LetterReferredTo")
+  leaveRequests              LeaveRequest[]       @relation("LeaveRequestEmployee")
+  leaveApprovals             LeaveRequest[]       @relation("LeaveRequestApprover")
+  leaveObedientMarks         LeaveRequest[]       @relation("LeaveRequestObedientBy")
+  overtimeRequests           OvertimeRequest[]    @relation("OvertimeRequestEmployee")
+  overtimeApprovals          OvertimeRequest[]    @relation("OvertimeRequestApprover")
+  convertedLeaves            ConvertedLeave[]     @relation("ConvertedLeaveEmployee")
+  leaveConversions           ConvertedLeave[]     @relation("ConvertedLeaveConverter")
+  pastOvertimeAccessRequests PastOvertimeAccess[] @relation("PastOvertimeAccessEmployee")
+  pastOvertimeAccessReviews  PastOvertimeAccess[] @relation("PastOvertimeAccessReviewer")
 }
 
 model RefreshToken {
@@ -1120,4 +1122,28 @@ model ConvertedLeave {
 
   @@index([employeeId, calculationPeriodId])
   @@index([calculationPeriodId])
+}
+
+/// Employee's request to be allowed to log overtime for dates in an already-closed calculation period.
+/// Once APPROVED, those dates become available on the employee's calendar for overtime requests
+/// (each overtime request is still filed under the period its date belongs to and reviewed as usual).
+model PastOvertimeAccess {
+  id              String             @id @default(cuid())
+  employeeId      String
+  /// First / last day of the range (stored at UTC noon so IST never shifts the day)
+  startDate       DateTime
+  endDate         DateTime
+  numberOfDays    Int
+  reason          String
+  status          HoursRequestStatus @default(PENDING)
+  reviewedById    String?
+  reviewedAt      DateTime?
+  rejectionReason String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  employee        User               @relation("PastOvertimeAccessEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
+  reviewedBy      User?              @relation("PastOvertimeAccessReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([employeeId, status])
+  @@index([status])
 }

@@ -31,7 +31,7 @@ import {
   toRequestDateInput
 } from "@/lib/hours-format";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarClock, CheckCircle2, Clock3, Loader2, MailWarning } from "lucide-react";
+import { CalendarClock, CalendarPlus, CheckCircle2, Clock3, Loader2, MailWarning } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -73,6 +73,15 @@ export default function CalculateHours() {
   const [otFrom, setOtFrom] = useState("");
   const [otTo, setOtTo] = useState("");
   const [otReason, setOtReason] = useState("");
+  const [accessOpen, setAccessOpen] = useState(false);
+  const [accessFrom, setAccessFrom] = useState("");
+  const [accessTo, setAccessTo] = useState("");
+  const [accessReason, setAccessReason] = useState("");
+
+  const { data: pastAccessRequests = [] } = useQuery({
+    queryKey: ["hours-my-past-access"],
+    queryFn: () => api.getMyPastOvertimeAccess()
+  });
 
   const { data: summary, isLoading: loadingSummary } = useQuery({
     queryKey: ["hours-my-summary"],
@@ -139,8 +148,23 @@ export default function CalculateHours() {
     return map;
   }, [overtimeRequests]);
 
+  // Past days the admin has approved for overtime entry (dates of an already-closed cycle).
+  const approvedPastKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const item of pastAccessRequests) {
+      if (item.status !== "APPROVED") continue;
+      for (const key of daysInRange(item.startDate, item.endDate)) keys.add(key);
+    }
+    return keys;
+  }, [pastAccessRequests]);
+  const firstApprovedPastDate = useMemo(() => {
+    const first = Array.from(approvedPastKeys).sort()[0];
+    return first ? localDateFromInput(first) : undefined;
+  }, [approvedPastKeys]);
+
   const refresh = async () => {
     await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["hours-my-past-access"] }),
       queryClient.invalidateQueries({ queryKey: ["hours-my-summary"] }),
       queryClient.invalidateQueries({ queryKey: ["hours-my-leave"] }),
       queryClient.invalidateQueries({ queryKey: ["hours-my-overtime"] })
@@ -195,11 +219,37 @@ export default function CalculateHours() {
     onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to submit overtime request")
   });
 
+  const createAccessMutation = useMutation({
+    mutationFn: () =>
+      api.createPastOvertimeAccess({ startDate: accessFrom, endDate: accessTo, reason: accessReason.trim() }),
+    onSuccess: async () => {
+      toast.success("Request sent to admin");
+      setAccessOpen(false);
+      setAccessFrom("");
+      setAccessTo("");
+      setAccessReason("");
+      await refresh();
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to send request")
+  });
+
   const period = summary?.period;
   const periodStart = period ? new Date(period.startDate) : undefined;
   const periodEnd = period ? new Date(period.endDate) : undefined;
+  const maxPastDateInput = (() => {
+    if (!periodStart) return undefined;
+    const day = new Date(periodStart);
+    day.setDate(day.getDate() - 1);
+    return toRequestDateInput(day);
+  })();
+  const accessRangeInvalid = Boolean(accessFrom && accessTo && accessTo < accessFrom);
+  const accessDays =
+    accessFrom && accessTo && !accessRangeInvalid
+      ? daysBetweenInclusive(localDateFromInput(accessFrom), localDateFromInput(accessTo))
+      : 0;
 
   const selectedKey = selectedDate ? dateKey(selectedDate) : null;
+  const isPastDateSelected = Boolean(selectedKey && periodStart && selectedKey < dateKey(periodStart));
   const selectedLeave = selectedKey ? leaveByDate.get(selectedKey) : undefined;
   const selectedOvertime = selectedKey ? overtimeByDate.get(selectedKey) : undefined;
   const canRequestLeave = !selectedLeave || selectedLeave.status === "REJECTED";
@@ -232,6 +282,13 @@ export default function CalculateHours() {
         status: item.status,
         rejectionReason: item.rejectionReason
       })),
+      ...pastAccessRequests.map((item) => ({
+        id: `access-${item.id}`,
+        date: item.createdAt,
+        label: `Past-date overtime request — ${formatDateRange(item.startDate, item.endDate)} (${pluralizeDays(item.numberOfDays)})`,
+        status: item.status,
+        rejectionReason: item.status === "REJECTED" ? item.rejectionReason : item.reason
+      })),
       ...convertedLeaves.map((item) => ({
         id: `converted-${item.id}`,
         date: item.calculationPeriod?.endDate ?? item.convertedAt,
@@ -241,7 +298,7 @@ export default function CalculateHours() {
       }))
     ];
     return items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [leaveRequests, overtimeRequests, convertedLeaves]);
+  }, [leaveRequests, overtimeRequests, convertedLeaves, pastAccessRequests]);
 
   const isLoading = loadingSummary || loadingLeave || loadingOvertime;
 
@@ -268,6 +325,10 @@ export default function CalculateHours() {
               : "Leave and overtime for the current calculation cycle."}
           </p>
         </div>
+        <Button variant="outline" className="gap-1.5 self-start" onClick={() => setAccessOpen(true)}>
+          <CalendarPlus className="h-4 w-4" />
+          Request Past Dates
+        </Button>
         {summary ? (
           <div className="flex flex-wrap gap-2 self-start">
             <Badge variant="secondary" className="rounded-full">
@@ -341,6 +402,42 @@ export default function CalculateHours() {
               </div>
             </>
           )}
+          {approvedPastKeys.size > 0 ? (
+            <div className="mt-4 border-t border-border/40 pt-3">
+              <p className="px-2 text-sm font-medium">Approved past dates</p>
+              <p className="px-2 pb-1 text-[11px] text-muted-foreground">
+                Admin approved these dates — click one to request overtime for it.
+              </p>
+              <Calendar
+                key={firstApprovedPastDate?.toISOString()}
+                defaultMonth={firstApprovedPastDate}
+                disabled={(date) => !approvedPastKeys.has(dateKey(date))}
+                modifiers={{ approvedPast: (date) => approvedPastKeys.has(dateKey(date)) }}
+                modifiersClassNames={{ approvedPast: "ring-1 ring-primary/50 rounded-md font-semibold" }}
+                onDayClick={(date, modifiers) => {
+                  if (!modifiers.disabled) openDialog(date);
+                }}
+                components={{
+                  DayContent: ({ date }) => {
+                    const overtime = overtimeByDate.get(dateKey(date));
+                    return (
+                      <div className="relative flex h-9 w-9 items-center justify-center">
+                        <span>{date.getDate()}</span>
+                        {overtime ? (
+                          <span
+                            className={cn(
+                              "absolute bottom-0.5 h-1.5 w-1.5 rounded-full",
+                              dotClass(overtime.status, "overtime")
+                            )}
+                          />
+                        ) : null}
+                      </div>
+                    );
+                  }
+                }}
+              />
+            </div>
+          ) : null}
         </div>
 
         <div className="glass-panel p-5 space-y-3">
@@ -379,12 +476,18 @@ export default function CalculateHours() {
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{selectedDate ? formatDateRange(selectedDate.toISOString(), selectedDate.toISOString()) : ""}</DialogTitle>
-            <DialogDescription>Request leave or overtime for this date.</DialogDescription>
+            <DialogDescription>
+              {isPastDateSelected
+                ? "Past date approved by admin — you can request overtime for it."
+                : "Request leave or overtime for this date."}
+            </DialogDescription>
           </DialogHeader>
 
-          <Tabs defaultValue="leave">
+          <Tabs key={selectedKey ?? "none"} defaultValue={isPastDateSelected ? "overtime" : "leave"}>
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="leave">Leave</TabsTrigger>
+              <TabsTrigger value="leave" disabled={isPastDateSelected}>
+                Leave
+              </TabsTrigger>
               <TabsTrigger value="overtime">Overtime</TabsTrigger>
             </TabsList>
 
@@ -575,6 +678,68 @@ export default function CalculateHours() {
               )}
             </TabsContent>
           </Tabs>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={accessOpen} onOpenChange={setAccessOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Request Past Dates</DialogTitle>
+            <DialogDescription>
+              Missed logging overtime for days of an earlier cycle? Ask the admin to reopen those dates. Once
+              approved they appear on your calendar so you can add overtime for them as usual.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">From Date</Label>
+                <Input
+                  type="date"
+                  value={accessFrom}
+                  max={maxPastDateInput}
+                  onChange={(e) => setAccessFrom(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">To Date</Label>
+                <Input
+                  type="date"
+                  value={accessTo}
+                  min={accessFrom || undefined}
+                  max={maxPastDateInput}
+                  onChange={(e) => setAccessTo(e.target.value)}
+                />
+              </div>
+            </div>
+            {accessRangeInvalid ? (
+              <p className="text-xs text-destructive">To Date cannot be before From Date.</p>
+            ) : accessDays > 0 ? (
+              <p className="text-xs text-muted-foreground">Days requested: {pluralizeDays(accessDays)}</p>
+            ) : null}
+            <Label>Reason</Label>
+            <textarea
+              value={accessReason}
+              onChange={(e) => setAccessReason(e.target.value)}
+              placeholder="Why do you need to add overtime for these past dates?"
+              rows={3}
+              className="w-full rounded-md border border-input bg-transparent px-2 py-1.5 text-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            />
+            <Button
+              className="w-full gap-1"
+              disabled={
+                !accessFrom ||
+                !accessTo ||
+                accessRangeInvalid ||
+                !accessReason.trim() ||
+                createAccessMutation.isPending
+              }
+              onClick={() => createAccessMutation.mutate()}
+            >
+              <CalendarPlus className="h-3.5 w-3.5" />
+              {createAccessMutation.isPending ? "Sending..." : "Send Request to Admin"}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </PageWrapper>

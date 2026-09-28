@@ -14,7 +14,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { api } from "@/lib/api";
-import type { HoursAdminRequestItem, HoursRequestStatus, LeaveRequestItem, LeaveType, OvertimeRequestItem } from "@/lib/domain";
+import type {
+  HoursAdminRequestItem,
+  HoursRequestStatus,
+  LeaveRequestItem,
+  LeaveType,
+  OvertimeRequestItem,
+  PastOvertimeAccessItem
+} from "@/lib/domain";
 import { exportAllEmployeesHoursReportPdf } from "@/lib/hours-report-pdf";
 import {
   buildBreakdownRows,
@@ -42,7 +49,7 @@ export default function EmployeeOvertime() {
   const queryClient = useQueryClient();
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
   const [selectedPeriodId, setSelectedPeriodId] = useState("");
-  const [rejectTarget, setRejectTarget] = useState<{ id: string; type: "LEAVE" | "OVERTIME" } | null>(null);
+  const [rejectTarget, setRejectTarget] = useState<{ id: string; type: "LEAVE" | "OVERTIME" | "PAST_ACCESS" } | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
   const [convertReason, setConvertReason] = useState("");
@@ -123,7 +130,23 @@ export default function EmployeeOvertime() {
       })
   });
 
+  const { data: pastAccessRequests = [] } = useQuery({
+    queryKey: ["hours-admin-past-access"],
+    queryFn: () => api.getAdminPastOvertimeAccess()
+  });
+  const pendingPastAccess = pastAccessRequests.filter((item) => item.status === "PENDING");
+
+  const approvePastAccessMutation = useMutation({
+    mutationFn: (id: string) => api.approvePastOvertimeAccess(id),
+    onSuccess: async () => {
+      toast.success("Past dates approved — the employee can now add overtime for them");
+      await refreshAll();
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to approve")
+  });
+
   const refreshAll = async () => {
+    await queryClient.invalidateQueries({ queryKey: ["hours-admin-past-access"] });
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["hours-admin-requests"] }),
       queryClient.invalidateQueries({ queryKey: ["hours-employee-report"] })
@@ -141,8 +164,11 @@ export default function EmployeeOvertime() {
   });
 
   const rejectMutation = useMutation({
-    mutationFn: (): Promise<LeaveRequestItem | OvertimeRequestItem> => {
+    mutationFn: (): Promise<LeaveRequestItem | OvertimeRequestItem | PastOvertimeAccessItem> => {
       if (!rejectTarget) throw new Error("No request selected");
+      if (rejectTarget.type === "PAST_ACCESS") {
+        return api.rejectPastOvertimeAccess(rejectTarget.id, rejectReason.trim() || undefined);
+      }
       return rejectTarget.type === "LEAVE"
         ? api.rejectLeaveRequest(rejectTarget.id, rejectReason.trim() || undefined)
         : api.rejectOvertimeRequest(rejectTarget.id, rejectReason.trim() || undefined);
@@ -431,6 +457,84 @@ export default function EmployeeOvertime() {
       ) : (
         <p className="text-sm text-muted-foreground p-4">Select an employee to view their hours summary.</p>
       )}
+
+      <div className="glass-panel p-5 space-y-3">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <h2 className="text-lg font-semibold">Past-date overtime requests</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Employees asking to add overtime for days of an already-closed cycle. Approving opens those dates on
+              their calendar; the overtime they then submit is reviewed below like any other.
+            </p>
+          </div>
+          <Badge variant="secondary" className="rounded-full">
+            {pendingPastAccess.length} pending
+          </Badge>
+        </div>
+        {pastAccessRequests.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-4 text-center">No past-date requests yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[720px]">
+              <thead>
+                <tr className="border-b border-border/40 text-muted-foreground text-xs">
+                  <th className="py-2 pr-3 text-left font-medium">Employee</th>
+                  <th className="py-2 px-3 text-left font-medium">Dates</th>
+                  <th className="py-2 px-3 text-left font-medium">Days</th>
+                  <th className="py-2 px-3 text-left font-medium">Reason</th>
+                  <th className="py-2 px-3 text-left font-medium">Status</th>
+                  <th className="py-2 pl-3 text-right font-medium">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pastAccessRequests.map((item) => (
+                  <tr key={item.id} className="border-b border-border/20 align-top">
+                    <td className="py-2 pr-3 font-medium">{item.employee.name}</td>
+                    <td className="py-2 px-3 whitespace-nowrap">{formatDateRange(item.startDate, item.endDate)}</td>
+                    <td className="py-2 px-3">{pluralizeDays(item.numberOfDays)}</td>
+                    <td className="py-2 px-3 max-w-[280px] whitespace-normal break-words">
+                      {item.reason}
+                      {item.status === "REJECTED" && item.rejectionReason ? (
+                        <span className="block text-xs text-muted-foreground">Rejected: {item.rejectionReason}</span>
+                      ) : null}
+                    </td>
+                    <td className="py-2 px-3">
+                      <Badge variant={statusBadgeVariant(item.status)}>{statusLabel(item.status)}</Badge>
+                    </td>
+                    <td className="py-2 pl-3 text-right">
+                      {item.status === "PENDING" ? (
+                        <div className="inline-flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1"
+                            disabled={approvePastAccessMutation.isPending}
+                            onClick={() => setRejectTarget({ id: item.id, type: "PAST_ACCESS" })}
+                          >
+                            <XCircle className="h-3.5 w-3.5" />
+                            Reject
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="gap-1"
+                            disabled={approvePastAccessMutation.isPending}
+                            onClick={() => approvePastAccessMutation.mutate(item.id)}
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            Approve
+                          </Button>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       <div className="glass-panel p-5 space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-2">

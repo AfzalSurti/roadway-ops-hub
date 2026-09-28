@@ -1723,7 +1723,7 @@ export default function LetterNumbering() {
                             <th className="p-2 text-left font-medium min-w-[180px]">Subject Cat.</th>
                             <th className="p-2 text-left font-medium w-28">Reply Letter of</th>
                             <th className="p-2 text-left font-medium min-w-[180px]">Remark by Employee</th>
-                            <th className="p-2 text-right font-medium w-36">Actions</th>
+                            <th className="p-2 text-right font-medium w-36 min-w-[140px] !right-0 !left-auto !z-30 border-l border-border/40">Actions</th>
                           </tr>
                           <tr
                             className="bg-secondary/25 border-t border-border/20 [&>th]:sticky [&>th]:z-20 [&>th]:top-[var(--st-top2)] [&>th]:bg-secondary/95 [&>th]:bg-clip-padding"
@@ -1879,7 +1879,7 @@ export default function LetterNumbering() {
                               />
                             </th>
                             <th className="p-1.5" />
-                            <th className="p-1.5 text-right">
+                            <th className="p-1.5 text-right !right-0 !left-auto !z-30 border-l border-border/40">
                               {hasLetterFilters ? (
                                 <Button
                                   type="button"
@@ -1999,7 +1999,7 @@ export default function LetterNumbering() {
                                     {letter.employeeRemark || "—"}
                                   </p>
                                 </td>
-                                <td className="p-2 text-right">
+                                <td className="p-2 text-right sticky right-0 z-10 bg-card border-l border-border/40">
                                   <div
                                     className="inline-flex gap-1"
                                     onClick={(e) => e.stopPropagation()}

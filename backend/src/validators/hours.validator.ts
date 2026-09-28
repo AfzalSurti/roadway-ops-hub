@@ -18,6 +18,12 @@ export const createOvertimeRequestSchema = z.object({
   reason: z.string().trim().min(1, "Reason is required").max(1000)
 });
 
+export const createPastAccessSchema = z.object({
+  startDate: z.string().min(1, "Start date is required"),
+  endDate: z.string().min(1, "End date is required"),
+  reason: z.string().trim().min(1, "Reason is required").max(1000)
+});
+
 export const reviewRequestSchema = z.object({
   rejectionReason: z.string().trim().max(1000).optional()
 });

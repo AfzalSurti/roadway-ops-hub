@@ -179,10 +179,11 @@ function isRowEmpty(values: unknown[]) {
 function parseLetterDateCell(value: unknown): { date: string | null; error?: string } {
   if (value === null || value === undefined || value === "") return { date: null };
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    // Prefer local calendar day from Excel cells (avoids UTC off-by-one).
-    const y = value.getFullYear();
-    const m = String(value.getMonth() + 1).padStart(2, "0");
-    const d = String(value.getDate()).padStart(2, "0");
+    // Shift by 12h before reading the local day so a few-minute reader skew around midnight can't move it.
+    const noon = new Date(value.getTime() + 12 * 60 * 60 * 1000);
+    const y = noon.getFullYear();
+    const m = String(noon.getMonth() + 1).padStart(2, "0");
+    const d = String(noon.getDate()).padStart(2, "0");
     return { date: `${y}-${m}-${d}` };
   }
   const text = cellString(value);
@@ -293,7 +294,10 @@ export function readLetterImportFile(file: ArrayBuffer): {
   rows: ParsedLetterImportRow[];
   errors: LetterImportParseIssue[];
 } {
-  const workbook = XLSX.read(file, { type: "array", cellDates: true });
+  // cellDates stays off on purpose: date cells then arrive as exact Excel serial numbers, which
+  // parseExcelDate turns into the correct calendar day. With cellDates the reader builds local-midnight
+  // JS dates that land on the previous day in timezones ahead of UTC (e.g. IST: 28 Sep -> 27 Sep).
+  const workbook = XLSX.read(file, { type: "array", cellDates: false });
   const sheetName = workbook.SheetNames.find((name) => name.toLowerCase() !== "guide") ?? workbook.SheetNames[0];
   if (!sheetName) {
     return { rows: [], errors: [{ excelRow: 0, message: "Excel file has no sheets" }] };

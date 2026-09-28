@@ -87,6 +87,11 @@ export function parseExcelDate(value: unknown): string | null {
     return null;
   }
 
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    const noon = new Date(value.getTime() + 12 * 60 * 60 * 1000);
+    return `${noon.getFullYear()}-${String(noon.getMonth() + 1).padStart(2, "0")}-${String(noon.getDate()).padStart(2, "0")}`;
+  }
+
   if (typeof value === "number" && Number.isFinite(value)) {
     const parsed = XLSX.SSF.parse_date_code(value);
     if (parsed) {
