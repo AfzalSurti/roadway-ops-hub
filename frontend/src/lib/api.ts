@@ -49,6 +49,8 @@ import type {
   LetterProjectItem,
   OvertimeRequestItem,
   PastOvertimeAccessItem,
+  ProjectBillingEntry,
+  ProjectBillingSummary,
   ContractActivityItem,
   PreContractActivityItem,
   ProjectItem,
@@ -1418,6 +1420,32 @@ export const api = {
 
   getAllProjectsBillStatus() {
     return request<FinancialAllProjectsBillStatusSummary>("/financials/bill-status/projects");
+  },
+
+  getProjectBillingEntries(projectId: string) {
+    return request<ProjectBillingEntry[]>(`/project-billing/project/${projectId}`);
+  },
+
+  createProjectBillingEntry(projectId: string, payload: Partial<ProjectBillingEntry>) {
+    return request<ProjectBillingEntry>(`/project-billing/project/${projectId}`, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+  },
+
+  updateProjectBillingEntry(id: string, payload: Partial<ProjectBillingEntry>) {
+    return request<ProjectBillingEntry>(`/project-billing/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    });
+  },
+
+  deleteProjectBillingEntry(id: string) {
+    return request<{ deleted: boolean }>(`/project-billing/${id}`, { method: "DELETE" });
+  },
+
+  getProjectBillingSummary() {
+    return request<ProjectBillingSummary>("/project-billing/summary");
   },
 
   getProjectFinancial(projectId: string) {

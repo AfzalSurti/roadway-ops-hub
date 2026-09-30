@@ -624,6 +624,64 @@ export type FinancialProjectDetail = {
   plan: FinancialPlan | null;
 };
 
+/** One row of the flat per-project RA-bill ledger (client's exact billing register format). */
+export type ProjectBillingEntry = {
+  id: string;
+  projectId: string;
+  date: string | null;
+  raBillNo: string;
+  billNo: string;
+  month: string;
+  basicAmountClaimed: number;
+  basicAmountPassed: number;
+  gstAmount: number;
+  totalAmount: number;
+  tds: number;
+  sdRetention: number;
+  gstDeduction: number;
+  amountToReceive: number;
+  chequeAmount: number;
+  amountHold: number;
+  gstReceived: number;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ProjectBillingSummaryRow = {
+  projectId: string;
+  projectName: string;
+  projectNumber: string | null;
+  billsCount: number;
+  billsPassedCount: number;
+  billsRemainingCount: number;
+  remainingAmount: number;
+  basicAmountClaimed: number;
+  basicAmountPassed: number;
+  gstAmount: number;
+  totalAmount: number;
+  tds: number;
+  sdRetention: number;
+  gstDeduction: number;
+  amountToReceive: number;
+  chequeAmount: number;
+  amountHold: number;
+  gstReceived: number;
+};
+
+export type ProjectBillingSummary = {
+  rows: ProjectBillingSummaryRow[];
+  grandTotal: {
+    billsCount: number;
+    billsPassedCount: number;
+    billsRemainingCount: number;
+    basicAmountClaimed: number;
+    totalAmount: number;
+    chequeAmount: number;
+    remainingAmount: number;
+  };
+};
+
 export type FinancialProjectBillStatusRow = {
   projectId: string;
   folderNo: string;

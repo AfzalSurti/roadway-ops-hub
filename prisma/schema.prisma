@@ -188,6 +188,7 @@ model Project {
   infraOtherCosts         InfraProjectOtherCost[]
   /// Contract(s) this project was created from via "Create Project" (Contract -> Project autofill)
   contractActivities      ContractActivity[]
+  billingEntries          ProjectBillingEntry[]
 
   @@index([name])
   @@index([projectCodePrefix, financialYearShort])
@@ -1146,4 +1147,33 @@ model PastOvertimeAccess {
 
   @@index([employeeId, status])
   @@index([status])
+}
+
+/// Flat per-project RA-bill ledger (client's exact billing register format: date, bill no, month,
+/// claimed/passed amounts, GST, and the payment-received breakdown TDS/SD/GST/cheque/hold). A simple
+/// ledger with no enforced workflow, unlike ProjectFinancialRaBill's percentage-of-item planning.
+model ProjectBillingEntry {
+  id                 String    @id @default(cuid())
+  projectId          String
+  date               DateTime?
+  raBillNo           String    @default("")
+  billNo             String    @default("")
+  month              String    @default("")
+  basicAmountClaimed Float     @default(0)
+  basicAmountPassed  Float     @default(0)
+  gstAmount          Float     @default(0)
+  totalAmount        Float     @default(0)
+  tds                Float     @default(0)
+  sdRetention        Float     @default(0)
+  gstDeduction       Float     @default(0)
+  amountToReceive    Float     @default(0)
+  chequeAmount       Float     @default(0)
+  amountHold         Float     @default(0)
+  gstReceived        Float     @default(0)
+  sortOrder          Int       @default(0)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  project            Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, sortOrder])
 }

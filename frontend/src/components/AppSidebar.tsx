@@ -61,6 +61,7 @@ const operationsNav = [
 const accountsNav = [
   { to: "/accounts/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/accounts/financial", icon: Landmark, label: "Financial" },
+  { to: "/accounts/billing", icon: Receipt, label: "Billing" },
 ];
 
 const infraNav = [
