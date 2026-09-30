@@ -113,9 +113,12 @@ export function parseExcelDate(value: unknown): string | null {
     return text;
   }
 
+  // JS parses a non-ISO string like "24-Sep-2025" as local midnight, not UTC — so read it back with
+  // local getters too. Using toISOString() here (UTC) is what caused the reported off-by-one: local
+  // midnight in IST (UTC+5:30) is still the previous day in UTC, so the date silently moved back one.
   const parsed = new Date(text);
   if (!Number.isNaN(parsed.getTime())) {
-    return parsed.toISOString().slice(0, 10);
+    return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, "0")}-${String(parsed.getDate()).padStart(2, "0")}`;
   }
 
   return null;
