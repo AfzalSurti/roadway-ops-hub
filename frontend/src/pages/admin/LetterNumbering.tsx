@@ -428,6 +428,7 @@ export default function LetterNumbering() {
     remark: ""
   });
   const [customCategoryTick, setCustomCategoryTick] = useState(0);
+  const [selectedLetterIds, setSelectedLetterIds] = useState<Set<string>>(new Set());
   const [letterFilters, setLetterFilters] = useState({
     serial: "",
     date: "",
@@ -563,6 +564,31 @@ export default function LetterNumbering() {
       return true;
     });
   }, [letters, letterFilters]);
+
+  const allFilteredSelected =
+    filteredLetters.length > 0 && filteredLetters.every((letter) => selectedLetterIds.has(letter.id));
+
+  const toggleSelectAll = () => {
+    setSelectedLetterIds((prev) => {
+      if (allFilteredSelected) {
+        const next = new Set(prev);
+        for (const letter of filteredLetters) next.delete(letter.id);
+        return next;
+      }
+      const next = new Set(prev);
+      for (const letter of filteredLetters) next.add(letter.id);
+      return next;
+    });
+  };
+
+  const toggleSelectOne = (letterId: string) => {
+    setSelectedLetterIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(letterId)) next.delete(letterId);
+      else next.add(letterId);
+      return next;
+    });
+  };
 
   const repliedByLinkKeys = useMemo(() => {
     const keys = new Set<string>();
@@ -898,9 +924,26 @@ export default function LetterNumbering() {
     onSuccess: async (_data, letterId) => {
       toast.success("Letter deleted");
       if (letterDialogId === letterId) setLetterDialogId(null);
+      setSelectedLetterIds((prev) => {
+        if (!prev.has(letterId)) return prev;
+        const next = new Set(prev);
+        next.delete(letterId);
+        return next;
+      });
       await refresh();
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Delete failed")
+  });
+
+  const bulkDeleteLetterMutation = useMutation({
+    mutationFn: (letterIds: string[]) => Promise.all(letterIds.map((id) => api.deleteLetterEntry(id))),
+    onSuccess: async (_data, letterIds) => {
+      toast.success(`${letterIds.length} letter(s) deleted`);
+      if (letterDialogId && letterIds.includes(letterDialogId)) setLetterDialogId(null);
+      setSelectedLetterIds(new Set());
+      await refresh();
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Bulk delete failed")
   });
 
   const dialogActionType = letterDialogForm.category === "OUTWARD" ? "" : letterDialogForm.actionType;
@@ -1009,6 +1052,7 @@ export default function LetterNumbering() {
   const selectLetterProject = (projectId: string) => {
     setSelectedProjectId(projectId);
     setLetterFilters(emptyLetterFilters);
+    setSelectedLetterIds(new Set());
     // Clear search so list collapses to only the selected project
     setFilterNumber("");
     setFilterShortName("");
@@ -1017,6 +1061,7 @@ export default function LetterNumbering() {
   const changeLetterProject = () => {
     setSelectedProjectId(null);
     setLetterFilters(emptyLetterFilters);
+    setSelectedLetterIds(new Set());
     setFilterNumber("");
     setFilterShortName("");
   };
@@ -1660,6 +1705,28 @@ export default function LetterNumbering() {
                       >
                         <Download className="h-3.5 w-3.5" /> Export Excel
                       </Button>
+                      {selectedLetterIds.size > 0 ? (
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="gap-1"
+                          disabled={bulkDeleteLetterMutation.isPending}
+                          onClick={() => {
+                            if (
+                              window.confirm(
+                                `Delete ${selectedLetterIds.size} selected letter(s)? This cannot be undone.`
+                              )
+                            ) {
+                              bulkDeleteLetterMutation.mutate(Array.from(selectedLetterIds));
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          {bulkDeleteLetterMutation.isPending
+                            ? "Deleting..."
+                            : `Delete ${selectedLetterIds.size} selected`}
+                        </Button>
+                      ) : null}
                       {pendingReplyLetters.length > 0 ? (
                         <Badge variant="secondary" className="rounded-full self-center gap-1">
                           <MailWarning className="h-3.5 w-3.5" />
@@ -1701,16 +1768,23 @@ export default function LetterNumbering() {
                     </p>
                   ) : (
                     <div ref={letterTableScrollRef} className="min-h-0 flex-1 overflow-auto">
-                      <table className="w-full text-xs min-w-[1500px] table-auto">
+                      <table className="w-full text-xs min-w-[1300px] table-auto">
                         <thead>
                           <tr
                             ref={letterHeaderRowRef}
                             className="bg-secondary/40 text-muted-foreground [&>th]:sticky [&>th]:z-20 [&>th]:top-[var(--st-top)] [&>th]:bg-secondary [&>th]:bg-clip-padding"
                             style={{ "--st-top": "0px" } as CSSProperties}
                           >
-                            <th className="p-2 text-left font-medium w-[110px] min-w-[110px] !left-0 !z-30">Project No.</th>
-                            <th className="p-2 text-left font-medium w-[150px] min-w-[150px] !left-[110px] !z-30">Project Name</th>
-                            <th className="p-2 text-left font-medium w-14 min-w-[56px] !left-[260px] !z-30 border-r border-border/40">Sr.</th>
+                            <th className="p-2 text-center font-medium w-10 min-w-[40px] !left-0 !z-30">
+                              <input
+                                type="checkbox"
+                                checked={allFilteredSelected}
+                                onChange={toggleSelectAll}
+                                aria-label="Select all letters"
+                                className="h-3.5 w-3.5"
+                              />
+                            </th>
+                            <th className="p-2 text-left font-medium w-14 min-w-[56px] !left-[40px] !z-30 border-r border-border/40">Sr.</th>
                             <th className="p-2 text-left font-medium min-w-[160px] w-[160px]">Date</th>
                             <th className="p-2 text-left font-medium w-48">Letter Number</th>
                             <th className="p-2 text-left font-medium w-32">Category</th>
@@ -1719,10 +1793,6 @@ export default function LetterNumbering() {
                             <th className="p-2 text-left font-medium min-w-[180px]">Sent To</th>
                             <th className="p-2 text-left font-medium min-w-[200px]">Subject</th>
                             <th className="p-2 text-left font-medium min-w-[160px]">CC To</th>
-                            <th className="p-2 text-left font-medium min-w-[160px]">Referred To</th>
-                            <th className="p-2 text-left font-medium min-w-[180px]">Subject Cat.</th>
-                            <th className="p-2 text-left font-medium w-28">Reply Letter of</th>
-                            <th className="p-2 text-left font-medium min-w-[180px]">Remark by Employee</th>
                             <th className="p-2 text-right font-medium w-36 min-w-[140px] !right-0 !left-auto !z-30 border-l border-border/40">Actions</th>
                           </tr>
                           <tr
@@ -1732,8 +1802,7 @@ export default function LetterNumbering() {
                             }
                           >
                             <th className="p-1.5 !left-0 !z-30" />
-                            <th className="p-1.5 !left-[110px] !z-30" />
-                            <th className="p-1.5 !left-[260px] !z-30 border-r border-border/40">
+                            <th className="p-1.5 !left-[40px] !z-30 border-r border-border/40">
                               <Input
                                 className="h-7 text-[11px]"
                                 placeholder="Filter"
@@ -1842,43 +1911,6 @@ export default function LetterNumbering() {
                                 }
                               />
                             </th>
-                            <th className="p-1.5">
-                              <Input
-                                className="h-7 text-[11px]"
-                                placeholder="Filter"
-                                value={letterFilters.referredTo}
-                                onChange={(e) =>
-                                  setLetterFilters((prev) => ({ ...prev, referredTo: e.target.value }))
-                                }
-                              />
-                            </th>
-                            <th className="p-1.5">
-                              <Input
-                                className="h-7 text-[11px]"
-                                placeholder="Filter"
-                                value={letterFilters.subjectCategory}
-                                onChange={(e) =>
-                                  setLetterFilters((prev) => ({
-                                    ...prev,
-                                    subjectCategory: e.target.value
-                                  }))
-                                }
-                              />
-                            </th>
-                            <th className="p-1.5">
-                              <Input
-                                className="h-7 text-[11px]"
-                                placeholder="Filter"
-                                value={letterFilters.replyOfSerial}
-                                onChange={(e) =>
-                                  setLetterFilters((prev) => ({
-                                    ...prev,
-                                    replyOfSerial: e.target.value
-                                  }))
-                                }
-                              />
-                            </th>
-                            <th className="p-1.5" />
                             <th className="p-1.5 text-right !right-0 !left-auto !z-30 border-l border-border/40">
                               {hasLetterFilters ? (
                                 <Button
@@ -1897,14 +1929,14 @@ export default function LetterNumbering() {
                         <tbody>
                           {letters.length === 0 ? (
                             <tr>
-                              <td colSpan={16} className="p-8 text-center text-muted-foreground">
+                              <td colSpan={11} className="p-8 text-center text-muted-foreground">
                                 No letters yet. Add Inward / Outward / Other, or Add Old Letter / Import Excel for existing numbers.
                               </td>
                             </tr>
                           ) : null}
                           {letters.length > 0 && filteredLetters.length === 0 ? (
                             <tr>
-                              <td colSpan={16} className="p-8 text-center text-muted-foreground">
+                              <td colSpan={11} className="p-8 text-center text-muted-foreground">
                                 No letters match the filters.{" "}
                                 <button
                                   type="button"
@@ -1950,13 +1982,19 @@ export default function LetterNumbering() {
                                 }`}
                                 onClick={() => openLetterDialog(letter)}
                               >
-                                <td className="p-2 sticky left-0 z-10 bg-card w-[110px] min-w-[110px] max-w-[110px] truncate font-medium">
-                                  {selectedProject.projectNumber}
+                                <td
+                                  className="p-2 text-center sticky left-0 z-10 bg-card w-10 min-w-[40px]"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedLetterIds.has(letter.id)}
+                                    onChange={() => toggleSelectOne(letter.id)}
+                                    aria-label={`Select letter ${letter.serialLabel}`}
+                                    className="h-3.5 w-3.5"
+                                  />
                                 </td>
-                                <td className="p-2 sticky left-[110px] z-10 bg-card w-[150px] min-w-[150px] max-w-[150px] truncate" title={selectedProject.fullName || selectedProject.shortName}>
-                                  {selectedProject.shortName}
-                                </td>
-                                <td className="p-2 sticky left-[260px] z-10 bg-card font-medium border-r border-border/40">{letter.serialLabel}</td>
+                                <td className="p-2 sticky left-[40px] z-10 bg-card font-medium border-r border-border/40">{letter.serialLabel}</td>
                                 <td className="p-2 whitespace-nowrap">
                                   {letter.letterDate ? toDateInput(letter.letterDate) : "—"}
                                 </td>
@@ -1985,18 +2023,6 @@ export default function LetterNumbering() {
                                 <td className="p-2 max-w-[160px]">
                                   <p className="line-clamp-2 whitespace-pre-wrap break-words">
                                     {letter.ccTo || "—"}
-                                  </p>
-                                </td>
-                                <td className="p-2 max-w-[160px]">
-                                  <p className="line-clamp-2 whitespace-pre-wrap break-words">
-                                    {letter.referredTo || "—"}
-                                  </p>
-                                </td>
-                                <td className="p-2">{letter.subjectCategory || "—"}</td>
-                                <td className="p-2">{letter.replyOfSerial || "—"}</td>
-                                <td className="p-2 max-w-[180px]">
-                                  <p className="line-clamp-2 whitespace-pre-wrap break-words">
-                                    {letter.employeeRemark || "—"}
                                   </p>
                                 </td>
                                 <td className="p-2 text-right sticky right-0 z-10 bg-card border-l border-border/40">
@@ -2101,6 +2127,13 @@ export default function LetterNumbering() {
               View and edit this letter record. Click Save to keep changes.
             </DialogDescription>
           </DialogHeader>
+
+          {dialogLetter?.employeeRemark ? (
+            <div className="rounded-lg border border-border/40 bg-secondary/20 px-3 py-2">
+              <p className="text-xs font-medium text-muted-foreground mb-1">Remark by Employee</p>
+              <p className="text-sm whitespace-pre-wrap break-words">{dialogLetter.employeeRemark}</p>
+            </div>
+          ) : null}
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
