@@ -11,6 +11,11 @@ import { errorHandler } from "./middleware/error-handler.js";
 
 export const app = express();
 
+// Behind nginx (same host, connects via loopback) — trust exactly one proxy hop so
+// req.ip / X-Forwarded-For are read from that hop instead of being rejected outright.
+// Without this, express-rate-limit throws ERR_ERL_UNEXPECTED_X_FORWARDED_FOR on every request.
+app.set("trust proxy", 1);
+
 const allowedOrigins = env.CORS_ORIGIN.split(",")
   .map((origin) => origin.trim())
   .filter(Boolean);
