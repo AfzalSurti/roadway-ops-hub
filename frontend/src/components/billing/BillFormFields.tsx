@@ -63,6 +63,48 @@ export function billFormFromEntry(entry: ProjectBillingEntry): BillFormState {
   };
 }
 
+function round2(value: number) {
+  return Math.round(value * 100) / 100;
+}
+
+/**
+ * Live-calculates GST / Total / TDS / GST-deduction / Amount-to-Receive from the claim amount and the
+ * other manually-entered deductions, so typing the claimed (or passed) amount fills the rest in —
+ * still plain editable fields afterward, this just sets sensible defaults.
+ * Rates: 18% GST (standard), 2% income-tax TDS and 2% GST-TDS (common contractor/works-contract rates
+ * for government RA bills) — adjust the entered values directly if your contract uses different rates.
+ */
+const AUTO_CALC_TRIGGERS = new Set<keyof BillFormState>([
+  "basicAmountClaimed",
+  "basicAmountPassed",
+  "sdRetention",
+  "amountHold"
+]);
+
+export function applyAutoCalc(form: BillFormState, changedKey?: keyof BillFormState): BillFormState {
+  if (changedKey && !AUTO_CALC_TRIGGERS.has(changedKey)) return form;
+
+  const base = Number(form.basicAmountPassed) || Number(form.basicAmountClaimed) || 0;
+  if (base <= 0) return form;
+
+  const gstAmount = round2(base * 0.18);
+  const totalAmount = round2(base + gstAmount);
+  const tds = round2(base * 0.02);
+  const gstDeduction = round2(base * 0.02);
+  const sdRetention = Number(form.sdRetention) || 0;
+  const amountHold = Number(form.amountHold) || 0;
+  const amountToReceive = round2(totalAmount - tds - gstDeduction - sdRetention - amountHold);
+
+  return {
+    ...form,
+    gstAmount: String(gstAmount),
+    totalAmount: String(totalAmount),
+    tds: String(tds),
+    gstDeduction: String(gstDeduction),
+    amountToReceive: String(amountToReceive)
+  };
+}
+
 export function billFormToPayload(form: BillFormState) {
   return {
     date: form.date || null,

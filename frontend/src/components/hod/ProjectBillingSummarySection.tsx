@@ -26,7 +26,12 @@ function formatDate(value: string | null) {
 }
 
 /** Per-project billing register summary — bills created/passed/remaining and totals, click to drill in. */
-export function ProjectBillingSummarySection() {
+export function ProjectBillingSummarySection({
+  onSelectProject
+}: {
+  /** When provided, clicking a project row navigates away instead of opening the read-only drill-down popup. */
+  onSelectProject?: (projectId: string) => void;
+} = {}) {
   const [openProject, setOpenProject] = useState<ProjectBillingSummaryRow | null>(null);
   const [openBill, setOpenBill] = useState<ProjectBillingEntry | null>(null);
 
@@ -83,7 +88,7 @@ export function ProjectBillingSummarySection() {
                 <tr
                   key={row.projectId}
                   className="border-t border-border/20 hover:bg-secondary/20 cursor-pointer"
-                  onClick={() => setOpenProject(row)}
+                  onClick={() => (onSelectProject ? onSelectProject(row.projectId) : setOpenProject(row))}
                 >
                   <td className="p-3 font-mono text-xs">{row.projectNumber || "—"}</td>
                   <td className="p-3">{row.projectName}</td>

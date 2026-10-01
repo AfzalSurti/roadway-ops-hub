@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { PageWrapper } from "@/components/PageWrapper";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { ProjectBillingEntry } from "@/lib/domain";
 import {
+  applyAutoCalc,
   BillFormFields,
   billFormFromEntry,
   billFormToPayload,
@@ -36,6 +38,7 @@ function formatDate(value: string | null) {
 
 export default function AccountsBillingLedger() {
   const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [showAddBill, setShowAddBill] = useState(false);
   const [addForm, setAddForm] = useState<BillFormState>(emptyBillForm);
@@ -48,7 +51,16 @@ export default function AccountsBillingLedger() {
     staleTime: 5 * 60 * 1000
   });
 
-  const activeProjectId = selectedProjectId || eligibleProjects[0]?.id || "";
+  const projectFromUrl = searchParams.get("project") || "";
+
+  useEffect(() => {
+    if (projectFromUrl && eligibleProjects.some((project) => project.id === projectFromUrl)) {
+      setSelectedProjectId(projectFromUrl);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectFromUrl, eligibleProjects.length]);
+
+  const activeProjectId = selectedProjectId || projectFromUrl || eligibleProjects[0]?.id || "";
 
   const { data: projectDetail } = useQuery({
     queryKey: ["billing-project-detail", activeProjectId],
@@ -229,7 +241,13 @@ export default function AccountsBillingLedger() {
             <DialogTitle>Add Bill</DialogTitle>
             <DialogDescription>Nothing here is required — fill in whatever applies.</DialogDescription>
           </DialogHeader>
-          <BillFormFields value={addForm} onChange={(patch) => setAddForm((prev) => ({ ...prev, ...patch }))} />
+          <BillFormFields
+            value={addForm}
+            onChange={(patch) => {
+              const changedKey = Object.keys(patch)[0] as keyof BillFormState;
+              setAddForm((prev) => applyAutoCalc({ ...prev, ...patch }, changedKey));
+            }}
+          />
           <DialogFooter className="gap-2">
             <Button variant="ghost" onClick={() => setShowAddBill(false)}>
               Cancel
@@ -249,7 +267,13 @@ export default function AccountsBillingLedger() {
               {editingBill ? `${editingBill.raBillNo || editingBill.billNo || "Bill"} — edit and save, or delete.` : ""}
             </DialogDescription>
           </DialogHeader>
-          <BillFormFields value={editForm} onChange={(patch) => setEditForm((prev) => ({ ...prev, ...patch }))} />
+          <BillFormFields
+            value={editForm}
+            onChange={(patch) => {
+              const changedKey = Object.keys(patch)[0] as keyof BillFormState;
+              setEditForm((prev) => applyAutoCalc({ ...prev, ...patch }, changedKey));
+            }}
+          />
           <DialogFooter className="gap-2 sm:justify-between">
             <Button
               variant="ghost"
