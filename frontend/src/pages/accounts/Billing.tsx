@@ -194,42 +194,72 @@ export default function AccountsBillingLedger() {
           ) : entries.length === 0 ? (
             <p className="text-sm text-muted-foreground py-8 text-center">No bills yet. Click "Add Bill" to begin.</p>
           ) : (
-            <div className="space-y-2">
-              {entries.map((entry) => (
-                <button
-                  key={entry.id}
-                  type="button"
-                  onClick={() => openEdit(entry)}
-                  className="w-full text-left rounded-xl border border-border/40 bg-secondary/20 hover:bg-secondary/30 transition-colors p-4 flex flex-wrap items-center justify-between gap-3"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium">
-                      {entry.raBillNo || entry.billNo || "Bill"}
-                      {entry.month ? ` — ${entry.month}` : ""}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {formatDate(entry.date)} · Claimed {money(entry.basicAmountClaimed)}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    <div className="text-right">
-                      <p className="text-sm font-semibold">{money(entry.totalAmount)}</p>
-                      <p className="text-[11px] text-muted-foreground">Total Amount</p>
-                    </div>
-                    <Badge variant={entry.chequeAmount > 0 ? "default" : "secondary"}>
-                      {entry.chequeAmount > 0 ? "Passed" : "Remaining"}
-                    </Badge>
-                  </div>
-                </button>
-              ))}
-              <div className="rounded-xl border border-border/50 bg-secondary/30 p-4 flex flex-wrap items-center justify-between gap-3 font-medium">
-                <p>TOTAL ({entries.length} bills)</p>
-                <div className="flex gap-6 text-sm">
-                  <span>Claimed: {money(totals.basicAmountClaimed)}</span>
-                  <span>Total: {money(totals.totalAmount)}</span>
-                  <span>Received: {money(totals.chequeAmount)}</span>
-                </div>
-              </div>
+            <div className="overflow-x-auto rounded-xl border border-border/40">
+              <table className="w-full text-sm min-w-[1300px]">
+                <thead>
+                  <tr className="bg-secondary/30 text-muted-foreground">
+                    <th className="p-2.5 text-left font-medium">Date</th>
+                    <th className="p-2.5 text-left font-medium">RA Bill No.</th>
+                    <th className="p-2.5 text-left font-medium">Bill No.</th>
+                    <th className="p-2.5 text-left font-medium">Month</th>
+                    <th className="p-2.5 text-right font-medium">Basic Amt Claimed</th>
+                    <th className="p-2.5 text-right font-medium">Basic Amt Passed</th>
+                    <th className="p-2.5 text-right font-medium">18% GST</th>
+                    <th className="p-2.5 text-right font-medium">Total Amount</th>
+                    <th className="p-2.5 text-right font-medium">TDS</th>
+                    <th className="p-2.5 text-right font-medium">SD / Retention</th>
+                    <th className="p-2.5 text-right font-medium">GST (Ded.)</th>
+                    <th className="p-2.5 text-right font-medium">Amt to Receive</th>
+                    <th className="p-2.5 text-right font-medium">Chq. Amt</th>
+                    <th className="p-2.5 text-right font-medium">Amt Hold</th>
+                    <th className="p-2.5 text-right font-medium">GST Received</th>
+                    <th className="p-2.5 text-center font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {entries.map((entry) => (
+                    <tr
+                      key={entry.id}
+                      className="border-t border-border/20 hover:bg-secondary/20 cursor-pointer"
+                      onClick={() => openEdit(entry)}
+                    >
+                      <td className="p-2.5 whitespace-nowrap">{formatDate(entry.date)}</td>
+                      <td className="p-2.5">{entry.raBillNo || "—"}</td>
+                      <td className="p-2.5">{entry.billNo || "—"}</td>
+                      <td className="p-2.5">{entry.month || "—"}</td>
+                      <td className="p-2.5 text-right tabular-nums">{money(entry.basicAmountClaimed)}</td>
+                      <td className="p-2.5 text-right tabular-nums">{money(entry.basicAmountPassed)}</td>
+                      <td className="p-2.5 text-right tabular-nums">{money(entry.gstAmount)}</td>
+                      <td className="p-2.5 text-right tabular-nums font-medium">{money(entry.totalAmount)}</td>
+                      <td className="p-2.5 text-right tabular-nums">{money(entry.tds)}</td>
+                      <td className="p-2.5 text-right tabular-nums">{money(entry.sdRetention)}</td>
+                      <td className="p-2.5 text-right tabular-nums">{money(entry.gstDeduction)}</td>
+                      <td className="p-2.5 text-right tabular-nums">{money(entry.amountToReceive)}</td>
+                      <td className="p-2.5 text-right tabular-nums">{money(entry.chequeAmount)}</td>
+                      <td className="p-2.5 text-right tabular-nums">{money(entry.amountHold)}</td>
+                      <td className="p-2.5 text-right tabular-nums">{money(entry.gstReceived)}</td>
+                      <td className="p-2.5 text-center">
+                        <Badge variant={entry.chequeAmount > 0 ? "default" : "secondary"}>
+                          {entry.chequeAmount > 0 ? "Passed" : "Remaining"}
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t-2 border-border/50 bg-secondary/30 font-semibold">
+                    <td className="p-2.5" colSpan={4}>
+                      TOTAL ({entries.length} bills)
+                    </td>
+                    <td className="p-2.5 text-right tabular-nums">{money(totals.basicAmountClaimed)}</td>
+                    <td className="p-2.5" colSpan={2} />
+                    <td className="p-2.5 text-right tabular-nums">{money(totals.totalAmount)}</td>
+                    <td className="p-2.5" colSpan={4} />
+                    <td className="p-2.5 text-right tabular-nums">{money(totals.chequeAmount)}</td>
+                    <td className="p-2.5" colSpan={2} />
+                  </tr>
+                </tfoot>
+              </table>
             </div>
           )}
         </div>
