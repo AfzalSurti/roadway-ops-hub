@@ -93,7 +93,11 @@ export function parseExcelDate(value: unknown): string | null {
   }
 
   if (typeof value === "number" && Number.isFinite(value)) {
-    const parsed = XLSX.SSF.parse_date_code(value);
+    // Round to the nearest whole day first: some tools (Google Sheets exports, older openpyxl
+    // writers, etc.) serialize a date-only cell as e.g. 46284.9999999997 instead of exactly 46284.
+    // parse_date_code truncates the fractional part, so that tiny float drift silently reads as
+    // the previous day. We only care about the calendar day here, so rounding is always safe.
+    const parsed = XLSX.SSF.parse_date_code(Math.round(value));
     if (parsed) {
       return `${parsed.y}-${String(parsed.m).padStart(2, "0")}-${String(parsed.d).padStart(2, "0")}`;
     }
