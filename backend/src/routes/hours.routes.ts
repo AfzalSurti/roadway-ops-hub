@@ -25,6 +25,13 @@ hoursRouter.post(
   asyncHandler(hoursController.createLeaveRequest)
 );
 hoursRouter.get("/leave-requests/me", asyncHandler(hoursController.listMyLeaveRequests));
+hoursRouter.patch(
+  "/leave-requests/:id",
+  requireRole("EMPLOYEE"),
+  validate(createLeaveRequestSchema),
+  asyncHandler(hoursController.updateLeaveRequest)
+);
+hoursRouter.delete("/leave-requests/:id", requireRole("EMPLOYEE"), asyncHandler(hoursController.deleteLeaveRequest));
 
 hoursRouter.post(
   "/overtime-requests",
@@ -33,6 +40,17 @@ hoursRouter.post(
   asyncHandler(hoursController.createOvertimeRequest)
 );
 hoursRouter.get("/overtime-requests/me", asyncHandler(hoursController.listMyOvertimeRequests));
+hoursRouter.patch(
+  "/overtime-requests/:id",
+  requireRole("EMPLOYEE"),
+  validate(createOvertimeRequestSchema),
+  asyncHandler(hoursController.updateOvertimeRequest)
+);
+hoursRouter.delete(
+  "/overtime-requests/:id",
+  requireRole("EMPLOYEE"),
+  asyncHandler(hoursController.deleteOvertimeRequest)
+);
 
 hoursRouter.post(
   "/past-overtime-access",
@@ -41,6 +59,17 @@ hoursRouter.post(
   asyncHandler(hoursController.createPastAccessRequest)
 );
 hoursRouter.get("/past-overtime-access/me", asyncHandler(hoursController.listMyPastAccessRequests));
+hoursRouter.patch(
+  "/past-overtime-access/:id",
+  requireRole("EMPLOYEE"),
+  validate(createPastAccessSchema),
+  asyncHandler(hoursController.updatePastAccessRequest)
+);
+hoursRouter.delete(
+  "/past-overtime-access/:id",
+  requireRole("EMPLOYEE"),
+  asyncHandler(hoursController.deletePastAccessRequest)
+);
 
 hoursRouter.get("/me/summary", asyncHandler(hoursController.getMySummary));
 hoursRouter.get("/converted-leaves/me", asyncHandler(hoursController.listMyConvertedLeaves));

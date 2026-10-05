@@ -20,6 +20,16 @@ export const hoursController = {
     return sendSuccess(res, result);
   },
 
+  async updateLeaveRequest(req: Request, res: Response) {
+    const result = await hoursService.updateLeaveRequest(req.params.id, req.user!.id, req.body);
+    return sendSuccess(res, result);
+  },
+
+  async deleteLeaveRequest(req: Request, res: Response) {
+    await hoursService.deleteLeaveRequest(req.params.id, req.user!.id);
+    return sendSuccess(res, { deleted: true });
+  },
+
   async listAdminLeaveRequests(req: Request, res: Response) {
     const result = await hoursService.listAdminLeaveRequests({
       employeeId: strParam(req.query.employeeId),
@@ -64,6 +74,16 @@ export const hoursController = {
     return sendSuccess(res, result);
   },
 
+  async updateOvertimeRequest(req: Request, res: Response) {
+    const result = await hoursService.updateOvertimeRequest(req.params.id, req.user!.id, req.body);
+    return sendSuccess(res, result);
+  },
+
+  async deleteOvertimeRequest(req: Request, res: Response) {
+    await hoursService.deleteOvertimeRequest(req.params.id, req.user!.id);
+    return sendSuccess(res, { deleted: true });
+  },
+
   async listAdminOvertimeRequests(req: Request, res: Response) {
     const result = await hoursService.listAdminOvertimeRequests({
       employeeId: strParam(req.query.employeeId),
@@ -100,6 +120,16 @@ export const hoursController = {
   async listMyPastAccessRequests(req: Request, res: Response) {
     const result = await hoursService.listMyPastAccessRequests(req.user!.id);
     return sendSuccess(res, result);
+  },
+
+  async updatePastAccessRequest(req: Request, res: Response) {
+    const result = await hoursService.updatePastAccessRequest(req.params.id, req.user!.id, req.body);
+    return sendSuccess(res, result);
+  },
+
+  async deletePastAccessRequest(req: Request, res: Response) {
+    await hoursService.deletePastAccessRequest(req.params.id, req.user!.id);
+    return sendSuccess(res, { deleted: true });
   },
 
   async listAdminPastAccessRequests(req: Request, res: Response) {

@@ -40,13 +40,14 @@ export const hoursRepository = {
   // ─── Leave requests ─────────────────────────────────────────────────────
 
   /** Any active (pending/approved) leave whose [startDate,endDate] overlaps the given range. */
-  findOverlappingLeave(employeeId: string, startDate: Date, endDate: Date) {
+  findOverlappingLeave(employeeId: string, startDate: Date, endDate: Date, excludeId?: string) {
     return prisma.leaveRequest.findFirst({
       where: {
         employeeId,
         status: { in: ["PENDING", "APPROVED"] },
         startDate: { lte: endDate },
-        endDate: { gte: startDate }
+        endDate: { gte: startDate },
+        ...(excludeId ? { NOT: { id: excludeId } } : {})
       }
     });
   },
@@ -84,6 +85,28 @@ export const hoursRepository = {
     });
   },
 
+  updateLeaveRequest(
+    id: string,
+    data: {
+      startDate: Date;
+      endDate: Date;
+      numberOfDays: number;
+      leaveType: LeaveType;
+      durationMinutes: number;
+      reason: string;
+    }
+  ) {
+    return prisma.leaveRequest.update({
+      where: { id },
+      data,
+      include: { employee: { select: employeeSelect } }
+    });
+  },
+
+  deleteLeaveRequest(id: string) {
+    return prisma.leaveRequest.delete({ where: { id } });
+  },
+
   markLeaveObedient(
     id: string,
     data: { obedientReason: string; obedientById: string; obedientAt: Date }
@@ -97,9 +120,14 @@ export const hoursRepository = {
 
   // ─── Overtime requests ──────────────────────────────────────────────────
 
-  findActiveOvertimeOnDate(employeeId: string, date: Date) {
+  findActiveOvertimeOnDate(employeeId: string, date: Date, excludeId?: string) {
     return prisma.overtimeRequest.findFirst({
-      where: { employeeId, date, status: { in: ["PENDING", "APPROVED"] } }
+      where: {
+        employeeId,
+        date,
+        status: { in: ["PENDING", "APPROVED"] },
+        ...(excludeId ? { NOT: { id: excludeId } } : {})
+      }
     });
   },
 
@@ -136,6 +164,29 @@ export const hoursRepository = {
     });
   },
 
+  updateOvertimeRequest(
+    id: string,
+    data: {
+      calculationPeriodId: string;
+      date: Date;
+      project: string;
+      startTime: Date;
+      endTime: Date;
+      reason: string;
+      durationMinutes: number;
+    }
+  ) {
+    return prisma.overtimeRequest.update({
+      where: { id },
+      data,
+      include: { employee: { select: employeeSelect } }
+    });
+  },
+
+  deleteOvertimeRequest(id: string) {
+    return prisma.overtimeRequest.delete({ where: { id } });
+  },
+
   // ─── Past-date overtime access ──────────────────────────────────────────
 
   createPastAccess(data: Prisma.PastOvertimeAccessUncheckedCreateInput) {
@@ -166,15 +217,28 @@ export const hoursRepository = {
   },
 
   /** Any pending/approved access request whose range overlaps the given one (used to block duplicates). */
-  findOverlappingPastAccess(employeeId: string, startDate: Date, endDate: Date) {
+  findOverlappingPastAccess(employeeId: string, startDate: Date, endDate: Date, excludeId?: string) {
     return prisma.pastOvertimeAccess.findFirst({
       where: {
         employeeId,
         status: { in: ["PENDING", "APPROVED"] },
         startDate: { lte: endDate },
-        endDate: { gte: startDate }
+        endDate: { gte: startDate },
+        ...(excludeId ? { NOT: { id: excludeId } } : {})
       }
     });
+  },
+
+  updatePastAccess(id: string, data: { startDate: Date; endDate: Date; numberOfDays: number; reason: string }) {
+    return prisma.pastOvertimeAccess.update({
+      where: { id },
+      data,
+      include: { employee: { select: employeeSelect } }
+    });
+  },
+
+  deletePastAccess(id: string) {
+    return prisma.pastOvertimeAccess.delete({ where: { id } });
   },
 
   findApprovedPastAccessCovering(employeeId: string, date: Date) {

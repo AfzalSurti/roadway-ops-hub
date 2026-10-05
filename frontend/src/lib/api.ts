@@ -814,6 +814,17 @@ export const api = {
     return request<LeaveRequestItem[]>("/hours/leave-requests/me");
   },
 
+  updateLeaveRequest(id: string, payload: { startDate: string; endDate: string; leaveType: LeaveType; reason: string }) {
+    return request<LeaveRequestItem>(`/hours/leave-requests/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    });
+  },
+
+  deleteLeaveRequest(id: string) {
+    return request<{ deleted: true }>(`/hours/leave-requests/${id}`, { method: "DELETE" });
+  },
+
   createOvertimeRequest(payload: { date: string; project: string; startTime: string; endTime: string; reason: string }) {
     return request<OvertimeRequestItem>("/hours/overtime-requests", {
       method: "POST",
@@ -823,6 +834,20 @@ export const api = {
 
   getMyOvertimeRequests() {
     return request<OvertimeRequestItem[]>("/hours/overtime-requests/me");
+  },
+
+  updateOvertimeRequest(
+    id: string,
+    payload: { date: string; project: string; startTime: string; endTime: string; reason: string }
+  ) {
+    return request<OvertimeRequestItem>(`/hours/overtime-requests/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    });
+  },
+
+  deleteOvertimeRequest(id: string) {
+    return request<{ deleted: true }>(`/hours/overtime-requests/${id}`, { method: "DELETE" });
   },
 
   getMyHoursSummary() {
@@ -874,6 +899,17 @@ export const api = {
 
   getMyPastOvertimeAccess() {
     return request<PastOvertimeAccessItem[]>("/hours/past-overtime-access/me");
+  },
+
+  updatePastOvertimeAccess(id: string, payload: { startDate: string; endDate: string; reason: string }) {
+    return request<PastOvertimeAccessItem>(`/hours/past-overtime-access/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    });
+  },
+
+  deletePastOvertimeAccess(id: string) {
+    return request<{ deleted: true }>(`/hours/past-overtime-access/${id}`, { method: "DELETE" });
   },
 
   getAdminPastOvertimeAccess(status?: HoursRequestStatus) {

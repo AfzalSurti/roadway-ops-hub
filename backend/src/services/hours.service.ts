@@ -1,6 +1,6 @@
 import type { HoursRequestStatus, LeaveType } from "@prisma/client";
 import { hoursRepository } from "../repositories/hours.repository.js";
-import { badRequest, conflict, notFound } from "../utils/errors.js";
+import { badRequest, conflict, forbidden, notFound } from "../utils/errors.js";
 import {
   LEAVE_DURATION_MINUTES,
   combineDateAndTime,
@@ -321,6 +321,56 @@ export const hoursService = {
     return serializeLeave(created);
   },
 
+  /** Employee self-edit — only while their own request is still PENDING. */
+  async updateLeaveRequest(
+    id: string,
+    employeeId: string,
+    payload: { startDate: string; endDate: string; leaveType: LeaveType; reason: string }
+  ) {
+    const existing = await hoursRepository.findLeaveById(id);
+    if (!existing) throw notFound("Leave request not found");
+    if (existing.employeeId !== employeeId) throw forbidden("You can only edit your own requests");
+    if (existing.status !== "PENDING") throw badRequest("Only pending requests can be edited");
+
+    const startDate = parseHoursDate(payload.startDate);
+    const endDate = parseHoursDate(payload.endDate);
+    if (endDate.getTime() < startDate.getTime()) {
+      throw badRequest("End date cannot be before start date");
+    }
+
+    const period = await this.getActivePeriod();
+    if (startDate.getTime() < period.startDate.getTime() || endDate.getTime() > period.endDate.getTime()) {
+      throw badRequest("Selected dates are outside the active calculation period");
+    }
+
+    const overlap = await hoursRepository.findOverlappingLeave(employeeId, startDate, endDate, id);
+    if (overlap) {
+      throw conflict("An overlapping leave request already exists for these dates");
+    }
+
+    const numberOfDays = daysBetweenInclusive(startDate, endDate);
+    const durationMinutes = numberOfDays * LEAVE_DURATION_MINUTES[payload.leaveType];
+
+    const updated = await hoursRepository.updateLeaveRequest(id, {
+      startDate,
+      endDate,
+      numberOfDays,
+      leaveType: payload.leaveType,
+      durationMinutes,
+      reason: payload.reason.trim()
+    });
+    return serializeLeave(updated);
+  },
+
+  /** Employee self-withdraw — only while their own request is still PENDING. */
+  async deleteLeaveRequest(id: string, employeeId: string) {
+    const existing = await hoursRepository.findLeaveById(id);
+    if (!existing) throw notFound("Leave request not found");
+    if (existing.employeeId !== employeeId) throw forbidden("You can only withdraw your own requests");
+    if (existing.status !== "PENDING") throw badRequest("Only pending requests can be withdrawn");
+    await hoursRepository.deleteLeaveRequest(id);
+  },
+
   async listMyLeaveRequests(employeeId: string) {
     const period = await this.getActivePeriod();
     const rows = await hoursRepository.listLeaveRequests({ employeeId, calculationPeriodId: period.id });
@@ -430,6 +480,66 @@ export const hoursService = {
     return serializeOvertime(created);
   },
 
+  /** Employee self-edit — only while their own request is still PENDING. */
+  async updateOvertimeRequest(
+    id: string,
+    employeeId: string,
+    payload: { date: string; project: string; startTime: string; endTime: string; reason: string }
+  ) {
+    const existing = await hoursRepository.findOvertimeById(id);
+    if (!existing) throw notFound("Overtime request not found");
+    if (existing.employeeId !== employeeId) throw forbidden("You can only edit your own requests");
+    if (existing.status !== "PENDING") throw badRequest("Only pending requests can be edited");
+
+    const date = parseHoursDate(payload.date);
+    const startTime = combineDateAndTime(payload.date, payload.startTime);
+    const endTime = combineDateAndTime(payload.date, payload.endTime);
+    if (endTime.getTime() <= startTime.getTime()) throw badRequest("End time must be after start time");
+    const durationMinutes = computeOvertimeMinutes(startTime, endTime);
+
+    const activePeriod = await this.getActivePeriod();
+    let period = activePeriod;
+    const inActivePeriod =
+      date.getTime() >= activePeriod.startDate.getTime() && date.getTime() <= activePeriod.endDate.getTime();
+    if (!inActivePeriod) {
+      if (date.getTime() > activePeriod.endDate.getTime()) {
+        throw badRequest("Selected date is outside the active calculation period");
+      }
+      const access = await hoursRepository.findApprovedPastAccessCovering(employeeId, date);
+      if (!access) {
+        throw badRequest(
+          "This date belongs to a closed period. Send a past-date request to the admin first and wait for approval."
+        );
+      }
+      period = await this.resolvePeriodForDate(date);
+    }
+
+    const duplicate = await hoursRepository.findActiveOvertimeOnDate(employeeId, date, id);
+    if (duplicate) {
+      throw conflict("An overtime request already exists for this date");
+    }
+
+    const updated = await hoursRepository.updateOvertimeRequest(id, {
+      calculationPeriodId: period.id,
+      date,
+      project: payload.project.trim(),
+      startTime,
+      endTime,
+      reason: payload.reason.trim(),
+      durationMinutes
+    });
+    return serializeOvertime(updated);
+  },
+
+  /** Employee self-withdraw — only while their own request is still PENDING. */
+  async deleteOvertimeRequest(id: string, employeeId: string) {
+    const existing = await hoursRepository.findOvertimeById(id);
+    if (!existing) throw notFound("Overtime request not found");
+    if (existing.employeeId !== employeeId) throw forbidden("You can only withdraw your own requests");
+    if (existing.status !== "PENDING") throw badRequest("Only pending requests can be withdrawn");
+    await hoursRepository.deleteOvertimeRequest(id);
+  },
+
   /** The period a (past) calendar day belongs to — created as CLOSED if it was never touched before. */
   async resolvePeriodForDate(date: Date) {
     const bounds = periodBoundsForDate(date);
@@ -479,6 +589,51 @@ export const hoursService = {
       reason: payload.reason.trim()
     });
     return serializePastAccess(created);
+  },
+
+  /** Employee self-edit — only while their own request is still PENDING. */
+  async updatePastAccessRequest(
+    id: string,
+    employeeId: string,
+    payload: { startDate: string; endDate: string; reason: string }
+  ) {
+    const existing = await hoursRepository.findPastAccessById(id);
+    if (!existing) throw notFound("Past-date request not found");
+    if (existing.employeeId !== employeeId) throw forbidden("You can only edit your own requests");
+    if (existing.status !== "PENDING") throw badRequest("Only pending requests can be edited");
+
+    const startDate = parseHoursDate(payload.startDate);
+    const endDate = parseHoursDate(payload.endDate);
+    if (endDate.getTime() < startDate.getTime()) {
+      throw badRequest("End date cannot be before start date");
+    }
+
+    const activePeriod = await this.getActivePeriod();
+    if (endDate.getTime() >= activePeriod.startDate.getTime()) {
+      throw badRequest("These dates are in the current cycle already — add overtime directly from the calendar");
+    }
+
+    const overlap = await hoursRepository.findOverlappingPastAccess(employeeId, startDate, endDate, id);
+    if (overlap) {
+      throw conflict("You already have a pending or approved request covering some of these dates");
+    }
+
+    const updated = await hoursRepository.updatePastAccess(id, {
+      startDate,
+      endDate,
+      numberOfDays: daysBetweenInclusive(startDate, endDate),
+      reason: payload.reason.trim()
+    });
+    return serializePastAccess(updated);
+  },
+
+  /** Employee self-withdraw — only while their own request is still PENDING. */
+  async deletePastAccessRequest(id: string, employeeId: string) {
+    const existing = await hoursRepository.findPastAccessById(id);
+    if (!existing) throw notFound("Past-date request not found");
+    if (existing.employeeId !== employeeId) throw forbidden("You can only withdraw your own requests");
+    if (existing.status !== "PENDING") throw badRequest("Only pending requests can be withdrawn");
+    await hoursRepository.deletePastAccess(id);
   },
 
   async listMyPastAccessRequests(employeeId: string) {

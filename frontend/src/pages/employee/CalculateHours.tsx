@@ -21,6 +21,7 @@ import {
   LEAVE_TYPE_OPTIONS,
   dateKey,
   daysBetweenInclusive,
+  format24HourTime,
   formatDateRange,
   formatIsoTimeLabel,
   leaveTypeLabel,
@@ -31,7 +32,16 @@ import {
   toRequestDateInput
 } from "@/lib/hours-format";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarClock, CalendarPlus, CheckCircle2, Clock3, Loader2, MailWarning } from "lucide-react";
+import {
+  CalendarClock,
+  CalendarPlus,
+  CheckCircle2,
+  Clock3,
+  Loader2,
+  MailWarning,
+  Pencil,
+  X
+} from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -77,6 +87,9 @@ export default function CalculateHours() {
   const [accessFrom, setAccessFrom] = useState("");
   const [accessTo, setAccessTo] = useState("");
   const [accessReason, setAccessReason] = useState("");
+  const [editingLeaveId, setEditingLeaveId] = useState<string | null>(null);
+  const [editingOvertimeId, setEditingOvertimeId] = useState<string | null>(null);
+  const [editingAccessId, setEditingAccessId] = useState<string | null>(null);
 
   const { data: pastAccessRequests = [] } = useQuery({
     queryKey: ["hours-my-past-access"],
@@ -201,6 +214,35 @@ export default function CalculateHours() {
     onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to submit leave request")
   });
 
+  const updateLeaveMutation = useMutation({
+    mutationFn: () =>
+      api.updateLeaveRequest(editingLeaveId!, {
+        startDate: leaveFrom,
+        endDate: leaveTo,
+        leaveType: leaveType as LeaveType,
+        reason: leaveReason.trim()
+      }),
+    onSuccess: async () => {
+      toast.success("Leave request updated");
+      resetLeaveForm();
+      setEditingLeaveId(null);
+      setSelectedDate(null);
+      await refresh();
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to update leave request")
+  });
+
+  const deleteLeaveMutation = useMutation({
+    mutationFn: (id: string) => api.deleteLeaveRequest(id),
+    onSuccess: async () => {
+      toast.success("Leave request withdrawn");
+      setEditingLeaveId(null);
+      setSelectedDate(null);
+      await refresh();
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to withdraw leave request")
+  });
+
   const createOvertimeMutation = useMutation({
     mutationFn: () =>
       api.createOvertimeRequest({
@@ -219,6 +261,36 @@ export default function CalculateHours() {
     onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to submit overtime request")
   });
 
+  const updateOvertimeMutation = useMutation({
+    mutationFn: () =>
+      api.updateOvertimeRequest(editingOvertimeId!, {
+        date: toRequestDateInput(selectedDate!),
+        project: otProject,
+        startTime: otFrom,
+        endTime: otTo,
+        reason: otReason.trim()
+      }),
+    onSuccess: async () => {
+      toast.success("Overtime request updated");
+      resetOvertimeForm();
+      setEditingOvertimeId(null);
+      setSelectedDate(null);
+      await refresh();
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to update overtime request")
+  });
+
+  const deleteOvertimeMutation = useMutation({
+    mutationFn: (id: string) => api.deleteOvertimeRequest(id),
+    onSuccess: async () => {
+      toast.success("Overtime request withdrawn");
+      setEditingOvertimeId(null);
+      setSelectedDate(null);
+      await refresh();
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to withdraw overtime request")
+  });
+
   const createAccessMutation = useMutation({
     mutationFn: () =>
       api.createPastOvertimeAccess({ startDate: accessFrom, endDate: accessTo, reason: accessReason.trim() }),
@@ -232,6 +304,66 @@ export default function CalculateHours() {
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to send request")
   });
+
+  const updateAccessMutation = useMutation({
+    mutationFn: () =>
+      api.updatePastOvertimeAccess(editingAccessId!, {
+        startDate: accessFrom,
+        endDate: accessTo,
+        reason: accessReason.trim()
+      }),
+    onSuccess: async () => {
+      toast.success("Request updated");
+      setAccessOpen(false);
+      setEditingAccessId(null);
+      setAccessFrom("");
+      setAccessTo("");
+      setAccessReason("");
+      await refresh();
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to update request")
+  });
+
+  const deleteAccessMutation = useMutation({
+    mutationFn: (id: string) => api.deletePastOvertimeAccess(id),
+    onSuccess: async () => {
+      toast.success("Request withdrawn");
+      setEditingAccessId(null);
+      await refresh();
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to withdraw request")
+  });
+
+  const withdrawRequest = (kind: "leave" | "overtime" | "access", id: string) => {
+    if (!window.confirm("Withdraw this request?")) return;
+    if (kind === "leave") deleteLeaveMutation.mutate(id);
+    else if (kind === "overtime") deleteOvertimeMutation.mutate(id);
+    else deleteAccessMutation.mutate(id);
+  };
+
+  const startEditLeave = (leave: (typeof leaveRequests)[number]) => {
+    setEditingLeaveId(leave.id);
+    setLeaveFrom(dateKey(leave.startDate));
+    setLeaveTo(dateKey(leave.endDate));
+    setLeaveType(leave.leaveType);
+    setLeaveReason(leave.reason || "");
+  };
+
+  const startEditOvertime = (overtime: (typeof overtimeRequests)[number]) => {
+    setEditingOvertimeId(overtime.id);
+    setOtProject(overtime.project);
+    setOtFrom(format24HourTime(overtime.startTime));
+    setOtTo(format24HourTime(overtime.endTime));
+    setOtReason(overtime.reason || "");
+  };
+
+  const startEditAccess = (item: (typeof pastAccessRequests)[number]) => {
+    setEditingAccessId(item.id);
+    setAccessFrom(dateKey(item.startDate));
+    setAccessTo(dateKey(item.endDate));
+    setAccessReason(item.reason || "");
+    setAccessOpen(true);
+  };
 
   const period = summary?.period;
   const periodStart = period ? new Date(period.startDate) : undefined;
@@ -252,8 +384,10 @@ export default function CalculateHours() {
   const isPastDateSelected = Boolean(selectedKey && periodStart && selectedKey < dateKey(periodStart));
   const selectedLeave = selectedKey ? leaveByDate.get(selectedKey) : undefined;
   const selectedOvertime = selectedKey ? overtimeByDate.get(selectedKey) : undefined;
-  const canRequestLeave = !selectedLeave || selectedLeave.status === "REJECTED";
-  const canRequestOvertime = !selectedOvertime || selectedOvertime.status === "REJECTED";
+  const isEditingSelectedLeave = Boolean(selectedLeave && editingLeaveId === selectedLeave.id);
+  const isEditingSelectedOvertime = Boolean(selectedOvertime && editingOvertimeId === selectedOvertime.id);
+  const canRequestLeave = !selectedLeave || selectedLeave.status === "REJECTED" || isEditingSelectedLeave;
+  const canRequestOvertime = !selectedOvertime || selectedOvertime.status === "REJECTED" || isEditingSelectedOvertime;
 
   const leaveNumberOfDays = leaveFrom && leaveTo ? daysBetweenInclusive(localDateFromInput(leaveFrom), localDateFromInput(leaveTo)) : 0;
   const leaveTotalMinutes = leaveType && leaveNumberOfDays > 0 ? leaveNumberOfDays * LEAVE_DURATION_MINUTES[leaveType] : 0;
@@ -267,9 +401,19 @@ export default function CalculateHours() {
   }, [otFrom, otTo]);
 
   const timelineItems = useMemo(() => {
-    const items: Array<{ id: string; date: string; label: string; status: string; rejectionReason?: string | null }> = [
+    const items: Array<{
+      id: string;
+      rawId: string;
+      kind: "leave" | "overtime" | "access" | "converted";
+      date: string;
+      label: string;
+      status: string;
+      rejectionReason?: string | null;
+    }> = [
       ...leaveRequests.map((item) => ({
         id: `leave-${item.id}`,
+        rawId: item.id,
+        kind: "leave" as const,
         date: item.startDate,
         label: `${leaveTypeLabel(item.leaveType)} Leave — ${formatDateRange(item.startDate, item.endDate)} (${pluralizeDays(item.numberOfDays)}) — ${item.durationLabel}`,
         status: item.status,
@@ -277,6 +421,8 @@ export default function CalculateHours() {
       })),
       ...overtimeRequests.map((item) => ({
         id: `overtime-${item.id}`,
+        rawId: item.id,
+        kind: "overtime" as const,
         date: item.date,
         label: `Overtime — ${item.project} — ${formatIsoTimeLabel(item.startTime)} to ${formatIsoTimeLabel(item.endTime)} — ${item.durationLabel}`,
         status: item.status,
@@ -284,6 +430,8 @@ export default function CalculateHours() {
       })),
       ...pastAccessRequests.map((item) => ({
         id: `access-${item.id}`,
+        rawId: item.id,
+        kind: "access" as const,
         date: item.createdAt,
         label: `Past-date overtime request — ${formatDateRange(item.startDate, item.endDate)} (${pluralizeDays(item.numberOfDays)})`,
         status: item.status,
@@ -291,6 +439,8 @@ export default function CalculateHours() {
       })),
       ...convertedLeaves.map((item) => ({
         id: `converted-${item.id}`,
+        rawId: item.id,
+        kind: "converted" as const,
         date: item.calculationPeriod?.endDate ?? item.convertedAt,
         label: `Converted Leave — ${item.durationLabel}`,
         status: "APPROVED",
@@ -304,6 +454,8 @@ export default function CalculateHours() {
 
   const openDialog = (date: Date) => {
     setSelectedDate(date);
+    setEditingLeaveId(null);
+    setEditingOvertimeId(null);
     const key = toRequestDateInput(date);
     setLeaveFrom(key);
     setLeaveTo(key);
@@ -325,7 +477,17 @@ export default function CalculateHours() {
               : "Leave and overtime for the current calculation cycle."}
           </p>
         </div>
-        <Button variant="outline" className="gap-1.5 self-start" onClick={() => setAccessOpen(true)}>
+        <Button
+          variant="outline"
+          className="gap-1.5 self-start"
+          onClick={() => {
+            setEditingAccessId(null);
+            setAccessFrom("");
+            setAccessTo("");
+            setAccessReason("");
+            setAccessOpen(true);
+          }}
+        >
           <CalendarPlus className="h-4 w-4" />
           Request Past Dates
         </Button>
@@ -462,9 +624,36 @@ export default function CalculateHours() {
                       <p className="text-xs text-muted-foreground mt-0.5">Reason: {item.rejectionReason}</p>
                     ) : null}
                   </div>
-                  <Badge variant={statusBadgeVariant(item.status as never)} className="shrink-0">
-                    {statusLabel(item.status as never)}
-                  </Badge>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <Badge variant={statusBadgeVariant(item.status as never)}>{statusLabel(item.status as never)}</Badge>
+                    {item.status === "PENDING" && item.kind !== "converted" ? (
+                      <>
+                        {item.kind === "access" ? (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7"
+                            title="Edit request"
+                            onClick={() => {
+                              const found = pastAccessRequests.find((entry) => entry.id === item.rawId);
+                              if (found) startEditAccess(found);
+                            }}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        ) : null}
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 text-destructive hover:text-destructive"
+                          title="Withdraw request"
+                          onClick={() => withdrawRequest(item.kind as "leave" | "overtime" | "access", item.rawId)}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      </>
+                    ) : null}
+                  </div>
                 </div>
               ))}
             </div>
@@ -472,7 +661,16 @@ export default function CalculateHours() {
         </div>
       </div>
 
-      <Dialog open={Boolean(selectedDate)} onOpenChange={(open) => !open && setSelectedDate(null)}>
+      <Dialog
+        open={Boolean(selectedDate)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedDate(null);
+            setEditingLeaveId(null);
+            setEditingOvertimeId(null);
+          }
+        }}
+      >
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{selectedDate ? formatDateRange(selectedDate.toISOString(), selectedDate.toISOString()) : ""}</DialogTitle>
@@ -492,7 +690,7 @@ export default function CalculateHours() {
             </TabsList>
 
             <TabsContent value="leave" className="space-y-3 pt-3">
-              {selectedLeave ? (
+              {selectedLeave && !isEditingSelectedLeave ? (
                 <div className="rounded-lg border border-border/40 bg-secondary/20 p-3 space-y-1">
                   <p className="text-sm font-medium">
                     {leaveTypeLabel(selectedLeave.leaveType)} — {formatDateRange(selectedLeave.startDate, selectedLeave.endDate)} (
@@ -504,6 +702,22 @@ export default function CalculateHours() {
                   ) : null}
                   {selectedLeave.status === "REJECTED" && selectedLeave.rejectionReason ? (
                     <p className="text-xs text-muted-foreground">Admin note: {selectedLeave.rejectionReason}</p>
+                  ) : null}
+                  {selectedLeave.status === "PENDING" ? (
+                    <div className="flex gap-2 pt-1">
+                      <Button size="sm" variant="outline" className="gap-1" onClick={() => startEditLeave(selectedLeave)}>
+                        <Pencil className="h-3.5 w-3.5" /> Edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1 text-destructive hover:text-destructive"
+                        disabled={deleteLeaveMutation.isPending}
+                        onClick={() => withdrawRequest("leave", selectedLeave.id)}
+                      >
+                        <X className="h-3.5 w-3.5" /> Withdraw
+                      </Button>
+                    </div>
                   ) : null}
                 </div>
               ) : null}
@@ -564,21 +778,42 @@ export default function CalculateHours() {
                     className="w-full rounded-md border border-input bg-transparent px-2 py-1.5 text-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   />
 
-                  <Button
-                    className="w-full gap-1"
-                    disabled={
-                      !leaveType ||
-                      !leaveFrom ||
-                      !leaveTo ||
-                      leaveRangeInvalid ||
-                      !leaveReason.trim() ||
-                      createLeaveMutation.isPending
-                    }
-                    onClick={() => createLeaveMutation.mutate()}
-                  >
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                    {createLeaveMutation.isPending ? "Submitting..." : "Request Leave"}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      className="flex-1 gap-1"
+                      disabled={
+                        !leaveType ||
+                        !leaveFrom ||
+                        !leaveTo ||
+                        leaveRangeInvalid ||
+                        !leaveReason.trim() ||
+                        createLeaveMutation.isPending ||
+                        updateLeaveMutation.isPending
+                      }
+                      onClick={() => (isEditingSelectedLeave ? updateLeaveMutation.mutate() : createLeaveMutation.mutate())}
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      {isEditingSelectedLeave
+                        ? updateLeaveMutation.isPending
+                          ? "Saving..."
+                          : "Save Changes"
+                        : createLeaveMutation.isPending
+                          ? "Submitting..."
+                          : "Request Leave"}
+                    </Button>
+                    {isEditingSelectedLeave ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => {
+                          setEditingLeaveId(null);
+                          resetLeaveForm();
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
               ) : (
                 <p className="text-xs text-muted-foreground">
@@ -588,7 +823,7 @@ export default function CalculateHours() {
             </TabsContent>
 
             <TabsContent value="overtime" className="space-y-3 pt-3">
-              {selectedOvertime ? (
+              {selectedOvertime && !isEditingSelectedOvertime ? (
                 <div className="rounded-lg border border-border/40 bg-secondary/20 p-3 space-y-1">
                   <p className="text-sm font-medium">
                     Overtime — {selectedOvertime.project} — {formatIsoTimeLabel(selectedOvertime.startTime)} to{" "}
@@ -600,6 +835,22 @@ export default function CalculateHours() {
                   </Badge>
                   {selectedOvertime.status === "REJECTED" && selectedOvertime.rejectionReason ? (
                     <p className="text-xs text-muted-foreground">Reason: {selectedOvertime.rejectionReason}</p>
+                  ) : null}
+                  {selectedOvertime.status === "PENDING" ? (
+                    <div className="flex gap-2 pt-1">
+                      <Button size="sm" variant="outline" className="gap-1" onClick={() => startEditOvertime(selectedOvertime)}>
+                        <Pencil className="h-3.5 w-3.5" /> Edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1 text-destructive hover:text-destructive"
+                        disabled={deleteOvertimeMutation.isPending}
+                        onClick={() => withdrawRequest("overtime", selectedOvertime.id)}
+                      >
+                        <X className="h-3.5 w-3.5" /> Withdraw
+                      </Button>
+                    </div>
                   ) : null}
                 </div>
               ) : null}
@@ -655,21 +906,44 @@ export default function CalculateHours() {
                     className="w-full rounded-md border border-input bg-transparent px-2 py-1.5 text-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   />
 
-                  <Button
-                    className="w-full gap-1"
-                    disabled={
-                      createOvertimeMutation.isPending ||
-                      !otProject.trim() ||
-                      !otFrom ||
-                      !otTo ||
-                      otDurationMinutes <= 0 ||
-                      !otReason.trim()
-                    }
-                    onClick={() => createOvertimeMutation.mutate()}
-                  >
-                    <Clock3 className="h-3.5 w-3.5" />
-                    {createOvertimeMutation.isPending ? "Submitting..." : "Request Overtime"}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      className="flex-1 gap-1"
+                      disabled={
+                        createOvertimeMutation.isPending ||
+                        updateOvertimeMutation.isPending ||
+                        !otProject.trim() ||
+                        !otFrom ||
+                        !otTo ||
+                        otDurationMinutes <= 0 ||
+                        !otReason.trim()
+                      }
+                      onClick={() =>
+                        isEditingSelectedOvertime ? updateOvertimeMutation.mutate() : createOvertimeMutation.mutate()
+                      }
+                    >
+                      <Clock3 className="h-3.5 w-3.5" />
+                      {isEditingSelectedOvertime
+                        ? updateOvertimeMutation.isPending
+                          ? "Saving..."
+                          : "Save Changes"
+                        : createOvertimeMutation.isPending
+                          ? "Submitting..."
+                          : "Request Overtime"}
+                    </Button>
+                    {isEditingSelectedOvertime ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => {
+                          setEditingOvertimeId(null);
+                          resetOvertimeForm();
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
               ) : (
                 <p className="text-xs text-muted-foreground">
@@ -681,10 +955,16 @@ export default function CalculateHours() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={accessOpen} onOpenChange={setAccessOpen}>
+      <Dialog
+        open={accessOpen}
+        onOpenChange={(open) => {
+          setAccessOpen(open);
+          if (!open) setEditingAccessId(null);
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Request Past Dates</DialogTitle>
+            <DialogTitle>{editingAccessId ? "Edit Past-Date Request" : "Request Past Dates"}</DialogTitle>
             <DialogDescription>
               Missed logging overtime for days of an earlier cycle? Ask the admin to reopen those dates. Once
               approved they appear on your calendar so you can add overtime for them as usual.
@@ -732,12 +1012,19 @@ export default function CalculateHours() {
                 !accessTo ||
                 accessRangeInvalid ||
                 !accessReason.trim() ||
-                createAccessMutation.isPending
+                createAccessMutation.isPending ||
+                updateAccessMutation.isPending
               }
-              onClick={() => createAccessMutation.mutate()}
+              onClick={() => (editingAccessId ? updateAccessMutation.mutate() : createAccessMutation.mutate())}
             >
               <CalendarPlus className="h-3.5 w-3.5" />
-              {createAccessMutation.isPending ? "Sending..." : "Send Request to Admin"}
+              {editingAccessId
+                ? updateAccessMutation.isPending
+                  ? "Saving..."
+                  : "Save Changes"
+                : createAccessMutation.isPending
+                  ? "Sending..."
+                  : "Send Request to Admin"}
             </Button>
           </div>
         </DialogContent>
