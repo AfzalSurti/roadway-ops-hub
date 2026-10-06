@@ -636,6 +636,9 @@ export type ProjectBillingEntry = {
   basicAmountPassed: number;
   gstAmount: number;
   totalAmount: number;
+  creditAmount: number;
+  creditGst: number;
+  creditTotal: number;
   tds: number;
   sdRetention: number;
   gstDeduction: number;

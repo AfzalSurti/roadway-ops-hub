@@ -175,13 +175,7 @@ export default function AccountsBillingLedger() {
               <h2 className="text-base font-semibold">Bills</h2>
               <p className="text-xs text-muted-foreground mt-0.5">Click a bill to view or edit its full details.</p>
             </div>
-            <Button
-              className="gap-1.5"
-              onClick={() => {
-                setAddForm(emptyBillForm);
-                setShowAddBill(true);
-              }}
-            >
+            <Button className="gap-1.5" onClick={() => setShowAddBill(true)}>
               <Plus className="h-4 w-4" />
               Add Bill
             </Button>
@@ -195,7 +189,7 @@ export default function AccountsBillingLedger() {
             <p className="text-sm text-muted-foreground py-8 text-center">No bills yet. Click "Add Bill" to begin.</p>
           ) : (
             <div className="overflow-x-auto rounded-xl border border-border/40">
-              <table className="w-full text-sm min-w-[1300px]">
+              <table className="w-full text-sm min-w-[1550px]">
                 <thead>
                   <tr className="bg-secondary/30 text-muted-foreground">
                     <th className="p-2.5 text-left font-medium">Date</th>
@@ -206,6 +200,9 @@ export default function AccountsBillingLedger() {
                     <th className="p-2.5 text-right font-medium">Basic Amt Passed</th>
                     <th className="p-2.5 text-right font-medium">18% GST</th>
                     <th className="p-2.5 text-right font-medium">Total Amount</th>
+                    <th className="p-2.5 text-right font-medium">Credit Amt</th>
+                    <th className="p-2.5 text-right font-medium">GST on Credit</th>
+                    <th className="p-2.5 text-right font-medium">Credit Total</th>
                     <th className="p-2.5 text-right font-medium">TDS</th>
                     <th className="p-2.5 text-right font-medium">SD / Retention</th>
                     <th className="p-2.5 text-right font-medium">GST (Ded.)</th>
@@ -231,6 +228,9 @@ export default function AccountsBillingLedger() {
                       <td className="p-2.5 text-right tabular-nums">{money(entry.basicAmountPassed)}</td>
                       <td className="p-2.5 text-right tabular-nums">{money(entry.gstAmount)}</td>
                       <td className="p-2.5 text-right tabular-nums font-medium">{money(entry.totalAmount)}</td>
+                      <td className="p-2.5 text-right tabular-nums">{money(entry.creditAmount)}</td>
+                      <td className="p-2.5 text-right tabular-nums">{money(entry.creditGst)}</td>
+                      <td className="p-2.5 text-right tabular-nums">{money(entry.creditTotal)}</td>
                       <td className="p-2.5 text-right tabular-nums">{money(entry.tds)}</td>
                       <td className="p-2.5 text-right tabular-nums">{money(entry.sdRetention)}</td>
                       <td className="p-2.5 text-right tabular-nums">{money(entry.gstDeduction)}</td>
@@ -254,9 +254,10 @@ export default function AccountsBillingLedger() {
                     <td className="p-2.5 text-right tabular-nums">{money(totals.basicAmountClaimed)}</td>
                     <td className="p-2.5" colSpan={2} />
                     <td className="p-2.5 text-right tabular-nums">{money(totals.totalAmount)}</td>
+                    <td className="p-2.5" colSpan={3} />
                     <td className="p-2.5" colSpan={4} />
                     <td className="p-2.5 text-right tabular-nums">{money(totals.chequeAmount)}</td>
-                    <td className="p-2.5" colSpan={2} />
+                    <td className="p-2.5" colSpan={3} />
                   </tr>
                 </tfoot>
               </table>
@@ -279,7 +280,13 @@ export default function AccountsBillingLedger() {
             }}
           />
           <DialogFooter className="gap-2">
-            <Button variant="ghost" onClick={() => setShowAddBill(false)}>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setAddForm(emptyBillForm);
+                setShowAddBill(false);
+              }}
+            >
               Cancel
             </Button>
             <Button disabled={addMutation.isPending} onClick={() => addMutation.mutate()}>

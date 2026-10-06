@@ -9,6 +9,9 @@ export type BillFormState = {
   basicAmountPassed: string;
   gstAmount: string;
   totalAmount: string;
+  creditAmount: string;
+  creditGst: string;
+  creditTotal: string;
   tds: string;
   sdRetention: string;
   gstDeduction: string;
@@ -27,6 +30,9 @@ export const emptyBillForm: BillFormState = {
   basicAmountPassed: "",
   gstAmount: "",
   totalAmount: "",
+  creditAmount: "",
+  creditGst: "",
+  creditTotal: "",
   tds: "",
   sdRetention: "",
   gstDeduction: "",
@@ -53,6 +59,9 @@ export function billFormFromEntry(entry: ProjectBillingEntry): BillFormState {
     basicAmountPassed: entry.basicAmountPassed ? String(entry.basicAmountPassed) : "",
     gstAmount: entry.gstAmount ? String(entry.gstAmount) : "",
     totalAmount: entry.totalAmount ? String(entry.totalAmount) : "",
+    creditAmount: entry.creditAmount ? String(entry.creditAmount) : "",
+    creditGst: entry.creditGst ? String(entry.creditGst) : "",
+    creditTotal: entry.creditTotal ? String(entry.creditTotal) : "",
     tds: entry.tds ? String(entry.tds) : "",
     sdRetention: entry.sdRetention ? String(entry.sdRetention) : "",
     gstDeduction: entry.gstDeduction ? String(entry.gstDeduction) : "",
@@ -70,57 +79,71 @@ function round2(value: number) {
 /**
  * Live-calculates derived amounts as the claim/payment fields are filled, so the dependent columns
  * fill themselves in — still plain editable fields afterward, this just sets sensible defaults that
- * get recomputed only when the field(s) they depend on change (so a manual override elsewhere, e.g.
- * typing straight into GST or Amount to be Received, is never silently clobbered by an unrelated edit).
+ * get recomputed only when the field(s) they depend on change (so a manual override elsewhere is never
+ * silently clobbered by an unrelated edit).
  *
- * What's auto-calculated and why, column by column:
- *  - 18% GST, Total Amount, TDS (2%), GST-TDS deduction (2%), Amount to be Received: all pure
- *    arithmetic off Basic Amount Passed (or Claimed if not yet passed) — these are statutory/contract-
- *    standard rates for government RA bills, so a formula is reliable here.
- *  - GST Received: suggested (only while still blank, so it never overwrites a manual figure) once
- *    Chq. Amt reaches the Total Amount — i.e. once the bill is shown as fully paid, the GST portion of
- *    that payment is the GST amount already billed.
- * Columns deliberately left manual: Basic Amount Passed by Client (the client's own approved figure,
- * not derivable from what was claimed), SD/Retention Money and Amt Hold (contract-specific percentages
- * that vary per project, no universal rate to assume), and Chq. Amt (the actual payment received, which
- * can legitimately differ from Amount to be Received on a partial payment).
+ * Auto-calculated (and off what):
+ *  - 18% GST, Total Amount: 18% of Basic Amount Passed (or Claimed if not yet passed), + that base.
+ *  - Credit Amount / GST on Credit / Credit Total: when the client passes less than was claimed, the
+ *    shortfall (Claimed − Passed) is billed as a credit note next cycle, with its own 18% GST.
+ *  - Amount to be Received: Total Amount − TDS − SD/Retention − GST, all three of which are typed in
+ *    directly (see below) — so this recomputes whenever any of those four inputs change.
+ *  - Amt Hold: Amount to be Received − Chq. Amt — whatever wasn't paid out is sitting on hold.
+ * Manual (no universal formula — contract/payment-specific): TDS, SD/Retention Money, GST (the
+ * Payment Received figure), Chq. Amt, and GST Received.
  */
-const CLAIM_CALC_TRIGGERS = new Set<keyof BillFormState>([
+const CLAIM_CALC_TRIGGERS = new Set<keyof BillFormState>(["basicAmountClaimed", "basicAmountPassed"]);
+const RECEIVE_CALC_TRIGGERS = new Set<keyof BillFormState>([
   "basicAmountClaimed",
   "basicAmountPassed",
+  "tds",
   "sdRetention",
-  "amountHold"
+  "gstDeduction"
 ]);
+const HOLD_CALC_TRIGGERS = new Set<keyof BillFormState>([...RECEIVE_CALC_TRIGGERS, "chequeAmount"]);
 
 export function applyAutoCalc(form: BillFormState, changedKey?: keyof BillFormState): BillFormState {
   let next = form;
 
   if (!changedKey || CLAIM_CALC_TRIGGERS.has(changedKey)) {
-    const base = Number(next.basicAmountPassed) || Number(next.basicAmountClaimed) || 0;
-    if (base > 0) {
-      const gstAmount = round2(base * 0.18);
-      const totalAmount = round2(base + gstAmount);
-      const tds = round2(base * 0.02);
-      const gstDeduction = round2(base * 0.02);
-      const sdRetention = Number(next.sdRetention) || 0;
-      const amountHold = Number(next.amountHold) || 0;
-      const amountToReceive = round2(totalAmount - tds - gstDeduction - sdRetention - amountHold);
+    const claimed = Number(next.basicAmountClaimed) || 0;
+    const passed = Number(next.basicAmountPassed) || 0;
+    const gstBase = passed || claimed;
+    if (gstBase > 0) {
+      const gstAmount = round2(gstBase * 0.18);
+      const totalAmount = round2(gstBase + gstAmount);
+      next = { ...next, gstAmount: String(gstAmount), totalAmount: String(totalAmount) };
+    }
+
+    if (claimed > 0 && passed > 0 && claimed > passed) {
+      const creditAmount = round2(claimed - passed);
+      const creditGst = round2(creditAmount * 0.18);
       next = {
         ...next,
-        gstAmount: String(gstAmount),
-        totalAmount: String(totalAmount),
-        tds: String(tds),
-        gstDeduction: String(gstDeduction),
-        amountToReceive: String(amountToReceive)
+        creditAmount: String(creditAmount),
+        creditGst: String(creditGst),
+        creditTotal: String(round2(creditAmount + creditGst))
       };
+    } else {
+      next = { ...next, creditAmount: "", creditGst: "", creditTotal: "" };
     }
   }
 
-  if (!changedKey || changedKey === "chequeAmount") {
-    const chequeAmount = Number(next.chequeAmount) || 0;
+  if (!changedKey || RECEIVE_CALC_TRIGGERS.has(changedKey)) {
     const totalAmount = Number(next.totalAmount) || 0;
-    if (chequeAmount > 0 && totalAmount > 0 && chequeAmount >= totalAmount && !next.gstReceived) {
-      next = { ...next, gstReceived: next.gstAmount };
+    if (totalAmount > 0) {
+      const tds = Number(next.tds) || 0;
+      const sdRetention = Number(next.sdRetention) || 0;
+      const gstDeduction = Number(next.gstDeduction) || 0;
+      next = { ...next, amountToReceive: String(round2(totalAmount - tds - sdRetention - gstDeduction)) };
+    }
+  }
+
+  if (!changedKey || HOLD_CALC_TRIGGERS.has(changedKey)) {
+    const amountToReceive = Number(next.amountToReceive) || 0;
+    if (amountToReceive > 0) {
+      const chequeAmount = Number(next.chequeAmount) || 0;
+      next = { ...next, amountHold: String(round2(amountToReceive - chequeAmount)) };
     }
   }
 
@@ -137,6 +160,9 @@ export function billFormToPayload(form: BillFormState) {
     basicAmountPassed: Number(form.basicAmountPassed) || 0,
     gstAmount: Number(form.gstAmount) || 0,
     totalAmount: Number(form.totalAmount) || 0,
+    creditAmount: Number(form.creditAmount) || 0,
+    creditGst: Number(form.creditGst) || 0,
+    creditTotal: Number(form.creditTotal) || 0,
     tds: Number(form.tds) || 0,
     sdRetention: Number(form.sdRetention) || 0,
     gstDeduction: Number(form.gstDeduction) || 0,
@@ -167,8 +193,16 @@ const FIELD_GROUPS: Array<{
     fields: [
       { key: "basicAmountClaimed", label: "Basic Amount Claimed", type: "number" },
       { key: "basicAmountPassed", label: "Basic Amount Passed by Client", type: "number" },
-      { key: "gstAmount", label: "18% GST", type: "number" },
-      { key: "totalAmount", label: "Total Amount", type: "number" }
+      { key: "gstAmount", label: "18% GST (Auto)", type: "number" },
+      { key: "totalAmount", label: "Total Amount (Auto)", type: "number" }
+    ]
+  },
+  {
+    title: "Credit Note (Auto — Claimed minus Passed)",
+    fields: [
+      { key: "creditAmount", label: "Credit Amount (Auto)", type: "number" },
+      { key: "creditGst", label: "GST on Credit (Auto)", type: "number" },
+      { key: "creditTotal", label: "Credit Total (Auto)", type: "number" }
     ]
   },
   {
@@ -177,9 +211,9 @@ const FIELD_GROUPS: Array<{
       { key: "tds", label: "TDS", type: "number" },
       { key: "sdRetention", label: "SD / Retention Money", type: "number" },
       { key: "gstDeduction", label: "GST", type: "number" },
-      { key: "amountToReceive", label: "Amount to be Received", type: "number" },
+      { key: "amountToReceive", label: "Amount to be Received (Auto)", type: "number" },
       { key: "chequeAmount", label: "Chq. Amt", type: "number" },
-      { key: "amountHold", label: "Amt Hold", type: "number" },
+      { key: "amountHold", label: "Amt Hold (Auto)", type: "number" },
       { key: "gstReceived", label: "GST Received", type: "number" }
     ]
   }

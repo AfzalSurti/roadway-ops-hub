@@ -10,6 +10,9 @@ type BillingEntryFields = {
   basicAmountPassed?: number;
   gstAmount?: number;
   totalAmount?: number;
+  creditAmount?: number;
+  creditGst?: number;
+  creditTotal?: number;
   tds?: number;
   sdRetention?: number;
   gstDeduction?: number;
@@ -35,6 +38,9 @@ const NUMERIC_FIELDS = [
   "basicAmountPassed",
   "gstAmount",
   "totalAmount",
+  "creditAmount",
+  "creditGst",
+  "creditTotal",
   "tds",
   "sdRetention",
   "gstDeduction",
