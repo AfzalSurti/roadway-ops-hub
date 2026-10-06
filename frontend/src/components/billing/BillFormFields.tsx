@@ -68,13 +68,24 @@ function round2(value: number) {
 }
 
 /**
- * Live-calculates GST / Total / TDS / GST-deduction / Amount-to-Receive from the claim amount and the
- * other manually-entered deductions, so typing the claimed (or passed) amount fills the rest in —
- * still plain editable fields afterward, this just sets sensible defaults.
- * Rates: 18% GST (standard), 2% income-tax TDS and 2% GST-TDS (common contractor/works-contract rates
- * for government RA bills) — adjust the entered values directly if your contract uses different rates.
+ * Live-calculates derived amounts as the claim/payment fields are filled, so the dependent columns
+ * fill themselves in — still plain editable fields afterward, this just sets sensible defaults that
+ * get recomputed only when the field(s) they depend on change (so a manual override elsewhere, e.g.
+ * typing straight into GST or Amount to be Received, is never silently clobbered by an unrelated edit).
+ *
+ * What's auto-calculated and why, column by column:
+ *  - 18% GST, Total Amount, TDS (2%), GST-TDS deduction (2%), Amount to be Received: all pure
+ *    arithmetic off Basic Amount Passed (or Claimed if not yet passed) — these are statutory/contract-
+ *    standard rates for government RA bills, so a formula is reliable here.
+ *  - GST Received: suggested (only while still blank, so it never overwrites a manual figure) once
+ *    Chq. Amt reaches the Total Amount — i.e. once the bill is shown as fully paid, the GST portion of
+ *    that payment is the GST amount already billed.
+ * Columns deliberately left manual: Basic Amount Passed by Client (the client's own approved figure,
+ * not derivable from what was claimed), SD/Retention Money and Amt Hold (contract-specific percentages
+ * that vary per project, no universal rate to assume), and Chq. Amt (the actual payment received, which
+ * can legitimately differ from Amount to be Received on a partial payment).
  */
-const AUTO_CALC_TRIGGERS = new Set<keyof BillFormState>([
+const CLAIM_CALC_TRIGGERS = new Set<keyof BillFormState>([
   "basicAmountClaimed",
   "basicAmountPassed",
   "sdRetention",
@@ -82,27 +93,38 @@ const AUTO_CALC_TRIGGERS = new Set<keyof BillFormState>([
 ]);
 
 export function applyAutoCalc(form: BillFormState, changedKey?: keyof BillFormState): BillFormState {
-  if (changedKey && !AUTO_CALC_TRIGGERS.has(changedKey)) return form;
+  let next = form;
 
-  const base = Number(form.basicAmountPassed) || Number(form.basicAmountClaimed) || 0;
-  if (base <= 0) return form;
+  if (!changedKey || CLAIM_CALC_TRIGGERS.has(changedKey)) {
+    const base = Number(next.basicAmountPassed) || Number(next.basicAmountClaimed) || 0;
+    if (base > 0) {
+      const gstAmount = round2(base * 0.18);
+      const totalAmount = round2(base + gstAmount);
+      const tds = round2(base * 0.02);
+      const gstDeduction = round2(base * 0.02);
+      const sdRetention = Number(next.sdRetention) || 0;
+      const amountHold = Number(next.amountHold) || 0;
+      const amountToReceive = round2(totalAmount - tds - gstDeduction - sdRetention - amountHold);
+      next = {
+        ...next,
+        gstAmount: String(gstAmount),
+        totalAmount: String(totalAmount),
+        tds: String(tds),
+        gstDeduction: String(gstDeduction),
+        amountToReceive: String(amountToReceive)
+      };
+    }
+  }
 
-  const gstAmount = round2(base * 0.18);
-  const totalAmount = round2(base + gstAmount);
-  const tds = round2(base * 0.02);
-  const gstDeduction = round2(base * 0.02);
-  const sdRetention = Number(form.sdRetention) || 0;
-  const amountHold = Number(form.amountHold) || 0;
-  const amountToReceive = round2(totalAmount - tds - gstDeduction - sdRetention - amountHold);
+  if (!changedKey || changedKey === "chequeAmount") {
+    const chequeAmount = Number(next.chequeAmount) || 0;
+    const totalAmount = Number(next.totalAmount) || 0;
+    if (chequeAmount > 0 && totalAmount > 0 && chequeAmount >= totalAmount && !next.gstReceived) {
+      next = { ...next, gstReceived: next.gstAmount };
+    }
+  }
 
-  return {
-    ...form,
-    gstAmount: String(gstAmount),
-    totalAmount: String(totalAmount),
-    tds: String(tds),
-    gstDeduction: String(gstDeduction),
-    amountToReceive: String(amountToReceive)
-  };
+  return next;
 }
 
 export function billFormToPayload(form: BillFormState) {
