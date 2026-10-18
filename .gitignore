@@ -27,3 +27,7 @@ dev.db-wal
 *.sln
 *.sw?
 .env
+
+# Generated / local-only artifacts
+*.timestamp-*.mjs
+dev.db.backup-*

@@ -1,417 +1,168 @@
 # HighwayOps Hub
 
-## About
+**An operations platform for a civil-engineering consultancy that prepares Detailed Project Reports (DPRs) for highway projects.** It replaces spreadsheet-and-message tracking with one system for project tasks and field reports, project finance and RA bills, expenses, assets, tenders, contracts and HR-style workflows — each behind its own role.
 
-HighwayOps Hub is a web-based **task and report management platform** for highway/construction operations teams. It helps admins assign and track field work, and helps employees submit structured daily reports from assigned tasks.
+Built and maintained by [Afzal Surti](https://github.com/AfzalSurti) as the in-house developer at Geo Designs & Research Pvt. Ltd.
 
-## Description
-
-This project is designed to replace manual tracking (spreadsheets/messages) with one centralized workflow:
-
-- Admins create projects, tasks, templates, and employee accounts.
-- Employees receive assigned tasks and submit report data using templates.
-- Teams can monitor progress, overdue work, submissions, and project-level status from dashboards.
-- Authentication and role-based access ensure secure admin/employee separation.
-
-## Tech Stack
-
-Full-stack HighwayOps application :
-
-- **Frontend**: React + Vite + Tailwind (now under `frontend/`)
-- **Backend**: Node.js + Express + Prisma + PostgreSQL (Neon) (under `backend/`)
-- **Auth**: JWT access + refresh tokens
-- **Roles**: `ADMIN`, `EMPLOYEE` , `PMO` , `HOD`
+`TypeScript` · `Node.js` · `Express` · `Prisma` · `PostgreSQL` · `React` · `Vite` · `TanStack Query` · `Tailwind` / `shadcn/ui`
 
 ---
 
-## Project Structure
+## At a glance
 
-```txt
-frontend/                                  # Vite + React client Application
-|- components.json                         # shadcn/ui component registry config
-|- index.html                              # HTML entry file used by Vite
-|- postcss.config.js                       # PostCSS plugin configuration
-|- tailwind.config.cjs                     # CommonJS Tailwind config variant
-|- tailwind.config.js                      # JavaScript Tailwind config variant
-|- tailwind.config.ts                      # TypeScript Tailwind config variant
-|- tsconfig.app.json                       # TypeScript config for app source
-|- tsconfig.node.json                      # TypeScript config for Vite/node files
-|- vite.config.ts                          # Main Vite build/dev server config
-|- vite.config.ts.timestamp-*.mjs          # Temporary/generated Vite timestamp files
-|- vitest.config.ts                        # Vitest test runner configuration
-|- public/                                 # Static assets served as-is
-|  |- favicon.ico                          # Browser tab icon
-|  |- landing-feature-1.svg                # Landing page feature illustration
-|  |- landing-feature-2.svg                # Landing page feature illustration
-|  |- landing-hero.svg                     # Landing page hero illustration
-|  |- placeholder.svg                      # Generic placeholder graphic
-|  |- roadway-logo.svg                     # Main product logo
-|  \- robots.txt                           # Search crawler rules
-\- src/                                    # Frontend application source
-   |- App.css                              # Root app-level styles
-   |- App.tsx                              # Top-level app component and routing shell
-   |- index.css                            # Global styles and Tailwind imports
-   |- main.tsx                             # React bootstrap entry point
-   |- vite-env.d.ts                        # Vite TypeScript type declarations
-   |- components/                          # Shared layout and feature components
-   |  |- AppLayout.tsx                     # Main authenticated app layout wrapper
-   |  |- AppSidebar.tsx                    # Sidebar navigation container
-   |  |- ChatAssistant.tsx                 # In-app assistant/chat UI
-   |  |- NavLink.tsx                       # Reusable navigation link component
-   |  |- PageWrapper.tsx                   # Standard page spacing/header wrapper
-   |  |- SidebarNavItem.tsx                # Sidebar item renderer
-   |  |- TopBar.tsx                        # Top header bar component
-   |  \- ui/                               # Reusable low-level UI primitives
-   |     |- accordion.tsx                  # Expand/collapse accordion UI
-   |     |- alert-dialog.tsx               # Modal confirm/cancel dialog
-   |     |- alert.tsx                      # Inline alert/banner component
-   |     |- aspect-ratio.tsx               # Fixed aspect-ratio container
-   |     |- avatar.tsx                     # User avatar component
-   |     |- badge.tsx                      # Status/label badge component
-   |     |- breadcrumb.tsx                 # Breadcrumb navigation component
-   |     |- button.tsx                     # Reusable button variants
-   |     |- calendar.tsx                   # Calendar/date picker UI
-   |     |- card.tsx                       # Card container component
-   |     |- carousel.tsx                   # Carousel/slider wrapper
-   |     |- chart.tsx                      # Chart display helpers
-   |     |- checkbox.tsx                   # Checkbox input component
-   |     |- collapsible.tsx                # Generic collapsible panel
-   |     |- command.tsx                    # Command menu/palette UI
-   |     |- context-menu.tsx               # Right-click context menu UI
-   |     |- dialog.tsx                     # Generic modal dialog UI
-   |     |- drawer.tsx                     # Slide-up/slide-out drawer UI
-   |     |- dropdown-menu.tsx              # Dropdown actions menu
-   |     |- form.tsx                       # Form field helpers/integration
-   |     |- hover-card.tsx                 # Hover preview card UI
-   |     |- input-otp.tsx                  # OTP/pin code input component
-   |     |- input.tsx                      # Text input component
-   |     |- label.tsx                      # Form label component
-   |     |- menubar.tsx                    # Desktop-style menubar UI
-   |     |- navigation-menu.tsx            # Structured navigation menu UI
-   |     |- pagination.tsx                 # Pagination controls
-   |     |- popover.tsx                    # Popover/floating panel UI
-   |     |- progress.tsx                   # Progress bar component
-   |     |- radio-group.tsx                # Radio button group component
-   |     |- resizable.tsx                  # Resizable panel layout UI
-   |     |- scroll-area.tsx                # Custom scroll container
-   |     |- select.tsx                     # Select/dropdown field component
-   |     |- separator.tsx                  # Visual divider component
-   |     |- sheet.tsx                      # Off-canvas sheet/panel UI
-   |     |- sidebar.tsx                    # Sidebar primitive helpers
-   |     |- skeleton.tsx                   # Loading skeleton placeholder UI
-   |     |- slider.tsx                     # Range slider component
-   |     |- sonner.tsx                     # Sonner toast integration
-   |     |- switch.tsx                     # Toggle switch component
-   |     |- table.tsx                      # Table layout primitives
-   |     |- tabs.tsx                       # Tab navigation component
-   |     |- textarea.tsx                   # Multiline text input
-   |     |- toast.tsx                      # Toast UI component
-   |     |- toaster.tsx                    # Toast container/manager
-   |     |- toggle-group.tsx               # Grouped toggle buttons
-   |     |- toggle.tsx                     # Single toggle button
-   |     |- tooltip.tsx                    # Hover tooltip component
-   |     \- use-toast.ts                   # Toast state helper hook
-   |- hooks/                               # Custom React hooks
-   |  |- use-mobile.tsx                    # Mobile breakpoint detection hook
-   |  |- use-persistent-state.ts           # State synced with local storage
-   |  \- use-toast.ts                      # App-level toast helper hook
-   |- lib/                                 # Shared utilities and domain helpers
-   |  |- api.ts                            # Frontend API client utilities
-   |  |- auth.tsx                          # Auth context and auth helpers
-   |  |- domain.ts                         # Domain constants/types/helpers
-   |  |- project-plan-template.ts          # Project plan template definitions
-   |  |- project-requisition-pdf.ts        # Project requisition PDF generator
-   |  |- ra-bill-pdf.ts                    # RA bill PDF generator
-   |  |- reports-pdf.ts                    # Report PDF export generator
-   |  \- utils.ts                          # General shared utility functions
-   |- pages/                               # Route-level page components
-   |  |- Index.tsx                         # Landing or home page
-   |  |- Login.tsx                         # Login screen
-   |  |- NotFound.tsx                      # 404 fallback page
-   |  |- admin/                            # Admin-only pages
-   |  |  |- CreateTask.tsx                 # Admin task creation page
-   |  |  |- Dashboard.tsx                  # Admin dashboard overview
-   |  |  |- Financial.tsx                  # Admin financial management page
-   |  |  |- Projects.tsx                   # Admin project management page
-   |  |  |- Reports.tsx                    # Admin reports review page
-   |  |  |- Tasks.tsx                      # Admin task list page
-   |  |  |- Team.tsx                       # Admin team/user management page
-   |  |  \- Templates.tsx                  # Admin report/template management page
-   |  \- employee/                         # Employee-facing pages
-   |     |- Dashboard.tsx                  # Employee dashboard overview
-   |     |- Profile.tsx                    # Employee profile page
-   |     |- Reports.tsx                    # Employee submitted reports page
-   |     |- TaskDetail.tsx                 # Employee task detail view
-   |     \- Tasks.tsx                      # Employee assigned tasks list
-   \- test/                                # Frontend test setup and samples
-      |- example.test.ts                   # Example unit test
-      \- setup.ts                          # Test environment setup
+| | |
+|---|---|
+| **Backend** | Express API, ~180 route handlers across 21 routers, layered as routes → controllers → services → repositories, with Zod validators per module |
+| **Data model** | 43 Prisma models on PostgreSQL |
+| **Auth** | Short-lived JWT access tokens + refresh tokens stored as hashes and revocable on logout |
+| **Access control** | 8 roles — `ADMIN`, `PMO`, `HOD`, `INFRA`, `TENDER`, `OPERATIONS`, `ACCOUNTS`, `EMPLOYEE` — enforced by middleware on the API and by route guards in the UI |
+| **Hardening** | Helmet, auth rate limiting, centralised error handling, request logging with pino, audit log table |
+| **AI** | In-app assistant that turns chat messages into validated actions (Groq LLM planner with a rule-based fallback) |
+
+## Modules
+
+- **Projects & tasks** — projects, assignments, task lifecycle, report templates, daily field reports with attachments and comments, notifications, overdue tracking.
+- **Project finance** — financial plans, professional fees, RA bills, carry-forwards, project billing entries, PDF exports.
+- **Expenses** — expense sheets, vouchers, categories and an approval flow.
+- **Assets** — asset register, class/type catalogue, movements between projects, maintenance, sale details, Excel import.
+- **Tender & contracts** — tender bids, pre-contract and contract activities, letter numbering.
+- **People** — team management, leave and overtime requests, hours calculation.
+- **DPR overview** — project-level progress view for heads of department.
+
+## The assistant
+
+`POST /api/assistant/chat` (authenticated) accepts a chat message plus conversation history and returns one of three outcomes: `completed`, `needs_input` (with the missing fields listed) or `failed`.
+
+1. **Plan.** If `GROQ_API` is set, an LLM (default `llama-3.3-70b-versatile`) maps the message to one action from a fixed list — e.g. `CREATE_PROJECT`, `CREATE_TASK`, `CREATE_EMPLOYEE`, `LIST_TASKS`, `PENDING_TASKS_MONTH`, `EMPLOYEE_PERFORMANCE`. Without a key, or if the call fails, a rule-based planner handles the same actions.
+2. **Check.** Required arguments are validated; anything missing is asked for instead of guessed.
+3. **Act.** The action runs through the same service layer the UI uses — the model never writes to the database directly.
+
+Implementation: [`backend/src/services/assistant.service.ts`](backend/src/services/assistant.service.ts). Design notes: [`CHATBOT_IMPLEMENTATION.md`](CHATBOT_IMPLEMENTATION.md).
+
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph Client["frontend/ — React + Vite"]
+        UI["Role dashboards<br/>(admin, pmo, hod, infra, tender,<br/>operations, accounts, employee)"]
+        Chat["Chat assistant"]
+    end
+
+    subgraph API["backend/ — Express"]
+        MW["helmet · CORS · pino<br/>auth (JWT) · RBAC · rate limit · Zod"]
+        R["routes → controllers"]
+        S["services<br/>(business rules, audit, email)"]
+        Repo["repositories"]
+        Asst["assistant.service<br/>LLM planner + rule fallback"]
+    end
+
+    DB[("PostgreSQL<br/>Prisma · 43 models")]
+    Groq["Groq API<br/>(optional)"]
+    Mail["Email<br/>(Gmail SMTP / Resend)"]
+
+    UI -- "REST + Bearer token" --> MW
+    Chat --> MW
+    MW --> R --> S --> Repo --> DB
+    R --> Asst --> S
+    Asst -.-> Groq
+    S -.-> Mail
 ```
 
-```txt
-backend/                                   # Express + Prisma API server
-|- tsconfig.json                           # TypeScript config for backend
-\- src/                                    # Backend application source
-   |- app.ts                               # Express app setup and middleware wiring
-   |- server.ts                            # HTTP server startup entry point
-   |- config/                              # Runtime configuration helpers
-   |  |- env.ts                            # Environment variable parsing/validation
-   |  \- logger.ts                         # Logging configuration/helpers
-   |- controllers/                         # Route controllers handling requests
-   |  |- assistant.controller.ts           # Assistant endpoint controller
-   |  |- auth.controller.ts                # Login/refresh/logout controller
-   |  |- comment.controller.ts             # Comment CRUD controller
-   |  |- financial.controller.ts           # Financial module controller
-   |  |- notification.controller.ts        # Notification endpoint controller
-   |  |- project-requisition-form.controller.ts # Project requisition form controller
-   |  |- project.controller.ts             # Project CRUD controller
-   |  |- report.controller.ts              # Report submission/review controller
-   |  |- task.controller.ts                # Task CRUD and assignment controller
-   |  |- template.controller.ts            # Template CRUD controller
-   |  |- upload.controller.ts              # File upload controller
-   |  \- user.controller.ts                # User/team management controller
-   |- middleware/                          # Express middleware layer
-   |  |- auth.ts                           # JWT auth middleware
-   |  |- error-handler.ts                  # Central error response middleware
-   |  |- not-found.ts                      # 404 handler middleware
-   |  |- rate-limit.ts                     # Request throttling middleware
-   |  |- rbac.ts                           # Role-based access control middleware
-   |  |- upload.ts                         # Multer/upload middleware config
-   |  \- validate.ts                       # Request body/query validation middleware
-   |- prisma/                              # Prisma integration helpers
-   |  \- client.ts                         # Shared Prisma client instance
-   |- repositories/                        # Data-access layer for database queries
-   |  |- attachment.repository.ts          # Attachment persistence queries
-   |  |- audit.repository.ts               # Audit log persistence queries
-   |  |- comment.repository.ts             # Comment persistence queries
-   |  |- financial.repository.ts           # Financial persistence queries
-   |  |- notification.repository.ts        # Notification persistence queries
-   |  |- project-requisition-form.repository.ts # Requisition form queries
-   |  |- project.repository.ts             # Project persistence queries
-   |  |- refresh-token.repository.ts       # Refresh token storage queries
-   |  |- report.repository.ts              # Report persistence queries
-   |  |- task.repository.ts                # Task persistence queries
-   |  |- template.repository.ts            # Template persistence queries
-   |  \- user.repository.ts                # User persistence queries
-   |- routes/                              # Express route definitions
-   |  |- assistant.routes.ts               # Assistant API routes
-   |  |- auth.routes.ts                    # Authentication routes
-   |  |- financial.routes.ts               # Financial routes
-   |  |- index.ts                          # Root router that mounts all routes
-   |  |- notifications.routes.ts           # Notification routes
-   |  |- project-requisition-forms.routes.ts # Requisition form routes
-   |  |- projects.routes.ts                # Project routes
-   |  |- reports.routes.ts                 # Report routes
-   |  |- tasks.routes.ts                   # Task routes
-   |  |- templates.routes.ts               # Template routes
-   |  |- uploads.routes.ts                 # Upload routes
-   |  \- users.routes.ts                   # User routes
-   |- scripts/                             # Utility scripts run from CLI
-   |  |- bootstrap-admin-env.ts            # Reads env for admin bootstrap
-   |  \- bootstrap-admin.ts                # Seeds the first admin user
-   |- services/                            # Business logic layer
-   |  |- assistant.service.ts              # Assistant business logic
-   |  |- audit.service.ts                  # Audit event business logic
-   |  |- auth.service.ts                   # Authentication/token logic
-   |  |- comment.service.ts                # Comment business logic
-   |  |- dpr-activity.service.ts           # DPR activity helper logic
-   |  |- email.service.ts                  # Email sending/service wrapper
-   |  |- financial.service.ts              # Financial business logic
-   |  |- notification.service.ts           # Notification business logic
-   |  |- project-requisition-form.service.ts # Requisition form business logic
-   |  |- project.service.ts                # Project business logic
-   |  |- report.service.ts                 # Report business logic
-   |  |- task.service.ts                   # Task business logic
-   |  |- template.service.ts               # Template business logic
-   |  |- upload.service.ts                 # Upload/file handling logic
-   |  \- user.service.ts                   # User management logic
-   |- types/                               # Shared backend type augmentations
-   |  \- express.d.ts                      # Express request typing extensions
-   |- utils/                               # Reusable backend utility helpers
-   |  |- async-handler.ts                  # Async route error wrapper
-   |  |- errors.ts                         # Custom error classes/helpers
-   |  |- jwt.ts                            # JWT sign/verify helpers
-   |  |- pagination.ts                     # Pagination utility helpers
-   |  |- password.ts                       # Password hashing/comparison helpers
-   |  \- response.ts                       # Standard API response helpers
-   \- validators/                          # Request validation schemas/rules
-      |- assistant.validator.ts            # Assistant request validation
-      |- auth.validator.ts                 # Auth request validation
-      |- comment.validator.ts              # Comment request validation
-      |- project-requisition-form.validator.ts # Requisition form validation
-      |- project.validator.ts              # Project request validation
-      |- report.validator.ts               # Report request validation
-      |- task-complete.validator.ts        # Task completion validation
-      |- task.validator.ts                 # Task request validation
-      |- template.validator.ts             # Template request validation
-      \- user.validator.ts                 # User request validation
+## Repository layout
+
+```text
+roadway-ops-hub/
+├── backend/src/
+│   ├── app.ts, server.ts      # Express wiring and entry point
+│   ├── config/                # Zod-validated env, pino logger
+│   ├── middleware/            # auth, rbac, rate-limit, validate, upload, error handling
+│   ├── routes/                # 21 routers mounted under / and /api
+│   ├── controllers/           # HTTP layer
+│   ├── services/              # business logic (incl. assistant, audit, email)
+│   ├── repositories/          # Prisma data access
+│   ├── validators/            # Zod request schemas
+│   ├── scripts/               # bootstrap and seed CLIs
+│   └── utils/                 # jwt, password, pagination, financial-year, etc.
+├── frontend/src/
+│   ├── pages/                 # one folder per role + shared pages
+│   ├── components/            # layout, sidebar, chat assistant, shadcn/ui primitives
+│   └── lib/                   # API client, auth context, PDF generators
+├── prisma/
+│   ├── schema.prisma          # data model
+│   ├── migrations/            # historical migrations (SQLite era — see limitations)
+│   └── sql/                   # one-off SQL bootstrap scripts
+├── showcase-site/             # separate marketing/demo site (own README)
+├── docs/DEPLOYMENT.md         # Render + Vercel + Neon guide
+└── render.yaml, vercel.json   # deployment configs
 ```
 
----
+## Running locally
 
-## Local Development
-
-### 1) Install dependencies
+**Prerequisites:** Node.js 20+, a PostgreSQL database (local or Neon).
 
 ```bash
+# 1. Install (also runs `prisma generate`)
 npm install
-```
 
-### 2) Configure environment
+# 2. Configure the backend — fill in DATABASE_URL and the two JWT secrets (min 16 chars)
+cp .env.example .env
 
-Create root `.env` from `.env.example` and set values.
+# 3. Configure the frontend
+cp frontend/.env.example frontend/.env     # VITE_API_URL=http://localhost:4000
 
-### 3) Run database migration
+# 4. Create the schema (see "Known limitations" for why this is db push)
+npx prisma db push
 
-```bash
-npx prisma migrate dev
-```
-
-### 4) Create first admin (if DB is empty)
-
-```bash
-npm run bootstrap:admin -- --email=admin@highwayops.com --password=Admin@123 --name="Admin User"
-```
-
-### 5) Run backend + frontend
-
-Option A (one command on Windows):
-
-```powershell
-.\run-project.ps1
-```
-
-Option B (separate terminals):
-
-```bash
-npm run dev            # backend on 4000
-npm run dev:frontend   # frontend on 8080 (or passed port)
-```
-
----
-
-## Deployment Target
-
-- **Frontend** -> **Vercel**
-- **Backend** -> **Render**
-
----
-
-## Step-by-Step: Deploy Backend on Render
-
-### 1) Create Render Web Service
-
-1. Push code to GitHub.
-2. In Render: **New +** -> **Web Service**.
-3. Select your repository.
-4. Use these settings:
-   - **Root Directory**: leave empty (`.`)
-   - **Build Command**:
-     ```bash
-     npm install && npm run build:backend && npx prisma migrate deploy
-     ```
-   - **Start Command**:
-     ```bash
-     npm run start
-     ```
-
-### 2) Create Neon PostgreSQL database
-
-1. Create a free database in Neon.
-2. Copy the pooled connection string.
-3. In Render env vars, set:
-   - `DATABASE_URL=<your-neon-connection-string>`
-
-### 3) Configure backend environment variables
-
-Set these in Render **Environment**:
-
-- `NODE_ENV=production`
-- `PORT=4000`
-- `DATABASE_URL=<your-neon-connection-string>`
-- `JWT_ACCESS_SECRET=<strong-random-secret>`
-- `JWT_REFRESH_SECRET=<strong-random-secret>`
-- `JWT_ACCESS_EXPIRES_IN=15m`
-- `JWT_REFRESH_EXPIRES_IN=7d`
-- `BCRYPT_SALT_ROUNDS=10`
-- `CORS_ORIGIN=https://<your-vercel-domain>`
-
-### 4) Create first admin in production
-
-After first successful deploy, open Render shell and run:
-
-```bash
+# 5. Create the first admin
 npm run bootstrap:admin -- --email=<admin-email> --password=<strong-password> --name="Admin"
+
+# 6. Start both apps (two terminals)
+npm run dev             # API on http://localhost:4000  (health: GET /health)
+npm run dev:frontend    # UI  on http://localhost:8080
 ```
 
-### 5) Confirm backend
+On Windows, `.\run-project.ps1` frees the ports and starts both.
 
-Open:
+### Environment variables
 
-```txt
-https://<your-render-service>.onrender.com/health
-```
+| Variable | Required | Purpose |
+|---|---|---|
+| `DATABASE_URL` | yes | PostgreSQL connection string |
+| `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET` | yes | Token signing secrets (≥ 16 chars) |
+| `JWT_ACCESS_EXPIRES_IN`, `JWT_REFRESH_EXPIRES_IN` | no | Defaults `15m` / `7d` |
+| `CORS_ORIGIN` | no | Comma-separated allowed origins |
+| `BCRYPT_SALT_ROUNDS` | no | 8–14, default 10 |
+| `GROQ_API`, `GROQ_MODEL` | no | Enables the LLM planner for the assistant |
+| `GMAIL` + `APP_PASSWORD`, or `RESEND_API_KEY` + `EMAIL_FROM` | no | Outgoing email |
+| `APP_URL` | no | Public frontend URL used in emails |
+| `VITE_API_URL` (in `frontend/.env`) | no | API base URL, default `http://localhost:4000` |
 
-Should return `{"success":true,...}`.
+All values in `.env.example` are placeholders. Never commit a real `.env`.
 
----
+## Scripts
 
-## Step-by-Step: Deploy Frontend on Vercel
+| Command | What it does |
+|---|---|
+| `npm run dev` / `npm run dev:frontend` | Watch-mode API / Vite dev server |
+| `npm run build` | Build frontend (`frontend/dist`) and backend (`backend/dist`) |
+| `npm start` | Run the compiled API |
+| `npm run lint` | ESLint |
+| `npm test` | Vitest (frontend) |
+| `npm run bootstrap:<admin\|administrative\|tender\|operations\|accounts>` | Create role accounts from CLI args |
 
-### 1) Create Vercel project
+## Deployment
 
-1. In Vercel: **Add New Project**.
-2. Import the same repository.
-3. Keep **Root Directory** as repository root (`.`).
+Frontend on Vercel, API on Render, database on Neon — step-by-step in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
-### 2) Build settings
+## Known limitations
 
-Use:
+- **Test coverage is minimal** — the Vitest suite has a single placeholder test; the service layer is the obvious next target.
+- **No CI** yet.
+- **Migrations are out of sync with the database provider.** `prisma/migrations/migration_lock.toml` still says `sqlite` from the project's early SQLite phase, while the schema now targets PostgreSQL, so `prisma migrate dev/deploy` fails (P3019). The schema is currently applied with `prisma db push`, and `render.yaml` runs `db push --accept-data-loss` on every start — risky for production data.
+- Uploads go to the local `uploads/` directory, which is not persistent on ephemeral hosts.
 
-- **Install Command**: `npm install`
-- **Build Command**: `npm run build:frontend`
-- **Output Directory**: `frontend/dist`
+## Roadmap
 
-(`vercel.json` in repo already sets build + SPA rewrites.)
-
-### 3) Add frontend environment variable
-
-In Vercel project settings -> Environment Variables:
-
-- `VITE_API_URL=https://<your-render-service>.onrender.com`
-
-Redeploy after setting env vars.
-
-### 4) Confirm frontend
-
-Open your Vercel domain and verify login + API calls work.
-
----
-
-## Deployment Checklist
-
-- Render `/health` is reachable.
-- Vercel `VITE_API_URL` points to Render backend URL.
-- Render `CORS_ORIGIN` includes exact Vercel domain.
-- Admin login works in deployed app.
-- Task/template/project APIs return success.
-
----
-
-## Useful Commands
-
-```bash
-npm run build
-npm run build:frontend
-npm run build:backend
-npm run dev
-npm run dev:frontend
-npm test
-```
-
----
-
-## Notes
-
-- Neon PostgreSQL is recommended for Render free tier persistence.
-- `uploads/` on ephemeral filesystem may not persist unless redirected to persistent storage (S3/R2 recommended for production files).
+- Service-layer tests for finance and expense calculations, plus a CI workflow running lint, type-check and build.
+- Move file uploads to object storage.
+- Baseline a fresh PostgreSQL migration history (`prisma migrate diff` → `migrate resolve --applied`) and switch the Render start command to `prisma migrate deploy`.
