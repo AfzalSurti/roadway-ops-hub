@@ -1,5 +1,4 @@
 -- HOD account credentials for Neon SQL editor
--- Temporary password used to generate this hash: Hod@123456
 -- If you want a different password, replace the hash with a new bcrypt hash.
 
 DO $$
