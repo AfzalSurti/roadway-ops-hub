@@ -76,6 +76,22 @@ export const projectBillingService = {
     });
   },
 
+  async bulkImport(projectId: string, rows: BillingEntryFields[]) {
+    const created: Array<{ row: number; id: string }> = [];
+    const errors: Array<{ row: number; message: string }> = [];
+
+    for (let index = 0; index < rows.length; index += 1) {
+      try {
+        const entry = await this.create(projectId, rows[index]);
+        created.push({ row: index + 1, id: entry.id });
+      } catch (error) {
+        errors.push({ row: index + 1, message: error instanceof Error ? error.message : "Failed to import row" });
+      }
+    }
+
+    return { createdCount: created.length, failedCount: errors.length, created, errors };
+  },
+
   async update(id: string, payload: BillingEntryFields) {
     const existing = await projectBillingRepository.findById(id);
     if (!existing) throw notFound("Billing entry not found");

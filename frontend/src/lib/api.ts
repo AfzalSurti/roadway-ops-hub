@@ -1480,6 +1480,18 @@ export const api = {
     return request<{ deleted: boolean }>(`/project-billing/${id}`, { method: "DELETE" });
   },
 
+  importProjectBillingEntries(projectId: string, rows: Array<Partial<ProjectBillingEntry>>) {
+    return request<{
+      createdCount: number;
+      failedCount: number;
+      created: Array<{ row: number; id: string }>;
+      errors: Array<{ row: number; message: string }>;
+    }>(`/project-billing/project/${projectId}/import`, {
+      method: "POST",
+      body: JSON.stringify({ rows })
+    });
+  },
+
   getProjectBillingSummary() {
     return request<ProjectBillingSummary>("/project-billing/summary");
   },

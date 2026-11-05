@@ -22,3 +22,7 @@ export const upsertBillingEntrySchema = z.object({
   amountHold: numeric,
   gstReceived: numeric
 });
+
+export const bulkImportBillingEntriesSchema = z.object({
+  rows: z.array(upsertBillingEntrySchema).min(1, "No rows to import")
+});

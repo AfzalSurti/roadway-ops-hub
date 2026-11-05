@@ -4,7 +4,10 @@ import { requireAuth } from "../middleware/auth.js";
 import { requireRole } from "../middleware/rbac.js";
 import { validate } from "../middleware/validate.js";
 import { asyncHandler } from "../utils/async-handler.js";
-import { upsertBillingEntrySchema } from "../validators/project-billing.validator.js";
+import {
+  bulkImportBillingEntriesSchema,
+  upsertBillingEntrySchema
+} from "../validators/project-billing.validator.js";
 
 export const projectBillingRouter = Router();
 
@@ -26,6 +29,11 @@ projectBillingRouter.post(
   "/project/:projectId",
   validate(upsertBillingEntrySchema),
   asyncHandler(projectBillingController.create)
+);
+projectBillingRouter.post(
+  "/project/:projectId/import",
+  validate(bulkImportBillingEntriesSchema),
+  asyncHandler(projectBillingController.bulkImport)
 );
 projectBillingRouter.patch("/:id", validate(upsertBillingEntrySchema), asyncHandler(projectBillingController.update));
 projectBillingRouter.delete("/:id", asyncHandler(projectBillingController.remove));

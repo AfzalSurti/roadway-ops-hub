@@ -22,7 +22,9 @@ import {
   emptyBillForm,
   type BillFormState
 } from "@/components/billing/BillFormFields";
-import { Landmark, Loader2, Plus, Trash2 } from "lucide-react";
+import { BillImportDialog } from "@/components/billing/BillImportDialog";
+import { downloadBillingImportTemplate } from "@/lib/billing-import";
+import { Download, FileUp, Landmark, Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 function money(value: number) {
@@ -41,6 +43,7 @@ export default function AccountsBillingLedger() {
   const [searchParams] = useSearchParams();
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [showAddBill, setShowAddBill] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
   const [addForm, setAddForm] = useState<BillFormState>(emptyBillForm);
   const [editingBill, setEditingBill] = useState<ProjectBillingEntry | null>(null);
   const [editForm, setEditForm] = useState<BillFormState>(emptyBillForm);
@@ -175,10 +178,30 @@ export default function AccountsBillingLedger() {
               <h2 className="text-base font-semibold">Bills</h2>
               <p className="text-xs text-muted-foreground mt-0.5">Click a bill to view or edit its full details.</p>
             </div>
-            <Button className="gap-1.5" onClick={() => setShowAddBill(true)}>
-              <Plus className="h-4 w-4" />
-              Add Bill
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5"
+                onClick={() => downloadBillingImportTemplate()}
+              >
+                <Download className="h-4 w-4" />
+                Sample Excel
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                className="gap-1.5"
+                onClick={() => setShowImportDialog(true)}
+              >
+                <FileUp className="h-4 w-4" />
+                Import Excel
+              </Button>
+              <Button className="gap-1.5" onClick={() => setShowAddBill(true)}>
+                <Plus className="h-4 w-4" />
+                Add Bill
+              </Button>
+            </div>
           </div>
 
           {loadingEntries ? (
@@ -334,6 +357,16 @@ export default function AccountsBillingLedger() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {activeProjectId ? (
+        <BillImportDialog
+          open={showImportDialog}
+          onOpenChange={setShowImportDialog}
+          projectId={activeProjectId}
+          projectLabel={projectDetail?.project.projectNumber}
+          onImported={refresh}
+        />
+      ) : null}
     </PageWrapper>
   );
 }
