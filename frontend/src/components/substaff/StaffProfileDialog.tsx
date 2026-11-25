@@ -1,8 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Download, Loader2 } from "lucide-react";
+import { downloadStaffDistributionReport } from "@/lib/sub-staff-pdf";
 
 function money(value: number) {
   return new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 }).format(value || 0);
@@ -83,6 +92,17 @@ export function StaffProfileDialog({ staffName, onClose }: { staffName: string |
             </table>
           </div>
         )}
+        <DialogFooter>
+          <Button
+            variant="outline"
+            className="gap-1.5"
+            disabled={matches.length === 0}
+            onClick={() => staffName && downloadStaffDistributionReport(staffName, matches)}
+          >
+            <Download className="h-4 w-4" />
+            Download Report
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

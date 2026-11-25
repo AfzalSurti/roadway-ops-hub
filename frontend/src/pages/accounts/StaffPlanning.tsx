@@ -26,6 +26,7 @@ import {
 } from "@/components/substaff/SubStaffFormFields";
 import { SubStaffImportDialog } from "@/components/substaff/SubStaffImportDialog";
 import { StaffProfileDialog } from "@/components/substaff/StaffProfileDialog";
+import { ProjectProfileDialog } from "@/components/substaff/ProjectProfileDialog";
 import { downloadSubStaffImportTemplate } from "@/lib/sub-staff-import";
 import { AlertTriangle, Download, FileUp, Loader2, Plus, RefreshCw, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
@@ -58,6 +59,7 @@ export default function StaffPlanning() {
   const [editingEntry, setEditingEntry] = useState<SubStaffAssignment | null>(null);
   const [editForm, setEditForm] = useState<SubStaffFormState>(emptySubStaffForm);
   const [profileStaffName, setProfileStaffName] = useState<string | null>(null);
+  const [profileProjectName, setProfileProjectName] = useState<string | null>(null);
 
   const now = new Date();
   const [planYear, setPlanYear] = useState(now.getFullYear());
@@ -325,7 +327,22 @@ export default function StaffPlanning() {
                           </button>
                         </td>
                         <td className="p-2.5">{entry.designation || "—"}</td>
-                        <td className="p-2.5">{entry.siteName || "—"}</td>
+                        <td className="p-2.5">
+                          {entry.siteName ? (
+                            <button
+                              type="button"
+                              className="underline underline-offset-2 hover:text-primary"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setProfileProjectName(entry.siteName);
+                              }}
+                            >
+                              {entry.siteName}
+                            </button>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
                         <td className="p-2.5">{entry.projectNumber || "—"}</td>
                         <td className="p-2.5">{entry.coOrdinator || "—"}</td>
                         <td className="p-2.5 text-right tabular-nums">{money(entry.rate)}</td>
@@ -448,7 +465,19 @@ export default function StaffPlanning() {
                         <tbody>
                           {rows.map((row) => (
                             <tr key={row.assignment.id} className="border-b border-border/10 last:border-0">
-                              <td className="p-2">{row.assignment.siteName || "—"}</td>
+                              <td className="p-2">
+                                {row.assignment.siteName ? (
+                                  <button
+                                    type="button"
+                                    className="underline underline-offset-2 hover:text-primary"
+                                    onClick={() => setProfileProjectName(row.assignment.siteName)}
+                                  >
+                                    {row.assignment.siteName}
+                                  </button>
+                                ) : (
+                                  "—"
+                                )}
+                              </td>
                               <td className="p-2">{row.assignment.designation || "—"}</td>
                               <td className="p-2 text-right tabular-nums">{row.metrics.balanceMm.toFixed(2)}</td>
                               <td className="p-2 text-right tabular-nums">
@@ -558,6 +587,7 @@ export default function StaffPlanning() {
 
       <SubStaffImportDialog open={showImport} onOpenChange={setShowImport} />
       <StaffProfileDialog staffName={profileStaffName} onClose={() => setProfileStaffName(null)} />
+      <ProjectProfileDialog projectName={profileProjectName} onClose={() => setProfileProjectName(null)} />
     </PageWrapper>
   );
 }
