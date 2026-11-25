@@ -15,6 +15,7 @@ type AssignmentFields = {
   rate?: number;
   constructionPeriodMonths?: number;
   dlpMonths?: number;
+  eotMonths?: number;
   totalPeriodMonths?: number;
   startDate?: string | null;
   endDate?: string | null;
@@ -58,6 +59,7 @@ const NUMERIC_FIELDS = [
   "rate",
   "constructionPeriodMonths",
   "dlpMonths",
+  "eotMonths",
   "totalPeriodMonths",
   "mmConstruction",
   "mmDlp",

@@ -1203,6 +1203,8 @@ model SubStaffAssignment {
   rate                     Float                    @default(0)
   constructionPeriodMonths Float                    @default(0)
   dlpMonths                Float                    @default(0)
+  /// Extension of Time — period length, in months, distinct from mmEot (the staffing man-months during it).
+  eotMonths                Float                    @default(0)
   totalPeriodMonths        Float                    @default(0)
   startDate                DateTime?
   /// Defaults to startDate + totalPeriodMonths when left blank, but freely editable afterward.

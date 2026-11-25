@@ -15,6 +15,7 @@ export const SUB_STAFF_IMPORT_HEADERS = [
   "Rate",
   "CONSTRUCTION PERIOD(MONTHS)",
   "DLP (MONTHS)",
+  "EOT (MONTHS)",
   "Total Period of Project",
   "COMMENCEMENT DATE",
   "Last Billed Month",
@@ -36,6 +37,7 @@ type FieldKey =
   | "rate"
   | "constructionPeriodMonths"
   | "dlpMonths"
+  | "eotMonths"
   | "totalPeriodMonths"
   | "startDate"
   | "lastBilledMonth"
@@ -71,6 +73,9 @@ const HEADER_ALIASES: Record<string, FieldKey> = {
   "dlp (months)": "dlpMonths",
   "dlp(months)": "dlpMonths",
   dlp: "dlpMonths",
+  "eot (months)": "eotMonths",
+  "eot(months)": "eotMonths",
+  eot: "eotMonths",
   "total period of project": "totalPeriodMonths",
   "total period": "totalPeriodMonths",
   "commencement date": "startDate",
@@ -148,6 +153,7 @@ export function downloadSubStaffImportTemplate() {
     Rate: 65000,
     "CONSTRUCTION PERIOD(MONTHS)": 24,
     "DLP (MONTHS)": 0,
+    "EOT (MONTHS)": 0,
     "Total Period of Project": 24,
     "COMMENCEMENT DATE": "15/10/2024",
     "Last Billed Month": "01/07/2026",
@@ -160,7 +166,7 @@ export function downloadSubStaffImportTemplate() {
     REMARK: ""
   };
   const sheet = XLSX.utils.json_to_sheet([sample], { header: [...SUB_STAFF_IMPORT_HEADERS] });
-  sheet["!cols"] = [18, 16, 20, 16, 20, 10, 16, 12, 16, 16, 16, 16, 14, 10, 10, 10, 10, 20].map((wch) => ({ wch }));
+  sheet["!cols"] = [18, 16, 20, 16, 20, 10, 16, 12, 12, 16, 16, 16, 16, 14, 10, 10, 10, 10, 20].map((wch) => ({ wch }));
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, sheet, "Sub-Professional Staff");
 
@@ -248,6 +254,7 @@ export function readSubStaffImportFile(file: ArrayBuffer): {
       rate: cellNumberString(raw.rate),
       constructionPeriodMonths: cellNumberString(raw.constructionPeriodMonths),
       dlpMonths: cellNumberString(raw.dlpMonths),
+      eotMonths: cellNumberString(raw.eotMonths),
       totalPeriodMonths: cellNumberString(raw.totalPeriodMonths),
       startDate: parseStaffDateCell(raw.startDate).date,
       lastBilledMonth: parseStaffDateCell(raw.lastBilledMonth).date,

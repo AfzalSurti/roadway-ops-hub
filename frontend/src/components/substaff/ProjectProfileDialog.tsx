@@ -70,7 +70,7 @@ export function ProjectProfileDialog({
                   <th className="p-2 text-right font-medium">Rate</th>
                   <th className="p-2 text-right font-medium">Total MM</th>
                   <th className="p-2 text-right font-medium">Used MM</th>
-                  <th className="p-2 text-right font-medium">Balance MM</th>
+                  <th className="p-2 text-right font-medium">Staff Balance MM</th>
                   <th className="p-2 text-left font-medium">Start</th>
                   <th className="p-2 text-left font-medium">End</th>
                   <th className="p-2 text-left font-medium">Status</th>

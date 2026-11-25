@@ -13,6 +13,7 @@ export type SubStaffFormState = {
   rate: string;
   constructionPeriodMonths: string;
   dlpMonths: string;
+  eotMonths: string;
   totalPeriodMonths: string;
   startDate: string;
   endDate: string;
@@ -37,6 +38,7 @@ export const emptySubStaffForm: SubStaffFormState = {
   rate: "",
   constructionPeriodMonths: "",
   dlpMonths: "",
+  eotMonths: "",
   totalPeriodMonths: "",
   startDate: "",
   endDate: "",
@@ -71,6 +73,7 @@ export function subStaffFormFromEntry(
     rate: entry.rate ? String(entry.rate) : "",
     constructionPeriodMonths: entry.constructionPeriodMonths ? String(entry.constructionPeriodMonths) : "",
     dlpMonths: entry.dlpMonths ? String(entry.dlpMonths) : "",
+    eotMonths: entry.eotMonths ? String(entry.eotMonths) : "",
     totalPeriodMonths: entry.totalPeriodMonths ? String(entry.totalPeriodMonths) : "",
     startDate: toDateInput(entry.startDate),
     endDate: toDateInput(entry.endDate),
@@ -95,25 +98,25 @@ function addMonthsToDateInput(value: string, months: number): string {
 }
 
 /**
- * Light, non-destructive defaults — only fill a field while it's still blank (or recompute End Date
- * specifically when Start Date / Total Period change, since those are its only inputs): never overwrite
- * something the client's own sheet, or the user, already set.
+ * "(Auto)" fields always recompute from their inputs when one of those inputs changes — Total Period,
+ * Total MM and End Date are never stale, whether you're filling in a new record or editing an existing
+ * one. Typing directly into an Auto field itself still works and sticks until its inputs next change.
  */
 export function applySubStaffDefaults(form: SubStaffFormState, changedKey?: keyof SubStaffFormState): SubStaffFormState {
   let next = form;
   if (
-    (!changedKey || changedKey === "constructionPeriodMonths" || changedKey === "dlpMonths") &&
-    !next.totalPeriodMonths
+    !changedKey ||
+    changedKey === "constructionPeriodMonths" ||
+    changedKey === "dlpMonths" ||
+    changedKey === "eotMonths"
   ) {
-    const sum = (Number(next.constructionPeriodMonths) || 0) + (Number(next.dlpMonths) || 0);
-    if (sum > 0) next = { ...next, totalPeriodMonths: String(sum) };
+    const sum =
+      (Number(next.constructionPeriodMonths) || 0) + (Number(next.dlpMonths) || 0) + (Number(next.eotMonths) || 0);
+    next = { ...next, totalPeriodMonths: String(sum) };
   }
-  if (
-    (!changedKey || changedKey === "mmConstruction" || changedKey === "mmDlp" || changedKey === "mmEot") &&
-    !next.totalMm
-  ) {
+  if (!changedKey || changedKey === "mmConstruction" || changedKey === "mmDlp" || changedKey === "mmEot") {
     const sum = (Number(next.mmConstruction) || 0) + (Number(next.mmDlp) || 0) + (Number(next.mmEot) || 0);
-    if (sum > 0) next = { ...next, totalMm: String(sum) };
+    next = { ...next, totalMm: String(sum) };
   }
   if (!changedKey || changedKey === "startDate" || changedKey === "totalPeriodMonths") {
     const computed = addMonthsToDateInput(next.startDate, Number(next.totalPeriodMonths) || 0);
@@ -133,6 +136,7 @@ export function subStaffFormToPayload(form: SubStaffFormState) {
     rate: Number(form.rate) || 0,
     constructionPeriodMonths: Number(form.constructionPeriodMonths) || 0,
     dlpMonths: Number(form.dlpMonths) || 0,
+    eotMonths: Number(form.eotMonths) || 0,
     totalPeriodMonths: Number(form.totalPeriodMonths) || 0,
     startDate: form.startDate || null,
     endDate: form.endDate || null,
@@ -293,6 +297,7 @@ const FIELD_GROUPS: Array<{
       { key: "startDate", label: "Start Date", type: "date" },
       { key: "constructionPeriodMonths", label: "Construction Period (Months)", type: "number" },
       { key: "dlpMonths", label: "DLP (Months)", type: "number" },
+      { key: "eotMonths", label: "EOT (Months)", type: "number" },
       { key: "totalPeriodMonths", label: "Total Period (Months, Auto)", type: "number" },
       { key: "endDate", label: "End Date (Auto)", type: "date" },
       { key: "lastBilledMonth", label: "Last Billed Month", type: "date" },

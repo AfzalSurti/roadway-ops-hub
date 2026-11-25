@@ -302,7 +302,7 @@ export default function StaffPlanning() {
                       <th className="p-2.5 text-right font-medium">Rate</th>
                       <th className="p-2.5 text-right font-medium">Total MM</th>
                       <th className="p-2.5 text-right font-medium">Used MM</th>
-                      <th className="p-2.5 text-right font-medium">Balance MM</th>
+                      <th className="p-2.5 text-right font-medium">Staff Balance MM</th>
                       <th className="p-2.5 text-left font-medium">Start Date</th>
                       <th className="p-2.5 text-left font-medium">End Date</th>
                     </tr>
@@ -456,8 +456,8 @@ export default function StaffPlanning() {
                           <tr className="border-b border-border/30 text-muted-foreground">
                             <th className="text-left p-2 font-medium">Site</th>
                             <th className="text-left p-2 font-medium">Designation</th>
-                            <th className="text-right p-2 font-medium">Balance MM</th>
-                            <th className="text-right p-2 font-medium">Remaining Months</th>
+                            <th className="text-right p-2 font-medium">Staff Balance MM</th>
+                            <th className="text-right p-2 font-medium">Project Remaining Months</th>
                             <th className="text-right p-2 font-medium">Suggested Days/Mo</th>
                             <th className="text-right p-2 font-medium w-28">Planned Days</th>
                           </tr>

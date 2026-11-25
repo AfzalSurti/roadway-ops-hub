@@ -13,6 +13,7 @@ export const upsertSubStaffAssignmentSchema = z.object({
   rate: numeric,
   constructionPeriodMonths: numeric,
   dlpMonths: numeric,
+  eotMonths: numeric,
   totalPeriodMonths: numeric,
   startDate: z.string().trim().max(40).nullable().optional(),
   endDate: z.string().trim().max(40).nullable().optional(),

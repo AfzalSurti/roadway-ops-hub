@@ -700,6 +700,7 @@ export type SubStaffAssignment = {
   rate: number;
   constructionPeriodMonths: number;
   dlpMonths: number;
+  eotMonths: number;
   totalPeriodMonths: number;
   startDate: string | null;
   endDate: string | null;
