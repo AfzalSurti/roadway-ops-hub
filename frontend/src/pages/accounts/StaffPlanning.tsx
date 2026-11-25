@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { PageWrapper } from "@/components/PageWrapper";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -26,6 +25,7 @@ import {
   type SubStaffFormState
 } from "@/components/substaff/SubStaffFormFields";
 import { SubStaffImportDialog } from "@/components/substaff/SubStaffImportDialog";
+import { SubStaffPlanTable } from "@/components/substaff/SubStaffPlanTable";
 import { StaffProfileDialog } from "@/components/substaff/StaffProfileDialog";
 import { ProjectProfileDialog } from "@/components/substaff/ProjectProfileDialog";
 import { downloadSubStaffImportTemplate } from "@/lib/sub-staff-import";
@@ -159,8 +159,15 @@ export default function StaffPlanning() {
   });
 
   const setPlanDayMutation = useMutation({
-    mutationFn: ({ assignmentId, plannedDays }: { assignmentId: string; plannedDays: number }) =>
-      api.setSubStaffPlanDay(assignmentId, planYear, planMonth, plannedDays),
+    mutationFn: ({
+      assignmentId,
+      field,
+      value
+    }: {
+      assignmentId: string;
+      field: "construction" | "dlp";
+      value: number;
+    }) => api.setSubStaffPlanDay(assignmentId, planYear, planMonth, field, value),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["sub-staff-plan", planYear, planMonth] });
     },
@@ -459,7 +466,7 @@ export default function StaffPlanning() {
               <div className="space-y-4">
                 {planByPerson.map((rows) => {
                   const staffName = rows[0].assignment.staffName;
-                  const totalDays = rows.reduce((s, r) => s + r.plannedDays, 0);
+                  const totalDays = rows.reduce((s, r) => s + r.plannedDaysConstruction + r.plannedDaysDlp, 0);
                   return (
                     <div key={staffName} className="rounded-xl border border-border/40 overflow-hidden">
                       <div className="px-4 py-2.5 bg-secondary/20 flex items-center justify-between gap-3">
@@ -474,75 +481,26 @@ export default function StaffPlanning() {
                           {totalDays.toFixed(1)} / 30 days this month
                         </Badge>
                       </div>
-                      <table className="w-full text-xs min-w-[1100px]">
-                        <thead>
-                          <tr className="border-b border-border/30 text-muted-foreground">
-                            <th className="text-left p-2 font-medium">Site</th>
-                            <th className="text-left p-2 font-medium">Designation</th>
-                            <th className="text-right p-2 font-medium">Staff Balance MM (Constr.)</th>
-                            <th className="text-right p-2 font-medium">Staff Balance MM (DLP)</th>
-                            <th className="text-right p-2 font-medium">Project Remaining Months (Constr.)</th>
-                            <th className="text-right p-2 font-medium">Project Remaining Months (DLP)</th>
-                            <th className="text-right p-2 font-medium">Constr. Suggested Days</th>
-                            <th className="text-right p-2 font-medium">DLP Suggested Days</th>
-                            <th className="text-right p-2 font-medium w-28">Planned Days</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {rows.map((row) => (
-                            <tr key={row.assignment.id} className="border-b border-border/10 last:border-0">
-                              <td className="p-2">
-                                {row.assignment.siteName ? (
-                                  <button
-                                    type="button"
-                                    className="underline underline-offset-2 hover:text-primary"
-                                    onClick={() => setProfileProjectName(row.assignment.siteName)}
-                                  >
-                                    {row.assignment.siteName}
-                                  </button>
-                                ) : (
-                                  "—"
-                                )}
-                                {row.metrics.remainingConsMonths <= 0 && row.metrics.remainingDlpMonths <= 0 && (
-                                  <Badge variant="secondary" className="ml-2 align-middle">
-                                    Completed
-                                  </Badge>
-                                )}
-                              </td>
-                              <td className="p-2">{row.assignment.designation || "—"}</td>
-                              <td className="p-2 text-right tabular-nums">
-                                {row.metrics.staffBalanceMmConstruction.toFixed(2)}
-                              </td>
-                              <td className="p-2 text-right tabular-nums">{row.metrics.staffBalanceMmDlp.toFixed(2)}</td>
-                              <td className="p-2 text-right tabular-nums">
-                                {row.metrics.remainingConsMonths.toFixed(2)}
-                              </td>
-                              <td className="p-2 text-right tabular-nums">{row.metrics.remainingDlpMonths.toFixed(2)}</td>
-                              <td className="p-2 text-right tabular-nums">
-                                {row.metrics.suggestedDaysConstruction.toFixed(1)}
-                              </td>
-                              <td className="p-2 text-right tabular-nums">{row.metrics.suggestedDaysDlp.toFixed(1)}</td>
-                              <td className="p-2 text-right">
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  max="31"
-                                  step="0.5"
-                                  defaultValue={row.plannedDays}
-                                  key={`${row.assignment.id}-${row.plannedDays}`}
-                                  className="h-7 w-20 text-right text-xs ml-auto"
-                                  onBlur={(e) => {
-                                    const next = Number(e.target.value) || 0;
-                                    if (next !== row.plannedDays) {
-                                      setPlanDayMutation.mutate({ assignmentId: row.assignment.id, plannedDays: next });
-                                    }
-                                  }}
-                                />
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                      <SubStaffPlanTable
+                        rows={rows}
+                        firstColumnLabel="Site"
+                        renderFirstColumn={(row) =>
+                          row.assignment.siteName ? (
+                            <button
+                              type="button"
+                              className="underline underline-offset-2 hover:text-primary"
+                              onClick={() => setProfileProjectName(row.assignment.siteName)}
+                            >
+                              {row.assignment.siteName}
+                            </button>
+                          ) : (
+                            "—"
+                          )
+                        }
+                        onEditPlanDay={(assignmentId, field, value) =>
+                          setPlanDayMutation.mutate({ assignmentId, field, value })
+                        }
+                      />
                     </div>
                   );
                 })}

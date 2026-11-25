@@ -1237,15 +1237,16 @@ enum SubStaffAssignmentStatus {
 /// One person's planned attendance days for one assignment in one calendar month — auto-generated from
 /// balance man-months, end date and rate, then freely hand-editable afterward.
 model SubStaffInputPlan {
-  id           String             @id @default(cuid())
-  assignmentId String
-  year         Int
-  month        Int
-  plannedDays  Float              @default(0)
-  autoPlanned  Boolean            @default(true)
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
-  assignment   SubStaffAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  id                      String             @id @default(cuid())
+  assignmentId            String
+  year                    Int
+  month                   Int
+  plannedDaysConstruction Float              @default(0)
+  plannedDaysDlp          Float              @default(0)
+  autoPlanned             Boolean            @default(true)
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+  assignment              SubStaffAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
 
   @@unique([assignmentId, year, month])
   @@index([year, month])

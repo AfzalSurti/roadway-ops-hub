@@ -715,7 +715,13 @@ export type SubStaffAssignment = {
   status: SubStaffAssignmentStatus;
   sortOrder: number;
   /** Every month this assignment has a planned-days entry for — powers the month-by-month breakdown views. */
-  inputPlans: Array<{ year: number; month: number; plannedDays: number; autoPlanned: boolean }>;
+  inputPlans: Array<{
+    year: number;
+    month: number;
+    plannedDaysConstruction: number;
+    plannedDaysDlp: number;
+    autoPlanned: boolean;
+  }>;
   createdAt: string;
   updatedAt: string;
 };
@@ -749,7 +755,8 @@ export type SubStaffClashReport = {
 export type SubStaffPlanRow = {
   assignment: SubStaffAssignment;
   metrics: SubStaffAssignmentMetrics;
-  plannedDays: number;
+  plannedDaysConstruction: number;
+  plannedDaysDlp: number;
   autoPlanned: boolean;
 };
 

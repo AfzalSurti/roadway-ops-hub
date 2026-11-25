@@ -68,11 +68,17 @@ export const subStaffRepository = {
     return prisma.subStaffAssignment.delete({ where: { id } });
   },
 
-  upsertPlan(assignmentId: string, year: number, month: number, plannedDays: number, autoPlanned: boolean) {
+  upsertPlan(
+    assignmentId: string,
+    year: number,
+    month: number,
+    values: { plannedDaysConstruction: number; plannedDaysDlp: number },
+    autoPlanned: boolean
+  ) {
     return prisma.subStaffInputPlan.upsert({
       where: { assignmentId_year_month: { assignmentId, year, month } },
-      create: { assignmentId, year, month, plannedDays, autoPlanned },
-      update: { plannedDays, autoPlanned }
+      create: { assignmentId, year, month, ...values, autoPlanned },
+      update: { ...values, autoPlanned }
     });
   },
 

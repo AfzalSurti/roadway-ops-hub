@@ -1560,10 +1560,10 @@ export const api = {
     });
   },
 
-  setSubStaffPlanDay(assignmentId: string, year: number, month: number, plannedDays: number) {
+  setSubStaffPlanDay(assignmentId: string, year: number, month: number, field: "construction" | "dlp", value: number) {
     return request<SubStaffPlanRow[]>(`/sub-staff/${assignmentId}/plan`, {
       method: "PATCH",
-      body: JSON.stringify({ year, month, plannedDays })
+      body: JSON.stringify({ year, month, field, value })
     });
   },
 

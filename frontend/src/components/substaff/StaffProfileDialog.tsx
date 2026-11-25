@@ -1,5 +1,5 @@
-import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bar, BarChart, CartesianGrid, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "@/lib/api";
 import {
@@ -13,9 +13,16 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ChartContainer } from "@/components/ui/chart";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Download, Loader2 } from "lucide-react";
 import { downloadStaffDistributionReport } from "@/lib/sub-staff-pdf";
 import { buildMonthlyBreakdown, type MonthlyBreakdownMonth } from "@/lib/sub-staff-timeline";
+import { SubStaffPlanTable } from "@/components/substaff/SubStaffPlanTable";
+
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+];
 
 function money(value: number) {
   return new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 }).format(value || 0);
@@ -64,10 +71,28 @@ export function StaffProfileDialog({
   designationFilter?: string;
   projectFilter?: string;
 }) {
+  const queryClient = useQueryClient();
+  const now = new Date();
+  const [planYear, setPlanYear] = useState(now.getFullYear());
+  const [planMonth, setPlanMonth] = useState(now.getMonth() + 1);
+  const yearOptions = Array.from({ length: 6 }, (_, i) => now.getFullYear() - 1 + i);
+
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["sub-staff-profile", staffName],
     queryFn: () => api.getSubStaffAssignments({ staffName: staffName ?? undefined }),
     enabled: Boolean(staffName)
+  });
+
+  const { data: planRows = [], isLoading: loadingPlan } = useQuery({
+    queryKey: ["sub-staff-plan", planYear, planMonth],
+    queryFn: () => api.getSubStaffPlan(planYear, planMonth),
+    enabled: Boolean(staffName)
+  });
+
+  const setPlanDayMutation = useMutation({
+    mutationFn: ({ assignmentId, field, value }: { assignmentId: string; field: "construction" | "dlp"; value: number }) =>
+      api.setSubStaffPlanDay(assignmentId, planYear, planMonth, field, value),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["sub-staff-plan", planYear, planMonth] })
   });
 
   const normalized = staffName?.trim().toLowerCase();
@@ -87,6 +112,17 @@ export function StaffProfileDialog({
 
   const monthly = useMemo(() => buildMonthlyBreakdown(filteredMatches), [filteredMatches]);
   const filtersActive = Boolean(designationFilter.trim() || projectFilter.trim());
+
+  const thisMonthRows = useMemo(() => {
+    const designationQ = designationFilter.trim().toLowerCase();
+    const projectQ = projectFilter.trim().toLowerCase();
+    return planRows.filter(
+      (r) =>
+        r.assignment.staffName.trim().toLowerCase() === normalized &&
+        (!designationQ || r.assignment.designation.toLowerCase().includes(designationQ)) &&
+        (!projectQ || r.assignment.siteName.toLowerCase().includes(projectQ))
+    );
+  }, [planRows, normalized, designationFilter, projectFilter]);
 
   return (
     <Dialog open={Boolean(staffName)} onOpenChange={(open) => !open && onClose()}>
@@ -142,6 +178,54 @@ export function StaffProfileDialog({
                   ))}
                 </tbody>
               </table>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h4 className="text-sm font-semibold">This month's plan — Contract &amp; DLP planned days</h4>
+                <div className="flex gap-2">
+                  <Select value={String(planMonth)} onValueChange={(v) => setPlanMonth(Number(v))}>
+                    <SelectTrigger className="w-36 h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MONTH_NAMES.map((name, i) => (
+                        <SelectItem key={name} value={String(i + 1)}>
+                          {name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={String(planYear)} onValueChange={(v) => setPlanYear(Number(v))}>
+                    <SelectTrigger className="w-24 h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {yearOptions.map((y) => (
+                        <SelectItem key={y} value={String(y)}>
+                          {y}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              {loadingPlan ? (
+                <p className="text-sm text-muted-foreground inline-flex items-center gap-2 p-4">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Loading plan...
+                </p>
+              ) : thisMonthRows.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center border border-dashed border-border/40 rounded-xl">
+                  No active assignments for this person for this month{filtersActive ? " (under the current filters)" : ""}.
+                </p>
+              ) : (
+                <SubStaffPlanTable
+                  rows={thisMonthRows}
+                  firstColumnLabel="Project"
+                  renderFirstColumn={(row) => row.assignment.siteName || "—"}
+                  onEditPlanDay={(assignmentId, field, value) => setPlanDayMutation.mutate({ assignmentId, field, value })}
+                />
+              )}
             </div>
 
             <div className="space-y-3">

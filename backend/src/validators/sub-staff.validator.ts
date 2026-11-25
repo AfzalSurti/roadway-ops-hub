@@ -35,7 +35,8 @@ export const bulkImportSubStaffAssignmentsSchema = z.object({
 export const setPlanDaySchema = z.object({
   year: z.coerce.number().int().min(2000).max(2100),
   month: z.coerce.number().int().min(1).max(12),
-  plannedDays: z.coerce.number().min(0).max(31)
+  field: z.enum(["construction", "dlp"]),
+  value: z.coerce.number().min(0).max(31)
 });
 
 export const generatePlanSchema = z.object({

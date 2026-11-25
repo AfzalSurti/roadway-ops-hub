@@ -61,7 +61,13 @@ export const subStaffController = {
   },
 
   async setPlanDay(req: Request, res: Response) {
-    const result = await subStaffService.setPlanDay(req.params.id, req.body.year, req.body.month, req.body.plannedDays);
+    const result = await subStaffService.setPlanDay(
+      req.params.id,
+      req.body.year,
+      req.body.month,
+      req.body.field,
+      req.body.value
+    );
     return sendSuccess(res, result);
   }
 };

@@ -379,7 +379,7 @@ export const subStaffService = {
       byName.set(key, list);
     }
 
-    const results: Array<{ assignmentId: string; plannedDays: number }> = [];
+    const results: Array<{ assignmentId: string; plannedDaysConstruction: number; plannedDaysDlp: number }> = [];
 
     for (const group of byName.values()) {
       const weighted = group
@@ -400,7 +400,15 @@ export const subStaffService = {
         const ideal = Math.min(metrics.suggestedDaysPerMonth, 30);
         const allocated = round2(Math.max(0, Math.min(ideal, budget)));
         budget = round2(Math.max(0, budget - allocated));
-        results.push({ assignmentId: row.id, plannedDays: allocated });
+
+        // Split the allocated days between Construction/DLP in the same ratio as their suggested
+        // need. In practice only one phase is ever active for a given assignment, so this puts 100% of
+        // the days there — the split only matters for a mid-month Construction-to-DLP transition.
+        const suggestedTotal = metrics.suggestedDaysConstruction + metrics.suggestedDaysDlp;
+        const consShare = suggestedTotal > 0 ? metrics.suggestedDaysConstruction / suggestedTotal : 0;
+        const plannedDaysConstruction = round2(allocated * consShare);
+        const plannedDaysDlp = round2(allocated - plannedDaysConstruction);
+        results.push({ assignmentId: row.id, plannedDaysConstruction, plannedDaysDlp });
       }
 
       // Anything in the group not in `weighted` (finished or no balance) gets zeroed, unless hand-edited.
@@ -408,18 +416,31 @@ export const subStaffService = {
         if (weighted.some((w) => w.row.id === row.id)) continue;
         const existing = row.inputPlans.find((p) => p.year === year && p.month === month);
         if (existing && !existing.autoPlanned) continue;
-        results.push({ assignmentId: row.id, plannedDays: 0 });
+        results.push({ assignmentId: row.id, plannedDaysConstruction: 0, plannedDaysDlp: 0 });
       }
     }
 
-    await Promise.all(results.map((r) => subStaffRepository.upsertPlan(r.assignmentId, year, month, r.plannedDays, true)));
+    await Promise.all(
+      results.map((r) =>
+        subStaffRepository.upsertPlan(
+          r.assignmentId,
+          year,
+          month,
+          { plannedDaysConstruction: r.plannedDaysConstruction, plannedDaysDlp: r.plannedDaysDlp },
+          true
+        )
+      )
+    );
     return this.getPlanGrid(year, month);
   },
 
-  async setPlanDay(assignmentId: string, year: number, month: number, plannedDays: number) {
+  async setPlanDay(assignmentId: string, year: number, month: number, field: "construction" | "dlp", value: number) {
     const assignment = await subStaffRepository.findById(assignmentId);
     if (!assignment) throw notFound("Assignment not found");
-    await subStaffRepository.upsertPlan(assignmentId, year, month, round2(plannedDays), false);
+    const existing = assignment.inputPlans.find((p) => p.year === year && p.month === month);
+    const plannedDaysConstruction = field === "construction" ? round2(value) : existing?.plannedDaysConstruction ?? 0;
+    const plannedDaysDlp = field === "dlp" ? round2(value) : existing?.plannedDaysDlp ?? 0;
+    await subStaffRepository.upsertPlan(assignmentId, year, month, { plannedDaysConstruction, plannedDaysDlp }, false);
     return this.getPlanGrid(year, month);
   },
 
@@ -432,7 +453,8 @@ export const subStaffService = {
       return {
         assignment: serializeAssignment(row),
         metrics: computeMetrics(row, asOf),
-        plannedDays: plan?.plannedDays ?? 0,
+        plannedDaysConstruction: plan?.plannedDaysConstruction ?? 0,
+        plannedDaysDlp: plan?.plannedDaysDlp ?? 0,
         autoPlanned: plan?.autoPlanned ?? true
       };
     });

@@ -25,7 +25,8 @@ export function buildMonthlyBreakdown(assignments: SubStaffAssignment[]): Monthl
 
   for (const assignment of assignments) {
     for (const plan of assignment.inputPlans) {
-      if (!plan.plannedDays) continue;
+      const plannedDays = (plan.plannedDaysConstruction || 0) + (plan.plannedDaysDlp || 0);
+      if (!plannedDays) continue;
       const key = `${plan.year}-${String(plan.month).padStart(2, "0")}`;
       const month = byMonth.get(key) ?? {
         key,
@@ -33,12 +34,12 @@ export function buildMonthlyBreakdown(assignments: SubStaffAssignment[]): Monthl
         totalDays: 0,
         entries: []
       };
-      month.totalDays += plan.plannedDays;
+      month.totalDays += plannedDays;
       month.entries.push({
         staffName: assignment.staffName,
         designation: assignment.designation,
         siteName: assignment.siteName,
-        plannedDays: plan.plannedDays
+        plannedDays
       });
       byMonth.set(key, month);
     }
