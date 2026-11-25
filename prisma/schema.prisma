@@ -1204,7 +1204,9 @@ model SubStaffAssignment {
   constructionPeriodMonths Float                    @default(0)
   dlpMonths                Float                    @default(0)
   totalPeriodMonths        Float                    @default(0)
-  commencementDate         DateTime?
+  startDate                DateTime?
+  /// Defaults to startDate + totalPeriodMonths when left blank, but freely editable afterward.
+  endDate                  DateTime?
   lastBilledMonth          DateTime?
   lastBilledDate           DateTime?
   mmConstruction           Float                    @default(0)
@@ -1214,7 +1216,6 @@ model SubStaffAssignment {
   usedMm                   Float                    @default(0)
   remark                   String                   @default("")
   status                   SubStaffAssignmentStatus @default(ACTIVE)
-  leftDate                 DateTime?
   sortOrder                Int                      @default(0)
   createdAt                DateTime                 @default(now())
   updatedAt                DateTime                 @updatedAt

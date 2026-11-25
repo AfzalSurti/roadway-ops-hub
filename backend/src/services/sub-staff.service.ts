@@ -1,10 +1,14 @@
 import { subStaffRepository } from "../repositories/sub-staff.repository.js";
+import { projectRepository } from "../repositories/project.repository.js";
+import { projectService } from "./project.service.js";
 import { notFound } from "../utils/errors.js";
 import type { SubStaffAssignmentStatus } from "@prisma/client";
 
 type AssignmentFields = {
   siteName?: string;
   projectId?: string | null;
+  /** Optional, to set/correct the linked (or newly-created) project's number — nothing here is required. */
+  projectNumber?: string;
   staffName?: string;
   designation?: string;
   coOrdinator?: string;
@@ -12,7 +16,8 @@ type AssignmentFields = {
   constructionPeriodMonths?: number;
   dlpMonths?: number;
   totalPeriodMonths?: number;
-  commencementDate?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
   lastBilledMonth?: string | null;
   lastBilledDate?: string | null;
   mmConstruction?: number;
@@ -22,7 +27,6 @@ type AssignmentFields = {
   usedMm?: number;
   remark?: string;
   status?: SubStaffAssignmentStatus;
-  leftDate?: string | null;
 };
 
 function round2(value: number) {
@@ -34,6 +38,20 @@ function parseDateField(value?: string | null) {
   if (!value) return null;
   const date = new Date(value.includes("T") ? value : `${value}T12:00:00.000Z`);
   return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/** Adds a (possibly fractional) number of months to a date, anchored at noon UTC like the rest of this field. */
+function addMonths(date: Date, months: number): Date {
+  const whole = Math.round(months);
+  const next = new Date(date);
+  next.setUTCMonth(next.getUTCMonth() + whole);
+  return next;
+}
+
+/** startDate + totalPeriodMonths, when both are known — the default before any manual override. */
+function defaultEndDate(startDate: Date | null | undefined, totalPeriodMonths: number | undefined) {
+  if (!startDate || !totalPeriodMonths) return null;
+  return addMonths(startDate, totalPeriodMonths);
 }
 
 const NUMERIC_FIELDS = [
@@ -62,6 +80,65 @@ function monthsBetween(start: Date, end: Date): number {
   return days / 30;
 }
 
+/**
+ * Links an assignment to a real Project record — reusing the main Projects service so a brand-new
+ * project typed via "Other" shows up everywhere else in the app (Admin's Projects list, Financial,
+ * Billing, …), not just here. An explicit projectId always wins; otherwise the typed name is matched
+ * case-insensitively against existing projects, or a new one is created. A project number is only
+ * ever set, never overwritten, since nothing here is required.
+ */
+async function resolveProject(
+  projectId: string | null | undefined,
+  siteName: string | undefined,
+  projectNumber: string | undefined
+): Promise<{ id: string; name: string } | null> {
+  const trimmedNumber = projectNumber?.trim() || undefined;
+
+  if (projectId) {
+    const project = await projectRepository.findById(projectId);
+    if (!project) return null;
+    if (trimmedNumber && !project.projectNumber) {
+      const updated = await projectService.update(project.id, { projectNumber: trimmedNumber });
+      return { id: updated.id, name: updated.name };
+    }
+    return { id: project.id, name: project.name };
+  }
+
+  const trimmedName = siteName?.trim();
+  if (!trimmedName) return null;
+
+  const existing = await projectRepository.findByNameCaseInsensitive(trimmedName);
+  if (existing) {
+    if (trimmedNumber && !existing.projectNumber) {
+      const updated = await projectService.update(existing.id, { projectNumber: trimmedNumber });
+      return { id: updated.id, name: updated.name };
+    }
+    return { id: existing.id, name: existing.name };
+  }
+
+  const created = await projectService.create({ name: trimmedName, projectNumber: trimmedNumber });
+  return { id: created.id, name: created.name };
+}
+
+// A seed of the client's known designations, merged with whatever's actually in use — so the
+// dropdown always covers the common ones even before any data exists, and grows as new ones are typed.
+const DESIGNATION_SEED = [
+  "CAD Expert",
+  "Horticulture Expert",
+  "Highway Design Engineer",
+  "Bridge Design Engineer",
+  "Environment Engineer",
+  "Toll Expert",
+  "Electrical Engineer",
+  "Road and Safety Expert",
+  "HTMS/Toll Expert",
+  "Accountant",
+  "Accountant Cum Cashier",
+  "Office Manager",
+  "QS",
+  "AHE"
+];
+
 export type AssignmentMetrics = {
   balanceMm: number;
   elapsedMonths: number;
@@ -73,7 +150,8 @@ export type AssignmentMetrics = {
 /** All figures the client's own sheet computes from the raw fields, derived live instead of stored. */
 export function computeMetrics(
   assignment: {
-    commencementDate: Date | null;
+    startDate: Date | null;
+    endDate: Date | null;
     totalPeriodMonths: number;
     totalMm: number;
     usedMm: number;
@@ -81,8 +159,9 @@ export function computeMetrics(
   asOf: Date = new Date()
 ): AssignmentMetrics {
   const balanceMm = round2(assignment.totalMm - assignment.usedMm);
-  const elapsedMonths = assignment.commencementDate ? monthsBetween(assignment.commencementDate, asOf) : 0;
-  const totalRemainingMonths = Math.max(0, round2(assignment.totalPeriodMonths - elapsedMonths));
+  const elapsedMonths = assignment.startDate ? monthsBetween(assignment.startDate, asOf) : 0;
+  const effectiveEndDate = assignment.endDate ?? defaultEndDate(assignment.startDate, assignment.totalPeriodMonths);
+  const totalRemainingMonths = effectiveEndDate ? Math.max(0, round2(monthsBetween(asOf, effectiveEndDate))) : 0;
   const suggestedDaysPerMonth =
     totalRemainingMonths > 0 && balanceMm > 0
       ? round2((balanceMm / totalRemainingMonths) * 30)
@@ -92,29 +171,54 @@ export function computeMetrics(
   return { balanceMm, elapsedMonths: round2(elapsedMonths), totalRemainingMonths, suggestedDaysPerMonth };
 }
 
+/** Flattens the linked project's number onto the assignment — it's a display/edit convenience, not a
+ * column on this table, so every response that returns an assignment goes through this. */
+function serializeAssignment<T extends { project?: { projectNumber: string | null } | null }>(row: T) {
+  const { project, ...rest } = row;
+  return { ...rest, projectNumber: project?.projectNumber ?? null };
+}
+
 export const subStaffService = {
   async list(filters: { status?: SubStaffAssignmentStatus; staffName?: string; siteName?: string }) {
-    return subStaffRepository.list(filters);
+    const rows = await subStaffRepository.list(filters);
+    return rows.map(serializeAssignment);
+  },
+
+  async getOptions() {
+    const [designations, staffNames] = await Promise.all([
+      subStaffRepository.distinctDesignations(),
+      subStaffRepository.distinctStaffNames()
+    ]);
+    const merged = new Set([...DESIGNATION_SEED, ...designations]);
+    return {
+      designations: Array.from(merged).sort((a, b) => a.localeCompare(b)),
+      staffNames: staffNames.sort((a, b) => a.localeCompare(b))
+    };
   },
 
   async create(payload: AssignmentFields) {
     if (!payload.staffName?.trim()) throw notFound("Staff name is required");
     const sortOrder = await subStaffRepository.nextSortOrder();
-    return subStaffRepository.create({
-      siteName: payload.siteName?.trim() || "",
-      projectId: payload.projectId || null,
+    const startDate = parseDateField(payload.startDate) ?? null;
+    const endDate =
+      parseDateField(payload.endDate) ?? defaultEndDate(startDate, Number(payload.totalPeriodMonths) || 0);
+    const project = await resolveProject(payload.projectId, payload.siteName, payload.projectNumber);
+    const created = await subStaffRepository.create({
+      siteName: project?.name ?? payload.siteName?.trim() ?? "",
+      projectId: project?.id ?? null,
       staffName: payload.staffName.trim(),
       designation: payload.designation?.trim() || "",
       coOrdinator: payload.coOrdinator?.trim() || "",
-      commencementDate: parseDateField(payload.commencementDate) ?? null,
+      startDate,
+      endDate,
       lastBilledMonth: parseDateField(payload.lastBilledMonth) ?? null,
       lastBilledDate: parseDateField(payload.lastBilledDate) ?? null,
       remark: payload.remark?.trim() || "",
       status: payload.status ?? "ACTIVE",
-      leftDate: parseDateField(payload.leftDate) ?? null,
       sortOrder,
       ...normalizeNumbers(payload)
     });
+    return serializeAssignment(created);
   },
 
   async bulkImport(rows: AssignmentFields[]) {
@@ -134,20 +238,39 @@ export const subStaffService = {
   async update(id: string, payload: AssignmentFields) {
     const existing = await subStaffRepository.findById(id);
     if (!existing) throw notFound("Assignment not found");
-    return subStaffRepository.update(id, {
-      siteName: payload.siteName?.trim(),
-      projectId: payload.projectId === undefined ? undefined : payload.projectId || null,
+
+    const startDate = payload.startDate === undefined ? undefined : parseDateField(payload.startDate);
+    let endDate = payload.endDate === undefined ? undefined : parseDateField(payload.endDate);
+    if (endDate === null && payload.startDate !== undefined) {
+      // End date cleared while start/period are being (re)set — fall back to the computed default.
+      endDate =
+        defaultEndDate(
+          startDate ?? existing.startDate,
+          payload.totalPeriodMonths ?? existing.totalPeriodMonths
+        ) ?? null;
+    }
+
+    const touchesProject =
+      payload.projectId !== undefined || payload.siteName !== undefined || payload.projectNumber !== undefined;
+    const project = touchesProject
+      ? await resolveProject(payload.projectId, payload.siteName ?? existing.siteName, payload.projectNumber)
+      : undefined;
+
+    const updated = await subStaffRepository.update(id, {
+      siteName: project !== undefined ? (project?.name ?? payload.siteName?.trim() ?? "") : undefined,
+      projectId: project !== undefined ? (project?.id ?? null) : undefined,
       staffName: payload.staffName?.trim(),
       designation: payload.designation?.trim(),
       coOrdinator: payload.coOrdinator?.trim(),
-      commencementDate: parseDateField(payload.commencementDate),
+      startDate,
+      endDate,
       lastBilledMonth: parseDateField(payload.lastBilledMonth),
       lastBilledDate: parseDateField(payload.lastBilledDate),
       remark: payload.remark?.trim(),
       status: payload.status,
-      leftDate: parseDateField(payload.leftDate),
       ...normalizeNumbers(payload)
     });
+    return serializeAssignment(updated);
   },
 
   async remove(id: string) {
@@ -251,7 +374,7 @@ export const subStaffService = {
     return assignments.map((row) => {
       const plan = row.inputPlans.find((p) => p.year === year && p.month === month);
       return {
-        assignment: row,
+        assignment: serializeAssignment(row),
         metrics: computeMetrics(row, asOf),
         plannedDays: plan?.plannedDays ?? 0,
         autoPlanned: plan?.autoPlanned ?? true

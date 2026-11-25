@@ -64,6 +64,21 @@ export default function StaffPlanning() {
     queryFn: () => api.getSubStaffAssignments({ status: statusFilter, staffName: searchName || undefined })
   });
 
+  const { data: options } = useQuery({
+    queryKey: ["sub-staff-options"],
+    queryFn: () => api.getSubStaffOptions()
+  });
+
+  const { data: projects = [] } = useQuery({
+    queryKey: ["projects"],
+    queryFn: () => api.getProjects(),
+    staleTime: 60_000
+  });
+  const projectOptions = useMemo(
+    () => projects.map((p) => ({ id: p.id, name: p.name, projectNumber: p.projectNumber ?? null })),
+    [projects]
+  );
+
   const { data: clashReport } = useQuery({
     queryKey: ["sub-staff-clashes"],
     queryFn: () => api.getSubStaffClashes()
@@ -241,13 +256,15 @@ export default function StaffPlanning() {
                     <tr className="bg-secondary/30 text-muted-foreground">
                       <th className="p-2.5 text-left font-medium">Staff Name</th>
                       <th className="p-2.5 text-left font-medium">Designation</th>
-                      <th className="p-2.5 text-left font-medium">Site / Client</th>
+                      <th className="p-2.5 text-left font-medium">Project Name</th>
+                      <th className="p-2.5 text-left font-medium">Project No.</th>
                       <th className="p-2.5 text-left font-medium">Co-Ordinator</th>
                       <th className="p-2.5 text-right font-medium">Rate</th>
                       <th className="p-2.5 text-right font-medium">Total MM</th>
                       <th className="p-2.5 text-right font-medium">Used MM</th>
                       <th className="p-2.5 text-right font-medium">Balance MM</th>
-                      <th className="p-2.5 text-left font-medium">Commencement</th>
+                      <th className="p-2.5 text-left font-medium">Start Date</th>
+                      <th className="p-2.5 text-left font-medium">End Date</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -260,6 +277,7 @@ export default function StaffPlanning() {
                         <td className="p-2.5 font-medium">{entry.staffName}</td>
                         <td className="p-2.5">{entry.designation || "—"}</td>
                         <td className="p-2.5">{entry.siteName || "—"}</td>
+                        <td className="p-2.5">{entry.projectNumber || "—"}</td>
                         <td className="p-2.5">{entry.coOrdinator || "—"}</td>
                         <td className="p-2.5 text-right tabular-nums">{money(entry.rate)}</td>
                         <td className="p-2.5 text-right tabular-nums">{entry.totalMm.toFixed(2)}</td>
@@ -267,7 +285,8 @@ export default function StaffPlanning() {
                         <td className="p-2.5 text-right tabular-nums font-medium">
                           {(entry.totalMm - entry.usedMm).toFixed(2)}
                         </td>
-                        <td className="p-2.5 whitespace-nowrap">{formatDate(entry.commencementDate)}</td>
+                        <td className="p-2.5 whitespace-nowrap">{formatDate(entry.startDate)}</td>
+                        <td className="p-2.5 whitespace-nowrap">{formatDate(entry.endDate)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -405,6 +424,9 @@ export default function StaffPlanning() {
               const changedKey = Object.keys(patch)[0] as keyof SubStaffFormState;
               setAddForm((prev) => applySubStaffDefaults({ ...prev, ...patch }, changedKey));
             }}
+            designationOptions={options?.designations ?? []}
+            staffNameOptions={options?.staffNames ?? []}
+            projectOptions={projectOptions}
           />
           <DialogFooter className="gap-2">
             <Button variant="ghost" onClick={() => setShowAdd(false)}>
@@ -431,6 +453,9 @@ export default function StaffPlanning() {
               const changedKey = Object.keys(patch)[0] as keyof SubStaffFormState;
               setEditForm((prev) => applySubStaffDefaults({ ...prev, ...patch }, changedKey));
             }}
+            designationOptions={options?.designations ?? []}
+            staffNameOptions={options?.staffNames ?? []}
+            projectOptions={projectOptions}
           />
           <DialogFooter className="gap-2 sm:justify-between">
             <Button

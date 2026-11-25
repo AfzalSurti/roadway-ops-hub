@@ -52,6 +52,7 @@ import type {
   ProjectBillingEntry,
   ProjectBillingSummary,
   SubStaffAssignment,
+  SubStaffOptions,
   SubStaffAssignmentStatus,
   SubStaffClashReport,
   SubStaffPlanRow,
@@ -1498,6 +1499,10 @@ export const api = {
 
   getProjectBillingSummary() {
     return request<ProjectBillingSummary>("/project-billing/summary");
+  },
+
+  getSubStaffOptions() {
+    return request<SubStaffOptions>("/sub-staff/options");
   },
 
   getSubStaffAssignments(filters: { status?: SubStaffAssignmentStatus; staffName?: string; siteName?: string } = {}) {

@@ -10,6 +10,7 @@ export const SUB_STAFF_IMPORT_HEADERS = [
   "Staff Name",
   "Designation",
   "Client",
+  "Project Number",
   "Co.Ordinator",
   "Rate",
   "CONSTRUCTION PERIOD(MONTHS)",
@@ -30,12 +31,13 @@ type FieldKey =
   | "staffName"
   | "designation"
   | "siteName"
+  | "projectNumber"
   | "coOrdinator"
   | "rate"
   | "constructionPeriodMonths"
   | "dlpMonths"
   | "totalPeriodMonths"
-  | "commencementDate"
+  | "startDate"
   | "lastBilledMonth"
   | "lastBilledDate"
   | "mmConstruction"
@@ -45,7 +47,8 @@ type FieldKey =
   | "usedMm"
   | "remark";
 
-// Matches the client's real "NHAI-Morth" Excel register headers (plus a few sane variants).
+// Matches the client's real "NHAI-Morth" Excel register headers (plus a few sane variants). "Client"
+// here is the project's name — it's matched (or a new project is created) by that name on import.
 const HEADER_ALIASES: Record<string, FieldKey> = {
   "staff name": "staffName",
   name: "staffName",
@@ -54,6 +57,10 @@ const HEADER_ALIASES: Record<string, FieldKey> = {
   client: "siteName",
   site: "siteName",
   "site name": "siteName",
+  "project name": "siteName",
+  "project number": "projectNumber",
+  "project no": "projectNumber",
+  "project no.": "projectNumber",
   "co.ordinator": "coOrdinator",
   "co ordinator": "coOrdinator",
   coordinator: "coOrdinator",
@@ -66,7 +73,8 @@ const HEADER_ALIASES: Record<string, FieldKey> = {
   dlp: "dlpMonths",
   "total period of project": "totalPeriodMonths",
   "total period": "totalPeriodMonths",
-  "commencement date": "commencementDate",
+  "commencement date": "startDate",
+  "start date": "startDate",
   "last billed month": "lastBilledMonth",
   "last billed date": "lastBilledDate",
   "mm (const. period)": "mmConstruction",
@@ -135,6 +143,7 @@ export function downloadSubStaffImportTemplate() {
     "Staff Name": "A Mahesh",
     Designation: "AHE",
     Client: "MORTH NANDYAL",
+    "Project Number": "",
     "Co.Ordinator": "Mr. Ashish Phanse",
     Rate: 65000,
     "CONSTRUCTION PERIOD(MONTHS)": 24,
@@ -151,7 +160,7 @@ export function downloadSubStaffImportTemplate() {
     REMARK: ""
   };
   const sheet = XLSX.utils.json_to_sheet([sample], { header: [...SUB_STAFF_IMPORT_HEADERS] });
-  sheet["!cols"] = [18, 16, 20, 20, 10, 16, 12, 16, 16, 16, 16, 14, 10, 10, 10, 10, 20].map((wch) => ({ wch }));
+  sheet["!cols"] = [18, 16, 20, 16, 20, 10, 16, 12, 16, 16, 16, 16, 14, 10, 10, 10, 10, 20].map((wch) => ({ wch }));
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, sheet, "Sub-Professional Staff");
 
@@ -159,6 +168,12 @@ export function downloadSubStaffImportTemplate() {
     ["Sub-Professional Staff — Excel Import Guide"],
     [],
     ["This matches your existing NHAI-Morth register columns — only the raw input columns are needed."],
+    [],
+    ["Client is matched to an existing project by name, or a new project is created automatically if"],
+    ["it doesn't exist yet — that new project then shows up everywhere else in the app too."],
+    [],
+    ["Project Number is optional — leave it blank if you don't have one yet; you (or anyone) can add it"],
+    ["later by editing the record, and it updates the real project."],
     [],
     ["Balance MM, elapsed/remaining months and the suggested Days-Per-Month are all calculated"],
     ["automatically in the app from Total MM, Used MM, Commencement Date and Total Period — don't add"],
@@ -228,12 +243,13 @@ export function readSubStaffImportFile(file: ArrayBuffer): {
       staffName,
       designation: cellString(raw.designation),
       siteName: cellString(raw.siteName),
+      projectNumber: cellString(raw.projectNumber),
       coOrdinator: cellString(raw.coOrdinator),
       rate: cellNumberString(raw.rate),
       constructionPeriodMonths: cellNumberString(raw.constructionPeriodMonths),
       dlpMonths: cellNumberString(raw.dlpMonths),
       totalPeriodMonths: cellNumberString(raw.totalPeriodMonths),
-      commencementDate: parseStaffDateCell(raw.commencementDate).date,
+      startDate: parseStaffDateCell(raw.startDate).date,
       lastBilledMonth: parseStaffDateCell(raw.lastBilledMonth).date,
       lastBilledDate: parseStaffDateCell(raw.lastBilledDate).date,
       mmConstruction: cellNumberString(raw.mmConstruction),

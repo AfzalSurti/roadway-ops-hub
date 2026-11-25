@@ -6,6 +6,7 @@ const status = z.enum(["ACTIVE", "LEFT"]);
 export const upsertSubStaffAssignmentSchema = z.object({
   siteName: z.string().trim().max(200).optional(),
   projectId: z.string().min(1).nullable().optional(),
+  projectNumber: z.string().trim().max(40).optional(),
   staffName: z.string().trim().max(200).optional(),
   designation: z.string().trim().max(200).optional(),
   coOrdinator: z.string().trim().max(200).optional(),
@@ -13,7 +14,8 @@ export const upsertSubStaffAssignmentSchema = z.object({
   constructionPeriodMonths: numeric,
   dlpMonths: numeric,
   totalPeriodMonths: numeric,
-  commencementDate: z.string().trim().max(40).nullable().optional(),
+  startDate: z.string().trim().max(40).nullable().optional(),
+  endDate: z.string().trim().max(40).nullable().optional(),
   lastBilledMonth: z.string().trim().max(40).nullable().optional(),
   lastBilledDate: z.string().trim().max(40).nullable().optional(),
   mmConstruction: numeric,
@@ -22,8 +24,7 @@ export const upsertSubStaffAssignmentSchema = z.object({
   totalMm: numeric,
   usedMm: numeric,
   remark: z.string().trim().max(2000).optional(),
-  status: status.optional(),
-  leftDate: z.string().trim().max(40).nullable().optional()
+  status: status.optional()
 });
 
 export const bulkImportSubStaffAssignmentsSchema = z.object({

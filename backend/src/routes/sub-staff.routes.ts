@@ -23,6 +23,7 @@ subStaffRouter.post(
   validate(bulkImportSubStaffAssignmentsSchema),
   asyncHandler(subStaffController.bulkImport)
 );
+subStaffRouter.get("/options", asyncHandler(subStaffController.getOptions));
 subStaffRouter.get("/clashes", asyncHandler(subStaffController.getClashReport));
 subStaffRouter.get("/plan", asyncHandler(subStaffController.getPlanGrid));
 subStaffRouter.post("/plan/generate", validate(generatePlanSchema), asyncHandler(subStaffController.generatePlan));

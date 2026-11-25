@@ -692,6 +692,8 @@ export type SubStaffAssignment = {
   id: string;
   siteName: string;
   projectId: string | null;
+  /** The linked project's own number, if any — not a column on this record, just surfaced for display/editing. */
+  projectNumber: string | null;
   staffName: string;
   designation: string;
   coOrdinator: string;
@@ -699,7 +701,8 @@ export type SubStaffAssignment = {
   constructionPeriodMonths: number;
   dlpMonths: number;
   totalPeriodMonths: number;
-  commencementDate: string | null;
+  startDate: string | null;
+  endDate: string | null;
   lastBilledMonth: string | null;
   lastBilledDate: string | null;
   mmConstruction: number;
@@ -709,10 +712,14 @@ export type SubStaffAssignment = {
   usedMm: number;
   remark: string;
   status: SubStaffAssignmentStatus;
-  leftDate: string | null;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
+};
+
+export type SubStaffOptions = {
+  designations: string[];
+  staffNames: string[];
 };
 
 export type SubStaffAssignmentMetrics = {

@@ -37,6 +37,11 @@ export const subStaffController = {
     return sendSuccess(res, { deleted: true });
   },
 
+  async getOptions(_req: Request, res: Response) {
+    const result = await subStaffService.getOptions();
+    return sendSuccess(res, result);
+  },
+
   async getClashReport(_req: Request, res: Response) {
     const result = await subStaffService.getClashReport();
     return sendSuccess(res, result);

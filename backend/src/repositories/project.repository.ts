@@ -17,6 +17,9 @@ export const projectRepository = {
   findByName(name: string) {
     return prisma.project.findUnique({ where: { name } });
   },
+  findByNameCaseInsensitive(name: string) {
+    return prisma.project.findFirst({ where: { name: { equals: name, mode: "insensitive" } } });
+  },
   findFirstByProjectNumber(projectNumber: string) {
     return prisma.project.findFirst({
       where: { projectNumber },
