@@ -451,14 +451,17 @@ export default function StaffPlanning() {
                           {totalDays.toFixed(1)} / 30 days this month
                         </Badge>
                       </div>
-                      <table className="w-full text-xs">
+                      <table className="w-full text-xs min-w-[1100px]">
                         <thead>
                           <tr className="border-b border-border/30 text-muted-foreground">
                             <th className="text-left p-2 font-medium">Site</th>
                             <th className="text-left p-2 font-medium">Designation</th>
-                            <th className="text-right p-2 font-medium">Staff Balance MM</th>
-                            <th className="text-right p-2 font-medium">Project Remaining Months</th>
-                            <th className="text-right p-2 font-medium">Suggested Days/Mo</th>
+                            <th className="text-right p-2 font-medium">Staff Balance MM (Constr.)</th>
+                            <th className="text-right p-2 font-medium">Staff Balance MM (DLP)</th>
+                            <th className="text-right p-2 font-medium">Project Remaining Months (Constr.)</th>
+                            <th className="text-right p-2 font-medium">Project Remaining Months (DLP)</th>
+                            <th className="text-right p-2 font-medium">Constr. Suggested Days</th>
+                            <th className="text-right p-2 font-medium">DLP Suggested Days</th>
                             <th className="text-right p-2 font-medium w-28">Planned Days</th>
                           </tr>
                         </thead>
@@ -477,15 +480,25 @@ export default function StaffPlanning() {
                                 ) : (
                                   "—"
                                 )}
+                                {row.metrics.remainingConsMonths <= 0 && row.metrics.remainingDlpMonths <= 0 && (
+                                  <Badge variant="secondary" className="ml-2 align-middle">
+                                    Completed
+                                  </Badge>
+                                )}
                               </td>
                               <td className="p-2">{row.assignment.designation || "—"}</td>
-                              <td className="p-2 text-right tabular-nums">{row.metrics.balanceMm.toFixed(2)}</td>
                               <td className="p-2 text-right tabular-nums">
-                                {row.metrics.totalRemainingMonths.toFixed(2)}
+                                {row.metrics.staffBalanceMmConstruction.toFixed(2)}
                               </td>
+                              <td className="p-2 text-right tabular-nums">{row.metrics.staffBalanceMmDlp.toFixed(2)}</td>
                               <td className="p-2 text-right tabular-nums">
-                                {row.metrics.suggestedDaysPerMonth.toFixed(1)}
+                                {row.metrics.remainingConsMonths.toFixed(2)}
                               </td>
+                              <td className="p-2 text-right tabular-nums">{row.metrics.remainingDlpMonths.toFixed(2)}</td>
+                              <td className="p-2 text-right tabular-nums">
+                                {row.metrics.suggestedDaysConstruction.toFixed(1)}
+                              </td>
+                              <td className="p-2 text-right tabular-nums">{row.metrics.suggestedDaysDlp.toFixed(1)}</td>
                               <td className="p-2 text-right">
                                 <Input
                                   type="number"

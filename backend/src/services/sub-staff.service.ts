@@ -144,16 +144,32 @@ const DESIGNATION_SEED = [
 export type AssignmentMetrics = {
   balanceMm: number;
   elapsedMonths: number;
+  /** Sum of the two phases below — used for cross-project priority (whichever project finishes soonest). */
   totalRemainingMonths: number;
-  /** Uncapped — a value above 30 is itself a signal this assignment is behind schedule. */
+  /** Sum of the two phases below — the figure the monthly planner actually allocates against. */
   suggestedDaysPerMonth: number;
+  remainingConsMonths: number;
+  /** DLP + EOT combined — EOT doesn't get its own column, but its time must still count somewhere. */
+  remainingDlpMonths: number;
+  staffBalanceMmConstruction: number;
+  staffBalanceMmDlp: number;
+  suggestedDaysConstruction: number;
+  suggestedDaysDlp: number;
 };
 
-/** All figures the client's own sheet computes from the raw fields, derived live instead of stored. */
+/**
+ * Matches the client's own "NHAI-Morth" sheet exactly (verified against its real Construction/DLP
+ * columns): whichever phase is still in progress gets the *entire* remaining balance — it's not split
+ * proportionally. Once Construction's elapsed time catches up to its contracted length, every bit of
+ * unused balance "moves into" DLP (DLP here folding in EOT too, since EOT has no column of its own).
+ */
 export function computeMetrics(
   assignment: {
     startDate: Date | null;
     endDate: Date | null;
+    constructionPeriodMonths: number;
+    dlpMonths: number;
+    eotMonths: number;
     totalPeriodMonths: number;
     totalMm: number;
     usedMm: number;
@@ -162,15 +178,48 @@ export function computeMetrics(
 ): AssignmentMetrics {
   const balanceMm = round2(assignment.totalMm - assignment.usedMm);
   const elapsedMonths = assignment.startDate ? monthsBetween(assignment.startDate, asOf) : 0;
-  const effectiveEndDate = assignment.endDate ?? defaultEndDate(assignment.startDate, assignment.totalPeriodMonths);
-  const totalRemainingMonths = effectiveEndDate ? Math.max(0, round2(monthsBetween(asOf, effectiveEndDate))) : 0;
-  const suggestedDaysPerMonth =
-    totalRemainingMonths > 0 && balanceMm > 0
-      ? round2((balanceMm / totalRemainingMonths) * 30)
-      : balanceMm > 0
-        ? 30
-        : 0;
-  return { balanceMm, elapsedMonths: round2(elapsedMonths), totalRemainingMonths, suggestedDaysPerMonth };
+
+  const constructionPeriodMonths = assignment.constructionPeriodMonths || 0;
+  const dlpWindowMonths = (assignment.dlpMonths || 0) + (assignment.eotMonths || 0);
+
+  const billedConsMonths = Math.min(Math.max(elapsedMonths, 0), constructionPeriodMonths);
+  const billedDlpMonths = Math.min(Math.max(elapsedMonths - constructionPeriodMonths, 0), dlpWindowMonths);
+  const remainingConsMonths = round2(Math.max(0, constructionPeriodMonths - billedConsMonths));
+  const remainingDlpMonths = round2(Math.max(0, dlpWindowMonths - billedDlpMonths));
+
+  const staffBalanceMmConstruction = remainingConsMonths > 0 ? balanceMm : 0;
+  const staffBalanceMmDlp = remainingConsMonths <= 0 && remainingDlpMonths > 0 ? balanceMm : 0;
+
+  const suggestedDaysConstruction =
+    remainingConsMonths > 0 ? round2((staffBalanceMmConstruction / remainingConsMonths) * 30) : 0;
+  const suggestedDaysDlp =
+    remainingConsMonths <= 0 && remainingDlpMonths > 0
+      ? round2((staffBalanceMmDlp / remainingDlpMonths) * 30)
+      : 0;
+
+  const totalRemainingMonths = round2(remainingConsMonths + remainingDlpMonths);
+  let suggestedDaysPerMonth = round2(suggestedDaysConstruction + suggestedDaysDlp);
+  // Neither phase has any contracted time left (e.g. period fields were never filled in on an older
+  // record) but there's still an unclaimed balance — fall back to the old whole-period estimate so the
+  // balance isn't silently stranded at 0 days/month forever.
+  if (totalRemainingMonths <= 0 && balanceMm > 0) {
+    const effectiveEndDate = assignment.endDate ?? defaultEndDate(assignment.startDate, assignment.totalPeriodMonths);
+    const fallbackRemaining = effectiveEndDate ? Math.max(0, monthsBetween(asOf, effectiveEndDate)) : 0;
+    suggestedDaysPerMonth = fallbackRemaining > 0 ? round2((balanceMm / fallbackRemaining) * 30) : 30;
+  }
+
+  return {
+    balanceMm,
+    elapsedMonths: round2(elapsedMonths),
+    totalRemainingMonths,
+    suggestedDaysPerMonth,
+    remainingConsMonths,
+    remainingDlpMonths,
+    staffBalanceMmConstruction,
+    staffBalanceMmDlp,
+    suggestedDaysConstruction,
+    suggestedDaysDlp
+  };
 }
 
 /** Flattens the linked project's number onto the assignment — it's a display/edit convenience, not a

@@ -728,6 +728,12 @@ export type SubStaffAssignmentMetrics = {
   elapsedMonths: number;
   totalRemainingMonths: number;
   suggestedDaysPerMonth: number;
+  remainingConsMonths: number;
+  remainingDlpMonths: number;
+  staffBalanceMmConstruction: number;
+  staffBalanceMmDlp: number;
+  suggestedDaysConstruction: number;
+  suggestedDaysDlp: number;
 };
 
 export type SubStaffClashReport = {
