@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Wand2 } from "lucide-react";
 import type { SubStaffPlanRow } from "@/lib/domain";
 
 /**
@@ -23,7 +25,7 @@ export function SubStaffPlanTable({
 }) {
   return (
     <div className="overflow-x-auto rounded-xl border border-border/40">
-      <table className="w-full text-xs min-w-[1250px]">
+      <table className="w-full text-xs min-w-[1400px]">
         <thead>
           <tr className="border-b border-border/30 text-muted-foreground">
             <th className="text-left p-2 font-medium">{firstColumnLabel}</th>
@@ -36,6 +38,7 @@ export function SubStaffPlanTable({
             <th className="text-right p-2 font-medium">DLP Suggested Days</th>
             <th className="text-right p-2 font-medium w-28">Contract Planned Days</th>
             <th className="text-right p-2 font-medium w-28">DLP Planned Days</th>
+            <th className="text-left p-2 font-medium">&nbsp;</th>
           </tr>
         </thead>
         <tbody>
@@ -91,6 +94,22 @@ export function SubStaffPlanTable({
                       if (next !== row.plannedDaysDlp) onEditPlanDay(row.assignment.id, "dlp", next);
                     }}
                   />
+                </td>
+                <td className="p-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="gap-1 h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                    title="Fill both Planned Days boxes with the computed Suggested Days"
+                    onClick={() => {
+                      onEditPlanDay(row.assignment.id, "construction", row.metrics.suggestedDaysConstruction);
+                      onEditPlanDay(row.assignment.id, "dlp", row.metrics.suggestedDaysDlp);
+                    }}
+                  >
+                    <Wand2 className="h-3.5 w-3.5" />
+                    Use Suggested
+                  </Button>
                 </td>
               </tr>
             );
