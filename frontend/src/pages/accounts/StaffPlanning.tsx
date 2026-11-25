@@ -639,6 +639,9 @@ export default function StaffPlanning() {
         onClose={() => setProfileProjectName(null)}
         designationFilter={searchDesignation}
         staffNameFilter={searchName}
+        designationOptions={options?.designations ?? []}
+        staffNameOptions={options?.staffNames ?? []}
+        projectOptions={projectOptions}
       />
     </PageWrapper>
   );

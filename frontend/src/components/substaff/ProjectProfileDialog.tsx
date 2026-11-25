@@ -1,7 +1,8 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Bar, BarChart, CartesianGrid, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "@/lib/api";
+import type { SubStaffAssignment } from "@/lib/domain";
 import {
   Dialog,
   DialogContent,
@@ -13,9 +14,11 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ChartContainer } from "@/components/ui/chart";
-import { Download, Loader2 } from "lucide-react";
+import { Download, Loader2, UserCog } from "lucide-react";
 import { downloadProjectStaffReport } from "@/lib/sub-staff-pdf";
 import { buildMonthlyBreakdown, type MonthlyBreakdownMonth } from "@/lib/sub-staff-timeline";
+import { ReplaceStaffDialog } from "@/components/substaff/ReplaceStaffDialog";
+import type { ProjectOption } from "@/components/substaff/SubStaffFormFields";
 
 function money(value: number) {
   return new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 }).format(value || 0);
@@ -54,7 +57,10 @@ export function ProjectProfileDialog({
   projectName,
   onClose,
   designationFilter = "",
-  staffNameFilter = ""
+  staffNameFilter = "",
+  designationOptions,
+  staffNameOptions,
+  projectOptions
 }: {
   projectName: string | null;
   onClose: () => void;
@@ -62,7 +68,11 @@ export function ProjectProfileDialog({
    * what the user was already looking at, not every record on the project. */
   designationFilter?: string;
   staffNameFilter?: string;
+  designationOptions: string[];
+  staffNameOptions: string[];
+  projectOptions: ProjectOption[];
 }) {
+  const [replacingAssignment, setReplacingAssignment] = useState<SubStaffAssignment | null>(null);
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["sub-staff-project-profile", projectName],
     queryFn: () => api.getSubStaffAssignments({ siteName: projectName ?? undefined }),
@@ -88,6 +98,7 @@ export function ProjectProfileDialog({
   const filtersActive = Boolean(designationFilter.trim() || staffNameFilter.trim());
 
   return (
+    <>
     <Dialog open={Boolean(projectName)} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-6xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
@@ -107,7 +118,7 @@ export function ProjectProfileDialog({
         ) : (
           <div className="space-y-6">
             <div className="overflow-x-auto rounded-xl border border-border/40">
-              <table className="w-full text-xs min-w-[820px]">
+              <table className="w-full text-xs min-w-[920px]">
                 <thead>
                   <tr className="bg-secondary/30 text-muted-foreground">
                     <th className="p-2 text-left font-medium">Staff Name</th>
@@ -120,6 +131,7 @@ export function ProjectProfileDialog({
                     <th className="p-2 text-left font-medium">Start</th>
                     <th className="p-2 text-left font-medium">End</th>
                     <th className="p-2 text-left font-medium">Status</th>
+                    <th className="p-2 text-left font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -138,6 +150,22 @@ export function ProjectProfileDialog({
                       <td className="p-2 whitespace-nowrap">{formatDate(entry.endDate)}</td>
                       <td className="p-2">
                         <Badge variant={entry.status === "ACTIVE" ? "secondary" : "outline"}>{entry.status}</Badge>
+                      </td>
+                      <td className="p-2">
+                        {entry.status === "ACTIVE" ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="gap-1 h-7 text-xs"
+                            onClick={() => setReplacingAssignment(entry)}
+                          >
+                            <UserCog className="h-3.5 w-3.5" />
+                            Replace
+                          </Button>
+                        ) : (
+                          "—"
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -217,5 +245,13 @@ export function ProjectProfileDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    <ReplaceStaffDialog
+      assignment={replacingAssignment}
+      onClose={() => setReplacingAssignment(null)}
+      designationOptions={designationOptions}
+      staffNameOptions={staffNameOptions}
+      projectOptions={projectOptions}
+    />
+    </>
   );
 }
