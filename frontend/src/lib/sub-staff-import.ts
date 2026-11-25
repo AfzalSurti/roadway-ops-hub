@@ -105,10 +105,13 @@ function cellString(value: unknown) {
   return String(value).trim();
 }
 
-function cellNumberString(value: unknown): string {
-  if (value === null || value === undefined || value === "") return "";
+/** Returns the parsed number as text, or flags `invalid` when the cell had content that isn't a number
+ * (so the caller can surface it instead of silently importing a blank). */
+function cellNumberResult(value: unknown): { text: string; invalid: boolean } {
+  if (value === null || value === undefined || value === "") return { text: "", invalid: false };
   const num = Number(value);
-  return Number.isFinite(num) ? String(num) : "";
+  if (Number.isFinite(num)) return { text: String(num), invalid: false };
+  return { text: "", invalid: true };
 }
 
 function isRowEmpty(values: unknown[]) {
@@ -139,6 +142,9 @@ function parseStaffDateCell(value: unknown): { date: string; error?: string } {
 export type ParsedSubStaffImportRow = {
   excelRow: number;
   form: SubStaffFormState;
+  /** Cells that were missing or couldn't be read as a number/date — the row still imports (left blank
+   * or defaulted), but these are surfaced so the user can review and fix them before or after import. */
+  issues: string[];
 };
 
 export type SubStaffImportParseIssue = { excelRow: number; message: string };
@@ -244,31 +250,46 @@ export function readSubStaffImportFile(file: ArrayBuffer): {
       continue;
     }
 
+    const issues: string[] = [];
+    const num = (label: string, rawValue: unknown): string => {
+      const { text, invalid } = cellNumberResult(rawValue);
+      if (invalid) issues.push(`${label}: "${cellString(rawValue)}" isn't a number — left blank, please fix`);
+      return text;
+    };
+    const startDateParsed = parseStaffDateCell(raw.startDate);
+    if (!startDateParsed.date && cellString(raw.startDate)) {
+      issues.push(`Commencement Date: "${cellString(raw.startDate)}" isn't a recognized date — left blank, please fix`);
+    }
+    const siteName = cellString(raw.siteName);
+    if (!siteName) issues.push("Client/Project: missing — this row won't be linked to a project until you add one");
+    const designation = cellString(raw.designation);
+    if (!designation) issues.push("Designation: missing");
+
     let form: SubStaffFormState = {
       ...emptySubStaffForm,
       staffName,
-      designation: cellString(raw.designation),
-      siteName: cellString(raw.siteName),
+      designation,
+      siteName,
       projectNumber: cellString(raw.projectNumber),
       coOrdinator: cellString(raw.coOrdinator),
-      rate: cellNumberString(raw.rate),
-      constructionPeriodMonths: cellNumberString(raw.constructionPeriodMonths),
-      dlpMonths: cellNumberString(raw.dlpMonths),
-      eotMonths: cellNumberString(raw.eotMonths),
-      totalPeriodMonths: cellNumberString(raw.totalPeriodMonths),
-      startDate: parseStaffDateCell(raw.startDate).date,
+      rate: num("Rate", raw.rate),
+      constructionPeriodMonths: num("Construction Period", raw.constructionPeriodMonths),
+      dlpMonths: num("DLP", raw.dlpMonths),
+      eotMonths: num("EOT", raw.eotMonths),
+      totalPeriodMonths: num("Total Period", raw.totalPeriodMonths),
+      startDate: startDateParsed.date,
       lastBilledMonth: parseStaffDateCell(raw.lastBilledMonth).date,
       lastBilledDate: parseStaffDateCell(raw.lastBilledDate).date,
-      mmConstruction: cellNumberString(raw.mmConstruction),
-      mmDlp: cellNumberString(raw.mmDlp),
-      mmEot: cellNumberString(raw.mmEot),
-      totalMm: cellNumberString(raw.totalMm),
-      usedMm: cellNumberString(raw.usedMm),
+      mmConstruction: num("MM (Const.)", raw.mmConstruction),
+      mmDlp: num("MM (DLP)", raw.mmDlp),
+      mmEot: num("MM (EOT)", raw.mmEot),
+      totalMm: num("Total MM", raw.totalMm),
+      usedMm: num("Used MM", raw.usedMm),
       remark: cellString(raw.remark)
     };
     form = applySubStaffDefaults(form);
 
-    rows.push({ excelRow, form });
+    rows.push({ excelRow, form, issues });
   }
 
   return { rows, errors };

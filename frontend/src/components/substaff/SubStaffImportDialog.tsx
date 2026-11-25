@@ -7,10 +7,17 @@ import {
   type ParsedSubStaffImportRow,
   type SubStaffImportParseIssue
 } from "@/lib/sub-staff-import";
-import { subStaffFormToPayload } from "@/components/substaff/SubStaffFormFields";
+import {
+  SubStaffFormFields,
+  subStaffFormToPayload,
+  applySubStaffDefaults,
+  type ProjectOption,
+  type SubStaffFormState
+} from "@/components/substaff/SubStaffFormFields";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Download, FileUp, Loader2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { AlertTriangle, ChevronDown, ChevronUp, Download, FileUp, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 type ImportResultState = {
@@ -21,10 +28,16 @@ type ImportResultState = {
 
 export function SubStaffImportDialog({
   open,
-  onOpenChange
+  onOpenChange,
+  designationOptions,
+  staffNameOptions,
+  projectOptions
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  designationOptions: string[];
+  staffNameOptions: string[];
+  projectOptions: ProjectOption[];
 }) {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -32,12 +45,14 @@ export function SubStaffImportDialog({
   const [parseErrors, setParseErrors] = useState<SubStaffImportParseIssue[]>([]);
   const [importResult, setImportResult] = useState<ImportResultState | null>(null);
   const [fileName, setFileName] = useState("");
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
 
   const resetState = () => {
     setParsedRows([]);
     setParseErrors([]);
     setImportResult(null);
     setFileName("");
+    setExpandedIndex(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -76,6 +91,7 @@ export function SubStaffImportDialog({
     setImportResult(null);
     setParsedRows([]);
     setParseErrors([]);
+    setExpandedIndex(null);
     setFileName(file?.name ?? "");
     if (!file) return;
     try {
@@ -83,12 +99,17 @@ export function SubStaffImportDialog({
       const { rows, errors } = readSubStaffImportFile(buffer);
       setParsedRows(rows);
       setParseErrors(errors);
+      const flaggedCount = rows.filter((r) => r.issues.length > 0).length;
       if (rows.length === 0 && errors.length === 0) {
         toast.error("No data rows found in the Excel file");
       } else if (rows.length === 0) {
         toast.error("No valid rows to import — fix the errors listed below");
-      } else if (errors.length > 0) {
-        toast.message(`${rows.length} valid row(s), ${errors.length} row(s) with problems`);
+      } else if (flaggedCount > 0 || errors.length > 0) {
+        toast.message(
+          `${rows.length} row(s) parsed — ${flaggedCount} flagged for review${
+            errors.length > 0 ? `, ${errors.length} skipped` : ""
+          }`
+        );
       } else {
         toast.success(`${rows.length} row(s) ready to import`);
       }
@@ -99,14 +120,15 @@ export function SubStaffImportDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Import staff from Excel</DialogTitle>
           <DialogDescription>
             Matches your existing staff register columns (Staff Name, Designation, Client, Rate, periods,
             man-months). Balance MM and suggested Days Per Month calculate automatically. Download the
-            sample for the correct columns. Valid rows are saved; a problem row is skipped and its reason
-            is shown, other rows still import.
+            sample for the correct columns. A row with a missing/unreadable cell still imports (left blank
+            or defaulted) but is flagged below for review — open it and fix the value before importing. A
+            row missing Staff Name entirely can't be imported and is listed separately.
           </DialogDescription>
         </DialogHeader>
 
@@ -159,6 +181,75 @@ export function SubStaffImportDialog({
                   </li>
                 ))}
               </ul>
+            </div>
+          ) : null}
+
+          {!importResult && parsedRows.some((r) => r.issues.length > 0) ? (
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 space-y-2">
+              <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 inline-flex items-center gap-1.5">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                {parsedRows.filter((r) => r.issues.length > 0).length} row(s) flagged for review — they'll still
+                import, but check these
+              </p>
+              <div className="max-h-72 overflow-auto space-y-1.5">
+                {parsedRows.map((row, index) => {
+                  if (row.issues.length === 0) return null;
+                  const isOpen = expandedIndex === index;
+                  return (
+                    <div key={row.excelRow} className="rounded-lg border border-border/40 bg-background/60">
+                      <button
+                        type="button"
+                        className="w-full flex items-center justify-between gap-2 p-2 text-left text-xs"
+                        onClick={() => setExpandedIndex(isOpen ? null : index)}
+                      >
+                        <span>
+                          Excel row {row.excelRow} — <span className="font-medium">{row.form.staffName}</span>{" "}
+                          <Badge variant="outline" className="ml-1">
+                            {row.issues.length} issue{row.issues.length > 1 ? "s" : ""}
+                          </Badge>
+                        </span>
+                        {isOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                      </button>
+                      <ul className="px-3 pb-2 space-y-0.5 text-xs text-muted-foreground">
+                        {row.issues.map((msg) => (
+                          <li key={msg}>• {msg}</li>
+                        ))}
+                      </ul>
+                      {isOpen ? (
+                        <div className="border-t border-border/30 p-3 space-y-3">
+                          <SubStaffFormFields
+                            value={row.form}
+                            onChange={(patch: Partial<SubStaffFormState>) => {
+                              const changedKey = Object.keys(patch)[0] as keyof SubStaffFormState;
+                              setParsedRows((prev) =>
+                                prev.map((r, i) =>
+                                  i === index
+                                    ? { ...r, form: applySubStaffDefaults({ ...r.form, ...patch }, changedKey) }
+                                    : r
+                                )
+                              );
+                            }}
+                            designationOptions={designationOptions}
+                            staffNameOptions={staffNameOptions}
+                            projectOptions={projectOptions}
+                          />
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => {
+                              setParsedRows((prev) => prev.map((r, i) => (i === index ? { ...r, issues: [] } : r)));
+                              setExpandedIndex(null);
+                            }}
+                          >
+                            Mark reviewed
+                          </Button>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           ) : null}
 

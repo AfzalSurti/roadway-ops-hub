@@ -714,6 +714,8 @@ export type SubStaffAssignment = {
   remark: string;
   status: SubStaffAssignmentStatus;
   sortOrder: number;
+  /** Every month this assignment has a planned-days entry for — powers the month-by-month breakdown views. */
+  inputPlans: Array<{ year: number; month: number; plannedDays: number; autoPlanned: boolean }>;
   createdAt: string;
   updatedAt: string;
 };

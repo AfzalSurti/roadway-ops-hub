@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -92,6 +93,10 @@ export default function StaffPlanning() {
   const projectOptions = useMemo(
     () => projects.map((p) => ({ id: p.id, name: p.name, projectNumber: p.projectNumber ?? null })),
     [projects]
+  );
+  const projectNameOptions = useMemo(
+    () => projectOptions.map((p) => p.name).filter(Boolean),
+    [projectOptions]
   );
 
   const { data: clashReport } = useQuery({
@@ -239,23 +244,32 @@ export default function StaffPlanning() {
                 <SelectItem value="LEFT">Left</SelectItem>
               </SelectContent>
             </Select>
-            <Input
-              className="max-w-[200px]"
-              placeholder="Search staff name..."
+            <SearchableSelect
+              className="w-[200px]"
               value={searchName}
-              onChange={(e) => setSearchName(e.target.value)}
+              onChange={setSearchName}
+              options={options?.staffNames ?? []}
+              placeholder="Staff name"
+              searchPlaceholder="Search staff name..."
+              allLabel="All staff"
             />
-            <Input
-              className="max-w-[180px]"
-              placeholder="Search designation..."
+            <SearchableSelect
+              className="w-[180px]"
               value={searchDesignation}
-              onChange={(e) => setSearchDesignation(e.target.value)}
+              onChange={setSearchDesignation}
+              options={options?.designations ?? []}
+              placeholder="Designation"
+              searchPlaceholder="Search designation..."
+              allLabel="All designations"
             />
-            <Input
-              className="max-w-[180px]"
-              placeholder="Search project..."
+            <SearchableSelect
+              className="w-[200px]"
               value={searchProject}
-              onChange={(e) => setSearchProject(e.target.value)}
+              onChange={setSearchProject}
+              options={projectNameOptions}
+              placeholder="Project"
+              searchPlaceholder="Search project..."
+              allLabel="All projects"
             />
             <div className="ml-auto flex flex-wrap gap-2">
               <Button size="sm" variant="outline" className="gap-1.5" onClick={() => downloadSubStaffImportTemplate()}>
@@ -399,23 +413,32 @@ export default function StaffPlanning() {
             </Button>
           </div>
           <div className="glass-panel p-4 flex flex-wrap items-center gap-3">
-            <Input
-              className="max-w-[200px]"
-              placeholder="Search staff name..."
+            <SearchableSelect
+              className="w-[200px]"
               value={planSearchName}
-              onChange={(e) => setPlanSearchName(e.target.value)}
+              onChange={setPlanSearchName}
+              options={options?.staffNames ?? []}
+              placeholder="Staff name"
+              searchPlaceholder="Search staff name..."
+              allLabel="All staff"
             />
-            <Input
-              className="max-w-[180px]"
-              placeholder="Search designation..."
+            <SearchableSelect
+              className="w-[180px]"
               value={planSearchDesignation}
-              onChange={(e) => setPlanSearchDesignation(e.target.value)}
+              onChange={setPlanSearchDesignation}
+              options={options?.designations ?? []}
+              placeholder="Designation"
+              searchPlaceholder="Search designation..."
+              allLabel="All designations"
             />
-            <Input
-              className="max-w-[180px]"
-              placeholder="Search project..."
+            <SearchableSelect
+              className="w-[200px]"
               value={planSearchProject}
-              onChange={(e) => setPlanSearchProject(e.target.value)}
+              onChange={setPlanSearchProject}
+              options={projectNameOptions}
+              placeholder="Project"
+              searchPlaceholder="Search project..."
+              allLabel="All projects"
             />
             <p className="text-xs text-muted-foreground">
               Auto-fills each person's days per site from balance MM, remaining time and rate — edits you
@@ -598,9 +621,25 @@ export default function StaffPlanning() {
         </DialogContent>
       </Dialog>
 
-      <SubStaffImportDialog open={showImport} onOpenChange={setShowImport} />
-      <StaffProfileDialog staffName={profileStaffName} onClose={() => setProfileStaffName(null)} />
-      <ProjectProfileDialog projectName={profileProjectName} onClose={() => setProfileProjectName(null)} />
+      <SubStaffImportDialog
+        open={showImport}
+        onOpenChange={setShowImport}
+        designationOptions={options?.designations ?? []}
+        staffNameOptions={options?.staffNames ?? []}
+        projectOptions={projectOptions}
+      />
+      <StaffProfileDialog
+        staffName={profileStaffName}
+        onClose={() => setProfileStaffName(null)}
+        designationFilter={searchDesignation}
+        projectFilter={searchProject}
+      />
+      <ProjectProfileDialog
+        projectName={profileProjectName}
+        onClose={() => setProfileProjectName(null)}
+        designationFilter={searchDesignation}
+        staffNameFilter={searchName}
+      />
     </PageWrapper>
   );
 }
