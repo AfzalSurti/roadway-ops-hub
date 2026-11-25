@@ -12,7 +12,8 @@ export const subStaffController = {
     const result = await subStaffService.list({
       status: strParam(req.query.status) as SubStaffAssignmentStatus | undefined,
       staffName: strParam(req.query.staffName),
-      siteName: strParam(req.query.siteName)
+      siteName: strParam(req.query.siteName),
+      designation: strParam(req.query.designation)
     });
     return sendSuccess(res, result);
   },

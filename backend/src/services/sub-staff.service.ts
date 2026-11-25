@@ -179,7 +179,12 @@ function serializeAssignment<T extends { project?: { projectNumber: string | nul
 }
 
 export const subStaffService = {
-  async list(filters: { status?: SubStaffAssignmentStatus; staffName?: string; siteName?: string }) {
+  async list(filters: {
+    status?: SubStaffAssignmentStatus;
+    staffName?: string;
+    siteName?: string;
+    designation?: string;
+  }) {
     const rows = await subStaffRepository.list(filters);
     return rows.map(serializeAssignment);
   },

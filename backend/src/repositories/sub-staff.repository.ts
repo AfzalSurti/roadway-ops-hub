@@ -4,12 +4,18 @@ import type { Prisma, SubStaffAssignmentStatus } from "@prisma/client";
 const projectSelect = { id: true, name: true, projectNumber: true } as const;
 
 export const subStaffRepository = {
-  list(filters: { status?: SubStaffAssignmentStatus; staffName?: string; siteName?: string }) {
+  list(filters: {
+    status?: SubStaffAssignmentStatus;
+    staffName?: string;
+    siteName?: string;
+    designation?: string;
+  }) {
     return prisma.subStaffAssignment.findMany({
       where: {
         ...(filters.status ? { status: filters.status } : {}),
         ...(filters.staffName ? { staffName: { contains: filters.staffName, mode: "insensitive" } } : {}),
-        ...(filters.siteName ? { siteName: { contains: filters.siteName, mode: "insensitive" } } : {})
+        ...(filters.siteName ? { siteName: { contains: filters.siteName, mode: "insensitive" } } : {}),
+        ...(filters.designation ? { designation: { contains: filters.designation, mode: "insensitive" } } : {})
       },
       include: { inputPlans: true, project: { select: projectSelect } },
       orderBy: [{ staffName: "asc" }, { sortOrder: "asc" }]

@@ -25,6 +25,7 @@ import {
   type SubStaffFormState
 } from "@/components/substaff/SubStaffFormFields";
 import { SubStaffImportDialog } from "@/components/substaff/SubStaffImportDialog";
+import { StaffProfileDialog } from "@/components/substaff/StaffProfileDialog";
 import { downloadSubStaffImportTemplate } from "@/lib/sub-staff-import";
 import { AlertTriangle, Download, FileUp, Loader2, Plus, RefreshCw, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
@@ -49,19 +50,31 @@ export default function StaffPlanning() {
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<"ACTIVE" | "LEFT">("ACTIVE");
   const [searchName, setSearchName] = useState("");
+  const [searchDesignation, setSearchDesignation] = useState("");
+  const [searchProject, setSearchProject] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [addForm, setAddForm] = useState<SubStaffFormState>(emptySubStaffForm);
   const [editingEntry, setEditingEntry] = useState<SubStaffAssignment | null>(null);
   const [editForm, setEditForm] = useState<SubStaffFormState>(emptySubStaffForm);
+  const [profileStaffName, setProfileStaffName] = useState<string | null>(null);
 
   const now = new Date();
   const [planYear, setPlanYear] = useState(now.getFullYear());
   const [planMonth, setPlanMonth] = useState(now.getMonth() + 1);
+  const [planSearchName, setPlanSearchName] = useState("");
+  const [planSearchDesignation, setPlanSearchDesignation] = useState("");
+  const [planSearchProject, setPlanSearchProject] = useState("");
 
   const { data: assignments = [], isLoading: loadingAssignments } = useQuery({
-    queryKey: ["sub-staff-assignments", statusFilter, searchName],
-    queryFn: () => api.getSubStaffAssignments({ status: statusFilter, staffName: searchName || undefined })
+    queryKey: ["sub-staff-assignments", statusFilter, searchName, searchDesignation, searchProject],
+    queryFn: () =>
+      api.getSubStaffAssignments({
+        status: statusFilter,
+        staffName: searchName || undefined,
+        designation: searchDesignation || undefined,
+        siteName: searchProject || undefined
+      })
   });
 
   const { data: options } = useQuery({
@@ -153,15 +166,22 @@ export default function StaffPlanning() {
   }
 
   const planByPerson = useMemo(() => {
+    const nameQ = planSearchName.trim().toLowerCase();
+    const designationQ = planSearchDesignation.trim().toLowerCase();
+    const projectQ = planSearchProject.trim().toLowerCase();
+
     const groups = new Map<string, typeof planRows>();
     for (const row of planRows) {
+      if (nameQ && !row.assignment.staffName.toLowerCase().includes(nameQ)) continue;
+      if (designationQ && !row.assignment.designation.toLowerCase().includes(designationQ)) continue;
+      if (projectQ && !row.assignment.siteName.toLowerCase().includes(projectQ)) continue;
       const key = row.assignment.staffName.trim().toLowerCase() || row.assignment.id;
       const list = groups.get(key) ?? [];
       list.push(row);
       groups.set(key, list);
     }
     return [...groups.values()].sort((a, b) => a[0].assignment.staffName.localeCompare(b[0].assignment.staffName));
-  }, [planRows]);
+  }, [planRows, planSearchName, planSearchDesignation, planSearchProject]);
 
   const yearOptions = Array.from({ length: 6 }, (_, i) => now.getFullYear() - 1 + i);
 
@@ -186,8 +206,14 @@ export default function StaffPlanning() {
           <div className="mt-2 space-y-1.5 max-h-40 overflow-auto">
             {clashReport.clashes.map((clash) => (
               <p key={clash.staffName} className="text-xs text-muted-foreground">
-                <span className="font-medium text-foreground">{clash.staffName}</span> —{" "}
-                {clash.assignments.map((a) => `${a.designation} @ ${a.siteName}`).join(" · ")}
+                <button
+                  type="button"
+                  className="font-medium text-foreground underline underline-offset-2 hover:text-primary"
+                  onClick={() => setProfileStaffName(clash.staffName)}
+                >
+                  {clash.staffName}
+                </button>{" "}
+                — {clash.assignments.map((a) => `${a.designation} @ ${a.siteName}`).join(" · ")}
               </p>
             ))}
           </div>
@@ -212,10 +238,22 @@ export default function StaffPlanning() {
               </SelectContent>
             </Select>
             <Input
-              className="max-w-xs"
+              className="max-w-[200px]"
               placeholder="Search staff name..."
               value={searchName}
               onChange={(e) => setSearchName(e.target.value)}
+            />
+            <Input
+              className="max-w-[180px]"
+              placeholder="Search designation..."
+              value={searchDesignation}
+              onChange={(e) => setSearchDesignation(e.target.value)}
+            />
+            <Input
+              className="max-w-[180px]"
+              placeholder="Search project..."
+              value={searchProject}
+              onChange={(e) => setSearchProject(e.target.value)}
             />
             <div className="ml-auto flex flex-wrap gap-2">
               <Button size="sm" variant="outline" className="gap-1.5" onClick={() => downloadSubStaffImportTemplate()}>
@@ -274,7 +312,18 @@ export default function StaffPlanning() {
                         className="border-t border-border/20 hover:bg-secondary/20 cursor-pointer"
                         onClick={() => openEdit(entry)}
                       >
-                        <td className="p-2.5 font-medium">{entry.staffName}</td>
+                        <td className="p-2.5 font-medium">
+                          <button
+                            type="button"
+                            className="underline underline-offset-2 hover:text-primary"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setProfileStaffName(entry.staffName);
+                            }}
+                          >
+                            {entry.staffName}
+                          </button>
+                        </td>
                         <td className="p-2.5">{entry.designation || "—"}</td>
                         <td className="p-2.5">{entry.siteName || "—"}</td>
                         <td className="p-2.5">{entry.projectNumber || "—"}</td>
@@ -331,6 +380,26 @@ export default function StaffPlanning() {
               <RefreshCw className="h-4 w-4" />
               {generatePlanMutation.isPending ? "Generating..." : "Generate / Refresh Plan"}
             </Button>
+          </div>
+          <div className="glass-panel p-4 flex flex-wrap items-center gap-3">
+            <Input
+              className="max-w-[200px]"
+              placeholder="Search staff name..."
+              value={planSearchName}
+              onChange={(e) => setPlanSearchName(e.target.value)}
+            />
+            <Input
+              className="max-w-[180px]"
+              placeholder="Search designation..."
+              value={planSearchDesignation}
+              onChange={(e) => setPlanSearchDesignation(e.target.value)}
+            />
+            <Input
+              className="max-w-[180px]"
+              placeholder="Search project..."
+              value={planSearchProject}
+              onChange={(e) => setPlanSearchProject(e.target.value)}
+            />
             <p className="text-xs text-muted-foreground">
               Auto-fills each person's days per site from balance MM, remaining time and rate — edits you
               make stick and won't be overwritten by a refresh.
@@ -354,7 +423,13 @@ export default function StaffPlanning() {
                   return (
                     <div key={staffName} className="rounded-xl border border-border/40 overflow-hidden">
                       <div className="px-4 py-2.5 bg-secondary/20 flex items-center justify-between gap-3">
-                        <span className="font-medium text-sm">{staffName}</span>
+                        <button
+                          type="button"
+                          className="font-medium text-sm underline underline-offset-2 hover:text-primary"
+                          onClick={() => setProfileStaffName(staffName)}
+                        >
+                          {staffName}
+                        </button>
                         <Badge variant={totalDays > 30 ? "destructive" : "secondary"}>
                           {totalDays.toFixed(1)} / 30 days this month
                         </Badge>
@@ -482,6 +557,7 @@ export default function StaffPlanning() {
       </Dialog>
 
       <SubStaffImportDialog open={showImport} onOpenChange={setShowImport} />
+      <StaffProfileDialog staffName={profileStaffName} onClose={() => setProfileStaffName(null)} />
     </PageWrapper>
   );
 }

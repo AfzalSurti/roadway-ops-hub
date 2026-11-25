@@ -1505,7 +1505,14 @@ export const api = {
     return request<SubStaffOptions>("/sub-staff/options");
   },
 
-  getSubStaffAssignments(filters: { status?: SubStaffAssignmentStatus; staffName?: string; siteName?: string } = {}) {
+  getSubStaffAssignments(
+    filters: {
+      status?: SubStaffAssignmentStatus;
+      staffName?: string;
+      siteName?: string;
+      designation?: string;
+    } = {}
+  ) {
     const params = new URLSearchParams();
     Object.entries(filters).forEach(([key, value]) => {
       if (value) params.set(key, value);
