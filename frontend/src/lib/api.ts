@@ -51,6 +51,10 @@ import type {
   PastOvertimeAccessItem,
   ProjectBillingEntry,
   ProjectBillingSummary,
+  SubStaffAssignment,
+  SubStaffAssignmentStatus,
+  SubStaffClashReport,
+  SubStaffPlanRow,
   ContractActivityItem,
   PreContractActivityItem,
   ProjectItem,
@@ -1494,6 +1498,61 @@ export const api = {
 
   getProjectBillingSummary() {
     return request<ProjectBillingSummary>("/project-billing/summary");
+  },
+
+  getSubStaffAssignments(filters: { status?: SubStaffAssignmentStatus; staffName?: string; siteName?: string } = {}) {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value) params.set(key, value);
+    });
+    const query = params.toString();
+    return request<SubStaffAssignment[]>(`/sub-staff${query ? `?${query}` : ""}`);
+  },
+
+  createSubStaffAssignment(payload: Partial<SubStaffAssignment>) {
+    return request<SubStaffAssignment>("/sub-staff", { method: "POST", body: JSON.stringify(payload) });
+  },
+
+  updateSubStaffAssignment(id: string, payload: Partial<SubStaffAssignment>) {
+    return request<SubStaffAssignment>(`/sub-staff/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+  },
+
+  deleteSubStaffAssignment(id: string) {
+    return request<{ deleted: boolean }>(`/sub-staff/${id}`, { method: "DELETE" });
+  },
+
+  importSubStaffAssignments(rows: Array<Partial<SubStaffAssignment>>) {
+    return request<{
+      createdCount: number;
+      failedCount: number;
+      created: Array<{ row: number; id: string }>;
+      errors: Array<{ row: number; message: string }>;
+    }>("/sub-staff/import", {
+      method: "POST",
+      body: JSON.stringify({ rows })
+    });
+  },
+
+  getSubStaffClashes() {
+    return request<SubStaffClashReport>("/sub-staff/clashes");
+  },
+
+  getSubStaffPlan(year: number, month: number) {
+    return request<SubStaffPlanRow[]>(`/sub-staff/plan?year=${year}&month=${month}`);
+  },
+
+  generateSubStaffPlan(year: number, month: number) {
+    return request<SubStaffPlanRow[]>("/sub-staff/plan/generate", {
+      method: "POST",
+      body: JSON.stringify({ year, month })
+    });
+  },
+
+  setSubStaffPlanDay(assignmentId: string, year: number, month: number, plannedDays: number) {
+    return request<SubStaffPlanRow[]>(`/sub-staff/${assignmentId}/plan`, {
+      method: "PATCH",
+      body: JSON.stringify({ year, month, plannedDays })
+    });
   },
 
   getProjectFinancial(projectId: string) {

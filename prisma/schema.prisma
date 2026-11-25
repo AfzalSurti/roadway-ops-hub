@@ -189,6 +189,7 @@ model Project {
   /// Contract(s) this project was created from via "Create Project" (Contract -> Project autofill)
   contractActivities      ContractActivity[]
   billingEntries          ProjectBillingEntry[]
+  subStaffAssignments     SubStaffAssignment[]
 
   @@index([name])
   @@index([projectCodePrefix, financialYearShort])
@@ -1179,4 +1180,70 @@ model ProjectBillingEntry {
   project            Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId, sortOrder])
+}
+
+/// Intermediate / sub-professional staff deployment (CAD Expert, Horticulture, Highway/Bridge Design
+/// Engineer, Environment, Toll, Electrical, Accountant, Office Manager, etc.) — one row per staff member
+/// per designation per site, mirroring the client's existing "NHAI-Morth" Excel register column for
+/// column. Deliberately separate from ProjectFinancialProfession (which tracks what's been billed to the
+/// client): this tracks physical attendance/input days so one person's time across several sites never
+/// overlaps or gets double-counted, and no contracted man-month goes unclaimed before a site's work ends.
+/// Progress %, remaining months/MM by phase and the suggested "days per month" are deliberately NOT
+/// stored — they're derived live from the raw fields below, same as the Billing module's auto-calc columns.
+model SubStaffAssignment {
+  id                       String                   @id @default(cuid())
+  /// Free-text site/client name exactly as the source register uses it (e.g. "MORTH NANDYAL") — not
+  /// every site has a matching Project record yet, so this is the primary identifier, not the FK below.
+  siteName                 String
+  /// Optional link to an actual Project record, once/if one exists for this site.
+  projectId                String?
+  staffName                String
+  designation              String
+  coOrdinator              String                   @default("")
+  rate                     Float                    @default(0)
+  constructionPeriodMonths Float                    @default(0)
+  dlpMonths                Float                    @default(0)
+  totalPeriodMonths        Float                    @default(0)
+  commencementDate         DateTime?
+  lastBilledMonth          DateTime?
+  lastBilledDate           DateTime?
+  mmConstruction           Float                    @default(0)
+  mmDlp                    Float                    @default(0)
+  mmEot                    Float                    @default(0)
+  totalMm                  Float                    @default(0)
+  usedMm                   Float                    @default(0)
+  remark                   String                   @default("")
+  status                   SubStaffAssignmentStatus @default(ACTIVE)
+  leftDate                 DateTime?
+  sortOrder                Int                      @default(0)
+  createdAt                DateTime                 @default(now())
+  updatedAt                DateTime                 @updatedAt
+  project                  Project?                 @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  inputPlans               SubStaffInputPlan[]
+
+  @@index([projectId, sortOrder])
+  @@index([staffName])
+  @@index([status])
+}
+
+enum SubStaffAssignmentStatus {
+  ACTIVE
+  LEFT
+}
+
+/// One person's planned attendance days for one assignment in one calendar month — auto-generated from
+/// balance man-months, end date and rate, then freely hand-editable afterward.
+model SubStaffInputPlan {
+  id           String             @id @default(cuid())
+  assignmentId String
+  year         Int
+  month        Int
+  plannedDays  Float              @default(0)
+  autoPlanned  Boolean            @default(true)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  assignment   SubStaffAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  @@unique([assignmentId, year, month])
+  @@index([year, month])
 }

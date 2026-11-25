@@ -55,6 +55,7 @@ import InfraBilling from "./pages/infra/Billing";
 import AccountsDashboard from "./pages/accounts/Dashboard";
 import AccountsFinancial from "./pages/accounts/Financial";
 import AccountsBillingLedger from "./pages/accounts/Billing";
+import AccountsStaffPlanning from "./pages/accounts/StaffPlanning";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -205,6 +206,7 @@ function AppRoutes() {
         <Route path="dashboard" element={<AccountsDashboard />} />
         <Route path="financial" element={<AccountsFinancial />} />
         <Route path="billing" element={<AccountsBillingLedger />} />
+        <Route path="staff-planning" element={<AccountsStaffPlanning />} />
       </Route>
 
       <Route path="/infra" element={<InfraRoute><AppLayout /></InfraRoute>}>

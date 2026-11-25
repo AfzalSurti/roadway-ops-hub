@@ -1,0 +1,42 @@
+import { z } from "zod";
+
+const numeric = z.coerce.number().optional();
+const status = z.enum(["ACTIVE", "LEFT"]);
+
+export const upsertSubStaffAssignmentSchema = z.object({
+  siteName: z.string().trim().max(200).optional(),
+  projectId: z.string().min(1).nullable().optional(),
+  staffName: z.string().trim().max(200).optional(),
+  designation: z.string().trim().max(200).optional(),
+  coOrdinator: z.string().trim().max(200).optional(),
+  rate: numeric,
+  constructionPeriodMonths: numeric,
+  dlpMonths: numeric,
+  totalPeriodMonths: numeric,
+  commencementDate: z.string().trim().max(40).nullable().optional(),
+  lastBilledMonth: z.string().trim().max(40).nullable().optional(),
+  lastBilledDate: z.string().trim().max(40).nullable().optional(),
+  mmConstruction: numeric,
+  mmDlp: numeric,
+  mmEot: numeric,
+  totalMm: numeric,
+  usedMm: numeric,
+  remark: z.string().trim().max(2000).optional(),
+  status: status.optional(),
+  leftDate: z.string().trim().max(40).nullable().optional()
+});
+
+export const bulkImportSubStaffAssignmentsSchema = z.object({
+  rows: z.array(upsertSubStaffAssignmentSchema).min(1, "No rows to import")
+});
+
+export const setPlanDaySchema = z.object({
+  year: z.coerce.number().int().min(2000).max(2100),
+  month: z.coerce.number().int().min(1).max(12),
+  plannedDays: z.coerce.number().min(0).max(31)
+});
+
+export const generatePlanSchema = z.object({
+  year: z.coerce.number().int().min(2000).max(2100),
+  month: z.coerce.number().int().min(1).max(12)
+});

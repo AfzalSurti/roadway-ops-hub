@@ -685,6 +685,58 @@ export type ProjectBillingSummary = {
   };
 };
 
+export type SubStaffAssignmentStatus = "ACTIVE" | "LEFT";
+
+/** One staff member × designation × site row — mirrors the client's "NHAI-Morth" Excel staff register. */
+export type SubStaffAssignment = {
+  id: string;
+  siteName: string;
+  projectId: string | null;
+  staffName: string;
+  designation: string;
+  coOrdinator: string;
+  rate: number;
+  constructionPeriodMonths: number;
+  dlpMonths: number;
+  totalPeriodMonths: number;
+  commencementDate: string | null;
+  lastBilledMonth: string | null;
+  lastBilledDate: string | null;
+  mmConstruction: number;
+  mmDlp: number;
+  mmEot: number;
+  totalMm: number;
+  usedMm: number;
+  remark: string;
+  status: SubStaffAssignmentStatus;
+  leftDate: string | null;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SubStaffAssignmentMetrics = {
+  balanceMm: number;
+  elapsedMonths: number;
+  totalRemainingMonths: number;
+  suggestedDaysPerMonth: number;
+};
+
+export type SubStaffClashReport = {
+  clashCount: number;
+  clashes: Array<{
+    staffName: string;
+    assignments: Array<{ id: string; siteName: string; designation: string; rate: number }>;
+  }>;
+};
+
+export type SubStaffPlanRow = {
+  assignment: SubStaffAssignment;
+  metrics: SubStaffAssignmentMetrics;
+  plannedDays: number;
+  autoPlanned: boolean;
+};
+
 export type FinancialProjectBillStatusRow = {
   projectId: string;
   folderNo: string;

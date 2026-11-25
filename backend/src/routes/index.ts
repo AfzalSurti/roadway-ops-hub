@@ -20,6 +20,7 @@ import { operationsRouter } from "./operations.routes.js";
 import { contractRouter } from "./contract.routes.js";
 import { hoursRouter } from "./hours.routes.js";
 import { projectBillingRouter } from "./project-billing.routes.js";
+import { subStaffRouter } from "./sub-staff.routes.js";
 
 export const apiRouter = Router();
 
@@ -44,3 +45,4 @@ apiRouter.use("/operations", operationsRouter);
 apiRouter.use("/contract", contractRouter);
 apiRouter.use("/hours", hoursRouter);
 apiRouter.use("/project-billing", projectBillingRouter);
+apiRouter.use("/sub-staff", subStaffRouter);
