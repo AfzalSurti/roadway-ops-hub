@@ -253,6 +253,7 @@ export function ProjectProfileDialog({
                   firstColumnLabel="Staff Name"
                   renderFirstColumn={(row) => row.assignment.staffName}
                   onEditPlanDay={(assignmentId, field, value) => setPlanDayMutation.mutate({ assignmentId, field, value })}
+                  budgetScope="independent"
                 />
               )}
             </div>

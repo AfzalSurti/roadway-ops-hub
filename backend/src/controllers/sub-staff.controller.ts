@@ -49,6 +49,11 @@ export const subStaffController = {
     return sendSuccess(res, result);
   },
 
+  async getClashSolution(req: Request, res: Response) {
+    const result = await subStaffService.getClashSolution(req.body.staffName, req.body.year, req.body.month);
+    return sendSuccess(res, result);
+  },
+
   async getPlanGrid(req: Request, res: Response) {
     const year = Number(req.query.year);
     const month = Number(req.query.month);

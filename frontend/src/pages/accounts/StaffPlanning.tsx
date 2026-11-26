@@ -28,8 +28,9 @@ import { SubStaffImportDialog } from "@/components/substaff/SubStaffImportDialog
 import { SubStaffPlanTable } from "@/components/substaff/SubStaffPlanTable";
 import { StaffProfileDialog } from "@/components/substaff/StaffProfileDialog";
 import { ProjectProfileDialog } from "@/components/substaff/ProjectProfileDialog";
+import { ClashSolutionDialog } from "@/components/substaff/ClashSolutionDialog";
 import { downloadSubStaffImportTemplate } from "@/lib/sub-staff-import";
-import { AlertTriangle, Download, FileUp, Loader2, Plus, RefreshCw, Trash2, Users } from "lucide-react";
+import { AlertTriangle, Download, FileUp, Loader2, Plus, RefreshCw, Sparkles, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 
 function money(value: number) {
@@ -70,6 +71,7 @@ export default function StaffPlanning() {
   const [editForm, setEditForm] = useState<SubStaffFormState>(emptySubStaffForm);
   const [profileStaffName, setProfileStaffName] = useState<string | null>(null);
   const [profileProjectName, setProfileProjectName] = useState<string | null>(null);
+  const [solutionStaffName, setSolutionStaffName] = useState<string | null>(null);
 
   const now = new Date();
   const [planYear, setPlanYear] = useState(now.getFullYear());
@@ -231,15 +233,23 @@ export default function StaffPlanning() {
           </p>
           <div className="mt-2 space-y-1.5 max-h-40 overflow-auto">
             {clashReport.clashes.map((clash) => (
-              <p key={clash.staffName} className="text-xs text-muted-foreground">
+              <p key={clash.staffName} className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-1.5">
                 <button
                   type="button"
                   className="font-medium text-foreground underline underline-offset-2 hover:text-primary"
                   onClick={() => setProfileStaffName(clash.staffName)}
                 >
                   {clash.staffName}
-                </button>{" "}
+                </button>
                 — {clash.assignments.map((a) => `${a.designation} @ ${a.siteName}`).join(" · ")}
+                <button
+                  type="button"
+                  className="ml-1.5 inline-flex items-center gap-1 rounded-full border border-amber-500/40 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-400 hover:bg-amber-500/10"
+                  onClick={() => setSolutionStaffName(clash.staffName)}
+                >
+                  <Sparkles className="h-3 w-3" />
+                  Solution
+                </button>
               </p>
             ))}
           </div>
@@ -533,6 +543,7 @@ export default function StaffPlanning() {
                         onEditPlanDay={(assignmentId, field, value) =>
                           setPlanDayMutation.mutate({ assignmentId, field, value })
                         }
+                        budgetScope="person"
                       />
                     </div>
                   );
@@ -634,6 +645,7 @@ export default function StaffPlanning() {
         staffNameOptions={options?.staffNames ?? []}
         projectOptions={projectOptions}
       />
+      <ClashSolutionDialog staffName={solutionStaffName} onClose={() => setSolutionStaffName(null)} />
     </PageWrapper>
   );
 }

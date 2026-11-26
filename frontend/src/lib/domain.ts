@@ -757,6 +757,17 @@ export type SubStaffClashReport = {
   }>;
 };
 
+export type SubStaffClashSolution = {
+  explanation: string;
+  allocations: Array<{
+    assignmentId: string;
+    siteName: string;
+    designation: string;
+    constructionDays: number;
+    dlpDays: number;
+  }>;
+};
+
 export type SubStaffPlanRow = {
   assignment: SubStaffAssignment;
   metrics: SubStaffAssignmentMetrics;

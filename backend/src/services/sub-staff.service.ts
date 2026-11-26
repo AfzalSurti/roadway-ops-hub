@@ -1,7 +1,9 @@
 import { subStaffRepository } from "../repositories/sub-staff.repository.js";
 import { projectRepository } from "../repositories/project.repository.js";
 import { projectService } from "./project.service.js";
-import { notFound } from "../utils/errors.js";
+import { notFound, badRequest } from "../utils/errors.js";
+import { env } from "../config/env.js";
+import { logger } from "../config/logger.js";
 import type { SubStaffAssignmentStatus, SubStaffClientCategory } from "@prisma/client";
 
 type AssignmentFields = {
@@ -142,6 +144,15 @@ const DESIGNATION_SEED = [
   "QS",
   "AHE"
 ];
+
+// These back-office roles are legitimately full-time on every project they're assigned to for as long
+// as it runs — being listed on several projects at once is normal for them, not a scheduling clash, and
+// their days aren't split/capped across projects the way a technical expert's are.
+const FULL_TIME_DESIGNATIONS = new Set(["office manager", "accountant", "accountant cum cashier"]);
+
+function isFullTimeDesignation(designation: string): boolean {
+  return FULL_TIME_DESIGNATIONS.has(designation.trim().toLowerCase());
+}
 
 export type AssignmentMetrics = {
   balanceMm: number;
@@ -374,6 +385,7 @@ export const subStaffService = {
     const assignments = await subStaffRepository.list({ status: "ACTIVE" });
     const byName = new Map<string, typeof assignments>();
     for (const row of assignments) {
+      if (isFullTimeDesignation(row.designation)) continue; // full-time on every project — not a clash
       const key = row.staffName.trim().toLowerCase();
       if (!key) continue;
       const list = byName.get(key) ?? [];
@@ -396,6 +408,128 @@ export const subStaffService = {
   },
 
   /**
+   * AI-assisted resolution for one staff member's clash: hands the model each clashing assignment's
+   * real numbers (rate, remaining Construction/DLP months, balance MM, computed Suggested Days) for a
+   * specific month, and asks for a plain-language rationale plus a concrete day split — prioritizing
+   * whichever project ends soonest and is worth more, the same factors the plain formula uses, but with
+   * room for judgment calls the formula can't make. Called on demand only (never automatically) since
+   * each call spends real OpenRouter tokens.
+   */
+  async getClashSolution(staffName: string, year: number, month: number) {
+    if (!env.OPENROUTER_API_KEY) {
+      throw badRequest("AI clash resolution isn't configured — set OPENROUTER_API_KEY on the server.");
+    }
+
+    const asOf = new Date(Date.UTC(year, month - 1, 1, 12, 0, 0));
+    const normalized = staffName.trim().toLowerCase();
+    const assignments = (await subStaffRepository.list({ status: "ACTIVE" })).filter(
+      (row) => row.staffName.trim().toLowerCase() === normalized && !isFullTimeDesignation(row.designation)
+    );
+    if (assignments.length < 2) {
+      throw badRequest("No clash to resolve for this person — they're on fewer than 2 competing assignments.");
+    }
+
+    const entries = assignments.map((row) => ({ row, metrics: computeMetrics(row, asOf) }));
+
+    const projectLines = entries
+      .map(
+        ({ row, metrics }, i) =>
+          `${i + 1}. assignmentId=${row.id} | Project: ${row.siteName} | Designation: ${row.designation} | ` +
+          `Rate: ${row.rate}/month | Remaining Construction Months: ${metrics.remainingConsMonths.toFixed(2)} | ` +
+          `Remaining DLP Months: ${metrics.remainingDlpMonths.toFixed(2)} | Staff Balance MM (Construction): ${metrics.staffBalanceMmConstruction.toFixed(2)} | ` +
+          `Staff Balance MM (DLP): ${metrics.staffBalanceMmDlp.toFixed(2)} | Suggested Days (Construction): ${metrics.suggestedDaysConstruction.toFixed(1)} | ` +
+          `Suggested Days (DLP): ${metrics.suggestedDaysDlp.toFixed(1)}`
+      )
+      .join("\n");
+
+    const systemPrompt = [
+      "You help an accounts team split one staff member's working days across multiple projects they're",
+      "assigned to at the same time, for one specific calendar month. The person can give at most 30",
+      "days total across ALL listed assignments combined (construction + DLP days summed over every",
+      "assignment) — never more.",
+      "Prioritize projects that are ending sooner (lower Remaining Months) and projects worth more",
+      "(higher Rate), the same way a human planner would, but use judgment rather than a rigid formula —",
+      "e.g. don't starve a lower-priority project down to 0 days every single month if it still has a",
+      "meaningful balance and some time left.",
+      "Respond with JSON only, no prose outside the JSON, in exactly this shape:",
+      '{"explanation": "short plain-language paragraph explaining the recommended split and why",',
+      ' "allocations": [{"assignmentId": "...", "constructionDays": number, "dlpDays": number}, ...]}',
+      "Include one allocation entry per assignmentId given below. Use 0 for a phase that isn't relevant",
+      "to that assignment (e.g. dlpDays=0 if Remaining DLP Months is 0)."
+    ].join("\n");
+
+    const userPrompt = `Staff member: ${staffName}\nMonth: ${month}/${year}\n\nAssignments:\n${projectLines}`;
+
+    let content: string | undefined;
+    try {
+      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${env.OPENROUTER_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: env.OPENROUTER_MODEL,
+          temperature: 0.2,
+          response_format: { type: "json_object" },
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt }
+          ]
+        })
+      });
+
+      if (!response.ok) {
+        logger.warn({ status: response.status }, "OpenRouter clash-solution request failed");
+        throw badRequest("The AI service didn't respond — please try again.");
+      }
+
+      const payload = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
+      content = payload.choices?.[0]?.message?.content;
+    } catch (error) {
+      if (error instanceof Error && "statusCode" in error) throw error;
+      logger.warn({ err: error }, "OpenRouter clash-solution unavailable");
+      throw badRequest("Could not reach the AI service — please try again.");
+    }
+
+    if (!content) throw badRequest("The AI service returned an empty response — please try again.");
+
+    const start = content.indexOf("{");
+    const end = content.lastIndexOf("}");
+    let parsed: { explanation?: string; allocations?: Array<{ assignmentId?: string; constructionDays?: number; dlpDays?: number }> } | null = null;
+    if (start !== -1 && end !== -1 && end > start) {
+      try {
+        parsed = JSON.parse(content.slice(start, end + 1));
+      } catch {
+        parsed = null;
+      }
+    }
+    if (!parsed) throw badRequest("Could not understand the AI's response — please try again.");
+
+    const knownIds = new Set(entries.map((e) => e.row.id));
+    const byId = new Map((parsed.allocations ?? []).map((a) => [a.assignmentId, a]));
+    const allocations = entries.map(({ row, metrics }) => {
+      const suggestion = byId.get(row.id);
+      const clamp = (value: number | undefined, fallback: number) =>
+        Number.isFinite(value) ? Math.min(31, Math.max(0, round2(value as number))) : fallback;
+      return {
+        assignmentId: row.id,
+        siteName: row.siteName,
+        designation: row.designation,
+        constructionDays: clamp(suggestion?.constructionDays, metrics.suggestedDaysConstruction),
+        dlpDays: clamp(suggestion?.dlpDays, metrics.suggestedDaysDlp)
+      };
+    });
+    // Drop anything the AI invented that isn't actually one of this person's assignments.
+    const filteredAllocations = allocations.filter((a) => knownIds.has(a.assignmentId));
+
+    return {
+      explanation: typeof parsed.explanation === "string" ? parsed.explanation : "",
+      allocations: filteredAllocations
+    };
+  },
+
+  /**
    * Auto-generates (or refreshes) this month's planned days for every active assignment, grouped by
    * staff member so one person's days across all their sites never exceed a 30-day month. Assignments
    * closer to their own end date, then higher-rate ones, get their full suggested days first; whatever's
@@ -415,8 +549,32 @@ export const subStaffService = {
 
     const results: Array<{ assignmentId: string; plannedDaysConstruction: number; plannedDaysDlp: number }> = [];
 
+    const splitByShare = (allocated: number, metrics: AssignmentMetrics) => {
+      // Split the allocated days between Construction/DLP in the same ratio as their suggested need.
+      // In practice only one phase is ever active for a given assignment, so this puts 100% of the
+      // days there — the split only matters for a mid-month Construction-to-DLP transition.
+      const suggestedTotal = metrics.suggestedDaysConstruction + metrics.suggestedDaysDlp;
+      const consShare = suggestedTotal > 0 ? metrics.suggestedDaysConstruction / suggestedTotal : 0;
+      const plannedDaysConstruction = round2(allocated * consShare);
+      const plannedDaysDlp = round2(allocated - plannedDaysConstruction);
+      return { plannedDaysConstruction, plannedDaysDlp };
+    };
+
     for (const group of byName.values()) {
-      const weighted = group
+      // Full-time back-office roles (Office Manager, Accountant, ...) are on every project they're
+      // assigned to for its whole duration — each gets its own full days independently, never sharing
+      // or competing for the 30-day budget the way technical experts do.
+      for (const row of group.filter((r) => isFullTimeDesignation(r.designation))) {
+        const existing = row.inputPlans.find((p) => p.year === year && p.month === month);
+        if (existing && !existing.autoPlanned) continue; // manual override — leave it alone
+        const metrics = computeMetrics(row, asOf);
+        const allocated =
+          metrics.totalRemainingMonths > 0 ? round2(Math.min(metrics.suggestedDaysPerMonth, 30)) : 0;
+        results.push({ assignmentId: row.id, ...splitByShare(allocated, metrics) });
+      }
+
+      const sharedGroup = group.filter((r) => !isFullTimeDesignation(r.designation));
+      const weighted = sharedGroup
         .map((row) => ({ row, metrics: computeMetrics(row, asOf) }))
         .filter((g) => g.metrics.totalRemainingMonths > 0 && g.metrics.suggestedDaysPerMonth > 0)
         .sort((a, b) => {
@@ -434,19 +592,12 @@ export const subStaffService = {
         const ideal = Math.min(metrics.suggestedDaysPerMonth, 30);
         const allocated = round2(Math.max(0, Math.min(ideal, budget)));
         budget = round2(Math.max(0, budget - allocated));
-
-        // Split the allocated days between Construction/DLP in the same ratio as their suggested
-        // need. In practice only one phase is ever active for a given assignment, so this puts 100% of
-        // the days there — the split only matters for a mid-month Construction-to-DLP transition.
-        const suggestedTotal = metrics.suggestedDaysConstruction + metrics.suggestedDaysDlp;
-        const consShare = suggestedTotal > 0 ? metrics.suggestedDaysConstruction / suggestedTotal : 0;
-        const plannedDaysConstruction = round2(allocated * consShare);
-        const plannedDaysDlp = round2(allocated - plannedDaysConstruction);
-        results.push({ assignmentId: row.id, plannedDaysConstruction, plannedDaysDlp });
+        results.push({ assignmentId: row.id, ...splitByShare(allocated, metrics) });
       }
 
-      // Anything in the group not in `weighted` (finished or no balance) gets zeroed, unless hand-edited.
-      for (const row of group) {
+      // Anything in the shared group not in `weighted` (finished or no balance) gets zeroed, unless
+      // hand-edited.
+      for (const row of sharedGroup) {
         if (weighted.some((w) => w.row.id === row.id)) continue;
         const existing = row.inputPlans.find((p) => p.year === year && p.month === month);
         if (existing && !existing.autoPlanned) continue;

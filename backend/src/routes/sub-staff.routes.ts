@@ -6,6 +6,7 @@ import { validate } from "../middleware/validate.js";
 import { asyncHandler } from "../utils/async-handler.js";
 import {
   bulkImportSubStaffAssignmentsSchema,
+  clashSolutionSchema,
   generatePlanSchema,
   setPlanDaySchema,
   upsertSubStaffAssignmentSchema
@@ -25,6 +26,11 @@ subStaffRouter.post(
 );
 subStaffRouter.get("/options", asyncHandler(subStaffController.getOptions));
 subStaffRouter.get("/clashes", asyncHandler(subStaffController.getClashReport));
+subStaffRouter.post(
+  "/clashes/solution",
+  validate(clashSolutionSchema),
+  asyncHandler(subStaffController.getClashSolution)
+);
 subStaffRouter.get("/plan", asyncHandler(subStaffController.getPlanGrid));
 subStaffRouter.post("/plan/generate", validate(generatePlanSchema), asyncHandler(subStaffController.generatePlan));
 subStaffRouter.patch("/:id/plan", validate(setPlanDaySchema), asyncHandler(subStaffController.setPlanDay));

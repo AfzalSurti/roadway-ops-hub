@@ -56,6 +56,7 @@ import type {
   SubStaffAssignmentStatus,
   SubStaffClientCategory,
   SubStaffClashReport,
+  SubStaffClashSolution,
   SubStaffPlanRow,
   ContractActivityItem,
   PreContractActivityItem,
@@ -1549,6 +1550,13 @@ export const api = {
 
   getSubStaffClashes() {
     return request<SubStaffClashReport>("/sub-staff/clashes");
+  },
+
+  getSubStaffClashSolution(staffName: string, year: number, month: number) {
+    return request<SubStaffClashSolution>("/sub-staff/clashes/solution", {
+      method: "POST",
+      body: JSON.stringify({ staffName, year, month })
+    });
   },
 
   getSubStaffPlan(year: number, month: number) {

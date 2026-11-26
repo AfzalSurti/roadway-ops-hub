@@ -224,6 +224,7 @@ export function StaffProfileDialog({
                   firstColumnLabel="Project"
                   renderFirstColumn={(row) => row.assignment.siteName || "—"}
                   onEditPlanDay={(assignmentId, field, value) => setPlanDayMutation.mutate({ assignmentId, field, value })}
+                  budgetScope={filtersActive ? "independent" : "person"}
                 />
               )}
             </div>

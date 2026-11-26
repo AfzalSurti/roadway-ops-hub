@@ -24,7 +24,11 @@ const envSchema = z.object({
   EMAIL_FROM: z.string().trim().min(3).optional(),
   APP_URL: z.string().url().optional(),
   GROQ_API: z.string().min(1).optional(),
-  GROQ_MODEL: z.string().default("llama-3.3-70b-versatile")
+  GROQ_MODEL: z.string().default("llama-3.3-70b-versatile"),
+  // Optional: AI-assisted clash resolution for Sub-Staff Planning (OpenRouter). Unset = the "Solution"
+  // button tells the user it isn't configured, rather than failing silently.
+  OPENROUTER_API_KEY: z.string().min(1).optional(),
+  OPENROUTER_MODEL: z.string().default("openai/gpt-4o-mini")
 });
 
 export const env = envSchema.parse(process.env);
