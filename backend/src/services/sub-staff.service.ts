@@ -2,13 +2,14 @@ import { subStaffRepository } from "../repositories/sub-staff.repository.js";
 import { projectRepository } from "../repositories/project.repository.js";
 import { projectService } from "./project.service.js";
 import { notFound } from "../utils/errors.js";
-import type { SubStaffAssignmentStatus } from "@prisma/client";
+import type { SubStaffAssignmentStatus, SubStaffClientCategory } from "@prisma/client";
 
 type AssignmentFields = {
   siteName?: string;
   projectId?: string | null;
   /** Optional, to set/correct the linked (or newly-created) project's number — nothing here is required. */
   projectNumber?: string;
+  clientCategory?: SubStaffClientCategory;
   staffName?: string;
   designation?: string;
   coOrdinator?: string;
@@ -76,10 +77,11 @@ function normalizeNumbers(fields: AssignmentFields) {
   return out;
 }
 
-/** Continuous (fractional) months between two dates, using the client's own 30-day-month convention. */
+/** Continuous (fractional) months between two dates — the client's own "TOTAL BILLING DONE" convention
+ * from their NHAI-Morth register: (end − start) in days, divided by 365, times 12. */
 function monthsBetween(start: Date, end: Date): number {
   const days = (end.getTime() - start.getTime()) / 86_400_000;
-  return days / 30;
+  return (days / 365) * 12;
 }
 
 /**
@@ -143,7 +145,9 @@ const DESIGNATION_SEED = [
 
 export type AssignmentMetrics = {
   balanceMm: number;
-  elapsedMonths: number;
+  /** Months of billing actually recorded so far — from Start Date to Last Billed Date (never "today"
+   * or End Date), the client's own "TOTAL BILLING DONE" figure. */
+  billedMonthsTotal: number;
   /** Sum of the two phases below — used for cross-project priority (whichever project finishes soonest). */
   totalRemainingMonths: number;
   /** Sum of the two phases below — the figure the monthly planner actually allocates against. */
@@ -158,44 +162,60 @@ export type AssignmentMetrics = {
 };
 
 /**
- * Matches the client's own "NHAI-Morth" sheet exactly (verified against its real Construction/DLP
- * columns): whichever phase is still in progress gets the *entire* remaining balance — it's not split
- * proportionally. Once Construction's elapsed time catches up to its contracted length, every bit of
- * unused balance "moves into" DLP (DLP here folding in EOT too, since EOT has no column of its own).
+ * Verified against the client's real "NHAI-Morth" register (its "Project Billed/Remaining CONS./DLP"
+ * and "Staff MM Remaining Construction/DLP" columns), reverse-engineered from live formulas and real
+ * rows:
+ *
+ * - The PROJECT's phase (how much of the Construction/DLP calendar window is used up) is driven by
+ *   billed TIME, not MM: months from Start Date to Last Billed Date, compared against the Construction
+ *   Period, with any excess counted into the DLP window. This never uses "today" or the End Date — a
+ *   project's phase only moves when a bill is actually recorded against it.
+ * - The STAFF's balance is driven by MM, not time: Used MM is drawn down against the Construction MM
+ *   contract first; only MM used beyond that contract counts against the DLP (+ EOT) MM contract. A
+ *   phase's balance can go negative (over budget) — that's a real signal in their sheet, not an error,
+ *   so it's never floored to 0 here.
  */
 export function computeMetrics(
   assignment: {
     startDate: Date | null;
     endDate: Date | null;
+    lastBilledDate: Date | null;
     constructionPeriodMonths: number;
     dlpMonths: number;
     eotMonths: number;
     totalPeriodMonths: number;
+    mmConstruction: number;
+    mmDlp: number;
+    mmEot: number;
     totalMm: number;
     usedMm: number;
   },
   asOf: Date = new Date()
 ): AssignmentMetrics {
   const balanceMm = round2(assignment.totalMm - assignment.usedMm);
-  const elapsedMonths = assignment.startDate ? monthsBetween(assignment.startDate, asOf) : 0;
+
+  const billedMonthsTotal =
+    assignment.startDate && assignment.lastBilledDate
+      ? Math.max(0, monthsBetween(assignment.startDate, assignment.lastBilledDate))
+      : 0;
 
   const constructionPeriodMonths = assignment.constructionPeriodMonths || 0;
   const dlpWindowMonths = (assignment.dlpMonths || 0) + (assignment.eotMonths || 0);
 
-  const billedConsMonths = Math.min(Math.max(elapsedMonths, 0), constructionPeriodMonths);
-  const billedDlpMonths = Math.min(Math.max(elapsedMonths - constructionPeriodMonths, 0), dlpWindowMonths);
-  const remainingConsMonths = round2(Math.max(0, constructionPeriodMonths - billedConsMonths));
-  const remainingDlpMonths = round2(Math.max(0, dlpWindowMonths - billedDlpMonths));
+  const billedConsMonths = Math.min(billedMonthsTotal, constructionPeriodMonths);
+  const billedDlpMonths = Math.max(0, billedMonthsTotal - constructionPeriodMonths);
+  const remainingConsMonths = round2(constructionPeriodMonths - billedConsMonths);
+  const remainingDlpMonths = round2(dlpWindowMonths - billedDlpMonths);
 
-  const staffBalanceMmConstruction = remainingConsMonths > 0 ? balanceMm : 0;
-  const staffBalanceMmDlp = remainingConsMonths <= 0 && remainingDlpMonths > 0 ? balanceMm : 0;
+  const mmDlpTotal = (assignment.mmDlp || 0) + (assignment.mmEot || 0);
+  const usedMmDlp = Math.max(0, assignment.usedMm - (assignment.mmConstruction || 0));
+  const staffBalanceMmConstruction = round2((assignment.mmConstruction || 0) - assignment.usedMm);
+  const staffBalanceMmDlp = round2(mmDlpTotal - usedMmDlp);
 
   const suggestedDaysConstruction =
-    remainingConsMonths > 0 ? round2((staffBalanceMmConstruction / remainingConsMonths) * 30) : 0;
+    remainingConsMonths > 0 ? Math.max(0, round2((staffBalanceMmConstruction / remainingConsMonths) * 30)) : 0;
   const suggestedDaysDlp =
-    remainingConsMonths <= 0 && remainingDlpMonths > 0
-      ? round2((staffBalanceMmDlp / remainingDlpMonths) * 30)
-      : 0;
+    remainingDlpMonths > 0 ? Math.max(0, round2((staffBalanceMmDlp / remainingDlpMonths) * 30)) : 0;
 
   const totalRemainingMonths = round2(remainingConsMonths + remainingDlpMonths);
   let suggestedDaysPerMonth = round2(suggestedDaysConstruction + suggestedDaysDlp);
@@ -210,7 +230,7 @@ export function computeMetrics(
 
   return {
     balanceMm,
-    elapsedMonths: round2(elapsedMonths),
+    billedMonthsTotal: round2(billedMonthsTotal),
     totalRemainingMonths,
     suggestedDaysPerMonth,
     remainingConsMonths,
@@ -229,12 +249,23 @@ function serializeAssignment<T extends { project?: { projectNumber: string | nul
   return { ...rest, projectNumber: project?.projectNumber ?? null };
 }
 
+/** An explicit choice always wins; otherwise guessed from the site name, since the register's own
+ * naming already distinguishes MORTH/NHAI sites — anything else defaults to OTHER until corrected. */
+function resolveClientCategory(explicit: SubStaffClientCategory | undefined, siteName: string): SubStaffClientCategory {
+  if (explicit) return explicit;
+  const name = siteName.toLowerCase();
+  if (name.includes("morth")) return "MORTH";
+  if (name.includes("nhai")) return "NHAI";
+  return "OTHER";
+}
+
 export const subStaffService = {
   async list(filters: {
     status?: SubStaffAssignmentStatus;
     staffName?: string;
     siteName?: string;
     designation?: string;
+    clientCategory?: SubStaffClientCategory;
   }) {
     const rows = await subStaffRepository.list(filters);
     return rows.map(serializeAssignment);
@@ -259,9 +290,11 @@ export const subStaffService = {
     const endDate =
       parseDateField(payload.endDate) ?? defaultEndDate(startDate, Number(payload.totalPeriodMonths) || 0);
     const project = await resolveProject(payload.projectId, payload.siteName, payload.projectNumber);
+    const resolvedSiteName = project?.name ?? payload.siteName?.trim() ?? "";
     const created = await subStaffRepository.create({
-      siteName: project?.name ?? payload.siteName?.trim() ?? "",
+      siteName: resolvedSiteName,
       projectId: project?.id ?? null,
+      clientCategory: resolveClientCategory(payload.clientCategory, resolvedSiteName),
       staffName: payload.staffName.trim(),
       designation: payload.designation?.trim() || "",
       coOrdinator: payload.coOrdinator?.trim() || "",
@@ -315,6 +348,7 @@ export const subStaffService = {
     const updated = await subStaffRepository.update(id, {
       siteName: project !== undefined ? (project?.name ?? payload.siteName?.trim() ?? "") : undefined,
       projectId: project !== undefined ? (project?.id ?? null) : undefined,
+      clientCategory: payload.clientCategory,
       staffName: payload.staffName?.trim(),
       designation: payload.designation?.trim(),
       coOrdinator: payload.coOrdinator?.trim(),
@@ -384,7 +418,7 @@ export const subStaffService = {
     for (const group of byName.values()) {
       const weighted = group
         .map((row) => ({ row, metrics: computeMetrics(row, asOf) }))
-        .filter((g) => g.metrics.totalRemainingMonths > 0 && g.metrics.balanceMm > 0)
+        .filter((g) => g.metrics.totalRemainingMonths > 0 && g.metrics.suggestedDaysPerMonth > 0)
         .sort((a, b) => {
           if (a.metrics.totalRemainingMonths !== b.metrics.totalRemainingMonths) {
             return a.metrics.totalRemainingMonths - b.metrics.totalRemainingMonths;

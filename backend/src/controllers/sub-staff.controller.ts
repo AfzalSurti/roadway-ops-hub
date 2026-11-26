@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import { subStaffService } from "../services/sub-staff.service.js";
 import { sendSuccess } from "../utils/response.js";
-import type { SubStaffAssignmentStatus } from "@prisma/client";
+import type { SubStaffAssignmentStatus, SubStaffClientCategory } from "@prisma/client";
 
 function strParam(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
@@ -13,7 +13,8 @@ export const subStaffController = {
       status: strParam(req.query.status) as SubStaffAssignmentStatus | undefined,
       staffName: strParam(req.query.staffName),
       siteName: strParam(req.query.siteName),
-      designation: strParam(req.query.designation)
+      designation: strParam(req.query.designation),
+      clientCategory: strParam(req.query.clientCategory) as SubStaffClientCategory | undefined
     });
     return sendSuccess(res, result);
   },

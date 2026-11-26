@@ -1,5 +1,5 @@
 import { prisma } from "../prisma/client.js";
-import type { Prisma, SubStaffAssignmentStatus } from "@prisma/client";
+import type { Prisma, SubStaffAssignmentStatus, SubStaffClientCategory } from "@prisma/client";
 
 const projectSelect = { id: true, name: true, projectNumber: true } as const;
 
@@ -9,13 +9,15 @@ export const subStaffRepository = {
     staffName?: string;
     siteName?: string;
     designation?: string;
+    clientCategory?: SubStaffClientCategory;
   }) {
     return prisma.subStaffAssignment.findMany({
       where: {
         ...(filters.status ? { status: filters.status } : {}),
         ...(filters.staffName ? { staffName: { contains: filters.staffName, mode: "insensitive" } } : {}),
         ...(filters.siteName ? { siteName: { contains: filters.siteName, mode: "insensitive" } } : {}),
-        ...(filters.designation ? { designation: { contains: filters.designation, mode: "insensitive" } } : {})
+        ...(filters.designation ? { designation: { contains: filters.designation, mode: "insensitive" } } : {}),
+        ...(filters.clientCategory ? { clientCategory: filters.clientCategory } : {})
       },
       include: { inputPlans: true, project: { select: projectSelect } },
       orderBy: [{ staffName: "asc" }, { sortOrder: "asc" }]

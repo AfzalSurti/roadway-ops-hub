@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import type { SubStaffAssignment } from "@/lib/domain";
+import type { SubStaffAssignment, SubStaffClientCategory } from "@/lib/domain";
 import {
   SubStaffFormFields,
   emptySubStaffForm,
@@ -48,9 +48,18 @@ const MONTH_NAMES = [
   "July", "August", "September", "October", "November", "December"
 ];
 
+const CLIENT_CATEGORY_OPTIONS: Array<{ value: SubStaffClientCategory | "ALL"; label: string }> = [
+  { value: "ALL", label: "All Clients" },
+  { value: "MORTH", label: "MORTH" },
+  { value: "NHAI", label: "NHAI" },
+  { value: "NH_DIVISION", label: "NH Division" },
+  { value: "OTHER", label: "Other" }
+];
+
 export default function StaffPlanning() {
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<"ACTIVE" | "LEFT">("ACTIVE");
+  const [categoryFilter, setCategoryFilter] = useState<SubStaffClientCategory | "ALL">("ALL");
   const [searchName, setSearchName] = useState("");
   const [searchDesignation, setSearchDesignation] = useState("");
   const [searchProject, setSearchProject] = useState("");
@@ -68,12 +77,14 @@ export default function StaffPlanning() {
   const [planSearchName, setPlanSearchName] = useState("");
   const [planSearchDesignation, setPlanSearchDesignation] = useState("");
   const [planSearchProject, setPlanSearchProject] = useState("");
+  const [planCategoryFilter, setPlanCategoryFilter] = useState<SubStaffClientCategory | "ALL">("ALL");
 
   const { data: assignments = [], isLoading: loadingAssignments } = useQuery({
-    queryKey: ["sub-staff-assignments", statusFilter, searchName, searchDesignation, searchProject],
+    queryKey: ["sub-staff-assignments", statusFilter, categoryFilter, searchName, searchDesignation, searchProject],
     queryFn: () =>
       api.getSubStaffAssignments({
         status: statusFilter,
+        clientCategory: categoryFilter === "ALL" ? undefined : categoryFilter,
         staffName: searchName || undefined,
         designation: searchDesignation || undefined,
         siteName: searchProject || undefined
@@ -189,13 +200,14 @@ export default function StaffPlanning() {
       if (nameQ && !row.assignment.staffName.toLowerCase().includes(nameQ)) continue;
       if (designationQ && !row.assignment.designation.toLowerCase().includes(designationQ)) continue;
       if (projectQ && !row.assignment.siteName.toLowerCase().includes(projectQ)) continue;
+      if (planCategoryFilter !== "ALL" && row.assignment.clientCategory !== planCategoryFilter) continue;
       const key = row.assignment.staffName.trim().toLowerCase() || row.assignment.id;
       const list = groups.get(key) ?? [];
       list.push(row);
       groups.set(key, list);
     }
     return [...groups.values()].sort((a, b) => a[0].assignment.staffName.localeCompare(b[0].assignment.staffName));
-  }, [planRows, planSearchName, planSearchDesignation, planSearchProject]);
+  }, [planRows, planSearchName, planSearchDesignation, planSearchProject, planCategoryFilter]);
 
   const yearOptions = Array.from({ length: 6 }, (_, i) => now.getFullYear() - 1 + i);
 
@@ -241,6 +253,15 @@ export default function StaffPlanning() {
         </TabsList>
 
         <TabsContent value="data-entry" className="space-y-4 pt-4">
+          <Tabs value={categoryFilter} onValueChange={(v) => setCategoryFilter(v as SubStaffClientCategory | "ALL")}>
+            <TabsList className="flex w-full flex-wrap h-auto">
+              {CLIENT_CATEGORY_OPTIONS.map((opt) => (
+                <TabsTrigger key={opt.value} value={opt.value} className="flex-1">
+                  {opt.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
           <div className="glass-panel p-4 flex flex-wrap items-center gap-3">
             <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as "ACTIVE" | "LEFT")}>
               <SelectTrigger className="w-36">
@@ -384,6 +405,18 @@ export default function StaffPlanning() {
         </TabsContent>
 
         <TabsContent value="planning" className="space-y-4 pt-4">
+          <Tabs
+            value={planCategoryFilter}
+            onValueChange={(v) => setPlanCategoryFilter(v as SubStaffClientCategory | "ALL")}
+          >
+            <TabsList className="flex w-full flex-wrap h-auto">
+              {CLIENT_CATEGORY_OPTIONS.map((opt) => (
+                <TabsTrigger key={opt.value} value={opt.value} className="flex-1">
+                  {opt.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
           <div className="glass-panel p-4 flex flex-wrap items-center gap-3">
             <Select value={String(planMonth)} onValueChange={(v) => setPlanMonth(Number(v))}>
               <SelectTrigger className="w-40">

@@ -2,11 +2,13 @@ import { z } from "zod";
 
 const numeric = z.coerce.number().optional();
 const status = z.enum(["ACTIVE", "LEFT"]);
+const clientCategory = z.enum(["MORTH", "NHAI", "NH_DIVISION", "OTHER"]);
 
 export const upsertSubStaffAssignmentSchema = z.object({
   siteName: z.string().trim().max(200).optional(),
   projectId: z.string().min(1).nullable().optional(),
   projectNumber: z.string().trim().max(40).optional(),
+  clientCategory: clientCategory.optional(),
   staffName: z.string().trim().max(200).optional(),
   designation: z.string().trim().max(200).optional(),
   coOrdinator: z.string().trim().max(200).optional(),

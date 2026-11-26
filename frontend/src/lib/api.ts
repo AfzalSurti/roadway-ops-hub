@@ -54,6 +54,7 @@ import type {
   SubStaffAssignment,
   SubStaffOptions,
   SubStaffAssignmentStatus,
+  SubStaffClientCategory,
   SubStaffClashReport,
   SubStaffPlanRow,
   ContractActivityItem,
@@ -1511,6 +1512,7 @@ export const api = {
       staffName?: string;
       siteName?: string;
       designation?: string;
+      clientCategory?: SubStaffClientCategory;
     } = {}
   ) {
     const params = new URLSearchParams();

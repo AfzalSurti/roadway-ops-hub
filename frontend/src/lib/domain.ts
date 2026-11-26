@@ -687,6 +687,10 @@ export type ProjectBillingSummary = {
 
 export type SubStaffAssignmentStatus = "ACTIVE" | "LEFT";
 
+/** Clients differ in how attendance itself is tracked (e.g. MORTH is offline, NHAI is online), so each
+ * gets its own board instead of one mixed list. */
+export type SubStaffClientCategory = "MORTH" | "NHAI" | "NH_DIVISION" | "OTHER";
+
 /** One staff member × designation × site row — mirrors the client's "NHAI-Morth" Excel staff register. */
 export type SubStaffAssignment = {
   id: string;
@@ -694,6 +698,7 @@ export type SubStaffAssignment = {
   projectId: string | null;
   /** The linked project's own number, if any — not a column on this record, just surfaced for display/editing. */
   projectNumber: string | null;
+  clientCategory: SubStaffClientCategory;
   staffName: string;
   designation: string;
   coOrdinator: string;
@@ -733,7 +738,7 @@ export type SubStaffOptions = {
 
 export type SubStaffAssignmentMetrics = {
   balanceMm: number;
-  elapsedMonths: number;
+  billedMonthsTotal: number;
   totalRemainingMonths: number;
   suggestedDaysPerMonth: number;
   remainingConsMonths: number;

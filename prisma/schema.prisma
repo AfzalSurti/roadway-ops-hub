@@ -1197,6 +1197,9 @@ model SubStaffAssignment {
   siteName                 String
   /// Optional link to an actual Project record, once/if one exists for this site.
   projectId                String?
+  /// Clients differ in how attendance itself is tracked (e.g. MORTH is offline, NHAI is online) — this
+  /// keeps each category's staff on its own board instead of mixed with the rest.
+  clientCategory           SubStaffClientCategory   @default(OTHER)
   staffName                String
   designation              String
   coOrdinator              String                   @default("")
@@ -1232,6 +1235,13 @@ model SubStaffAssignment {
 enum SubStaffAssignmentStatus {
   ACTIVE
   LEFT
+}
+
+enum SubStaffClientCategory {
+  MORTH
+  NHAI
+  NH_DIVISION
+  OTHER
 }
 
 /// One person's planned attendance days for one assignment in one calendar month — auto-generated from

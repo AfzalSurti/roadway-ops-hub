@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { SubStaffAssignment, SubStaffAssignmentStatus } from "@/lib/domain";
+import type { SubStaffAssignment, SubStaffAssignmentStatus, SubStaffClientCategory } from "@/lib/domain";
 
 export type ProjectOption = { id: string; name: string; projectNumber: string | null };
 
@@ -7,6 +7,7 @@ export type SubStaffFormState = {
   projectId: string;
   siteName: string;
   projectNumber: string;
+  clientCategory: SubStaffClientCategory;
   staffName: string;
   designation: string;
   coOrdinator: string;
@@ -32,6 +33,7 @@ export const emptySubStaffForm: SubStaffFormState = {
   projectId: "",
   siteName: "",
   projectNumber: "",
+  clientCategory: "OTHER",
   staffName: "",
   designation: "",
   coOrdinator: "",
@@ -67,6 +69,7 @@ export function subStaffFormFromEntry(
     projectId: entry.projectId || "",
     siteName: entry.siteName,
     projectNumber: entry.projectNumber || "",
+    clientCategory: entry.clientCategory,
     staffName: entry.staffName,
     designation: entry.designation,
     coOrdinator: entry.coOrdinator,
@@ -130,6 +133,7 @@ export function subStaffFormToPayload(form: SubStaffFormState) {
     projectId: form.projectId || null,
     siteName: form.siteName.trim(),
     projectNumber: form.projectNumber.trim(),
+    clientCategory: form.clientCategory,
     staffName: form.staffName.trim(),
     designation: form.designation.trim(),
     coOrdinator: form.coOrdinator.trim(),
@@ -392,6 +396,20 @@ export function SubStaffFormFields({
               placeholder="Leave blank if not yet assigned"
               className={textClass}
             />
+          </div>
+          <div>
+            <label className={labelClass}>Client Category</label>
+            <select
+              value={value.clientCategory}
+              disabled={readOnly}
+              onChange={(e) => onChange({ clientCategory: e.target.value as SubStaffClientCategory })}
+              className={textClass}
+            >
+              <option value="MORTH">MORTH</option>
+              <option value="NHAI">NHAI</option>
+              <option value="NH_DIVISION">NH Division</option>
+              <option value="OTHER">Other</option>
+            </select>
           </div>
           <div>
             <label className={labelClass}>Co-Ordinator</label>
