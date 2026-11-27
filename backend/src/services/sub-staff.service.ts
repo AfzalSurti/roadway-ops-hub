@@ -674,17 +674,7 @@ export const subStaffService = {
   async confirmPlanDay(assignmentId: string, year: number, month: number, confirmed: boolean) {
     const assignment = await subStaffRepository.findById(assignmentId);
     if (!assignment) throw notFound("Assignment not found");
-    const existing = assignment.inputPlans.find((p) => p.year === year && p.month === month);
-    await subStaffRepository.upsertPlan(
-      assignmentId,
-      year,
-      month,
-      {
-        plannedDaysConstruction: existing?.plannedDaysConstruction ?? 0,
-        plannedDaysDlp: existing?.plannedDaysDlp ?? 0
-      },
-      !confirmed
-    );
+    await subStaffRepository.confirmPlan(assignmentId, year, month, confirmed);
     return this.getPlanGrid(year, month);
   },
 
@@ -699,39 +689,14 @@ export const subStaffService = {
     ]);
     if (!fromProject || !toProject) throw notFound("One of the selected projects was not found");
 
-    const result = await subStaffRepository.reassignProject(
-      fromProjectId,
-      fromProject.name,
-      toProjectId,
-      toProject.name
-    );
-
-    // Only ever remove the duplicate automatically once nothing real anywhere else in the app (Billing,
-    // Financial, Letters, …) still depends on it — otherwise its onDelete: Cascade relations would wipe
-    // out real records this tool never touched or even looked at.
-    const otherReferences = await projectRepository.countOtherReferences(fromProjectId);
-    let duplicateDeleted = false;
-    let duplicateBlockedReason: string | undefined;
-    if (otherReferences === 0) {
-      await projectRepository.delete(fromProjectId);
-      duplicateDeleted = true;
-    } else {
-      duplicateBlockedReason = `"${fromProject.name}" still has ${otherReferences} other record(s) linked to it elsewhere (Billing, Financial, Letters, …) — not deleted automatically, and the kept project wasn't renamed to avoid a name clash. Clear those first, or delete it from Admin > Projects once they're gone.`;
+    try {
+      return await projectRepository.mergeProjects(fromProjectId, toProjectId, renameTo);
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith("Cannot merge because")) {
+        throw badRequest(error.message);
+      }
+      throw error;
     }
-
-    let toProjectName = toProject.name;
-    if (duplicateDeleted && renameTo?.trim() && renameTo.trim() !== toProject.name) {
-      const renamed = await projectService.update(toProjectId, { name: renameTo.trim() });
-      toProjectName = renamed.name;
-    }
-
-    return {
-      updatedCount: result.count,
-      fromProjectName: fromProject.name,
-      toProjectName,
-      duplicateDeleted,
-      duplicateBlockedReason
-    };
   },
 
   /** Data-cleanup helper: renames a designation across every record that uses it (e.g. fixing "CAD

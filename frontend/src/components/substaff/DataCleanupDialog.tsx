@@ -44,19 +44,18 @@ export function DataCleanupDialog({
       queryClient.invalidateQueries({ queryKey: ["sub-staff-assignments"] }),
       queryClient.invalidateQueries({ queryKey: ["sub-staff-plan"] }),
       queryClient.invalidateQueries({ queryKey: ["sub-staff-clashes"] }),
-      queryClient.invalidateQueries({ queryKey: ["sub-staff-options"] })
+      queryClient.invalidateQueries({ queryKey: ["sub-staff-options"] }),
+      queryClient.invalidateQueries({ queryKey: ["projects"] }),
+      queryClient.invalidateQueries({ queryKey: ["project-billing"] }),
+      queryClient.invalidateQueries({ queryKey: ["financial"] })
     ]);
 
   const reassignMutation = useMutation({
     mutationFn: () => api.bulkReassignSubStaffProject(fromProjectId, toProjectId, renameTo.trim() || undefined),
     onSuccess: async (result) => {
       toast.success(
-        `Moved ${result.updatedCount} record(s) from "${result.fromProjectName}" to "${result.toProjectName}"` +
-          (result.duplicateDeleted ? ` — "${result.fromProjectName}" removed, nothing else referenced it` : "")
+        `Merged ${result.updatedCount} linked record(s) from "${result.fromProjectName}" into "${result.toProjectName}"`
       );
-      if (!result.duplicateDeleted && result.duplicateBlockedReason) {
-        toast.message(result.duplicateBlockedReason);
-      }
       setFromProjectId("");
       setToProjectId("");
       setRenameTo("");
@@ -124,11 +123,10 @@ export function DataCleanupDialog({
               />
             </div>
             <p className="text-xs text-muted-foreground">
-              Moves every Sub-Staff record off the duplicate and onto the real project — its actual
-              values (Total MM, billing, etc.) are never touched, only staff get repointed. If the
-              duplicate ends up with nothing else referencing it anywhere in the app, it's deleted
-              automatically and the rename above (if given) applies cleanly; if something elsewhere still
-              points at it, it's left alone (and not renamed, to avoid a name clash) so nothing is lost.
+              Moves linked Financial, Billing, staff-planning and other project records onto the real
+              project, then removes the duplicate. If both projects have separate Financial plans,
+              requisition forms or DPR overviews, the merge stops and reports the conflict so neither
+              record is lost.
             </p>
             <Button
               type="button"

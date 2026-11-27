@@ -166,3 +166,4 @@ Frontend on Vercel, API on Render, database on Neon — step-by-step in [`docs/D
 - Service-layer tests for finance and expense calculations, plus a CI workflow running lint, type-check and build.
 - Move file uploads to object storage.
 - Baseline a fresh PostgreSQL migration history (`prisma migrate diff` → `migrate resolve --applied`) and switch the Render start command to `prisma migrate deploy`.
+

@@ -32,6 +32,7 @@ import { ClashSolutionDialog } from "@/components/substaff/ClashSolutionDialog";
 import { ReassignmentSuggestionsDialog } from "@/components/substaff/ReassignmentSuggestionsDialog";
 import { DataCleanupDialog } from "@/components/substaff/DataCleanupDialog";
 import { downloadSubStaffImportTemplate } from "@/lib/sub-staff-import";
+import { downloadSiteMonthlyPlanReport } from "@/lib/sub-staff-pdf";
 import { AlertTriangle, Download, FileUp, Loader2, Plus, RefreshCw, Sparkles, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 
@@ -545,13 +546,30 @@ export default function StaffPlanning() {
                         firstColumnLabel="Site"
                         renderFirstColumn={(row) =>
                           row.assignment.siteName ? (
-                            <button
-                              type="button"
-                              className="underline underline-offset-2 hover:text-primary"
-                              onClick={() => setProfileProjectName(row.assignment.siteName)}
-                            >
-                              {row.assignment.siteName}
-                            </button>
+                            <span className="inline-flex items-center gap-2">
+                              <button
+                                type="button"
+                                className="underline underline-offset-2 hover:text-primary"
+                                onClick={() => setProfileProjectName(row.assignment.siteName)}
+                              >
+                                {row.assignment.siteName}
+                              </button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 px-1.5 gap-1 text-[11px]"
+                                title={`Download ${row.assignment.siteName} attendance plan for ${MONTH_NAMES[planMonth - 1]} ${planYear}`}
+                                onClick={() => {
+                                  const siteRows = planByPerson.flat().filter((planRow) =>
+                                    planRow.assignment.siteName.localeCompare(row.assignment.siteName, undefined, { sensitivity: "base" }) === 0
+                                  );
+                                  downloadSiteMonthlyPlanReport(row.assignment.siteName, planYear, planMonth, siteRows);
+                                }}
+                              >
+                                <Download className="h-3 w-3" /> PDF
+                              </Button>
+                            </span>
                           ) : (
                             "—"
                           )

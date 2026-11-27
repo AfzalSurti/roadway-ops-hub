@@ -84,6 +84,14 @@ export const subStaffRepository = {
     });
   },
 
+  confirmPlan(assignmentId: string, year: number, month: number, confirmed: boolean) {
+    return prisma.subStaffInputPlan.upsert({
+      where: { assignmentId_year_month: { assignmentId, year, month } },
+      create: { assignmentId, year, month, autoPlanned: !confirmed },
+      update: { autoPlanned: !confirmed }
+    });
+  },
+
   listPlansForMonth(year: number, month: number) {
     return prisma.subStaffInputPlan.findMany({
       where: { year, month },

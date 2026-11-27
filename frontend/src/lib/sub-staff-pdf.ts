@@ -1,6 +1,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { SubStaffAssignment } from "./domain";
+import type { SubStaffPlanRow } from "./domain";
 
 const PAGE_W = 210;
 const MARGIN = 14;
@@ -139,4 +140,35 @@ export function downloadProjectStaffReport(projectName: string, assignments: Sub
   });
 
   doc.save(`Project-Staff-${sanitizeFilePart(projectName)}.pdf`);
+}
+
+/** Monthly attendance handoff: every designation planned for a site in the selected month. */
+export function downloadSiteMonthlyPlanReport(
+  siteName: string,
+  year: number,
+  month: number,
+  rows: SubStaffPlanRow[]
+) {
+  const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "landscape" });
+  const monthLabel = new Date(year, month - 1, 1).toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+  const totalDays = rows.reduce((sum, row) => sum + row.plannedDaysConstruction + row.plannedDaysDlp, 0);
+  drawHeader(doc, "Site Attendance Plan", `${siteName} — ${monthLabel}`);
+  drawSummaryStrip(doc, `${rows.length} staff designation record(s)   |   Total planned days: ${totalDays.toFixed(1)}`);
+  autoTable(doc, {
+    startY: 40,
+    head: [["Staff Name", "Designation", "Construction Days", "DLP Days", "Total Days", "Confirmed"]],
+    body: rows.map((row) => [
+      row.assignment.staffName,
+      row.assignment.designation || "-",
+      row.plannedDaysConstruction.toFixed(1),
+      row.plannedDaysDlp.toFixed(1),
+      (row.plannedDaysConstruction + row.plannedDaysDlp).toFixed(1),
+      row.autoPlanned ? "No" : "Yes"
+    ]),
+    theme: "grid",
+    margin: { left: MARGIN, right: MARGIN },
+    styles: TABLE_BODY_STYLES,
+    headStyles: TABLE_HEAD_STYLES
+  });
+  doc.save(`Attendance-Plan-${sanitizeFilePart(siteName)}-${year}-${String(month).padStart(2, "0")}.pdf`);
 }
