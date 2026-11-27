@@ -95,6 +95,18 @@ export function StaffProfileDialog({
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["sub-staff-plan", planYear, planMonth] })
   });
 
+  const updateMmMutation = useMutation({
+    mutationFn: ({ assignmentId, field, value }: { assignmentId: string; field: "totalMm" | "usedMm"; value: number }) =>
+      api.updateSubStaffAssignment(assignmentId, { [field]: value }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["sub-staff-profile", staffName] }),
+        queryClient.invalidateQueries({ queryKey: ["sub-staff-plan", planYear, planMonth] }),
+        queryClient.invalidateQueries({ queryKey: ["sub-staff-assignments"] })
+      ]);
+    }
+  });
+
   const normalized = staffName?.trim().toLowerCase();
   const matches = rows.filter((r) => r.staffName.trim().toLowerCase() === normalized);
   const totalMm = matches.reduce((s, r) => s + r.totalMm, 0);
@@ -133,6 +145,7 @@ export function StaffProfileDialog({
             {matches.length} assignment(s) across all sites — Total MM {totalMm.toFixed(2)} · Used{" "}
             {usedMm.toFixed(2)} · Balance {(totalMm - usedMm).toFixed(2)}
             {filtersActive ? " · breakdown below matches your current page filters" : null}
+            {" · click a Total MM or Used MM value below to correct it directly"}
           </DialogDescription>
         </DialogHeader>
         {isLoading ? (
@@ -164,8 +177,36 @@ export function StaffProfileDialog({
                       <td className="p-2">{entry.siteName || "—"}</td>
                       <td className="p-2">{entry.designation || "—"}</td>
                       <td className="p-2 text-right tabular-nums">{money(entry.rate)}</td>
-                      <td className="p-2 text-right tabular-nums">{entry.totalMm.toFixed(2)}</td>
-                      <td className="p-2 text-right tabular-nums">{entry.usedMm.toFixed(2)}</td>
+                      <td className="p-2 text-right">
+                        <input
+                          type="number"
+                          step="0.01"
+                          defaultValue={entry.totalMm}
+                          key={`${entry.id}-totalMm-${entry.totalMm}`}
+                          className="w-20 text-right tabular-nums bg-transparent border border-transparent hover:border-border/50 focus:border-border focus:bg-secondary/40 rounded px-1 py-0.5"
+                          onBlur={(e) => {
+                            const next = Number(e.target.value) || 0;
+                            if (next !== entry.totalMm) {
+                              updateMmMutation.mutate({ assignmentId: entry.id, field: "totalMm", value: next });
+                            }
+                          }}
+                        />
+                      </td>
+                      <td className="p-2 text-right">
+                        <input
+                          type="number"
+                          step="0.01"
+                          defaultValue={entry.usedMm}
+                          key={`${entry.id}-usedMm-${entry.usedMm}`}
+                          className="w-20 text-right tabular-nums bg-transparent border border-transparent hover:border-border/50 focus:border-border focus:bg-secondary/40 rounded px-1 py-0.5"
+                          onBlur={(e) => {
+                            const next = Number(e.target.value) || 0;
+                            if (next !== entry.usedMm) {
+                              updateMmMutation.mutate({ assignmentId: entry.id, field: "usedMm", value: next });
+                            }
+                          }}
+                        />
+                      </td>
                       <td className="p-2 text-right tabular-nums font-medium">
                         {(entry.totalMm - entry.usedMm).toFixed(2)}
                       </td>

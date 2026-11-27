@@ -170,6 +170,14 @@ export type AssignmentMetrics = {
   staffBalanceMmDlp: number;
   suggestedDaysConstruction: number;
   suggestedDaysDlp: number;
+  /** MM contracted for this person, for this phase, beyond what the project's own remaining calendar
+   * time could ever absorb (at the natural 1 MM = 1 month cap) — i.e. MM that can never actually be
+   * billed before the project's time runs out. 0 when the phase still has enough time left. */
+  lossMmConstruction: number;
+  lossMmDlp: number;
+  /** The above, priced at this assignment's own rate — a concrete rupee figure for "unusable" MM. */
+  lossAmountConstruction: number;
+  lossAmountDlp: number;
 };
 
 /**
@@ -200,6 +208,7 @@ export function computeMetrics(
     mmEot: number;
     totalMm: number;
     usedMm: number;
+    rate: number;
   },
   asOf: Date = new Date()
 ): AssignmentMetrics {
@@ -220,13 +229,31 @@ export function computeMetrics(
 
   const mmDlpTotal = (assignment.mmDlp || 0) + (assignment.mmEot || 0);
   const usedMmDlp = Math.max(0, assignment.usedMm - (assignment.mmConstruction || 0));
-  const staffBalanceMmConstruction = round2((assignment.mmConstruction || 0) - assignment.usedMm);
+  const rawStaffBalanceMmConstruction = round2((assignment.mmConstruction || 0) - assignment.usedMm);
   const staffBalanceMmDlp = round2(mmDlpTotal - usedMmDlp);
+  // Once Construction's own calendar time is used up, its MM balance is no longer "live" — whatever's
+  // left (or overspent) there is already folded into the DLP side above, so showing a lingering
+  // negative number here would just be confusing noise.
+  const staffBalanceMmConstruction = remainingConsMonths > 0 ? rawStaffBalanceMmConstruction : 0;
 
+  // A single project can never need more than a 30-day month of attendance — cap the displayed
+  // suggestion at that physical ceiling rather than showing an implausible "110 days/month".
   const suggestedDaysConstruction =
-    remainingConsMonths > 0 ? Math.max(0, round2((staffBalanceMmConstruction / remainingConsMonths) * 30)) : 0;
+    remainingConsMonths > 0
+      ? Math.max(0, Math.min(30, round2((staffBalanceMmConstruction / remainingConsMonths) * 30)))
+      : 0;
   const suggestedDaysDlp =
-    remainingDlpMonths > 0 ? Math.max(0, round2((staffBalanceMmDlp / remainingDlpMonths) * 30)) : 0;
+    remainingDlpMonths > 0 ? Math.max(0, Math.min(30, round2((staffBalanceMmDlp / remainingDlpMonths) * 30))) : 0;
+
+  // If the staff's own contracted MM for a phase is more than the phase's remaining calendar time could
+  // ever absorb (at the natural 1 MM = 1 month cap), that excess can never actually be billed before the
+  // project's time runs out — flagged here as a concrete, priced "loss" rather than just an oversized
+  // suggested-days number.
+  const lossMmConstruction =
+    remainingConsMonths > 0 ? round2(Math.max(0, rawStaffBalanceMmConstruction - remainingConsMonths)) : 0;
+  const lossMmDlp = remainingDlpMonths > 0 ? round2(Math.max(0, staffBalanceMmDlp - remainingDlpMonths)) : 0;
+  const lossAmountConstruction = round2(lossMmConstruction * (assignment.rate || 0));
+  const lossAmountDlp = round2(lossMmDlp * (assignment.rate || 0));
 
   const totalRemainingMonths = round2(remainingConsMonths + remainingDlpMonths);
   let suggestedDaysPerMonth = round2(suggestedDaysConstruction + suggestedDaysDlp);
@@ -249,7 +276,11 @@ export function computeMetrics(
     staffBalanceMmConstruction,
     staffBalanceMmDlp,
     suggestedDaysConstruction,
-    suggestedDaysDlp
+    suggestedDaysDlp,
+    lossMmConstruction,
+    lossMmDlp,
+    lossAmountConstruction,
+    lossAmountDlp
   };
 }
 

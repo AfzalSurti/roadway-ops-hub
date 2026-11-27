@@ -747,6 +747,10 @@ export type SubStaffAssignmentMetrics = {
   staffBalanceMmDlp: number;
   suggestedDaysConstruction: number;
   suggestedDaysDlp: number;
+  lossMmConstruction: number;
+  lossMmDlp: number;
+  lossAmountConstruction: number;
+  lossAmountDlp: number;
 };
 
 export type SubStaffClashReport = {

@@ -5,6 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Wand2 } from "lucide-react";
 import type { SubStaffPlanRow } from "@/lib/domain";
 
+function money(value: number) {
+  return new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(value || 0);
+}
+
 // Mirrors the backend's own FULL_TIME_DESIGNATIONS list (sub-staff.service.ts) — kept in sync by hand
 // since these are a fixed, rarely-changing set of back-office roles, not a live-fetched catalog.
 const FULL_TIME_DESIGNATIONS = new Set(["office manager", "accountant", "accountant cum cashier"]);
@@ -113,6 +117,7 @@ export function SubStaffPlanTable({
               <th className="text-right p-2 font-medium">Project Remaining Months (DLP)</th>
               <th className="text-right p-2 font-medium">Constr. Suggested Days</th>
               <th className="text-right p-2 font-medium">DLP Suggested Days</th>
+              <th className="text-right p-2 font-medium">Potential Loss</th>
               <th className="text-right p-2 font-medium w-28">Contract Planned Days</th>
               <th className="text-right p-2 font-medium w-28">DLP Planned Days</th>
               {budgetScope === "independent" ? <th className="text-left p-2 font-medium">&nbsp;</th> : null}
@@ -138,6 +143,22 @@ export function SubStaffPlanTable({
                   <td className="p-2 text-right tabular-nums">{row.metrics.remainingDlpMonths.toFixed(2)}</td>
                   <td className="p-2 text-right tabular-nums">{row.metrics.suggestedDaysConstruction.toFixed(1)}</td>
                   <td className="p-2 text-right tabular-nums">{row.metrics.suggestedDaysDlp.toFixed(1)}</td>
+                  <td className="p-2 text-right tabular-nums">
+                    {(() => {
+                      const loss = row.metrics.lossAmountConstruction + row.metrics.lossAmountDlp;
+                      const lossMm = row.metrics.lossMmConstruction + row.metrics.lossMmDlp;
+                      return loss > 0 ? (
+                        <Badge
+                          variant="destructive"
+                          title={`${lossMm.toFixed(2)} MM contracted beyond what the remaining time can absorb`}
+                        >
+                          ₹{money(loss)}
+                        </Badge>
+                      ) : (
+                        "—"
+                      );
+                    })()}
+                  </td>
                   <td className="p-2 text-right">
                     <Input
                       type="number"
