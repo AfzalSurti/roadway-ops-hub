@@ -118,7 +118,7 @@ export function SubStaffPlanTable({
               <th className="text-right p-2 font-medium">Constr. Suggested Days</th>
               <th className="text-right p-2 font-medium">DLP Suggested Days</th>
               <th className="text-right p-2 font-medium">Potential Loss</th>
-              <th className="text-right p-2 font-medium w-28">Contract Planned Days</th>
+              <th className="text-right p-2 font-medium w-28">Construction Planned Days</th>
               <th className="text-right p-2 font-medium w-28">DLP Planned Days</th>
               {budgetScope === "independent" ? <th className="text-left p-2 font-medium">&nbsp;</th> : null}
             </tr>

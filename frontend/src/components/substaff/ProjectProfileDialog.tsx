@@ -252,7 +252,7 @@ export function ProjectProfileDialog({
 
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <h4 className="text-sm font-semibold">This month's plan — Contract &amp; DLP planned days</h4>
+                <h4 className="text-sm font-semibold">This month's plan — Construction &amp; DLP planned days</h4>
                 <div className="flex gap-2">
                   <Select value={String(planMonth)} onValueChange={(v) => setPlanMonth(Number(v))}>
                     <SelectTrigger className="w-36 h-8 text-xs">
