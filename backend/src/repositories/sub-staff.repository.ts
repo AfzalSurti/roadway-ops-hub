@@ -89,5 +89,27 @@ export const subStaffRepository = {
       where: { year, month },
       include: { assignment: true }
     });
+  },
+
+  /** Repoints every assignment on the duplicate project (by id, or by a plain-text site name that was
+   * never linked) onto the real/canonical project — used to clean up duplicate Project records created
+   * by name mismatches (e.g. "Nandyal" in Billing vs "MORTH NANDYAL" from the staff register). */
+  reassignProject(fromProjectId: string, fromProjectName: string, toProjectId: string, toProjectName: string) {
+    return prisma.subStaffAssignment.updateMany({
+      where: {
+        OR: [
+          { projectId: fromProjectId },
+          { projectId: null, siteName: { equals: fromProjectName, mode: "insensitive" } }
+        ]
+      },
+      data: { projectId: toProjectId, siteName: toProjectName }
+    });
+  },
+
+  renameDesignation(fromDesignation: string, toDesignation: string) {
+    return prisma.subStaffAssignment.updateMany({
+      where: { designation: { equals: fromDesignation, mode: "insensitive" } },
+      data: { designation: toDesignation }
+    });
   }
 };

@@ -4,7 +4,7 @@ import { projectService } from "./project.service.js";
 import { notFound, badRequest } from "../utils/errors.js";
 import { env } from "../config/env.js";
 import { logger } from "../config/logger.js";
-import type { SubStaffAssignmentStatus, SubStaffClientCategory } from "@prisma/client";
+import type { SubStaffAssignmentStatus, SubStaffClientCategory, SubStaffEotAppliesTo } from "@prisma/client";
 
 type AssignmentFields = {
   siteName?: string;
@@ -19,6 +19,7 @@ type AssignmentFields = {
   constructionPeriodMonths?: number;
   dlpMonths?: number;
   eotMonths?: number;
+  eotAppliesTo?: SubStaffEotAppliesTo;
   totalPeriodMonths?: number;
   startDate?: string | null;
   endDate?: string | null;
@@ -202,6 +203,7 @@ export function computeMetrics(
     constructionPeriodMonths: number;
     dlpMonths: number;
     eotMonths: number;
+    eotAppliesTo: "CONSTRUCTION" | "DLP";
     totalPeriodMonths: number;
     mmConstruction: number;
     mmDlp: number;
@@ -219,17 +221,21 @@ export function computeMetrics(
       ? Math.max(0, monthsBetween(assignment.startDate, assignment.lastBilledDate))
       : 0;
 
-  const constructionPeriodMonths = assignment.constructionPeriodMonths || 0;
-  const dlpWindowMonths = (assignment.dlpMonths || 0) + (assignment.eotMonths || 0);
+  // Extension of Time extends whichever window the contract says — Construction or DLP — instead of
+  // always folding into DLP.
+  const eotOnConstruction = assignment.eotAppliesTo === "CONSTRUCTION";
+  const constructionPeriodMonths = (assignment.constructionPeriodMonths || 0) + (eotOnConstruction ? assignment.eotMonths || 0 : 0);
+  const dlpWindowMonths = (assignment.dlpMonths || 0) + (eotOnConstruction ? 0 : assignment.eotMonths || 0);
 
   const billedConsMonths = Math.min(billedMonthsTotal, constructionPeriodMonths);
   const billedDlpMonths = Math.max(0, billedMonthsTotal - constructionPeriodMonths);
   const remainingConsMonths = round2(constructionPeriodMonths - billedConsMonths);
   const remainingDlpMonths = round2(dlpWindowMonths - billedDlpMonths);
 
-  const mmDlpTotal = (assignment.mmDlp || 0) + (assignment.mmEot || 0);
-  const usedMmDlp = Math.max(0, assignment.usedMm - (assignment.mmConstruction || 0));
-  const rawStaffBalanceMmConstruction = round2((assignment.mmConstruction || 0) - assignment.usedMm);
+  const mmConstructionTotal = (assignment.mmConstruction || 0) + (eotOnConstruction ? assignment.mmEot || 0 : 0);
+  const mmDlpTotal = (assignment.mmDlp || 0) + (eotOnConstruction ? 0 : assignment.mmEot || 0);
+  const usedMmDlp = Math.max(0, assignment.usedMm - mmConstructionTotal);
+  const rawStaffBalanceMmConstruction = round2(mmConstructionTotal - assignment.usedMm);
   const staffBalanceMmDlp = round2(mmDlpTotal - usedMmDlp);
   // Once Construction's own calendar time is used up, its MM balance is no longer "live" — whatever's
   // left (or overspent) there is already folded into the DLP side above, so showing a lingering
@@ -346,6 +352,7 @@ export const subStaffService = {
       lastBilledDate: parseDateField(payload.lastBilledDate) ?? null,
       remark: payload.remark?.trim() || "",
       status: payload.status ?? "ACTIVE",
+      eotAppliesTo: payload.eotAppliesTo ?? "DLP",
       sortOrder,
       ...normalizeNumbers(payload)
     });
@@ -394,6 +401,7 @@ export const subStaffService = {
       staffName: payload.staffName?.trim(),
       designation: payload.designation?.trim(),
       coOrdinator: payload.coOrdinator?.trim(),
+      eotAppliesTo: payload.eotAppliesTo,
       startDate,
       endDate,
       lastBilledMonth: parseDateField(payload.lastBilledMonth),
@@ -658,6 +666,158 @@ export const subStaffService = {
     const plannedDaysDlp = field === "dlp" ? round2(value) : existing?.plannedDaysDlp ?? 0;
     await subStaffRepository.upsertPlan(assignmentId, year, month, { plannedDaysConstruction, plannedDaysDlp }, false);
     return this.getPlanGrid(year, month);
+  },
+
+  /** Locks (or unlocks) a month's plan for one assignment, independent of its day values — a "Confirmed"
+   * checkbox the user ticks once they're happy with the numbers, so a later Generate/Refresh never
+   * silently rewrites it. Internally this is the same autoPlanned flag Generate Plan already respects. */
+  async confirmPlanDay(assignmentId: string, year: number, month: number, confirmed: boolean) {
+    const assignment = await subStaffRepository.findById(assignmentId);
+    if (!assignment) throw notFound("Assignment not found");
+    const existing = assignment.inputPlans.find((p) => p.year === year && p.month === month);
+    await subStaffRepository.upsertPlan(
+      assignmentId,
+      year,
+      month,
+      {
+        plannedDaysConstruction: existing?.plannedDaysConstruction ?? 0,
+        plannedDaysDlp: existing?.plannedDaysDlp ?? 0
+      },
+      !confirmed
+    );
+    return this.getPlanGrid(year, month);
+  },
+
+  /** Data-cleanup helper: repoints every assignment on a duplicate Project record onto the real one and
+   * deletes the now-empty duplicate — for cases like Billing's "Nandyal" vs the staff register's "MORTH
+   * NANDYAL" creating two Project rows for the same real site. */
+  async bulkReassignProject(fromProjectId: string, toProjectId: string) {
+    if (fromProjectId === toProjectId) throw badRequest("Pick two different projects to reassign between.");
+    const [fromProject, toProject] = await Promise.all([
+      projectRepository.findById(fromProjectId),
+      projectRepository.findById(toProjectId)
+    ]);
+    if (!fromProject || !toProject) throw notFound("One of the selected projects was not found");
+
+    const result = await subStaffRepository.reassignProject(
+      fromProjectId,
+      fromProject.name,
+      toProjectId,
+      toProject.name
+    );
+    return { updatedCount: result.count, fromProjectName: fromProject.name, toProjectName: toProject.name };
+  },
+
+  /** Data-cleanup helper: renames a designation across every record that uses it (e.g. fixing "CAD
+   * EXPERT" / "CAD Expert" typed inconsistently during import into one canonical spelling). */
+  async bulkRenameDesignation(fromDesignation: string, toDesignation: string) {
+    const result = await subStaffRepository.renameDesignation(fromDesignation, toDesignation);
+    return { updatedCount: result.count };
+  },
+
+  /** Known ways the register marks an unfilled position — matched loosely since the real data has
+   * several casing variants ("TO BE NAME", "To Be Name", ...). */
+  _isOpenSlotName(staffName: string): boolean {
+    const name = staffName.trim().toLowerCase();
+    return name.includes("to be name") || name.includes("tbd") || name === "vacant";
+  },
+
+  /**
+   * Once a person is fully done with a site (both phases completed), this looks for other ACTIVE
+   * assignments in the same designation that are still unfilled placeholder rows ("TO BE NAME") — so
+   * their next posting can be suggested instead of leaving them idle. When there's more than one
+   * candidate, also asks the AI (if configured) to rank them by remaining time and rate; with 0 or 1
+   * candidates there's nothing to rank, so the AI is skipped entirely to avoid spending a call on it.
+   */
+  async getReassignmentSuggestions(assignmentId: string) {
+    const assignment = await subStaffRepository.findById(assignmentId);
+    if (!assignment) throw notFound("Assignment not found");
+    const asOf = new Date();
+    const metrics = computeMetrics(assignment, asOf);
+    if (metrics.remainingConsMonths > 0 || metrics.remainingDlpMonths > 0) {
+      throw badRequest("This assignment isn't completed yet — reassignment suggestions are for completed ones.");
+    }
+
+    const sameDesignation = await subStaffRepository.list({ status: "ACTIVE", designation: assignment.designation });
+    const openSlots = sameDesignation.filter(
+      (row) =>
+        row.id !== assignmentId &&
+        row.designation.trim().toLowerCase() === assignment.designation.trim().toLowerCase() &&
+        this._isOpenSlotName(row.staffName)
+    );
+
+    const candidates = openSlots.map((row) => ({
+      assignmentId: row.id,
+      siteName: row.siteName,
+      designation: row.designation,
+      rate: row.rate,
+      metrics: computeMetrics(row, asOf)
+    }));
+
+    let recommendation = "";
+    if (candidates.length > 1 && env.OPENROUTER_API_KEY) {
+      const lines = candidates
+        .map(
+          (c, i) =>
+            `${i + 1}. assignmentId=${c.assignmentId} | Project: ${c.siteName} | Rate: ${c.rate}/month | ` +
+            `Remaining Construction Months: ${c.metrics.remainingConsMonths.toFixed(2)} | Remaining DLP Months: ${c.metrics.remainingDlpMonths.toFixed(2)}`
+        )
+        .join("\n");
+      try {
+        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${env.OPENROUTER_API_KEY}` },
+          body: JSON.stringify({
+            model: env.OPENROUTER_MODEL,
+            temperature: 0.2,
+            messages: [
+              {
+                role: "system",
+                content:
+                  "You help an accounts team pick which open (unfilled) position a now-free staff member should move " +
+                  "into next, from a short list of same-designation open slots. Prefer projects ending sooner and worth " +
+                  "more. Reply with one short plain-language paragraph only, no JSON, no lists."
+              },
+              {
+                role: "user",
+                content: `${assignment.staffName} just finished ${assignment.siteName} (${assignment.designation}). Open slots:\n${lines}`
+              }
+            ]
+          })
+        });
+        if (response.ok) {
+          const payload = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
+          recommendation = payload.choices?.[0]?.message?.content ?? "";
+        } else {
+          logger.warn({ status: response.status }, "OpenRouter reassignment-suggestion request failed");
+        }
+      } catch (error) {
+        logger.warn({ err: error }, "OpenRouter reassignment-suggestion unavailable");
+      }
+    }
+
+    return {
+      completedAssignment: { staffName: assignment.staffName, siteName: assignment.siteName, designation: assignment.designation },
+      candidates: candidates.map((c) => ({
+        assignmentId: c.assignmentId,
+        siteName: c.siteName,
+        designation: c.designation,
+        rate: c.rate,
+        remainingConsMonths: c.metrics.remainingConsMonths,
+        remainingDlpMonths: c.metrics.remainingDlpMonths
+      })),
+      recommendation
+    };
+  },
+
+  /** Fills an open "TO BE NAME" slot with a now-free staff member — just renames that placeholder row,
+   * it's still the same assignment/site/designation, just no longer vacant. */
+  async fillOpenSlot(openSlotAssignmentId: string, staffName: string) {
+    if (!staffName.trim()) throw badRequest("Staff name is required");
+    const existing = await subStaffRepository.findById(openSlotAssignmentId);
+    if (!existing) throw notFound("Open slot assignment not found");
+    const updated = await subStaffRepository.update(openSlotAssignmentId, { staffName: staffName.trim() });
+    return serializeAssignment(updated);
   },
 
   /** Planning view: every active assignment with its (possibly not-yet-generated) plan for the month. */

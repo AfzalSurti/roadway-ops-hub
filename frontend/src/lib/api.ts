@@ -58,6 +58,9 @@ import type {
   SubStaffClashReport,
   SubStaffClashSolution,
   SubStaffPlanRow,
+  SubStaffReassignProjectResult,
+  SubStaffRenameDesignationResult,
+  SubStaffReassignmentSuggestions,
   ContractActivityItem,
   PreContractActivityItem,
   ProjectItem,
@@ -1574,6 +1577,38 @@ export const api = {
     return request<SubStaffPlanRow[]>(`/sub-staff/${assignmentId}/plan`, {
       method: "PATCH",
       body: JSON.stringify({ year, month, field, value })
+    });
+  },
+
+  confirmSubStaffPlanDay(assignmentId: string, year: number, month: number, confirmed: boolean) {
+    return request<SubStaffPlanRow[]>(`/sub-staff/${assignmentId}/plan/confirm`, {
+      method: "PATCH",
+      body: JSON.stringify({ year, month, confirmed })
+    });
+  },
+
+  bulkReassignSubStaffProject(fromProjectId: string, toProjectId: string) {
+    return request<SubStaffReassignProjectResult>("/sub-staff/reassign-project", {
+      method: "POST",
+      body: JSON.stringify({ fromProjectId, toProjectId })
+    });
+  },
+
+  bulkRenameSubStaffDesignation(fromDesignation: string, toDesignation: string) {
+    return request<SubStaffRenameDesignationResult>("/sub-staff/rename-designation", {
+      method: "POST",
+      body: JSON.stringify({ fromDesignation, toDesignation })
+    });
+  },
+
+  getSubStaffReassignmentSuggestions(assignmentId: string) {
+    return request<SubStaffReassignmentSuggestions>(`/sub-staff/${assignmentId}/reassignment-suggestions`);
+  },
+
+  fillSubStaffOpenSlot(openSlotAssignmentId: string, staffName: string) {
+    return request<SubStaffAssignment>(`/sub-staff/${openSlotAssignmentId}/fill-open-slot`, {
+      method: "POST",
+      body: JSON.stringify({ staffName })
     });
   },
 

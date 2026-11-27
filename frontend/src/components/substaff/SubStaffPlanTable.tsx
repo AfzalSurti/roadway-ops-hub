@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Wand2 } from "lucide-react";
+import { Search, Wand2 } from "lucide-react";
 import type { SubStaffPlanRow } from "@/lib/domain";
 
 function money(value: number) {
@@ -76,12 +76,20 @@ export function SubStaffPlanTable({
   firstColumnLabel,
   renderFirstColumn,
   onEditPlanDay,
+  onConfirmPlanDay,
+  onFindOpenPositions,
   budgetScope
 }: {
   rows: SubStaffPlanRow[];
   firstColumnLabel: string;
   renderFirstColumn: (row: SubStaffPlanRow) => ReactNode;
   onEditPlanDay: (assignmentId: string, field: "construction" | "dlp", value: number) => void;
+  /** Ticking "Confirmed" locks this row's current numbers so a later Generate/Refresh never silently
+   * rewrites them — optional since the read-only history views don't need it. */
+  onConfirmPlanDay?: (assignmentId: string, confirmed: boolean) => void;
+  /** Shown as a small action once a row is Completed, to look for an unfilled ("TO BE NAME") slot in the
+   * same designation this person could move into next — optional for the same reason. */
+  onFindOpenPositions?: (assignmentId: string) => void;
   /** "person": every row here belongs to the same person, so one "Use Suggested" button can safely
    * rebalance all of them against one real 30-day/month cap. "independent": each row is a different
    * person (e.g. all staff on one project) — there's no safe shared cap to compute here, so each row
@@ -120,12 +128,16 @@ export function SubStaffPlanTable({
               <th className="text-right p-2 font-medium">Potential Loss</th>
               <th className="text-right p-2 font-medium w-28">Construction Planned Days</th>
               <th className="text-right p-2 font-medium w-28">DLP Planned Days</th>
+              {onConfirmPlanDay ? <th className="text-center p-2 font-medium">Confirmed</th> : null}
               {budgetScope === "independent" ? <th className="text-left p-2 font-medium">&nbsp;</th> : null}
             </tr>
           </thead>
           <tbody>
             {rows.map((row) => {
               const completed = row.metrics.remainingConsMonths <= 0 && row.metrics.remainingDlpMonths <= 0;
+              const totalPlanned = row.plannedDaysConstruction + row.plannedDaysDlp;
+              const budgetUsedElsewhere =
+                !completed && row.autoPlanned && row.metrics.suggestedDaysPerMonth > 0 && totalPlanned === 0;
               return (
                 <tr key={row.assignment.id} className="border-b border-border/10 last:border-0">
                   <td className="p-2">
@@ -134,6 +146,24 @@ export function SubStaffPlanTable({
                       <Badge variant="secondary" className="ml-2 align-middle">
                         Completed
                       </Badge>
+                    ) : null}
+                    {completed && onFindOpenPositions ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="gap-1 h-6 px-1.5 ml-1 text-[11px] text-muted-foreground hover:text-foreground"
+                        title="Find an unfilled position in the same designation this person could move into"
+                        onClick={() => onFindOpenPositions(row.assignment.id)}
+                      >
+                        <Search className="h-3 w-3" />
+                        Find open positions
+                      </Button>
+                    ) : null}
+                    {budgetUsedElsewhere ? (
+                      <div className="text-[11px] text-muted-foreground mt-0.5">
+                        Budget used by another project this month
+                      </div>
                     ) : null}
                   </td>
                   <td className="p-2">{row.assignment.designation || "—"}</td>
@@ -148,11 +178,8 @@ export function SubStaffPlanTable({
                       const loss = row.metrics.lossAmountConstruction + row.metrics.lossAmountDlp;
                       const lossMm = row.metrics.lossMmConstruction + row.metrics.lossMmDlp;
                       return loss > 0 ? (
-                        <Badge
-                          variant="destructive"
-                          title={`${lossMm.toFixed(2)} MM contracted beyond what the remaining time can absorb`}
-                        >
-                          ₹{money(loss)}
+                        <Badge variant="destructive" className="whitespace-nowrap">
+                          {lossMm.toFixed(2)} MM · ₹{money(loss)}
                         </Badge>
                       ) : (
                         "—"
@@ -191,6 +218,17 @@ export function SubStaffPlanTable({
                       }}
                     />
                   </td>
+                  {onConfirmPlanDay ? (
+                    <td className="p-2 text-center">
+                      <input
+                        type="checkbox"
+                        checked={!row.autoPlanned}
+                        onChange={(e) => onConfirmPlanDay(row.assignment.id, e.target.checked)}
+                        title="Lock this row so Generate/Refresh never rewrites it"
+                        className="h-4 w-4"
+                      />
+                    </td>
+                  ) : null}
                   {budgetScope === "independent" ? (
                     <td className="p-2">
                       <Button

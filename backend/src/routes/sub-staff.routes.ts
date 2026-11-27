@@ -6,7 +6,10 @@ import { validate } from "../middleware/validate.js";
 import { asyncHandler } from "../utils/async-handler.js";
 import {
   bulkImportSubStaffAssignmentsSchema,
+  bulkReassignProjectSchema,
+  bulkRenameDesignationSchema,
   clashSolutionSchema,
+  confirmPlanDaySchema,
   generatePlanSchema,
   setPlanDaySchema,
   upsertSubStaffAssignmentSchema
@@ -34,5 +37,22 @@ subStaffRouter.post(
 subStaffRouter.get("/plan", asyncHandler(subStaffController.getPlanGrid));
 subStaffRouter.post("/plan/generate", validate(generatePlanSchema), asyncHandler(subStaffController.generatePlan));
 subStaffRouter.patch("/:id/plan", validate(setPlanDaySchema), asyncHandler(subStaffController.setPlanDay));
+subStaffRouter.patch(
+  "/:id/plan/confirm",
+  validate(confirmPlanDaySchema),
+  asyncHandler(subStaffController.confirmPlanDay)
+);
+subStaffRouter.post(
+  "/reassign-project",
+  validate(bulkReassignProjectSchema),
+  asyncHandler(subStaffController.bulkReassignProject)
+);
+subStaffRouter.post(
+  "/rename-designation",
+  validate(bulkRenameDesignationSchema),
+  asyncHandler(subStaffController.bulkRenameDesignation)
+);
+subStaffRouter.get("/:id/reassignment-suggestions", asyncHandler(subStaffController.getReassignmentSuggestions));
+subStaffRouter.post("/:id/fill-open-slot", asyncHandler(subStaffController.fillOpenSlot));
 subStaffRouter.patch("/:id", validate(upsertSubStaffAssignmentSchema), asyncHandler(subStaffController.update));
 subStaffRouter.delete("/:id", asyncHandler(subStaffController.remove));

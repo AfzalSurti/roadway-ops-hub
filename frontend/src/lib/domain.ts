@@ -691,6 +691,9 @@ export type SubStaffAssignmentStatus = "ACTIVE" | "LEFT";
  * gets its own board instead of one mixed list. */
 export type SubStaffClientCategory = "MORTH" | "NHAI" | "NH_DIVISION" | "OTHER";
 
+/** Which window an assignment's Extension of Time actually extends — contract-dependent. */
+export type SubStaffEotAppliesTo = "CONSTRUCTION" | "DLP";
+
 /** One staff member × designation × site row — mirrors the client's "NHAI-Morth" Excel staff register. */
 export type SubStaffAssignment = {
   id: string;
@@ -706,6 +709,7 @@ export type SubStaffAssignment = {
   constructionPeriodMonths: number;
   dlpMonths: number;
   eotMonths: number;
+  eotAppliesTo: SubStaffEotAppliesTo;
   totalPeriodMonths: number;
   startDate: string | null;
   endDate: string | null;
@@ -778,6 +782,22 @@ export type SubStaffPlanRow = {
   plannedDaysConstruction: number;
   plannedDaysDlp: number;
   autoPlanned: boolean;
+};
+
+export type SubStaffReassignProjectResult = { updatedCount: number; fromProjectName: string; toProjectName: string };
+export type SubStaffRenameDesignationResult = { updatedCount: number };
+
+export type SubStaffReassignmentSuggestions = {
+  completedAssignment: { staffName: string; siteName: string; designation: string };
+  candidates: Array<{
+    assignmentId: string;
+    siteName: string;
+    designation: string;
+    rate: number;
+    remainingConsMonths: number;
+    remainingDlpMonths: number;
+  }>;
+  recommendation: string;
 };
 
 export type FinancialProjectBillStatusRow = {

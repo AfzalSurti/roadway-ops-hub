@@ -29,6 +29,8 @@ import { SubStaffPlanTable } from "@/components/substaff/SubStaffPlanTable";
 import { StaffProfileDialog } from "@/components/substaff/StaffProfileDialog";
 import { ProjectProfileDialog } from "@/components/substaff/ProjectProfileDialog";
 import { ClashSolutionDialog } from "@/components/substaff/ClashSolutionDialog";
+import { ReassignmentSuggestionsDialog } from "@/components/substaff/ReassignmentSuggestionsDialog";
+import { DataCleanupDialog } from "@/components/substaff/DataCleanupDialog";
 import { downloadSubStaffImportTemplate } from "@/lib/sub-staff-import";
 import { AlertTriangle, Download, FileUp, Loader2, Plus, RefreshCw, Sparkles, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
@@ -72,6 +74,8 @@ export default function StaffPlanning() {
   const [profileStaffName, setProfileStaffName] = useState<string | null>(null);
   const [profileProjectName, setProfileProjectName] = useState<string | null>(null);
   const [solutionStaffName, setSolutionStaffName] = useState<string | null>(null);
+  const [reassignmentAssignmentId, setReassignmentAssignmentId] = useState<string | null>(null);
+  const [showDataCleanup, setShowDataCleanup] = useState(false);
 
   const now = new Date();
   const [planYear, setPlanYear] = useState(now.getFullYear());
@@ -185,6 +189,15 @@ export default function StaffPlanning() {
       await queryClient.invalidateQueries({ queryKey: ["sub-staff-plan", planYear, planMonth] });
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to update day")
+  });
+
+  const confirmPlanDayMutation = useMutation({
+    mutationFn: ({ assignmentId, confirmed }: { assignmentId: string; confirmed: boolean }) =>
+      api.confirmSubStaffPlanDay(assignmentId, planYear, planMonth, confirmed),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["sub-staff-plan", planYear, planMonth] });
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Failed to update")
   });
 
   function openEdit(entry: SubStaffAssignment) {
@@ -317,6 +330,9 @@ export default function StaffPlanning() {
               <Button size="sm" variant="secondary" className="gap-1.5" onClick={() => setShowImport(true)}>
                 <FileUp className="h-4 w-4" />
                 Import Excel
+              </Button>
+              <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowDataCleanup(true)}>
+                Fix Duplicates
               </Button>
               <Button
                 size="sm"
@@ -543,6 +559,10 @@ export default function StaffPlanning() {
                         onEditPlanDay={(assignmentId, field, value) =>
                           setPlanDayMutation.mutate({ assignmentId, field, value })
                         }
+                        onConfirmPlanDay={(assignmentId, confirmed) =>
+                          confirmPlanDayMutation.mutate({ assignmentId, confirmed })
+                        }
+                        onFindOpenPositions={(assignmentId) => setReassignmentAssignmentId(assignmentId)}
                         budgetScope="person"
                       />
                     </div>
@@ -646,6 +666,16 @@ export default function StaffPlanning() {
         projectOptions={projectOptions}
       />
       <ClashSolutionDialog staffName={solutionStaffName} onClose={() => setSolutionStaffName(null)} />
+      <ReassignmentSuggestionsDialog
+        assignmentId={reassignmentAssignmentId}
+        onClose={() => setReassignmentAssignmentId(null)}
+      />
+      <DataCleanupDialog
+        open={showDataCleanup}
+        onClose={() => setShowDataCleanup(false)}
+        projectOptions={projectOptions}
+        designationOptions={options?.designations ?? []}
+      />
     </PageWrapper>
   );
 }

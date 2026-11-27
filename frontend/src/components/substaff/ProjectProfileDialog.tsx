@@ -104,6 +104,12 @@ export function ProjectProfileDialog({
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["sub-staff-plan", planYear, planMonth] })
   });
 
+  const confirmPlanDayMutation = useMutation({
+    mutationFn: ({ assignmentId, confirmed }: { assignmentId: string; confirmed: boolean }) =>
+      api.confirmSubStaffPlanDay(assignmentId, planYear, planMonth, confirmed),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["sub-staff-plan", planYear, planMonth] })
+  });
+
   const updateMmMutation = useMutation({
     mutationFn: ({ assignmentId, field, value }: { assignmentId: string; field: "totalMm" | "usedMm"; value: number }) =>
       api.updateSubStaffAssignment(assignmentId, { [field]: value }),
@@ -294,6 +300,7 @@ export function ProjectProfileDialog({
                   firstColumnLabel="Staff Name"
                   renderFirstColumn={(row) => row.assignment.staffName}
                   onEditPlanDay={(assignmentId, field, value) => setPlanDayMutation.mutate({ assignmentId, field, value })}
+                  onConfirmPlanDay={(assignmentId, confirmed) => confirmPlanDayMutation.mutate({ assignmentId, confirmed })}
                   budgetScope="independent"
                 />
               )}

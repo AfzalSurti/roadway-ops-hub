@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { SubStaffAssignment, SubStaffAssignmentStatus, SubStaffClientCategory } from "@/lib/domain";
+import type { SubStaffAssignment, SubStaffAssignmentStatus, SubStaffClientCategory, SubStaffEotAppliesTo } from "@/lib/domain";
 
 export type ProjectOption = { id: string; name: string; projectNumber: string | null };
 
@@ -15,6 +15,7 @@ export type SubStaffFormState = {
   constructionPeriodMonths: string;
   dlpMonths: string;
   eotMonths: string;
+  eotAppliesTo: SubStaffEotAppliesTo;
   totalPeriodMonths: string;
   startDate: string;
   endDate: string;
@@ -41,6 +42,7 @@ export const emptySubStaffForm: SubStaffFormState = {
   constructionPeriodMonths: "",
   dlpMonths: "",
   eotMonths: "",
+  eotAppliesTo: "DLP",
   totalPeriodMonths: "",
   startDate: "",
   endDate: "",
@@ -77,6 +79,7 @@ export function subStaffFormFromEntry(
     constructionPeriodMonths: entry.constructionPeriodMonths ? String(entry.constructionPeriodMonths) : "",
     dlpMonths: entry.dlpMonths ? String(entry.dlpMonths) : "",
     eotMonths: entry.eotMonths ? String(entry.eotMonths) : "",
+    eotAppliesTo: entry.eotAppliesTo ?? "DLP",
     totalPeriodMonths: entry.totalPeriodMonths ? String(entry.totalPeriodMonths) : "",
     startDate: toDateInput(entry.startDate),
     endDate: toDateInput(entry.endDate),
@@ -141,6 +144,7 @@ export function subStaffFormToPayload(form: SubStaffFormState) {
     constructionPeriodMonths: Number(form.constructionPeriodMonths) || 0,
     dlpMonths: Number(form.dlpMonths) || 0,
     eotMonths: Number(form.eotMonths) || 0,
+    eotAppliesTo: form.eotAppliesTo,
     totalPeriodMonths: Number(form.totalPeriodMonths) || 0,
     startDate: form.startDate || null,
     endDate: form.endDate || null,
@@ -292,7 +296,7 @@ const FIELD_GROUPS: Array<{
   fields: Array<{
     key: keyof SubStaffFormState;
     label: string;
-    type?: "text" | "date" | "number" | "select";
+    type?: "text" | "date" | "number" | "select" | "eotApplies";
   }>;
 }> = [
   {
@@ -302,6 +306,7 @@ const FIELD_GROUPS: Array<{
       { key: "constructionPeriodMonths", label: "Construction Period (Months)", type: "number" },
       { key: "dlpMonths", label: "DLP (Months)", type: "number" },
       { key: "eotMonths", label: "EOT (Months)", type: "number" },
+      { key: "eotAppliesTo", label: "EOT Extends", type: "eotApplies" },
       { key: "totalPeriodMonths", label: "Total Period (Months, Auto)", type: "number" },
       { key: "endDate", label: "End Date (Auto)", type: "date" },
       { key: "lastBilledMonth", label: "Last Billed Month", type: "date" },
@@ -439,6 +444,16 @@ export function SubStaffFormFields({
                   >
                     <option value="ACTIVE">Active</option>
                     <option value="LEFT">Left</option>
+                  </select>
+                ) : field.type === "eotApplies" ? (
+                  <select
+                    value={value.eotAppliesTo}
+                    disabled={readOnly}
+                    onChange={(e) => onChange({ eotAppliesTo: e.target.value as SubStaffFormState["eotAppliesTo"] })}
+                    className={textClass}
+                  >
+                    <option value="DLP">DLP period</option>
+                    <option value="CONSTRUCTION">Construction period</option>
                   </select>
                 ) : (
                   <input

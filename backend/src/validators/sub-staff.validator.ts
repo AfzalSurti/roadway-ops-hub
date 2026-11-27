@@ -3,6 +3,7 @@ import { z } from "zod";
 const numeric = z.coerce.number().optional();
 const status = z.enum(["ACTIVE", "LEFT"]);
 const clientCategory = z.enum(["MORTH", "NHAI", "NH_DIVISION", "OTHER"]);
+const eotAppliesTo = z.enum(["CONSTRUCTION", "DLP"]);
 
 export const upsertSubStaffAssignmentSchema = z.object({
   siteName: z.string().trim().max(200).optional(),
@@ -16,6 +17,7 @@ export const upsertSubStaffAssignmentSchema = z.object({
   constructionPeriodMonths: numeric,
   dlpMonths: numeric,
   eotMonths: numeric,
+  eotAppliesTo: eotAppliesTo.optional(),
   totalPeriodMonths: numeric,
   startDate: z.string().trim().max(40).nullable().optional(),
   endDate: z.string().trim().max(40).nullable().optional(),
@@ -50,4 +52,20 @@ export const clashSolutionSchema = z.object({
   staffName: z.string().trim().min(1),
   year: z.coerce.number().int().min(2000).max(2100),
   month: z.coerce.number().int().min(1).max(12)
+});
+
+export const confirmPlanDaySchema = z.object({
+  year: z.coerce.number().int().min(2000).max(2100),
+  month: z.coerce.number().int().min(1).max(12),
+  confirmed: z.boolean()
+});
+
+export const bulkReassignProjectSchema = z.object({
+  fromProjectId: z.string().min(1),
+  toProjectId: z.string().min(1)
+});
+
+export const bulkRenameDesignationSchema = z.object({
+  fromDesignation: z.string().trim().min(1),
+  toDesignation: z.string().trim().min(1)
 });

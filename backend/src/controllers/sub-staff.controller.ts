@@ -75,5 +75,35 @@ export const subStaffController = {
       req.body.value
     );
     return sendSuccess(res, result);
+  },
+
+  async confirmPlanDay(req: Request, res: Response) {
+    const result = await subStaffService.confirmPlanDay(
+      req.params.id,
+      req.body.year,
+      req.body.month,
+      req.body.confirmed
+    );
+    return sendSuccess(res, result);
+  },
+
+  async bulkReassignProject(req: Request, res: Response) {
+    const result = await subStaffService.bulkReassignProject(req.body.fromProjectId, req.body.toProjectId);
+    return sendSuccess(res, result);
+  },
+
+  async bulkRenameDesignation(req: Request, res: Response) {
+    const result = await subStaffService.bulkRenameDesignation(req.body.fromDesignation, req.body.toDesignation);
+    return sendSuccess(res, result);
+  },
+
+  async getReassignmentSuggestions(req: Request, res: Response) {
+    const result = await subStaffService.getReassignmentSuggestions(req.params.id);
+    return sendSuccess(res, result);
+  },
+
+  async fillOpenSlot(req: Request, res: Response) {
+    const result = await subStaffService.fillOpenSlot(req.params.id, req.body.staffName);
+    return sendSuccess(res, result);
   }
 };

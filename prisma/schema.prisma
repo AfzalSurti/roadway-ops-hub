@@ -1208,6 +1208,8 @@ model SubStaffAssignment {
   dlpMonths                Float                    @default(0)
   /// Extension of Time — period length, in months, distinct from mmEot (the staffing man-months during it).
   eotMonths                Float                    @default(0)
+  /// Whether the EOT above extends the Construction window or the DLP window — contract-dependent.
+  eotAppliesTo             SubStaffEotAppliesTo     @default(DLP)
   totalPeriodMonths        Float                    @default(0)
   startDate                DateTime?
   /// Defaults to startDate + totalPeriodMonths when left blank, but freely editable afterward.
@@ -1235,6 +1237,11 @@ model SubStaffAssignment {
 enum SubStaffAssignmentStatus {
   ACTIVE
   LEFT
+}
+
+enum SubStaffEotAppliesTo {
+  CONSTRUCTION
+  DLP
 }
 
 enum SubStaffClientCategory {
