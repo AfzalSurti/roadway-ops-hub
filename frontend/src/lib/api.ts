@@ -1587,10 +1587,10 @@ export const api = {
     });
   },
 
-  bulkReassignSubStaffProject(fromProjectId: string, toProjectId: string) {
+  bulkReassignSubStaffProject(fromProjectId: string, toProjectId: string, renameTo?: string) {
     return request<SubStaffReassignProjectResult>("/sub-staff/reassign-project", {
       method: "POST",
-      body: JSON.stringify({ fromProjectId, toProjectId })
+      body: JSON.stringify({ fromProjectId, toProjectId, renameTo })
     });
   },
 

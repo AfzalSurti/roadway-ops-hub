@@ -691,7 +691,7 @@ export const subStaffService = {
   /** Data-cleanup helper: repoints every assignment on a duplicate Project record onto the real one and
    * deletes the now-empty duplicate — for cases like Billing's "Nandyal" vs the staff register's "MORTH
    * NANDYAL" creating two Project rows for the same real site. */
-  async bulkReassignProject(fromProjectId: string, toProjectId: string) {
+  async bulkReassignProject(fromProjectId: string, toProjectId: string, renameTo?: string) {
     if (fromProjectId === toProjectId) throw badRequest("Pick two different projects to reassign between.");
     const [fromProject, toProject] = await Promise.all([
       projectRepository.findById(fromProjectId),
@@ -705,7 +705,33 @@ export const subStaffService = {
       toProjectId,
       toProject.name
     );
-    return { updatedCount: result.count, fromProjectName: fromProject.name, toProjectName: toProject.name };
+
+    // Only ever remove the duplicate automatically once nothing real anywhere else in the app (Billing,
+    // Financial, Letters, …) still depends on it — otherwise its onDelete: Cascade relations would wipe
+    // out real records this tool never touched or even looked at.
+    const otherReferences = await projectRepository.countOtherReferences(fromProjectId);
+    let duplicateDeleted = false;
+    let duplicateBlockedReason: string | undefined;
+    if (otherReferences === 0) {
+      await projectRepository.delete(fromProjectId);
+      duplicateDeleted = true;
+    } else {
+      duplicateBlockedReason = `"${fromProject.name}" still has ${otherReferences} other record(s) linked to it elsewhere (Billing, Financial, Letters, …) — not deleted automatically, and the kept project wasn't renamed to avoid a name clash. Clear those first, or delete it from Admin > Projects once they're gone.`;
+    }
+
+    let toProjectName = toProject.name;
+    if (duplicateDeleted && renameTo?.trim() && renameTo.trim() !== toProject.name) {
+      const renamed = await projectService.update(toProjectId, { name: renameTo.trim() });
+      toProjectName = renamed.name;
+    }
+
+    return {
+      updatedCount: result.count,
+      fromProjectName: fromProject.name,
+      toProjectName,
+      duplicateDeleted,
+      duplicateBlockedReason
+    };
   },
 
   /** Data-cleanup helper: renames a designation across every record that uses it (e.g. fixing "CAD

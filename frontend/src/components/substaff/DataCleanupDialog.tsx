@@ -13,12 +13,13 @@ const labelClass = "text-xs text-muted-foreground mb-1 block";
 
 /**
  * Fixes the duplicate-Project problem that comes from name mismatches between modules — e.g. Billing's
- * project entered as "Nandyal" while the staff register uses "MORTH NANDYAL" creates two separate
+ * project entered as "Adilabad" while the staff register uses "Morth Adilabad" creates two separate
  * Project records for the same real site. This repoints every Sub-Staff assignment from the duplicate
- * onto the real one (it does not touch or delete the duplicate Project record itself — once nothing on
- * this page references it, it can be removed from Admin > Projects directly, with that page's own
- * safeguards). Also fixes designation spelling inconsistencies (e.g. "CAD EXPERT" vs "CAD Expert") the
- * same way, across every record at once.
+ * onto the real one, without touching the real project's own values (Total MM, billing, etc.) — only
+ * removing the duplicate (and applying an optional rename) once it's confirmed nothing else in the app
+ * still references it, so a project with real Billing/Financial data behind it is never silently wiped.
+ * Also fixes designation spelling inconsistencies (e.g. "CAD EXPERT" vs "CAD Expert") the same way,
+ * across every record at once.
  */
 export function DataCleanupDialog({
   open,
@@ -34,6 +35,7 @@ export function DataCleanupDialog({
   const queryClient = useQueryClient();
   const [fromProjectId, setFromProjectId] = useState("");
   const [toProjectId, setToProjectId] = useState("");
+  const [renameTo, setRenameTo] = useState("");
   const [fromDesignation, setFromDesignation] = useState("");
   const [toDesignation, setToDesignation] = useState("");
 
@@ -46,13 +48,18 @@ export function DataCleanupDialog({
     ]);
 
   const reassignMutation = useMutation({
-    mutationFn: () => api.bulkReassignSubStaffProject(fromProjectId, toProjectId),
+    mutationFn: () => api.bulkReassignSubStaffProject(fromProjectId, toProjectId, renameTo.trim() || undefined),
     onSuccess: async (result) => {
       toast.success(
-        `Moved ${result.updatedCount} record(s) from "${result.fromProjectName}" to "${result.toProjectName}"`
+        `Moved ${result.updatedCount} record(s) from "${result.fromProjectName}" to "${result.toProjectName}"` +
+          (result.duplicateDeleted ? ` — "${result.fromProjectName}" removed, nothing else referenced it` : "")
       );
+      if (!result.duplicateDeleted && result.duplicateBlockedReason) {
+        toast.message(result.duplicateBlockedReason);
+      }
       setFromProjectId("");
       setToProjectId("");
+      setRenameTo("");
       await refreshSubStaff();
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Could not reassign the project")
@@ -107,9 +114,21 @@ export function DataCleanupDialog({
                 </select>
               </div>
             </div>
+            <div>
+              <label className={labelClass}>Rename the real project to (optional)</label>
+              <input
+                value={renameTo}
+                onChange={(e) => setRenameTo(e.target.value)}
+                placeholder="Leave blank to keep its current name"
+                className={inputClass}
+              />
+            </div>
             <p className="text-xs text-muted-foreground">
-              Only moves Sub-Staff Planning records — the now-empty duplicate project itself isn't deleted
-              here; remove it from Admin &gt; Projects once nothing references it anymore.
+              Moves every Sub-Staff record off the duplicate and onto the real project — its actual
+              values (Total MM, billing, etc.) are never touched, only staff get repointed. If the
+              duplicate ends up with nothing else referencing it anywhere in the app, it's deleted
+              automatically and the rename above (if given) applies cleanly; if something elsewhere still
+              points at it, it's left alone (and not renamed, to avoid a name clash) so nothing is lost.
             </p>
             <Button
               type="button"

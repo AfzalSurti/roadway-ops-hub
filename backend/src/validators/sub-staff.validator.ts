@@ -62,7 +62,8 @@ export const confirmPlanDaySchema = z.object({
 
 export const bulkReassignProjectSchema = z.object({
   fromProjectId: z.string().min(1),
-  toProjectId: z.string().min(1)
+  toProjectId: z.string().min(1),
+  renameTo: z.string().trim().max(200).optional()
 });
 
 export const bulkRenameDesignationSchema = z.object({

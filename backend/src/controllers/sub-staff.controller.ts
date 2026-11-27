@@ -88,7 +88,11 @@ export const subStaffController = {
   },
 
   async bulkReassignProject(req: Request, res: Response) {
-    const result = await subStaffService.bulkReassignProject(req.body.fromProjectId, req.body.toProjectId);
+    const result = await subStaffService.bulkReassignProject(
+      req.body.fromProjectId,
+      req.body.toProjectId,
+      req.body.renameTo
+    );
     return sendSuccess(res, result);
   },
 

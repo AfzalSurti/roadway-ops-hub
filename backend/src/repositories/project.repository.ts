@@ -63,5 +63,24 @@ export const projectRepository = {
   },
   delete(id: string) {
     return prisma.project.delete({ where: { id } });
+  },
+
+  /** How many records elsewhere in the app (Billing, Financial, Letters, …) still point at this
+   * project — used before an automatic delete, so a duplicate is only ever removed once nothing real
+   * depends on it. Deliberately excludes SubStaffAssignment, whose own reassignment is handled by the
+   * caller first. */
+  async countOtherReferences(projectId: string): Promise<number> {
+    const counts = await Promise.all([
+      prisma.projectAssignment.count({ where: { projectId } }),
+      prisma.infraProjectOtherCost.count({ where: { projectId } }),
+      prisma.projectRequisitionForm.count({ where: { projectId } }),
+      prisma.projectFinancialPlan.count({ where: { projectId } }),
+      prisma.projectDprOverview.count({ where: { projectId } }),
+      prisma.expenseSheet.count({ where: { projectId } }),
+      prisma.projectBillingEntry.count({ where: { projectId } }),
+      prisma.letterProject.count({ where: { linkedProjectId: projectId } }),
+      prisma.contractActivity.count({ where: { linkedProjectId: projectId } })
+    ]);
+    return counts.reduce((sum, c) => sum + c, 0);
   }
 };

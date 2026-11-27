@@ -784,7 +784,13 @@ export type SubStaffPlanRow = {
   autoPlanned: boolean;
 };
 
-export type SubStaffReassignProjectResult = { updatedCount: number; fromProjectName: string; toProjectName: string };
+export type SubStaffReassignProjectResult = {
+  updatedCount: number;
+  fromProjectName: string;
+  toProjectName: string;
+  duplicateDeleted: boolean;
+  duplicateBlockedReason?: string;
+};
 export type SubStaffRenameDesignationResult = { updatedCount: number };
 
 export type SubStaffReassignmentSuggestions = {
